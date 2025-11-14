@@ -14,6 +14,7 @@ export * from './client/useLoans';
 export * from './client/useSales';
 export * from './client/useSalesAnalytics';
 export * from './client/usePersonnel';
+export * from './client/usePersonnelAnalytics';
 export * from './client/useLeasing';
 export * from './client/useVariables';
 export * from './client/useInvestments';
