@@ -9,8 +9,10 @@ export * from './use-toast';
 // Export data hooks
 export * from './client/useUsers';
 export * from './client/useExpenses';
+export * from './client/useExpensesAnalytics';
 export * from './client/useLoans';
 export * from './client/useSales';
+export * from './client/useSalesAnalytics';
 export * from './client/usePersonnel';
 export * from './client/useLeasing';
 export * from './client/useVariables';

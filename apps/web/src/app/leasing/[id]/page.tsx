@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@kit/ui/badge";
 import { Save, X, Trash2, Calendar } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLeasingPaymentById, useUpdateLeasingPayment, useDeleteLeasingPayment } from "@kit/hooks";
+import { useLeasingById, useUpdateLeasing, useDeleteLeasing } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -25,9 +25,9 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const { data: leasing, isLoading } = useLeasingPaymentById(resolvedParams?.id || "");
-  const updateLeasing = useUpdateLeasingPayment();
-  const deleteMutation = useDeleteLeasingPayment();
+  const { data: leasing, isLoading } = useLeasingById(resolvedParams?.id || "");
+  const updateLeasing = useUpdateLeasing();
+  const deleteMutation = useDeleteLeasing();
   
   const [formData, setFormData] = useState({
     name: "",
