@@ -1,12 +1,12 @@
 "use client";
 
-import { Button } from "@smartlogbook/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@smartlogbook/ui/card";
+import { Button } from "@kit/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Clock, ArrowLeft, RefreshCw, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useToast } from "@smartlogbook/hooks";
-import { useAuth } from "@smartlogbook/hooks";
+import { useToast } from "@kit/hooks";
+import { useAuth } from "@kit/hooks";
 
 export default function WaitingApprovalPage() {
   const { checkAccountStatus } = useAuth();
@@ -157,7 +157,7 @@ export default function WaitingApprovalPage() {
           </div>
 
           <div className="text-center text-sm text-muted-foreground border-t pt-4">
-            <p>Need help? Contact support at <span className="font-mono">support@smartlogbook.com</span></p>
+            <p>Need help? Contact support at <span className="font-mono">support@kit.com</span></p>
           </div>
         </CardContent>
       </Card>

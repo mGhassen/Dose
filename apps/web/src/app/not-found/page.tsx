@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@smartlogbook/ui/card";
+import { Card, CardContent } from "@kit/ui/card";
 import { AlertCircle } from "lucide-react";
 
 export default function NotFound() {

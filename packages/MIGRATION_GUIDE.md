@@ -12,9 +12,9 @@ Add dependencies to your app's `package.json`:
 ```json
 {
   "dependencies": {
-    "@smartlogbook/types": "workspace:*",
-    "@smartlogbook/api-client": "workspace:*",
-    "@smartlogbook/api": "workspace:*"
+    "@kit/types": "workspace:*",
+    "@kit/api-client": "workspace:*",
+    "@kit/api": "workspace:*"
   }
 }
 ```
@@ -23,9 +23,9 @@ Add dependencies to your app's `package.json`:
 ```json
 {
   "dependencies": {
-    "@smartlogbook/types": "workspace:*",
-    "@smartlogbook/api-client": "workspace:*",
-    "@smartlogbook/api": "workspace:*"
+    "@kit/types": "workspace:*",
+    "@kit/api-client": "workspace:*",
+    "@kit/api": "workspace:*"
   }
 }
 ```
@@ -39,7 +39,7 @@ Run `pnpm install` to link packages.
 Create `apps/web/src/lib/api/adapters/web.ts`:
 
 ```typescript
-import type { ApiAdapter, HttpMethod, ApiRequestOptions } from '@smartlogbook/api-client';
+import type { ApiAdapter, HttpMethod, ApiRequestOptions } from '@kit/api-client';
 
 export function createWebAdapter(baseUrl?: string): ApiAdapter {
   const API_BASE_URL = baseUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
@@ -82,7 +82,7 @@ export function createWebAdapter(baseUrl?: string): ApiAdapter {
 Create `apps/web/src/lib/api/client.ts`:
 
 ```typescript
-import { ApiClient } from '@smartlogbook/api-client';
+import { ApiClient } from '@kit/api-client';
 import { createWebAdapter } from './adapters/web';
 
 export const apiClient = new ApiClient(createWebAdapter());
@@ -94,7 +94,7 @@ Update `apps/web/src/lib/api/index.ts`:
 
 ```typescript
 import { apiClient } from './client';
-import { createUsersApi, createAuthApi, createObjectsApi } from '@smartlogbook/api';
+import { createUsersApi, createAuthApi, createObjectsApi } from '@kit/api';
 
 export const usersApi = createUsersApi(apiClient);
 export const authApi = createAuthApi(apiClient);
@@ -113,7 +113,7 @@ import { usersApi } from '@/lib/api/users';
 **After:**
 ```typescript
 import { usersApi } from '@/lib/api';
-import type { User } from '@smartlogbook/types';
+import type { User } from '@kit/types';
 ```
 
 ## Mobile App Migration
@@ -126,7 +126,7 @@ Create `apps/mobile/src/lib/api/adapters/mobile.ts`:
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { Platform } from 'react-native';
-import type { ApiAdapter, HttpMethod, ApiRequestOptions } from '@smartlogbook/api-client';
+import type { ApiAdapter, HttpMethod, ApiRequestOptions } from '@kit/api-client';
 
 export function createMobileAdapter(baseUrl?: string): ApiAdapter {
   // Implementation based on your existing mobile-api.ts
@@ -139,7 +139,7 @@ export function createMobileAdapter(baseUrl?: string): ApiAdapter {
 Create `apps/mobile/src/lib/api/client.ts`:
 
 ```typescript
-import { ApiClient } from '@smartlogbook/api-client';
+import { ApiClient } from '@kit/api-client';
 import { createMobileAdapter } from './adapters/mobile';
 
 export const apiClient = new ApiClient(createMobileAdapter());
@@ -151,7 +151,7 @@ Update `apps/mobile/src/lib/api/index.ts`:
 
 ```typescript
 import { apiClient } from './client';
-import { createUsersApi, createAuthApi, createObjectsApi } from '@smartlogbook/api';
+import { createUsersApi, createAuthApi, createObjectsApi } from '@kit/api';
 
 export const usersApi = createUsersApi(apiClient);
 export const authApi = createAuthApi(apiClient);
@@ -178,8 +178,8 @@ export interface Locomotive {
 }
 
 // packages/api/src/locomotives.ts
-import type { ApiClient } from '@smartlogbook/api-client';
-import type { Locomotive } from '@smartlogbook/types';
+import type { ApiClient } from '@kit/api-client';
+import type { Locomotive } from '@kit/types';
 
 export function createLocomotivesApi(client: ApiClient) {
   return {
@@ -194,7 +194,7 @@ export function createLocomotivesApi(client: ApiClient) {
 export { createLocomotivesApi } from './locomotives';
 
 // Now both apps can use it:
-import { createLocomotivesApi } from '@smartlogbook/api';
+import { createLocomotivesApi } from '@kit/api';
 const locomotivesApi = createLocomotivesApi(apiClient);
 ```
 

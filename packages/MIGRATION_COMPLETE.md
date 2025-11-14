@@ -13,7 +13,7 @@ import { useDateFormat } from '@/hooks/use-date-format';
 
 **After:**
 ```typescript
-import { useUsers, useDateFormat } from '@smartlogbook/hooks';
+import { useUsers, useDateFormat } from '@kit/hooks';
 ```
 
 ### Libraries
@@ -25,7 +25,7 @@ import { formatDate } from '@/lib/date';
 
 **After:**
 ```typescript
-import { usersApi, formatDate } from '@smartlogbook/api';
+import { usersApi, formatDate } from '@kit/api';
 ```
 
 ### UI Components
@@ -37,8 +37,8 @@ import { Card } from '@/components/ui/card';
 
 **After:**
 ```typescript
-import { Button } from '@smartlogbook/ui/button';
-import { Card } from '@smartlogbook/ui/card';
+import { Button } from '@kit/ui/button';
+import { Card } from '@kit/ui/card';
 ```
 
 ### Config
@@ -49,7 +49,7 @@ import appConfig from '@/config/app.config';
 
 **After:**
 ```typescript
-import { appConfig } from '@smartlogbook/config';
+import { appConfig } from '@kit/config';
 ```
 
 ### Mocks
@@ -61,7 +61,7 @@ import { worker } from '@/mocks/browser';
 
 **After:**
 ```typescript
-import { mockUsers, worker } from '@smartlogbook/mocks';
+import { mockUsers, worker } from '@kit/mocks';
 ```
 
 ## Files Updated
@@ -75,12 +75,12 @@ import { mockUsers, worker } from '@smartlogbook/mocks';
 ## Package Dependencies
 
 Added to `apps/web/package.json`:
-- `@smartlogbook/config`
-- `@smartlogbook/hooks`
-- `@smartlogbook/api`
-- `@smartlogbook/mocks`
-- `@smartlogbook/types`
-- `@smartlogbook/ui`
+- `@kit/config`
+- `@kit/hooks`
+- `@kit/api`
+- `@kit/mocks`
+- `@kit/types`
+- `@kit/ui`
 
 ## Next Steps
 

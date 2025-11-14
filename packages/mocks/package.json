@@ -1,5 +1,5 @@
 {
-  "name": "@smartlogbook/mocks",
+  "name": "@kit/mocks",
   "version": "0.1.0",
   "description": "Mock Service Worker setup for SmartLogBook",
   "main": "./src/index.ts",
@@ -9,7 +9,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@smartlogbook/lib": "workspace:*",
+    "@kit/lib": "workspace:*",
     "msw": "2.11.5"
   },
   "devDependencies": {

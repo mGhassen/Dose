@@ -10,7 +10,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@smartlogbook/ui/breadcrumb";
+} from "@kit/ui/breadcrumb";
 
 // Function to generate breadcrumb items from pathname
 function generateBreadcrumbs(pathname: string, t: any) {

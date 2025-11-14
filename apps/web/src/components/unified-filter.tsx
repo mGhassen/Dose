@@ -2,29 +2,29 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@smartlogbook/ui/button";
-import { Input } from "@smartlogbook/ui/input";
-import { Label } from "@smartlogbook/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@smartlogbook/ui/card";
-import { Badge } from "@smartlogbook/ui/badge";
-import { Separator } from "@smartlogbook/ui/separator";
+import { Button } from "@kit/ui/button";
+import { Input } from "@kit/ui/input";
+import { Label } from "@kit/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
+import { Badge } from "@kit/ui/badge";
+import { Separator } from "@kit/ui/separator";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@smartlogbook/ui/select";
+} from "@kit/ui/select";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@smartlogbook/ui/popover";
-import { Calendar } from "@smartlogbook/ui/calendar";
+} from "@kit/ui/popover";
+import { Calendar } from "@kit/ui/calendar";
 import { format } from "date-fns";
 import { CalendarIcon, Filter, X, Search, RotateCcw, ChevronDown } from "lucide-react";
-import { cn } from "@smartlogbook/lib/utils";
-import { useDebounce } from "@smartlogbook/hooks";
+import { cn } from "@kit/lib/utils";
+import { useDebounce } from "@kit/hooks";
 
 export interface FilterOption {
   key: string;

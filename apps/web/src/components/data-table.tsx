@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Button } from "@smartlogbook/ui/button";
-import { Input } from "@smartlogbook/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@smartlogbook/ui/select";
-import { Checkbox } from "@smartlogbook/ui/checkbox";
-import { Badge } from "@smartlogbook/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@smartlogbook/ui/card";
+import { Button } from "@kit/ui/button";
+import { Input } from "@kit/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { Checkbox } from "@kit/ui/checkbox";
+import { Badge } from "@kit/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
   DropdownMenuSeparator
-} from "@smartlogbook/ui/dropdown-menu";
+} from "@kit/ui/dropdown-menu";
 import { 
   ChevronDown, 
   ChevronRight, 

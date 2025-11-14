@@ -5,7 +5,7 @@ import { Navbar } from "@/components/navbar";
 import {
   SidebarInset,
   SidebarProvider,
-} from "@smartlogbook/ui/sidebar";
+} from "@kit/ui/sidebar";
 
 export default function UserLayout({
   children,

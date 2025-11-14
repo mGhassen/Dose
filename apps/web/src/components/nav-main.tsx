@@ -8,7 +8,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@smartlogbook/ui/collapsible"
+} from "@kit/ui/collapsible"
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -19,7 +19,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-} from "@smartlogbook/ui/sidebar"
+} from "@kit/ui/sidebar"
 
 import React from "react"
 

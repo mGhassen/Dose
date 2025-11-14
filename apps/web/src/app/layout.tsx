@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
-import { TooltipProvider } from '@smartlogbook/ui/tooltip';
-import { AuthProvider } from '@smartlogbook/hooks/use-auth';
+import { TooltipProvider } from '@kit/ui/tooltip';
+import { AuthProvider } from '@kit/hooks/use-auth';
 import Providers from "./providers";
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';

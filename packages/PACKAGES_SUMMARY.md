@@ -4,7 +4,7 @@ All hooks and libs from the web app have been moved to shared packages for reuse
 
 ## Packages Created
 
-### @smartlogbook/hooks
+### @kit/hooks
 **Location:** `packages/hooks/`
 
 Contains all React hooks:
@@ -17,11 +17,11 @@ Contains all React hooks:
 - **Server hooks:** Prefetch hooks in `server/` directory
 
 **Dependencies:**
-- `@smartlogbook/api` - For API and utilities
-- `@smartlogbook/types` - For types
+- `@kit/api` - For API and utilities
+- `@kit/types` - For types
 - `@tanstack/react-query` - For data fetching
 
-### @smartlogbook/api
+### @kit/api
 **Location:** `packages/lib/`
 
 Contains all utility libraries:
@@ -37,8 +37,8 @@ Contains all utility libraries:
 ## Import Changes
 
 All imports have been updated:
-- `@/lib/...` → `@smartlogbook/api/...`
-- `@/hooks/...` → `@smartlogbook/hooks/...`
+- `@/lib/...` → `@kit/api/...`
+- `@/hooks/...` → `@kit/hooks/...`
 
 ## Platform-Specific Notes
 
@@ -58,14 +58,14 @@ Contains Next.js-specific imports (`next/headers`). This is fine as it's only us
 
 ### In Web App
 ```typescript
-import { useUsers, useObjects } from '@smartlogbook/hooks';
-import { usersApi, formatDate } from '@smartlogbook/api';
+import { useUsers, useObjects } from '@kit/hooks';
+import { usersApi, formatDate } from '@kit/api';
 ```
 
 ### In Mobile App
 ```typescript
-import { useUsers, useObjects } from '@smartlogbook/hooks';
-import { usersApi, formatDate } from '@smartlogbook/api';
+import { useUsers, useObjects } from '@kit/hooks';
+import { usersApi, formatDate } from '@kit/api';
 ```
 
 ## Next Steps

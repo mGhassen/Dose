@@ -9,7 +9,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@smartlogbook/ui/sidebar"
+} from "@kit/ui/sidebar"
 
 export function NavSecondary({
   items,

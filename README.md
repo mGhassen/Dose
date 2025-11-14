@@ -21,20 +21,20 @@ smartlogbook-console/
 
 ## Shared Packages
 
-### @smartlogbook/types
+### @kit/types
 Contains all shared TypeScript types and interfaces used across mobile and web applications.
 
 **Usage:**
 ```typescript
-import type { User, CreateUserData, AuthResponse } from '@smartlogbook/types';
+import type { User, CreateUserData, AuthResponse } from '@kit/types';
 ```
 
-### @smartlogbook/api-client
+### @kit/api-client
 Universal API client that works with platform-specific adapters. Provides a consistent interface for making HTTP requests.
 
 **Usage:**
 ```typescript
-import { ApiClient } from '@smartlogbook/api-client';
+import { ApiClient } from '@kit/api-client';
 import { createWebAdapter } from './adapters/web';
 
 const adapter = createWebAdapter();
@@ -43,13 +43,13 @@ const client = new ApiClient(adapter);
 const users = await client.get('/api/users');
 ```
 
-### @smartlogbook/api
+### @kit/api
 Shared API endpoint definitions. All functions are factories that accept an `ApiClient` instance.
 
 **Usage:**
 ```typescript
-import { ApiClient } from '@smartlogbook/api-client';
-import { createUsersApi, createAuthApi } from '@smartlogbook/api';
+import { ApiClient } from '@kit/api-client';
+import { createUsersApi, createAuthApi } from '@kit/api';
 
 const client = new ApiClient(adapter);
 const usersApi = createUsersApi(client);
@@ -59,18 +59,18 @@ const users = await usersApi.getUsers();
 await authApi.login({ email, password });
 ```
 
-### @smartlogbook/shared
+### @kit/shared
 Shared utilities and constants.
 
 **Usage:**
 ```typescript
-import { buildUrl, normalizeEndpoint } from '@smartlogbook/shared';
+import { buildUrl, normalizeEndpoint } from '@kit/shared';
 ```
 
 ## Adding New Packages
 
 1. Create a new directory under `packages/`
-2. Add a `package.json` with the package name following `@smartlogbook/<name>`
+2. Add a `package.json` with the package name following `@kit/<name>`
 3. Use `workspace:*` for internal dependencies
 4. Update `pnpm-workspace.yaml` if needed (already includes `packages/*`)
 5. Run `pnpm install` to link packages

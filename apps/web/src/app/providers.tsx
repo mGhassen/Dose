@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { getQueryFn } from "@smartlogbook/lib/queryClient";
+import { getQueryFn } from "@kit/lib/queryClient";
 import { MSWProvider } from "@/components/msw-provider";
 import { UserSettingsProvider } from "@/components/user-settings-provider";
 import { ThemeProvider } from "@/components/theme-provider";

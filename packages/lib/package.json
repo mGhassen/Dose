@@ -1,5 +1,5 @@
 {
-  "name": "@smartlogbook/lib",
+  "name": "@kit/lib",
   "version": "0.1.0",
   "description": "API client and utilities for SmartLogBook",
   "main": "./src/index.ts",
@@ -9,6 +9,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.47.10",
     "@tanstack/react-query": "^5.83.0",
     "clsx": "2.1.1",
     "tailwind-merge": "3.3.1"

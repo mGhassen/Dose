@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@smartlogbook/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { Loader2 } from 'lucide-react';
 
 export default function OAuthSuccessPage() {

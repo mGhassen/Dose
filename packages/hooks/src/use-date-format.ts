@@ -7,7 +7,7 @@
  */
 
 import { useMemo } from 'react';
-import { getUserSettings } from '@smartlogbook/lib/user-settings';
+import { getUserSettings } from '@kit/lib/user-settings';
 
 // Helper function to convert date format string to Intl.DateTimeFormat options
 function getDateFormatOptions(format: string, includeTime = false) {

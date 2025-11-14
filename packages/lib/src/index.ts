@@ -19,3 +19,21 @@ export * from './api/users';
 // Don't export authApi from api/auth as it's already exported from api.ts
 // Export other types and interfaces from api/auth
 export type { LoginCredentials, RegisterData, AuthResponse, SessionData } from './api/auth';
+
+// Export financial API modules
+export * from './api/expenses';
+export * from './api/leasing';
+export * from './api/loans';
+export * from './api/variables';
+export * from './api/personnel';
+export * from './api/sales';
+export * from './api/investments';
+export * from './api/cash-flow';
+export * from './api/working-capital';
+export * from './api/profit-loss';
+export * from './api/balance-sheet';
+export * from './api/financial-plan';
+export * from './api/dashboard';
+
+// Export Supabase client
+export * from './supabase';

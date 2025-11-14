@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@smartlogbook/ui/button';
-import { Input } from '@smartlogbook/ui/input';
-import { Label } from '@smartlogbook/ui/label';
-import { Badge } from '@smartlogbook/ui/badge';
-import { RadioGroup, RadioGroupItem } from '@smartlogbook/ui/radio-group';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@smartlogbook/ui/table';
+import { Button } from '@kit/ui/button';
+import { Input } from '@kit/ui/input';
+import { Label } from '@kit/ui/label';
+import { Badge } from '@kit/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@kit/ui/radio-group';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@kit/ui/table';
 import { X, Plus, Edit2, Trash2, Type, CheckSquare, List, Upload, Star, FileText, Image as ImageIcon } from 'lucide-react';
 
 interface ResponseOptionsEditorProps {

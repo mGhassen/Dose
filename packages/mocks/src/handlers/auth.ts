@@ -25,10 +25,10 @@ export const authHandlers = [
     
     // Different passwords for different users (for testing)
     const validPasswords = {
-      'jean.dupont@smartlogbook.com': 'password123',
-      'marie.martin@smartlogbook.com': 'password123',
-      'pierre.durand@smartlogbook.com': 'password123',
-      'admin@smartlogbook.com': 'password123'
+      'jean.dupont@kit.com': 'password123',
+      'marie.martin@kit.com': 'password123',
+      'pierre.durand@kit.com': 'password123',
+      'admin@kit.com': 'password123'
     };
     
     if (password !== validPasswords[email as keyof typeof validPasswords]) {
@@ -347,7 +347,7 @@ export const authHandlers = [
       id: mockData.users.length + 1,
       firstName: 'Google',
       lastName: 'User',
-      email: 'google.user@smartlogbook.com',
+      email: 'google.user@kit.com',
       role: 'conductor' as const,
       department: 'Operations',
       status: 'active' as const,

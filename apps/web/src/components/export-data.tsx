@@ -1,10 +1,10 @@
 "use client";
 
-import { Button } from "@smartlogbook/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@smartlogbook/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@smartlogbook/ui/select";
+import { Button } from "@kit/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { Download, FileSpreadsheet, FileText, FileImage } from "lucide-react";
-import { toast } from "@smartlogbook/hooks";
+import { toast } from "@kit/hooks";
 
 interface ExportDataProps {
   data: any[];

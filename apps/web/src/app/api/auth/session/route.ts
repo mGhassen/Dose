@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { mockUsers } from '@smartlogbook/mocks/data';
+import { mockUsers } from '@kit/mocks/data';
 
 export async function GET(request: NextRequest) {
   const useRealAPI = process.env.MIGRATION_USE_API_AUTH === 'true';

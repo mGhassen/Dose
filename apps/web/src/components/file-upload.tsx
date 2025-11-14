@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Button } from "@smartlogbook/ui/button";
-import { Input } from "@smartlogbook/ui/input";
-import { Progress } from "@smartlogbook/ui/progress";
+import { Button } from "@kit/ui/button";
+import { Input } from "@kit/ui/input";
+import { Progress } from "@kit/ui/progress";
 import { Upload, X, File, FileText, Loader2, Image } from "lucide-react";
-import { toast } from "@smartlogbook/hooks";
-import { cn } from "@smartlogbook/lib/utils";
+import { toast } from "@kit/hooks";
+import { cn } from "@kit/lib/utils";
 
 interface FileUploadProps {
   onUploadComplete: (fileId: number, fileName: string) => void;

@@ -1,13 +1,13 @@
 "use client";
 
-import { Button } from "@smartlogbook/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@smartlogbook/ui/card";
+import { Button } from "@kit/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Mail, Clock, ArrowLeft, RefreshCw, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { useToast } from "@smartlogbook/hooks";
-import { useAuth } from "@smartlogbook/hooks";
+import { useToast } from "@kit/hooks";
+import { useAuth } from "@kit/hooks";
 
 type AccountStatus = 'pending' | 'archived' | 'suspended' | 'active' | 'unknown';
 
@@ -203,12 +203,12 @@ function AccountStatusContent() {
           color: "text-destructive",
           bgColor: "bg-destructive/10",
           instructions: [
-            "1. Contact support at support@smartlogbook.com",
+            "1. Contact support at support@kit.com",
             "2. Provide your account details",
             "3. Wait for support to review your case"
           ],
           actionText: "Contact Support",
-          actionHandler: () => window.open('mailto:support@smartlogbook.com', '_blank')
+          actionHandler: () => window.open('mailto:support@kit.com', '_blank')
         };
       
       default:
@@ -339,7 +339,7 @@ function AccountStatusContent() {
           </div>
 
           <div className="text-center text-sm text-muted-foreground border-t pt-4">
-            <p>Need help? Contact support at <span className="font-mono">support@smartlogbook.com</span></p>
+            <p>Need help? Contact support at <span className="font-mono">support@kit.com</span></p>
           </div>
         </CardContent>
       </Card>

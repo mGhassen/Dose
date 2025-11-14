@@ -1,11 +1,11 @@
-# @smartlogbook/types
+# @kit/types
 
 Shared TypeScript types and interfaces for SmartLogBook.
 
 ## Usage
 
 ```typescript
-import type { User, CreateUserData, AuthResponse } from '@smartlogbook/types';
+import type { User, CreateUserData, AuthResponse } from '@kit/types';
 ```
 
 This package contains all shared types used across mobile and web applications to ensure type consistency.

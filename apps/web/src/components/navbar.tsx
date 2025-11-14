@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@smartlogbook/ui/button";
+import { Button } from "@kit/ui/button";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-} from "@smartlogbook/ui/dropdown-menu";
+} from "@kit/ui/dropdown-menu";
 import { 
   Bell,
   Settings,
@@ -21,7 +21,7 @@ import {
   Sun
 } from "lucide-react";
 import Link from "next/link";
-import { SidebarTrigger } from "@smartlogbook/ui/sidebar";
+import { SidebarTrigger } from "@kit/ui/sidebar";
 import { GlobalSearch } from "@/components/global-search";
 import { useTheme } from "@/components/theme-provider";
 

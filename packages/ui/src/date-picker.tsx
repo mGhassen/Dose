@@ -1,8 +1,8 @@
 import * as React from "react"
 import { CalendarIcon } from "lucide-react"
 import { cn } from "./utils"
-import { Button } from "@smartlogbook/ui/button"
-import { formatDate } from "@smartlogbook/lib/date-format"
+import { Button } from "@kit/ui/button"
+import { formatDate } from "@kit/lib/date-format"
 
 interface DatePickerProps {
   value?: Date

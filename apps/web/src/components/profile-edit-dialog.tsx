@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@smartlogbook/hooks";
-import { Button } from "@smartlogbook/ui/button";
-import { Input } from "@smartlogbook/ui/input";
-import { Label } from "@smartlogbook/ui/label";
-import { Textarea } from "@smartlogbook/ui/textarea";
+import { useAuth } from "@kit/hooks";
+import { Button } from "@kit/ui/button";
+import { Input } from "@kit/ui/input";
+import { Label } from "@kit/ui/label";
+import { Textarea } from "@kit/ui/textarea";
 import { 
   Dialog,
   DialogContent,
@@ -13,16 +13,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@smartlogbook/ui/dialog";
+} from "@kit/ui/dialog";
 import { 
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@smartlogbook/ui/select";
-import { useToast } from "@smartlogbook/hooks";
-import { User } from "@smartlogbook/hooks";
+} from "@kit/ui/select";
+import { useToast } from "@kit/hooks";
+import { User } from "@kit/hooks";
 
 interface ProfileEditDialogProps {
   open: boolean;

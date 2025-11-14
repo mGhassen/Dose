@@ -22,7 +22,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@smartlogbook/ui/sidebar"
+} from "@kit/ui/sidebar"
 import { type LucideIcon } from "lucide-react"
 
 // Icon mapping

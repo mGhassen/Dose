@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Button } from "@smartlogbook/ui/button";
+import { Button } from "@kit/ui/button";
 import { ChevronLeft, ChevronRight, X, ExternalLink } from "lucide-react";
-import { cn } from "@smartlogbook/lib/utils";
+import { cn } from "@kit/lib/utils";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
-} from "@smartlogbook/ui/dialog";
+} from "@kit/ui/dialog";
 
 export interface MediaItem {
   id: number | string;

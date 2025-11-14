@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Badge } from "@smartlogbook/ui/badge";
-import { Button } from "@smartlogbook/ui/button";
+import { Badge } from "@kit/ui/badge";
+import { Button } from "@kit/ui/button";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +10,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@smartlogbook/ui/dropdown-menu";
+} from "@kit/ui/dropdown-menu";
 import { 
   MoreHorizontal,
   Edit,
@@ -26,12 +26,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from 'next-intl';
 import DataTablePage from "@/components/data-table-page";
-import { useUsers, useDeleteUser } from "@smartlogbook/hooks";
+import { useUsers, useDeleteUser } from "@kit/hooks";
 import { RelatedDataLinks, ClickableBadges } from "@/components/related-data-link";
-import { useDateFormat } from '@smartlogbook/hooks/use-date-format';
-import { useEnumValues } from '@smartlogbook/hooks/useMetadataEnums';
-import { User as ApiUser } from "@smartlogbook/lib/api/users";
-import { toast } from '@smartlogbook/hooks/use-toast';
+import { useDateFormat } from '@kit/hooks/use-date-format';
+import { useEnumValues } from '@kit/hooks/useMetadataEnums';
+import { User as ApiUser } from "@kit/lib/api/users";
+import { toast } from '@kit/hooks/use-toast';
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { extractErrorMessage } from "@/shared/error-utils";
 

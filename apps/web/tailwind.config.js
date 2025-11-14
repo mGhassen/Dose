@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-const baseConfig = require('@smartlogbook/ui/tailwind.config.js');
+const baseConfig = require('@kit/ui/tailwind.config.js');
 
 module.exports = {
   ...baseConfig,

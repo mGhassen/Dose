@@ -1,5 +1,5 @@
 {
-  "name": "@smartlogbook/config",
+  "name": "@kit/config",
   "version": "0.1.0",
   "description": "Shared configuration and i18n for SmartLogBook",
   "main": "./src/index.ts",

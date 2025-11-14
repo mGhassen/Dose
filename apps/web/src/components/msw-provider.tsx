@@ -7,7 +7,7 @@ export function MSWProvider({ children }: { children: React.ReactNode }) {
 
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && mswEnabled) {
       (window as any).__MSW_ENABLED__ = true;
-      import('@smartlogbook/mocks/browser')
+      import('@kit/mocks/browser')
         .then(({ worker }) => {
           const startPromise = worker.start({
             onUnhandledRequest: 'bypass',

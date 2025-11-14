@@ -9,9 +9,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@smartlogbook/ui/alert-dialog";
-import { Label } from "@smartlogbook/ui/label";
-import { Input } from "@smartlogbook/ui/input";
+} from "@kit/ui/alert-dialog";
+import { Label } from "@kit/ui/label";
+import { Input } from "@kit/ui/input";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 

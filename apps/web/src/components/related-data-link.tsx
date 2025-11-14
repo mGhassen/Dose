@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { ReactNode } from "react";
-import { cn } from "@smartlogbook/lib/utils";
+import { cn } from "@kit/lib/utils";
 import { ExternalLink } from "lucide-react";
-import { Badge } from "@smartlogbook/ui/badge";
+import { Badge } from "@kit/ui/badge";
 
 interface RelatedDataLinkProps {
   href: string;

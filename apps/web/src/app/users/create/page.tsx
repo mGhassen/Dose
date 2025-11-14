@@ -2,19 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@smartlogbook/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@smartlogbook/ui/card";
-import { Input } from "@smartlogbook/ui/input";
-import { Label } from "@smartlogbook/ui/label";
+import { Button } from "@kit/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { Input } from "@kit/ui/input";
+import { Label } from "@kit/ui/label";
 import { Save, X } from "lucide-react";
 import Link from "next/link";
 import AppLayout from "@/components/app-layout";
 import { UnifiedSelector } from "@/components/unified-selector";
-import { toast } from "@smartlogbook/hooks";
-import { useCreateUser } from "@smartlogbook/hooks";
-import { useMetadataEnum } from "@smartlogbook/hooks";
+import { toast } from "@kit/hooks";
+import { useCreateUser } from "@kit/hooks";
+import { useMetadataEnum } from "@kit/hooks";
 import RelatedDataLink from "@/components/related-data-link";
-import appConfig from '@smartlogbook/config/app.config';
+import appConfig from '@kit/config/app.config';
 
 export default function CreateUserPage() {
   const router = useRouter();

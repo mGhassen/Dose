@@ -1,5 +1,5 @@
 {
-  "name": "@smartlogbook/shared",
+  "name": "@kit/shared",
   "version": "0.1.0",
   "description": "Shared utilities and constants for SmartLogBook",
   "main": "./src/index.ts",

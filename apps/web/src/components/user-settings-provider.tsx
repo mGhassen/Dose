@@ -9,7 +9,7 @@ import {
   updateUserSetting,
   DEFAULT_USER_SETTINGS,
   type UserSettings 
-} from '@smartlogbook/lib/user-settings';
+} from '@kit/lib/user-settings';
 
 interface UserSettingsContextType {
   settings: UserSettings;

@@ -1,22 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button } from "@smartlogbook/ui/button";
+import { Button } from "@kit/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@smartlogbook/ui/card";
-import { Input } from "@smartlogbook/ui/input";
-import { Label } from "@smartlogbook/ui/label";
-import { Alert, AlertDescription } from "@smartlogbook/ui/alert";
-import { Separator } from "@smartlogbook/ui/separator";
+} from "@kit/ui/card";
+import { Input } from "@kit/ui/input";
+import { Label } from "@kit/ui/label";
+import { Alert, AlertDescription } from "@kit/ui/alert";
+import { Separator } from "@kit/ui/separator";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, Loader2, CheckCircle } from "lucide-react";
-import { useToast } from "@smartlogbook/hooks";
-import { useAuth } from "@smartlogbook/hooks";
+import { useToast } from "@kit/hooks";
+import { useAuth } from "@kit/hooks";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -259,7 +259,7 @@ export default function LoginPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handlePrefilledLogin("admin@smartlogbook.com", "password123")}
+                    onClick={() => handlePrefilledLogin("admin@kit.com", "password123")}
                     disabled={isLoading}
                     className="text-xs"
                   >
@@ -275,7 +275,7 @@ export default function LoginPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handlePrefilledLogin("marie.martin@smartlogbook.com", "password123")}
+                    onClick={() => handlePrefilledLogin("marie.martin@kit.com", "password123")}
                     disabled={isLoading}
                     className="text-xs"
                   >
@@ -291,7 +291,7 @@ export default function LoginPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handlePrefilledLogin("jean.dupont@smartlogbook.com", "password123")}
+                    onClick={() => handlePrefilledLogin("jean.dupont@kit.com", "password123")}
                     disabled={isLoading}
                     className="text-xs"
                   >

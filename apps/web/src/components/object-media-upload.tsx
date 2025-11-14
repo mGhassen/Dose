@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Button } from "@smartlogbook/ui/button";
-import { Input } from "@smartlogbook/ui/input";
-import { Textarea } from "@smartlogbook/ui/textarea";
-import { Label } from "@smartlogbook/ui/label";
+import { Button } from "@kit/ui/button";
+import { Input } from "@kit/ui/input";
+import { Textarea } from "@kit/ui/textarea";
+import { Label } from "@kit/ui/label";
 import { Upload, X, File, FileText, Image } from "lucide-react";
-import { cn } from "@smartlogbook/lib/utils";
-import { MediaDTO } from "@smartlogbook/lib/api/objects";
+import { cn } from "@kit/lib/utils";
+import { MediaDTO } from "@kit/lib/api/objects";
 
 interface MediaItem {
   id: string | number; // Use string for new files, number for existing

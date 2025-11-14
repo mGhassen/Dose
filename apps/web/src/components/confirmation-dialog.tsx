@@ -9,7 +9,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@smartlogbook/ui/alert-dialog";
+} from "@kit/ui/alert-dialog";
 import { Loader2 } from "lucide-react";
 
 interface ConfirmationDialogProps {

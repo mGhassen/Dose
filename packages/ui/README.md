@@ -1,4 +1,4 @@
-# @smartlogbook/ui
+# @kit/ui
 
 Shared UI components and Tailwind CSS configuration for SmartLogBook.
 
@@ -8,14 +8,14 @@ Shared UI components and Tailwind CSS configuration for SmartLogBook.
 
 Components can be imported individually:
 ```typescript
-import { Button } from '@smartlogbook/ui/button';
-import { Card } from '@smartlogbook/ui/card';
-import { cn } from '@smartlogbook/ui/utils';
+import { Button } from '@kit/ui/button';
+import { Card } from '@kit/ui/card';
+import { cn } from '@kit/ui/utils';
 ```
 
 Or from the main export:
 ```typescript
-import { Button, Card } from '@smartlogbook/ui';
+import { Button, Card } from '@kit/ui';
 ```
 
 ### Using Tailwind Config
@@ -23,7 +23,7 @@ import { Button, Card } from '@smartlogbook/ui';
 In your app's `tailwind.config.js`:
 
 ```js
-const baseConfig = require('@smartlogbook/ui/tailwind.config.js');
+const baseConfig = require('@kit/ui/tailwind.config.js');
 
 module.exports = {
   ...baseConfig,
@@ -39,7 +39,7 @@ module.exports = {
 Or extend it:
 
 ```js
-const baseConfig = require('@smartlogbook/ui/tailwind.config.js');
+const baseConfig = require('@kit/ui/tailwind.config.js');
 
 module.exports = {
   ...baseConfig,

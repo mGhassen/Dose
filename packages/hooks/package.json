@@ -1,5 +1,5 @@
 {
-  "name": "@smartlogbook/hooks",
+  "name": "@kit/hooks",
   "version": "0.1.0",
   "description": "Shared React hooks for SmartLogBook",
   "main": "./src/index.ts",
@@ -9,8 +9,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@smartlogbook/lib": "workspace:*",
-    "@smartlogbook/types": "workspace:*",
+    "@kit/lib": "workspace:*",
+    "@kit/types": "workspace:*",
     "@tanstack/react-query": "^5.83.0",
     "react": "^19.1.0"
   },

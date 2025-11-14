@@ -4,8 +4,8 @@ import React, { useState, useEffect, createContext, useContext, ReactNode } from
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 // import { useLocale } from 'next-intl';
-import { authApi, RegisterData, LoginCredentials, AuthResponse } from '@smartlogbook/lib/api/auth';
-import { safeLocalStorage } from '@smartlogbook/lib/localStorage';
+import { authApi, RegisterData, LoginCredentials, AuthResponse } from '@kit/lib/api/auth';
+import { safeLocalStorage } from '@kit/lib/localStorage';
 
 export interface User {
   id: string;

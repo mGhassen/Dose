@@ -16,8 +16,8 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "paths": {
-      "@smartlogbook/lib": ["../lib/src/index.ts"],
-      "@smartlogbook/lib/*": ["../lib/src/*"]
+      "@kit/lib": ["../lib/src/index.ts"],
+      "@kit/lib/*": ["../lib/src/*"]
     }
   },
   "include": ["src/**/*"],

@@ -1,5 +1,5 @@
 {
-  "name": "@smartlogbook/ui",
+  "name": "@kit/ui",
   "private": true,
   "version": "0.1.0",
   "description": "Shared UI components for SmartLogBook",
@@ -9,7 +9,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@smartlogbook/hooks": "workspace:*",
+    "@kit/hooks": "workspace:*",
     "@tailwindcss/typography": "0.5.16",
     "@radix-ui/react-accordion": "1.2.11",
     "@radix-ui/react-alert-dialog": "1.1.14",

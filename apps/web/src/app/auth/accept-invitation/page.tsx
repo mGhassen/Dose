@@ -1,11 +1,11 @@
 "use client";
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Button } from '@smartlogbook/ui/button';
-import { Input } from '@smartlogbook/ui/input';
-import { Label } from '@smartlogbook/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@smartlogbook/ui/card';
-import { Alert, AlertDescription } from '@smartlogbook/ui/alert';
+import { Button } from '@kit/ui/button';
+import { Input } from '@kit/ui/input';
+import { Label } from '@kit/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
+import { Alert, AlertDescription } from '@kit/ui/alert';
 import { Loader2 } from 'lucide-react';
 
 function AcceptInvitationForm() {

@@ -6,7 +6,7 @@ The monorepo is structured to maximize code reuse between web and mobile while m
 
 ## Package Structure
 
-### @smartlogbook/types
+### @kit/types
 **Purpose:** Single source of truth for all shared types
 
 **Contents:**
@@ -20,7 +20,7 @@ The monorepo is structured to maximize code reuse between web and mobile while m
 - API request/response types
 - Shared domain models
 
-### @smartlogbook/api-client
+### @kit/api-client
 **Purpose:** Platform-agnostic HTTP client
 
 **Contents:**
@@ -33,7 +33,7 @@ The monorepo is structured to maximize code reuse between web and mobile while m
 - Handles auth tokens, error handling, URL building
 - Provides methods: `get`, `post`, `put`, `patch`, `delete`
 
-### @smartlogbook/api
+### @kit/api
 **Purpose:** Shared API endpoint definitions
 
 **Contents:**
@@ -46,7 +46,7 @@ The monorepo is structured to maximize code reuse between web and mobile while m
 - Each API module is independent
 - No platform-specific code
 
-### @smartlogbook/shared
+### @kit/shared
 **Purpose:** Shared utilities and constants
 
 **Contents:**
@@ -60,14 +60,14 @@ The monorepo is structured to maximize code reuse between web and mobile while m
 
 ```typescript
 // apps/web/src/lib/api/client.ts
-import { ApiClient } from '@smartlogbook/api-client';
+import { ApiClient } from '@kit/api-client';
 import { createWebAdapter } from './adapters/web';
 
 export const apiClient = new ApiClient(createWebAdapter());
 
 // apps/web/src/lib/api/index.ts
 import { apiClient } from './client';
-import { createUsersApi, createAuthApi } from '@smartlogbook/api';
+import { createUsersApi, createAuthApi } from '@kit/api';
 
 export const usersApi = createUsersApi(apiClient);
 export const authApi = createAuthApi(apiClient);
@@ -77,14 +77,14 @@ export const authApi = createAuthApi(apiClient);
 
 ```typescript
 // apps/mobile/src/lib/api/client.ts
-import { ApiClient } from '@smartlogbook/api-client';
+import { ApiClient } from '@kit/api-client';
 import { createMobileAdapter } from './adapters/mobile';
 
 export const apiClient = new ApiClient(createMobileAdapter());
 
 // apps/mobile/src/lib/api/index.ts
 import { apiClient } from './client';
-import { createUsersApi, createAuthApi } from '@smartlogbook/api';
+import { createUsersApi, createAuthApi } from '@kit/api';
 
 export const usersApi = createUsersApi(apiClient);
 export const authApi = createAuthApi(apiClient);
@@ -104,8 +104,8 @@ export interface Locomotive {
 ### Step 2: Add API Functions
 ```typescript
 // packages/api/src/locomotives.ts
-import type { ApiClient } from '@smartlogbook/api-client';
-import type { Locomotive } from '@smartlogbook/types';
+import type { ApiClient } from '@kit/api-client';
+import type { Locomotive } from '@kit/types';
 
 export function createLocomotivesApi(client: ApiClient) {
   return {
@@ -126,7 +126,7 @@ export { createLocomotivesApi } from './locomotives';
 ### Step 4: Use in Apps
 ```typescript
 // Both apps can now use:
-import { createLocomotivesApi } from '@smartlogbook/api';
+import { createLocomotivesApi } from '@kit/api';
 const locomotivesApi = createLocomotivesApi(apiClient);
 ```
 
@@ -143,8 +143,8 @@ Platform-specific code should stay in apps:
 
 ```
 apps/web ──────┐
-               ├──> @smartlogbook/api ──> @smartlogbook/api-client ──> @smartlogbook/types
-apps/mobile ───┘                        └──> @smartlogbook/shared
+               ├──> @kit/api ──> @kit/api-client ──> @kit/types
+apps/mobile ───┘                        └──> @kit/shared
 ```
 
 ## Benefits

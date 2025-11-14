@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Button } from "@smartlogbook/ui/button";
-import { Badge } from "@smartlogbook/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@smartlogbook/ui/card";
-import { Separator } from "@smartlogbook/ui/separator";
+import { Button } from "@kit/ui/button";
+import { Badge } from "@kit/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
+import { Separator } from "@kit/ui/separator";
 import { 
   Edit, 
   Trash2, 
@@ -16,9 +16,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import AppLayout from "@/components/app-layout";
-import { useUser, useDeleteUser } from "@smartlogbook/hooks";
-import { useDateFormat } from '@smartlogbook/hooks/use-date-format';
-import { useEnumValues } from '@smartlogbook/hooks/useMetadataEnums';
+import { useUser, useDeleteUser } from "@kit/hooks";
+import { useDateFormat } from '@kit/hooks/use-date-format';
+import { useEnumValues } from '@kit/hooks/useMetadataEnums';
 import RelatedDataLink from "@/components/related-data-link";
 
 interface UserDetailsContentProps {

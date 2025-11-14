@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@smartlogbook/hooks";
+import { useAuth } from "@kit/hooks";
 import AdminLayout from "@/components/admin-layout";
 import ManagerLayout from "@/components/manager-layout";
 import UserLayout from "@/components/user-layout";

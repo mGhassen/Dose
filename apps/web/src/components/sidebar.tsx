@@ -25,7 +25,7 @@ import {
 } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { pathsConfig, type MenuItem } from '@smartlogbook/config/paths.config'
+import { pathsConfig, type MenuItem } from '@kit/config/paths.config'
 
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
@@ -38,7 +38,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@smartlogbook/ui/sidebar"
+} from "@kit/ui/sidebar"
 import { type LucideIcon } from "lucide-react"
 
 // Icon mapping

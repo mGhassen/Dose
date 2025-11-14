@@ -3,25 +3,25 @@ import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
 
-import { useIsMobile } from "@smartlogbook/hooks"
+import { useIsMobile } from "@kit/hooks"
 import { cn } from "./utils"
-import { Button } from "@smartlogbook/ui/button"
-import { Input } from "@smartlogbook/ui/input"
-import { Separator } from "@smartlogbook/ui/separator"
+import { Button } from "@kit/ui/button"
+import { Input } from "@kit/ui/input"
+import { Separator } from "@kit/ui/separator"
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@smartlogbook/ui/sheet"
-import { Skeleton } from "@smartlogbook/ui/skeleton"
+} from "@kit/ui/sheet"
+import { Skeleton } from "@kit/ui/skeleton"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@smartlogbook/ui/tooltip"
+} from "@kit/ui/tooltip"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -29,7 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-} from "@smartlogbook/ui/dropdown-menu";
+} from "@kit/ui/dropdown-menu";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { mockUsers } from '@smartlogbook/mocks/data';
+import { mockUsers } from '@kit/mocks/data';
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
       id: mockUsers.length + 1,
       first_name: 'Google',
       last_name: 'User',
-      email: 'google.user@smartlogbook.com',
+      email: 'google.user@kit.com',
       role: 'conductor' as const,
       department: 'Operations',
       status: 'active' as const,

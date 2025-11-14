@@ -1,9 +1,9 @@
 "use client";
 
 import { ReactNode } from "react";
-import { Button } from "@smartlogbook/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@smartlogbook/ui/card";
-import { Badge } from "@smartlogbook/ui/badge";
+import { Button } from "@kit/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { Badge } from "@kit/ui/badge";
 import { Plus, Download, RefreshCw } from "lucide-react";
 import Link from "next/link";
 

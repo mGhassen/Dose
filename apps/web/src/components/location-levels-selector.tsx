@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useLocationLevels, useLocationLevelChildren, LocationLevel } from "@smartlogbook/hooks";
-import { Card, CardContent, CardHeader, CardTitle } from "@smartlogbook/ui/card";
-import { Badge } from "@smartlogbook/ui/badge";
-import { Button } from "@smartlogbook/ui/button";
-import { Input } from "@smartlogbook/ui/input";
+import { useLocationLevels, useLocationLevelChildren, LocationLevel } from "@kit/hooks";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
+import { Badge } from "@kit/ui/badge";
+import { Button } from "@kit/ui/button";
+import { Input } from "@kit/ui/input";
 import { MapPin, ChevronRight, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 

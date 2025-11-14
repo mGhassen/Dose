@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, ReactNode } from "react";
-import { Button } from "@smartlogbook/ui/button";
+import { Button } from "@kit/ui/button";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -10,9 +10,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
-} from "@smartlogbook/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@smartlogbook/ui/popover";
-import { Checkbox } from "@smartlogbook/ui/checkbox";
+} from "@kit/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@kit/ui/popover";
+import { Checkbox } from "@kit/ui/checkbox";
 import { 
   Plus, 
   MoreHorizontal,
@@ -34,9 +34,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from 'next-intl';
 import AppLayout from "@/components/app-layout";
-import DataTable from "@smartlogbook/ui/data-table";
+import DataTable from "@kit/ui/data-table";
 import { UnifiedFilter, FilterOption, FilterState } from "@/components/unified-filter";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@smartlogbook/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 
 interface DataTablePageProps<T> {
   title: string;

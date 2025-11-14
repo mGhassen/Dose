@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@smartlogbook/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@smartlogbook/ui/card";
+import { Button } from "@kit/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { Filter, ChevronDown, ChevronUp } from "lucide-react";
 
 interface FilterToggleProps {

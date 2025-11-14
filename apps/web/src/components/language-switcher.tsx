@@ -2,13 +2,13 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { Button } from '@smartlogbook/ui/button';
+import { Button } from '@kit/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@smartlogbook/ui/dropdown-menu';
+} from '@kit/ui/dropdown-menu';
 import { Globe } from 'lucide-react';
 import { useUserSettings } from './user-settings-provider';
 

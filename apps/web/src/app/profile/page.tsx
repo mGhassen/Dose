@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useAuth } from "@smartlogbook/hooks";
-import { useProfileByUserId } from "@smartlogbook/hooks";
-import { Button } from "@smartlogbook/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@smartlogbook/ui/card";
-import { Badge } from "@smartlogbook/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@smartlogbook/ui/avatar";
-import { Separator } from "@smartlogbook/ui/separator";
+import { useAuth } from "@kit/hooks";
+import { useProfileByUserId } from "@kit/hooks";
+import { Button } from "@kit/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { Badge } from "@kit/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@kit/ui/avatar";
+import { Separator } from "@kit/ui/separator";
 import { 
   Edit, 
   Mail, 
@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { ProfileEditDialog } from "@/components/profile-edit-dialog";
-import { useDateFormat } from "@smartlogbook/hooks/use-date-format";
+import { useDateFormat } from "@kit/hooks/use-date-format";
 
 export default function ProfilePage() {
   const { user, isLoading: authLoading } = useAuth();

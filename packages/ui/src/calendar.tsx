@@ -9,7 +9,7 @@ import {
 import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
 
 import { cn } from "./utils"
-import { Button, buttonVariants } from "@smartlogbook/ui/button"
+import { Button, buttonVariants } from "@kit/ui/button"
 
 function Calendar({
   className,

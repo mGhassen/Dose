@@ -1,9 +1,9 @@
 'use client';
 
-import { Button } from "@smartlogbook/ui/button";
-import { Badge } from "@smartlogbook/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@smartlogbook/ui/card";
-import { Separator } from "@smartlogbook/ui/separator";
+import { Button } from "@kit/ui/button";
+import { Badge } from "@kit/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
+import { Separator } from "@kit/ui/separator";
 import { 
   Edit, 
   Trash2, 
@@ -15,7 +15,7 @@ import {
   XCircle
 } from "lucide-react";
 import Link from "next/link";
-import { useDateFormat } from '@smartlogbook/hooks/use-date-format';
+import { useDateFormat } from '@kit/hooks/use-date-format';
 
 interface QuestionDetailViewProps {
   question: any;

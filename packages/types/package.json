@@ -1,5 +1,5 @@
 {
-  "name": "@smartlogbook/types",
+  "name": "@kit/types",
   "version": "0.1.0",
   "description": "Shared TypeScript types and interfaces for SmartLogBook",
   "main": "./src/index.ts",

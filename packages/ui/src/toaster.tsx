@@ -1,4 +1,4 @@
-import { useToast } from "@smartlogbook/hooks/use-toast"
+import { useToast } from "@kit/hooks/use-toast"
 import {
   Toast,
   ToastClose,
@@ -6,7 +6,7 @@ import {
   ToastProvider,
   ToastTitle,
   ToastViewport,
-} from "@smartlogbook/ui/toast"
+} from "@kit/ui/toast"
 
 export function Toaster() {
   const { toasts } = useToast()

@@ -7,8 +7,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@smartlogbook/ui/select";
-import { Label } from "@smartlogbook/ui/label";
+} from "@kit/ui/select";
+import { Label } from "@kit/ui/label";
 import { Loader2 } from "lucide-react";
 
 interface AsyncSelectOption {

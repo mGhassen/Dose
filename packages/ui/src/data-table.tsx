@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, ReactNode, Fragment } from "react";
-import { Button } from "@smartlogbook/ui/button";
-import { Input } from "@smartlogbook/ui/input";
-import { Checkbox } from "@smartlogbook/ui/checkbox";
-import { Badge } from "@smartlogbook/ui/badge";
+import { Button } from "@kit/ui/button";
+import { Input } from "@kit/ui/input";
+import { Checkbox } from "@kit/ui/checkbox";
+import { Badge } from "@kit/ui/badge";
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
-} from "@smartlogbook/ui/dropdown-menu";
+} from "@kit/ui/dropdown-menu";
 import { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
 import {
@@ -37,7 +37,7 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@smartlogbook/ui/select";
+} from "@kit/ui/select";
 
 interface DataTableProps {
   data: any[];

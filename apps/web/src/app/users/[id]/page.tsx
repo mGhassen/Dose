@@ -1,5 +1,5 @@
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
-import { prefetchUser } from '@smartlogbook/hooks/server/prefetchUsers';
+import { prefetchUser } from '@kit/hooks/server/prefetchUsers';
 import UserDetailsContent from './user-details-content';
 
 interface PageProps {

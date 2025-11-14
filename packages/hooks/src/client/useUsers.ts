@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
-import { usersApi, User, CreateUserData, UpdateUserData } from '@smartlogbook/lib/api/users';
+import { usersApi, User, CreateUserData, UpdateUserData } from '@kit/lib/api/users';
 
 export function useUsers(options?: Omit<UseQueryOptions<User[]>, 'queryKey' | 'queryFn'>) {
   return useQuery({

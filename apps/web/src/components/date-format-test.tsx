@@ -1,9 +1,9 @@
 'use client';
 
-import { useDateFormat } from '@smartlogbook/hooks/use-date-format';
+import { useDateFormat } from '@kit/hooks/use-date-format';
 import { useUserSettings } from '@/components/user-settings-provider';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@smartlogbook/ui/card';
-import { Button } from '@smartlogbook/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
+import { Button } from '@kit/ui/button';
 
 export default function DateFormatTest() {
   const { formatDate, formatDateTime, formatTime } = useDateFormat();

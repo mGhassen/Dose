@@ -1,10 +1,10 @@
 import { format } from "date-fns";
 
-import { useDisclosure } from "@smartlogbook/hooks/use-disclosure";
+import { useDisclosure } from "@kit/hooks/use-disclosure";
 
-import { Button } from "@smartlogbook/ui/button";
-import { SingleCalendar } from "@smartlogbook/ui/single-calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@smartlogbook/ui/popover";
+import { Button } from "@kit/ui/button";
+import { SingleCalendar } from "@kit/ui/single-calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@kit/ui/popover";
 
 import { cn } from "./utils";
 

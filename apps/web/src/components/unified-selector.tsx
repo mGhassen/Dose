@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@smartlogbook/ui/button';
-import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@smartlogbook/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@smartlogbook/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@smartlogbook/ui/select';
-import { Checkbox } from '@smartlogbook/ui/checkbox';
-import { Badge } from '@smartlogbook/ui/badge';
-import { Label } from '@smartlogbook/ui/label';
+import { Button } from '@kit/ui/button';
+import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@kit/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@kit/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@kit/ui/select';
+import { Checkbox } from '@kit/ui/checkbox';
+import { Badge } from '@kit/ui/badge';
+import { Label } from '@kit/ui/label';
 import { Plus, Search, Copy } from 'lucide-react';
 import RelatedDataLink from '@/components/related-data-link';
 

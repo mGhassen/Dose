@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@smartlogbook/ui/button";
+import { Button } from "@kit/ui/button";
 import { 
   Filter,
   ArrowDownUp,

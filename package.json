@@ -17,14 +17,19 @@
     "boilerplate"
   ],
   "scripts": {
-    "dev": "pnpm --filter @sunnybudget/web dev",
-    "build": "pnpm --filter @sunnybudget/web build",
-    "lint": "pnpm --filter @sunnybudget/web lint",
-    "type-check": "pnpm --filter @sunnybudget/web type-check",
-    "type-check:packages": "pnpm --filter @sunnybudget/types type-check && pnpm --filter @sunnybudget/shared type-check && pnpm --filter @sunnybudget/lib type-check",
+    "dev": "pnpm --filter @kit/web dev",
+    "build": "pnpm --filter @kit/web build",
+    "lint": "pnpm --filter @kit/web lint",
+    "type-check": "pnpm --filter @kit/web type-check",
+    "type-check:packages": "pnpm --filter @kit/types type-check && pnpm --filter @kit/shared type-check && pnpm --filter @kit/lib type-check",
     "install:all": "pnpm install",
-    "clean": "pnpm --filter @sunnybudget/web clean",
-    "clean:packages": "pnpm --filter './packages/*' exec -- rm -rf dist"
+    "clean": "pnpm --filter @kit/web clean",
+    "clean:packages": "pnpm --filter './packages/*' exec -- rm -rf dist",
+    "supabase:start": "pnpm --filter @kit/web supabase:start",
+    "supabase:stop": "pnpm --filter @kit/web supabase:stop",
+    "supabase:status": "pnpm --filter @kit/web supabase:status",
+    "supabase:reset": "pnpm --filter @kit/web supabase:reset",
+    "supabase:studio": "pnpm --filter @kit/web supabase:studio"
   },
   "engines": {
     "node": ">=18.0.0",

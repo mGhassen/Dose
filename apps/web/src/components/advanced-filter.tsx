@@ -1,17 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@smartlogbook/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@smartlogbook/ui/card";
-import { Input } from "@smartlogbook/ui/input";
-import { Label } from "@smartlogbook/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@smartlogbook/ui/select";
-import { Calendar } from "@smartlogbook/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@smartlogbook/ui/popover";
-import { Badge } from "@smartlogbook/ui/badge";
+import { Button } from "@kit/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { Input } from "@kit/ui/input";
+import { Label } from "@kit/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { Calendar } from "@kit/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@kit/ui/popover";
+import { Badge } from "@kit/ui/badge";
 import { CalendarIcon, Filter, X, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@smartlogbook/lib/utils";
+import { cn } from "@kit/lib/utils";
 
 interface AdvancedFilterProps {
   onFilterChange: (filters: any) => void;

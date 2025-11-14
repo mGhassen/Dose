@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@smartlogbook/ui/button";
-import { Checkbox } from "@smartlogbook/ui/checkbox";
+import { Button } from "@kit/ui/button";
+import { Checkbox } from "@kit/ui/checkbox";
 import { 
   ChevronDown,
   ExternalLink,

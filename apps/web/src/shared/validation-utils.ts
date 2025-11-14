@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { toast } from "@smartlogbook/hooks/use-toast";
+import { toast } from "@kit/hooks/use-toast";
 
 /**
  * Validates data against a Zod schema and handles errors

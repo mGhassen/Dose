@@ -3,7 +3,7 @@
 import * as React from "react";
 import { DayPicker } from "react-day-picker";
 
-import { buttonVariants } from "@smartlogbook/ui/button";
+import { buttonVariants } from "@kit/ui/button";
 
 import { cn } from "./utils";
 

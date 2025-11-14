@@ -14,7 +14,7 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@smartlogbook/ui/avatar"
+} from "@kit/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,14 +23,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@smartlogbook/ui/dropdown-menu"
+} from "@kit/ui/dropdown-menu"
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@smartlogbook/ui/sidebar"
-import { useAuth } from "@smartlogbook/hooks"
+} from "@kit/ui/sidebar"
+import { useAuth } from "@kit/hooks"
 import LanguageSwitcher from "./language-switcher"
 import Link from "next/link"
 

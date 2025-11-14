@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
-import { makeQueryClient } from '@smartlogbook/lib/queryClient.server';
-import { usersApi } from '@smartlogbook/lib/api/users';
+import { makeQueryClient } from '@kit/lib/queryClient.server';
+import { usersApi } from '@kit/lib/api/users';
 
 export async function prefetchUsers(queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();

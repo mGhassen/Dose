@@ -1,14 +1,14 @@
 'use client';
 
 import { useUserSettings } from '@/components/user-settings-provider';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@smartlogbook/ui/card';
-import { Label } from '@smartlogbook/ui/label';
-import { Switch } from '@smartlogbook/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@smartlogbook/ui/select';
-import { Badge } from '@smartlogbook/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
+import { Label } from '@kit/ui/label';
+import { Switch } from '@kit/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@kit/ui/select';
+import { Badge } from '@kit/ui/badge';
 import { Settings } from 'lucide-react';
 import AppLayout from '@/components/app-layout';
-import { cleanTimezone } from '@smartlogbook/lib/date-format';
+import { cleanTimezone } from '@kit/lib/date-format';
 import DateFormatTest from '@/components/date-format-test';
 
 export default function UserSettingsPage() {

@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@smartlogbook/hooks/use-auth';
-import { Button } from '@smartlogbook/ui/button';
-import { Input } from '@smartlogbook/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@smartlogbook/ui/card';
-import { Alert, AlertDescription } from '@smartlogbook/ui/alert';
-import { useToast } from '@smartlogbook/hooks/use-toast';
+import { useAuth } from '@kit/hooks/use-auth';
+import { Button } from '@kit/ui/button';
+import { Input } from '@kit/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
+import { Alert, AlertDescription } from '@kit/ui/alert';
+import { useToast } from '@kit/hooks/use-toast';
 import { AlertCircle, CheckCircle, Loader2, ArrowLeft, Clock } from 'lucide-react';
 import Link from 'next/link';
 

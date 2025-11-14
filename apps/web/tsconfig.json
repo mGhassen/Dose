@@ -24,12 +24,12 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@smartlogbook/ui/*": ["../../packages/ui/src/*"],
-      "@smartlogbook/hooks/*": ["../../packages/hooks/src/*"],
-      "@smartlogbook/lib/*": ["../../packages/lib/src/*"],
-      "@smartlogbook/config/*": ["../../packages/config/src/*"],
-      "@smartlogbook/mocks/*": ["../../packages/mocks/src/*"],
-      "@smartlogbook/types/*": ["../../packages/types/src/*"]
+      "@kit/ui/*": ["../../packages/ui/src/*"],
+      "@kit/hooks/*": ["../../packages/hooks/src/*"],
+      "@kit/lib/*": ["../../packages/lib/src/*"],
+      "@kit/config/*": ["../../packages/config/src/*"],
+      "@kit/mocks/*": ["../../packages/mocks/src/*"],
+      "@kit/types/*": ["../../packages/types/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/types/**/*.d.ts"],

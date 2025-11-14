@@ -1,4 +1,4 @@
-import { Skeleton } from "@smartlogbook/ui/skeleton";
+import { Skeleton } from "@kit/ui/skeleton";
 
 interface DataTableSkeletonProps {
   rows?: number;

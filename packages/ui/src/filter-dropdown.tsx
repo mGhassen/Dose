@@ -1,12 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { Button } from "@smartlogbook/ui/button"
+import { Button } from "@kit/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@smartlogbook/ui/dropdown-menu"
+} from "@kit/ui/dropdown-menu"
 import { Filter } from "lucide-react"
 
 interface FilterDropdownProps {

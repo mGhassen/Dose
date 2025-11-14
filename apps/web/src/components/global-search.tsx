@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@smartlogbook/ui/command";
-import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@smartlogbook/ui/dialog";
-import { Button } from "@smartlogbook/ui/button";
-import { Badge } from "@smartlogbook/ui/badge";
+import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@kit/ui/command";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@kit/ui/dialog";
+import { Button } from "@kit/ui/button";
+import { Badge } from "@kit/ui/badge";
 import { 
   Search, 
   ListChecks, 
@@ -28,7 +28,7 @@ import {
   FolderTree
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Input } from "@smartlogbook/ui/input";
+import { Input } from "@kit/ui/input";
 import { X } from "lucide-react";
 import { 
   useEvents, 
@@ -48,7 +48,7 @@ import {
   useChecklists,
   useAssetItems,
   useAssetModels
-} from "@smartlogbook/hooks";
+} from "@kit/hooks";
 
 interface SearchItem {
   id: string;

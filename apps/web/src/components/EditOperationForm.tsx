@@ -1,18 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useOperation, useUpdateOperation } from "@smartlogbook/hooks";
-import { useOperationTypes } from "@smartlogbook/hooks";
-import { useProcedures } from "@smartlogbook/hooks";
+import { useOperation, useUpdateOperation } from "@kit/hooks";
+import { useOperationTypes } from "@kit/hooks";
+import { useProcedures } from "@kit/hooks";
 import { useRouter } from 'next/navigation';
-import { Button } from '@smartlogbook/ui/button';
-import { Input } from '@smartlogbook/ui/input';
-import { Label } from '@smartlogbook/ui/label';
-import { Textarea } from '@smartlogbook/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@smartlogbook/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@smartlogbook/ui/card';
+import { Button } from '@kit/ui/button';
+import { Input } from '@kit/ui/input';
+import { Label } from '@kit/ui/label';
+import { Textarea } from '@kit/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@kit/ui/select';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { ArrowLeft } from 'lucide-react';
-import { useToast } from '@smartlogbook/hooks/use-toast';
+import { useToast } from '@kit/hooks/use-toast';
 import { UnifiedSelector } from '@/components/unified-selector';
 
 export default function EditOperationForm({ 

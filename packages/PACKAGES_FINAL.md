@@ -4,7 +4,7 @@ All packages created from existing web app code - nothing new created.
 
 ## Packages Created
 
-### @smartlogbook/config
+### @kit/config
 **Location:** `packages/config/`
 
 Contains all configuration files from `apps/web/src/config/`:
@@ -14,7 +14,7 @@ Contains all configuration files from `apps/web/src/config/`:
 - `i18n.ts` - Internationalization configuration
 - `messages/` - Translation files (en.json, fr.json)
 
-### @smartlogbook/ui
+### @kit/ui
 **Location:** `packages/ui/`
 
 Contains all UI components from `apps/web/src/components/ui/`:
@@ -22,7 +22,7 @@ Contains all UI components from `apps/web/src/components/ui/`:
 - 60+ reusable UI components
 - `utils.ts` - cn() utility for className merging
 
-### @smartlogbook/mocks
+### @kit/mocks
 **Location:** `packages/mocks/`
 
 Contains MSW mock setup from `apps/web/src/mocks/`:
@@ -33,32 +33,32 @@ Contains MSW mock setup from `apps/web/src/mocks/`:
 
 ## Existing Packages
 
-### @smartlogbook/hooks
+### @kit/hooks
 All React hooks from web app
 
-### @smartlogbook/api  
+### @kit/api  
 All utility libraries from web app
 
-### @smartlogbook/types
+### @kit/types
 Shared TypeScript types
 
-### @smartlogbook/shared
+### @kit/shared
 Shared utilities and constants
 
 ## Usage
 
 ```typescript
 // Config
-import { appConfig, authConfig, pathsConfig } from '@smartlogbook/config';
-import { locales, defaultLocale } from '@smartlogbook/config';
+import { appConfig, authConfig, pathsConfig } from '@kit/config';
+import { locales, defaultLocale } from '@kit/config';
 
 // UI Components
-import { Button, Card, Dialog } from '@smartlogbook/ui';
-import { cn } from '@smartlogbook/ui';
+import { Button, Card, Dialog } from '@kit/ui';
+import { cn } from '@kit/ui';
 
 // Mocks
-import { worker, server } from '@smartlogbook/mocks';
-import { mockUsers } from '@smartlogbook/mocks';
+import { worker, server } from '@kit/mocks';
+import { mockUsers } from '@kit/mocks';
 ```
 
 ## Next Steps

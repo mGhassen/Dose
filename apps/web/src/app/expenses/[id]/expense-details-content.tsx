@@ -1,0 +1,211 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { Button } from "@kit/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { Badge } from "@kit/ui/badge";
+import { Edit, Trash2, Calendar } from "lucide-react";
+import AppLayout from "@/components/app-layout";
+import { useExpenseById, useDeleteExpense } from "@kit/hooks";
+import { toast } from "sonner";
+import { formatCurrency } from "@kit/lib/config";
+import { formatDate } from "@kit/lib/date-format";
+import type { ExpenseCategory, ExpenseRecurrence } from "@kit/types";
+
+interface ExpenseDetailsContentProps {
+  expenseId: string;
+}
+
+export default function ExpenseDetailsContent({ expenseId }: ExpenseDetailsContentProps) {
+  const router = useRouter();
+  const { data: expense, isLoading } = useExpenseById(expenseId);
+  const deleteMutation = useDeleteExpense();
+
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this expense? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await deleteMutation.mutateAsync(Number(expenseId));
+      toast.success("Expense deleted successfully");
+      router.push('/expenses');
+    } catch (error) {
+      toast.error("Failed to delete expense");
+      console.error(error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!expense) {
+    return (
+      <AppLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold">Expense Not Found</h1>
+            <p className="text-muted-foreground">The expense you're looking for doesn't exist.</p>
+          </div>
+          <Button onClick={() => router.push('/expenses')}>Back to Expenses</Button>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const categoryLabels: Record<ExpenseCategory, string> = {
+    rent: "Rent",
+    utilities: "Utilities",
+    supplies: "Supplies",
+    marketing: "Marketing",
+    insurance: "Insurance",
+    maintenance: "Maintenance",
+    professional_services: "Professional Services",
+    other: "Other",
+  };
+
+  const recurrenceLabels: Record<ExpenseRecurrence, string> = {
+    one_time: "One Time",
+    monthly: "Monthly",
+    quarterly: "Quarterly",
+    yearly: "Yearly",
+    custom: "Custom",
+  };
+
+  return (
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">{expense.name}</h1>
+            <p className="text-muted-foreground">Expense details and information</p>
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/expenses/${expenseId}/timeline`)}
+            >
+              <Calendar className="mr-2 h-4 w-4" />
+              View Timeline
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/expenses/${expenseId}/edit`)}
+            >
+              <Edit className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </div>
+
+        {/* Details Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Expense Information</CardTitle>
+            <CardDescription>View and manage expense details</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Name */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Name</label>
+                <p className="text-base font-semibold mt-1">{expense.name}</p>
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Category</label>
+                <div className="mt-1">
+                  <Badge variant="outline">
+                    {categoryLabels[expense.category] || expense.category}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Amount</label>
+                <p className="text-base font-semibold mt-1">{formatCurrency(expense.amount)}</p>
+              </div>
+
+              {/* Recurrence */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Recurrence</label>
+                <p className="text-base mt-1">{recurrenceLabels[expense.recurrence] || expense.recurrence}</p>
+              </div>
+
+              {/* Start Date */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Start Date</label>
+                <p className="text-base mt-1">{formatDate(expense.startDate)}</p>
+              </div>
+
+              {/* End Date */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">End Date</label>
+                <p className="text-base mt-1">
+                  {expense.endDate ? formatDate(expense.endDate) : <span className="text-muted-foreground">—</span>}
+                </p>
+              </div>
+
+              {/* Vendor */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Vendor</label>
+                <p className="text-base mt-1">
+                  {expense.vendor || <span className="text-muted-foreground">—</span>}
+                </p>
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Status</label>
+                <div className="mt-1">
+                  <Badge variant={expense.isActive ? "default" : "secondary"}>
+                    {expense.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+
+            {/* Description */}
+            {expense.description && (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Description</label>
+                <p className="text-base mt-1 whitespace-pre-wrap">{expense.description}</p>
+              </div>
+            )}
+
+            {/* Metadata */}
+            <div className="pt-4 border-t">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-muted-foreground">
+                <div>
+                  <span className="font-medium">Created:</span> {formatDate(expense.createdAt)}
+                </div>
+                <div>
+                  <span className="font-medium">Last Updated:</span> {formatDate(expense.updatedAt)}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </AppLayout>
+  );
+}
+
