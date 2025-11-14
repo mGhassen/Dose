@@ -103,6 +103,41 @@ export async function GET(request: NextRequest) {
     const result: PersonnelProjection[] = Object.values(projections)
       .sort((a, b) => a.month.localeCompare(b.month));
 
+    // Save projections to database
+    if (result.length > 0) {
+      // Convert personnel projections to budget projection format
+      // Note: Personnel projections are aggregated by month, so we'll save them without reference_id
+      const budgetProjections = result.map(proj => ({
+        projection_type: 'personnel',
+        reference_id: null,
+        month: proj.month,
+        amount: proj.totalCost,
+        category: null,
+        is_projected: new Date(proj.month + '-01') > new Date(),
+      }));
+      
+      // Delete existing personnel projections for the date range
+      await supabase
+        .from('budget_projections')
+        .delete()
+        .eq('projection_type', 'personnel')
+        .gte('month', startMonth)
+        .lte('month', endMonth);
+      
+      // Insert new projections
+      const { error: saveError } = await supabase
+        .from('budget_projections')
+        .upsert(budgetProjections, {
+          onConflict: 'projection_type,reference_id,month',
+          ignoreDuplicates: false
+        });
+      
+      if (saveError) {
+        console.error('Error saving personnel projections:', saveError);
+        // Continue even if save fails, return projections anyway
+      }
+    }
+
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('Error calculating personnel projections:', error);

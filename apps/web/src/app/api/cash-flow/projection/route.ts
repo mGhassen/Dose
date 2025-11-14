@@ -130,13 +130,23 @@ export async function GET(request: NextRequest) {
     const loanPayments: LoanScheduleEntry[] = (loansResult.data || []).map(transformLoanSchedule);
 
     // Project expenses for the date range
-    const { projectExpense } = await import('@/lib/calculations/expense-projections');
+    const { projectExpense, expenseProjectionsToBudgetProjections } = await import('@/lib/calculations/expense-projections');
     const expenseProjections: Array<{ month: string; amount: number }> = [];
+    const fullExpenseProjections: any[] = [];
     for (const expense of expenses) {
       const projections = projectExpense(expense, startMonth, endMonth);
       for (const proj of projections) {
         expenseProjections.push({ month: proj.month, amount: proj.amount });
+        fullExpenseProjections.push(proj);
       }
+    }
+
+    // Project leasing for the date range
+    const { projectLeasingPaymentsForRange, leasingProjectionsToBudgetProjections } = await import('@/lib/calculations/leasing-timeline');
+    const leasingEntries = projectLeasingPaymentsForRange(leasing, startMonth, endMonth);
+    const leasingProjections: Array<{ month: string; amount: number }> = [];
+    for (const entry of leasingEntries) {
+      leasingProjections.push({ month: entry.month, amount: entry.amount });
     }
 
     // Group by month
@@ -173,38 +183,50 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Leasing
-    for (const lease of leasing) {
-      const leaseStart = new Date(lease.startDate);
-      const leaseEnd = lease.endDate ? new Date(lease.endDate) : null;
-      let current = new Date(Math.max(new Date(startMonth + '-01').getTime(), leaseStart.getTime()));
-      const finalDate = leaseEnd ? new Date(Math.min(end.getTime(), leaseEnd.getTime())) : end;
-
-      while (current <= finalDate) {
-        const month = current.toISOString().slice(0, 7);
-        let shouldInclude = false;
-
-        switch (lease.frequency) {
-          case 'monthly':
-            shouldInclude = true;
-            break;
-          case 'quarterly':
-            const monthNum = current.getMonth();
-            const startMonthNum = leaseStart.getMonth();
-            shouldInclude = (monthNum - startMonthNum) % 3 === 0 && monthNum >= startMonthNum;
-            break;
-          case 'yearly':
-            shouldInclude = current.getMonth() === leaseStart.getMonth();
-            break;
-        }
-
-        if (shouldInclude && monthlyData[month]) {
-          monthlyData[month].cashOutflows += lease.amount;
-        }
-
-        current.setMonth(current.getMonth() + 1);
+    // Leasing (now using projections)
+    for (const proj of leasingProjections) {
+      if (monthlyData[proj.month]) {
+        monthlyData[proj.month].cashOutflows += proj.amount;
       }
     }
+
+    // Save projections to database
+    // Save expense projections
+    if (fullExpenseProjections.length > 0) {
+      const budgetExpenseProjections = expenseProjectionsToBudgetProjections(fullExpenseProjections);
+      await supabase
+        .from('budget_projections')
+        .delete()
+        .eq('projection_type', 'expense')
+        .gte('month', startMonth)
+        .lte('month', endMonth);
+      
+      await supabase
+        .from('budget_projections')
+        .upsert(budgetExpenseProjections, {
+          onConflict: 'projection_type,reference_id,month',
+          ignoreDuplicates: false
+        });
+    }
+
+    // Save leasing projections
+    if (leasingEntries.length > 0) {
+      const budgetLeasingProjections = leasingProjectionsToBudgetProjections(leasingEntries);
+      await supabase
+        .from('budget_projections')
+        .delete()
+        .eq('projection_type', 'leasing')
+        .gte('month', startMonth)
+        .lte('month', endMonth);
+      
+      await supabase
+        .from('budget_projections')
+        .upsert(budgetLeasingProjections, {
+          onConflict: 'projection_type,reference_id,month',
+          ignoreDuplicates: false
+        });
+    }
+
 
     // Personnel
     for (const person of personnel) {

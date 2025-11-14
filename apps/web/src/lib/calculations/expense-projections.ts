@@ -3,10 +3,9 @@
 
 import type { 
   Expense, 
-  ExpenseProjection, 
-  ExpenseRecurrence, 
-  ExpenseCategory 
+  ExpenseProjection
 } from '@kit/types';
+import { ExpenseRecurrence, ExpenseCategory } from '@kit/types';
 
 /**
  * Project a single expense across a date range based on its recurrence pattern
@@ -126,6 +125,29 @@ export function projectExpensesForYear(
   }
 
   return allProjections.sort((a, b) => a.month.localeCompare(b.month));
+}
+
+/**
+ * Convert expense projections to budget projection format for database storage
+ */
+export function expenseProjectionsToBudgetProjections(
+  projections: ExpenseProjection[]
+): Array<{
+  projection_type: string;
+  reference_id: number;
+  month: string;
+  amount: number;
+  category: string;
+  is_projected: boolean;
+}> {
+  return projections.map(proj => ({
+    projection_type: 'expense',
+    reference_id: proj.expenseId,
+    month: proj.month,
+    amount: proj.amount,
+    category: proj.category,
+    is_projected: proj.isProjected,
+  }));
 }
 
 /**

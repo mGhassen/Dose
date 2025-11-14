@@ -267,6 +267,21 @@ export type Database = {
         Insert: Omit<Database['public']['Tables']['financial_plan']['Row'], 'id' | 'total_sources' | 'total_uses' | 'net_financing' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['financial_plan']['Insert']>;
       };
+      budget_projections: {
+        Row: {
+          id: number;
+          projection_type: string;
+          reference_id: number | null;
+          month: string;
+          amount: number;
+          category: string | null;
+          is_projected: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['budget_projections']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['budget_projections']['Insert']>;
+      };
     };
   };
 };

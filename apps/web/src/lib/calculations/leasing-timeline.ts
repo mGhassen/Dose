@@ -1,7 +1,8 @@
 // Leasing Payment Timeline Calculation Service
 // Projects leasing payments over time based on frequency
 
-import type { LeasingPayment, ExpenseRecurrence } from '@kit/types';
+import type { LeasingPayment } from '@kit/types';
+import { ExpenseRecurrence } from '@kit/types';
 
 export interface LeasingTimelineEntry {
   month: string; // YYYY-MM
@@ -121,5 +122,28 @@ export function projectLeasingPaymentsForRange(
   }
 
   return allEntries.sort((a, b) => a.month.localeCompare(b.month));
+}
+
+/**
+ * Convert leasing timeline entries to budget projection format for database storage
+ */
+export function leasingProjectionsToBudgetProjections(
+  entries: LeasingTimelineEntry[]
+): Array<{
+  projection_type: string;
+  reference_id: number;
+  month: string;
+  amount: number;
+  category: string | null;
+  is_projected: boolean;
+}> {
+  return entries.map(entry => ({
+    projection_type: 'leasing',
+    reference_id: entry.leasingId,
+    month: entry.month,
+    amount: entry.amount,
+    category: null,
+    is_projected: entry.isProjected,
+  }));
 }
 

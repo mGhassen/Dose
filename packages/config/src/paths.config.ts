@@ -39,6 +39,78 @@ export const pathsConfig: NavigationConfig = {
       translationKey: "dashboard"
     },
     {
+      title: "expenses",
+      url: "/expenses",
+      icon: "Receipt",
+      translationKey: "expenses"
+    },
+    {
+      title: "sales",
+      url: "/sales",
+      icon: "TrendingUp",
+      translationKey: "sales"
+    },
+    {
+      title: "personnel",
+      url: "/personnel",
+      icon: "Briefcase",
+      translationKey: "personnel"
+    },
+    {
+      title: "loans",
+      url: "/loans",
+      icon: "CreditCard",
+      translationKey: "loans"
+    },
+    {
+      title: "leasing",
+      url: "/leasing",
+      icon: "Building2",
+      translationKey: "leasing"
+    },
+    {
+      title: "investments",
+      url: "/investments",
+      icon: "PiggyBank",
+      translationKey: "investments"
+    },
+    {
+      title: "variables",
+      url: "/variables",
+      icon: "Hash",
+      translationKey: "variables"
+    },
+    {
+      title: "cash-flow",
+      url: "/cash-flow",
+      icon: "Wallet",
+      translationKey: "cashFlow"
+    },
+    {
+      title: "profit-loss",
+      url: "/profit-loss",
+      icon: "BarChart3",
+      translationKey: "profitLoss"
+    },
+    {
+      title: "balance-sheet",
+      url: "/balance-sheet",
+      icon: "FileText",
+      translationKey: "balanceSheet"
+    },
+    {
+      title: "working-capital",
+      url: "/working-capital",
+      icon: "Calculator",
+      translationKey: "workingCapital"
+    },
+    {
+      title: "financial-plan",
+      url: "/financial-plan",
+      icon: "Target",
+      translationKey: "financialPlan"
+    },
+    {
       title: "users",
       url: "/users",
       icon: "Users",

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useProfitLossStatements, useDeleteProfitLoss } from "@kit/hooks";
+import { useProfitLoss, useDeleteProfitLoss } from "@kit/hooks";
 import type { ProfitAndLoss } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 export default function ProfitLossPage() {
   const router = useRouter();
-  const { data: profitLoss, isLoading } = useProfitLossStatements();
+  const { data: profitLoss, isLoading } = useProfitLoss();
   const deleteMutation = useDeleteProfitLoss();
 
   const columns: ColumnDef<ProfitAndLoss>[] = useMemo(() => [

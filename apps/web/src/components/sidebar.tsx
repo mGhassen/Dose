@@ -22,6 +22,17 @@ import {
   Bug,
   Layers,
   Hash,
+  DollarSign,
+  CreditCard,
+  TrendingUp,
+  Building2,
+  Briefcase,
+  PiggyBank,
+  BarChart3,
+  Wallet,
+  Receipt,
+  Calculator,
+  Target,
 } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
@@ -62,6 +73,17 @@ const iconMap = {
   Bug,
   Layers,
   Hash,
+  DollarSign,
+  CreditCard,
+  TrendingUp,
+  Building2,
+  Briefcase,
+  PiggyBank,
+  BarChart3,
+  Wallet,
+  Receipt,
+  Calculator,
+  Target,
 } as const
 
 // Processed menu item type with React component icon

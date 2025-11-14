@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import { projectExpensesForYear, calculateAnnualBudgetSummary } from '@/lib/calculations/expense-projections';
+import { projectExpensesForYear, calculateAnnualBudgetSummary, expenseProjectionsToBudgetProjections } from '@/lib/calculations/expense-projections';
 import type { Expense, ExpenseProjection, ExpenseProjectionSummary } from '@kit/types';
 
 function transformExpense(row: any): Expense {
@@ -70,6 +70,35 @@ export async function GET(request: NextRequest) {
         { error: 'Invalid parameters' },
         { status: 400 }
       );
+    }
+
+    // Save projections to database
+    if (projections.length > 0) {
+      const budgetProjections = expenseProjectionsToBudgetProjections(projections);
+      
+      // Delete existing projections for the date range
+      const deleteStartMonth = year ? `${year}-01` : startMonth!;
+      const deleteEndMonth = year ? `${year}-12` : endMonth!;
+      
+      await supabase
+        .from('budget_projections')
+        .delete()
+        .eq('projection_type', 'expense')
+        .gte('month', deleteStartMonth)
+        .lte('month', deleteEndMonth);
+      
+      // Insert new projections
+      const { error: saveError } = await supabase
+        .from('budget_projections')
+        .upsert(budgetProjections, {
+          onConflict: 'projection_type,reference_id,month',
+          ignoreDuplicates: false
+        });
+      
+      if (saveError) {
+        console.error('Error saving expense projections:', saveError);
+        // Continue even if save fails, return projections anyway
+      }
     }
 
     return NextResponse.json(projections);

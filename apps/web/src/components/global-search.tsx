@@ -5,50 +5,10 @@ import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@kit/ui/dialog";
 import { Button } from "@kit/ui/button";
 import { Badge } from "@kit/ui/badge";
-import { 
-  Search, 
-  ListChecks, 
-  Calendar, 
-  MapPin, 
-  Users, 
-  Settings,
-  FileText,
-  AlertTriangle,
-  Wrench,
-  Building,
-  Package,
-  Tag,
-  ClipboardList,
-  Activity,
-  Code,
-  GitBranch,
-  Layers,
-  Database,
-  Target,
-  FolderTree
-} from "lucide-react";
+import { Search, Users, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Input } from "@kit/ui/input";
-import { X } from "lucide-react";
-import { 
-  useEvents, 
-  useUsers, 
-  useObjects, 
-  useIssues, 
-  useActs,
-  useAllOperations,
-  useProcedures,
-  useAllActions,
-  useAllQuestions,
-  useActionReferences,
-  useActionRefTypes,
-  useOperationTypes,
-  useLocations,
-  useLocationLevels,
-  useChecklists,
-  useAssetItems,
-  useAssetModels
-} from "@kit/hooks";
+import { useUsers } from "@kit/hooks";
 
 interface SearchItem {
   id: string;
@@ -58,192 +18,6 @@ interface SearchItem {
   type: string;
   icon: React.ReactNode;
 }
-
-interface EntityConfig {
-  icon: React.ReactNode;
-  name: string;
-  getTitle: (item: any) => string;
-  getDescription: (item: any) => string;
-  getId: (item: any) => string | number;
-  getUrl: (id: string | number) => string;
-  getData: () => any[] | undefined; // Function to get data from hook
-}
-
-// Create entity configs with data getters
-// Note: ActionTypes is excluded as it's an enum, not a searchable entity
-const createEntityConfigs = (
-  eventsData: any[] | undefined,
-  usersData: any[] | undefined,
-  objectsData: any,
-  issuesData: any[] | undefined,
-  actsData: any[] | undefined,
-  operationsData: any,
-  proceduresData: any,
-  actionsData: any[] | undefined,
-  questionsData: any[] | undefined,
-  actionReferencesData: any,
-  actionRefTypesData: any[] | undefined,
-  operationTypesData: any[] | undefined,
-  locationsData: any,
-  locationLevelsData: any[] | undefined,
-  checklistsData: any[] | undefined,
-  assetItemsData: any[] | undefined,
-  assetModelsData: any[] | undefined
-): Record<string, EntityConfig> => ({
-  events: {
-    icon: <Calendar className="h-4 w-4" />,
-    name: "Events",
-    getTitle: (item) => item.name || item.type || `Event ${item.id}`,
-    getDescription: (item) => item.description || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/events/${id}`,
-    getData: () => eventsData
-  },
-  locations: {
-    icon: <MapPin className="h-4 w-4" />,
-    name: "Locations",
-    getTitle: (item) => item.name || item.code || `Location ${item.id}`,
-    getDescription: (item) => item.description || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/locations/${id}`,
-    getData: () => locationsData?.items || []
-  },
-  locationLevels: {
-    icon: <Layers className="h-4 w-4" />,
-    name: "Location Levels",
-    getTitle: (item) => item.name || `Level ${item.level}` || "",
-    getDescription: (item) => item.description || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/location-levels/${id}`,
-    getData: () => locationLevelsData
-  },
-  users: {
-    icon: <Users className="h-4 w-4" />,
-    name: "Users",
-    getTitle: (item) => `${item.firstName || ""} ${item.lastName || ""}`.trim() || item.email || "",
-    getDescription: (item) => `${item.role || ""} ${item.department || ""}`.trim() || item.email || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/users/${id}`,
-    getData: () => usersData
-  },
-  objects: {
-    icon: <Wrench className="h-4 w-4" />,
-    name: "Objects",
-    getTitle: (item) => item.name || item.code || `Object ${item.id}`,
-    getDescription: (item) => item.description || item.type || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/objects/${id}`,
-    getData: () => objectsData?.items || []
-  },
-  issues: {
-    icon: <AlertTriangle className="h-4 w-4" />,
-    name: "Issues",
-    getTitle: (item) => item.label || item.title || item.type || `Issue ${item.id}`,
-    getDescription: (item) => item.description || item.status || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/issues/${id}`,
-    getData: () => issuesData
-  },
-  actions: {
-    icon: <Activity className="h-4 w-4" />,
-    name: "Actions",
-    getTitle: (item) => item.comment || `Action ${item.id}`,
-    getDescription: (item) => `Action Reference: ${item.actionReferenceId}` || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/actions/${id}`,
-    getData: () => actionsData
-  },
-  actionReferences: {
-    icon: <GitBranch className="h-4 w-4" />,
-    name: "Action References",
-    getTitle: (item) => item.description || item.act?.name || `Action Reference ${item.id}`,
-    getDescription: (item) => `${item.actionRefType?.name || ""} ${item.act?.name || ""}`.trim() || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/action-references/${id}`,
-    getData: () => actionReferencesData?.items || []
-  },
-  operations: {
-    icon: <ClipboardList className="h-4 w-4" />,
-    name: "Operations",
-    getTitle: (item) => item.name || `Operation ${item.id}`,
-    getDescription: (item) => item.description || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/operations/${id}`,
-    getData: () => operationsData?.items || []
-  },
-  operationTypes: {
-    icon: <Target className="h-4 w-4" />,
-    name: "Operation Types",
-    getTitle: (item) => item.name || `Operation Type ${item.id}`,
-    getDescription: (item) => item.description || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/operation-types/${id}`,
-    getData: () => operationTypesData
-  },
-  questions: {
-    icon: <Code className="h-4 w-4" />,
-    name: "Questions",
-    getTitle: (item) => item.value || `Question ${item.id}`,
-    getDescription: (item) => `Operation: ${item.operationId}` || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/questions/${id}`,
-    getData: () => questionsData
-  },
-  procedures: {
-    icon: <FileText className="h-4 w-4" />,
-    name: "Procedures",
-    getTitle: (item) => item.name || `Procedure ${item.id}`,
-    getDescription: (item) => item.description || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/procedures/${id}`,
-    getData: () => proceduresData?.items || []
-  },
-  acts: {
-    icon: <FileText className="h-4 w-4" />,
-    name: "Acts",
-    getTitle: (item) => item.name || `Act ${item.id}`,
-    getDescription: (item) => item.description || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/acts/${id}`,
-    getData: () => actsData
-  },
-  checklists: {
-    icon: <ListChecks className="h-4 w-4" />,
-    name: "Checklists",
-    getTitle: (item) => item.name || `Checklist ${item.id}`,
-    getDescription: (item) => item.description || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/checklists/${id}`,
-    getData: () => checklistsData
-  },
-  actionRefTypes: {
-    icon: <FolderTree className="h-4 w-4" />,
-    name: "Action Ref Types",
-    getTitle: (item) => item.name || `Action Ref Type ${item.id}`,
-    getDescription: (item) => item.description || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/action-ref-types/${id}`,
-    getData: () => actionRefTypesData
-  },
-  assetItems: {
-    icon: <Database className="h-4 w-4" />,
-    name: "Asset Items",
-    getTitle: (item) => item.label || item.name || `Asset Item ${item.id}`,
-    getDescription: (item) => item.description || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/asset-items/${id}`,
-    getData: () => assetItemsData
-  },
-  assetModels: {
-    icon: <Building className="h-4 w-4" />,
-    name: "Asset Models",
-    getTitle: (item) => item.label || item.name || `Asset Model ${item.id}`,
-    getDescription: (item) => item.description || "",
-    getId: (item) => item.id,
-    getUrl: (id) => `/asset-models/${id}`,
-    getData: () => assetModelsData
-  }
-});
 
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
@@ -259,125 +33,24 @@ export function GlobalSearch() {
   const normalize = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "");
   const toSingular = (v: string) => v.endsWith("s") ? v.slice(0, -1) : v;
 
-  // Simple static mapping for determining which entity to fetch (before entityConfigs is built)
-  const entityKeyMap: Record<string, string> = {
-    'events': 'events',
-    'event': 'events',
-    'locations': 'locations',
-    'location': 'locations',
-    'locationlevels': 'locationLevels',
-    'locationlevel': 'locationLevels',
-    'users': 'users',
-    'user': 'users',
-    'objects': 'objects',
-    'object': 'objects',
-    'issues': 'issues',
-    'issue': 'issues',
-    'actions': 'actions',
-    'action': 'actions',
-    'actionreferences': 'actionReferences',
-    'actionreference': 'actionReferences',
-    'operations': 'operations',
-    'operation': 'operations',
-    'operationtypes': 'operationTypes',
-    'operationtype': 'operationTypes',
-    'questions': 'questions',
-    'question': 'questions',
-    'procedures': 'procedures',
-    'procedure': 'procedures',
-    'acts': 'acts',
-    'act': 'acts',
-    'checklists': 'checklists',
-    'checklist': 'checklists',
-    'actionreftypes': 'actionRefTypes',
-    'actionreftype': 'actionRefTypes',
-    'assetitems': 'assetItems',
-    'assetitem': 'assetItems',
-    'assetmodels': 'assetModels',
-    'assetmodel': 'assetModels',
-  };
-
-  // Parse query early to determine which entity to fetch
-  const parseQueryForFetch = (q: string): { scope?: string; term: string; rawScope?: string } => {
+  // Parse query to determine which filter is active
+  const parseQuery = (q: string): { scope?: string; term: string; rawScope?: string } => {
     const match = q.match(/^\s*([^:]+)\s*:\s*(.*)$/);
     if (!match) return { term: q };
     const rawScope = match[1] || "";
     const term = match[2] || "";
     const normalized = normalize(rawScope);
-    const entityKey = entityKeyMap[normalized];
-    const entityTypeMap: Record<string, string> = {
-      'events': 'Events',
-      'locationLevels': 'Location Levels',
-      'users': 'Users',
-      'objects': 'Objects',
-      'issues': 'Issues',
-      'actions': 'Actions',
-      'actionReferences': 'Action References',
-      'operations': 'Operations',
-      'operationTypes': 'Operation Types',
-      'questions': 'Questions',
-      'procedures': 'Procedures',
-      'acts': 'Acts',
-      'checklists': 'Checklists',
-      'actionRefTypes': 'Action Ref Types',
-      'assetItems': 'Asset Items',
-      'assetModels': 'Asset Models',
-      'locations': 'Locations',
-    };
-    return { 
-      scope: entityKey ? entityTypeMap[entityKey] : undefined, 
-      term, 
-      rawScope 
-    };
+    if (normalized === 'user' || normalized === 'users') {
+      return { scope: 'Users', term, rawScope };
+    }
+    return { term, rawScope };
   };
 
-  // Determine which entity type is selected based on query (for fetching)
-  const { scope: fetchScope, term: fetchTerm, rawScope: fetchRawScope } = parseQueryForFetch(query);
-  const selectedEntityKey = fetchScope ? Object.entries(entityKeyMap).find(([_, key]) => {
-    const entityTypeMap: Record<string, string> = {
-      'events': 'Events',
-      'locationLevels': 'Location Levels',
-      'users': 'Users',
-      'objects': 'Objects',
-      'issues': 'Issues',
-      'actions': 'Actions',
-      'actionReferences': 'Action References',
-      'operations': 'Operations',
-      'operationTypes': 'Operation Types',
-      'questions': 'Questions',
-      'procedures': 'Procedures',
-      'acts': 'Acts',
-      'checklists': 'Checklists',
-      'actionRefTypes': 'Action Ref Types',
-      'assetItems': 'Asset Items',
-      'assetModels': 'Asset Models',
-      'locations': 'Locations',
-    };
-    return entityTypeMap[key] === fetchScope;
-  })?.[1] : undefined;
-  
-  // Only fetch data for the selected entity type when dialog is open and a filter is selected
-  // Note: ActionTypes is an enum, not a searchable entity, so it's excluded
-  const shouldFetch = open && selectedEntityKey !== undefined;
-  
-  // Use React Query hooks with conditional fetching based on selected filter
-  const { data: eventsData, isLoading: eventsLoading } = useEvents({ enabled: shouldFetch && selectedEntityKey === 'events' });
-  const { data: usersData, isLoading: usersLoading } = useUsers({ enabled: shouldFetch && selectedEntityKey === 'users' });
-  const { data: objectsData, isLoading: objectsLoading } = useObjects({ page: 1, pageSize: 100, enabled: shouldFetch && selectedEntityKey === 'objects' });
-  const { data: issuesData, isLoading: issuesLoading } = useIssues({ enabled: shouldFetch && selectedEntityKey === 'issues' });
-  const { data: actsData, isLoading: actsLoading } = useActs({ enabled: shouldFetch && selectedEntityKey === 'acts' });
-  const { data: operationsData, isLoading: operationsLoading } = useAllOperations({ enabled: shouldFetch && selectedEntityKey === 'operations' });
-  const { data: proceduresData, isLoading: proceduresLoading } = useProcedures({ page: 1, pageSize: 100, enabled: shouldFetch && selectedEntityKey === 'procedures' });
-  const { data: actionsData, isLoading: actionsLoading } = useAllActions({ enabled: shouldFetch && selectedEntityKey === 'actions' });
-  const { data: questionsData, isLoading: questionsLoading } = useAllQuestions({ enabled: shouldFetch && selectedEntityKey === 'questions' });
-  const { data: actionReferencesData, isLoading: actionReferencesLoading } = useActionReferences({ page: 1, pageSize: 100, enabled: shouldFetch && selectedEntityKey === 'actionReferences' });
-  const { data: actionRefTypesData, isLoading: actionRefTypesLoading } = useActionRefTypes({ enabled: shouldFetch && selectedEntityKey === 'actionRefTypes' });
-  const { data: operationTypesData, isLoading: operationTypesLoading } = useOperationTypes({ enabled: shouldFetch && selectedEntityKey === 'operationTypes' });
-  const { data: locationsData, isLoading: locationsLoading } = useLocations({ page: 1, pageSize: 100, enabled: shouldFetch && selectedEntityKey === 'locations' });
-  const { data: locationLevelsData, isLoading: locationLevelsLoading } = useLocationLevels({ enabled: shouldFetch && selectedEntityKey === 'locationLevels' });
-  const { data: checklistsData, isLoading: checklistsLoading } = useChecklists({ enabled: shouldFetch && selectedEntityKey === 'checklists' });
-  const { data: assetItemsData, isLoading: assetItemsLoading } = useAssetItems({ enabled: shouldFetch && selectedEntityKey === 'assetItems' });
-  const { data: assetModelsData, isLoading: assetModelsLoading } = useAssetModels({ enabled: shouldFetch && selectedEntityKey === 'assetModels' });
+  const { scope, term, rawScope } = parseQuery(query);
+  const shouldFetch = open && scope === 'Users';
+
+  // Fetch users data
+  const { data: usersData, isLoading: usersLoading } = useUsers({ enabled: shouldFetch });
 
   // Keyboard shortcut handler
   useEffect(() => {
@@ -407,121 +80,27 @@ export function GlobalSearch() {
     }
   }, [open]);
 
-  // Create entity configs with current data
-  const entityConfigs = useMemo(() => createEntityConfigs(
-    eventsData,
-    usersData,
-    objectsData,
-    issuesData,
-    actsData,
-    operationsData,
-    proceduresData,
-    actionsData,
-    questionsData,
-    actionReferencesData,
-    actionRefTypesData,
-    operationTypesData,
-    locationsData,
-    locationLevelsData,
-    checklistsData,
-    assetItemsData,
-    assetModelsData
-  ), [
-    eventsData,
-    usersData,
-    objectsData,
-    issuesData,
-    actsData,
-    operationsData,
-    proceduresData,
-    actionsData,
-    questionsData,
-    actionReferencesData,
-    actionRefTypesData,
-    operationTypesData,
-    locationsData,
-    locationLevelsData,
-    checklistsData,
-    assetItemsData,
-    assetModelsData
-  ]);
-
-  // Build entity aliases for filter matching (dynamic, built from entityConfigs)
-  const entityAliases: Array<{
-    key: string;
-    typeName: string;
-    alias: string;
-    display: string;
-    icon: React.ReactNode;
-  }> = Object.entries(entityConfigs).flatMap(([key, cfg]) => {
-    const fromKey = normalize(key);
-    const fromKeySingular = toSingular(fromKey);
-    const fromName = normalize(cfg.name);
-    const fromNameSingular = toSingular(fromName);
-    const baseDisplay = toSingular(cfg.name).toLowerCase();
-    const makeEntry = (alias: string) => ({
-      key,
-      typeName: cfg.name,
-      alias,
-      display: `${baseDisplay}:`,
-      icon: cfg.icon
-    });
-    const aliases = new Map<string, boolean>();
-    [fromKey, fromKeySingular, fromName, fromNameSingular].forEach(a => {
-      if (a) aliases.set(a, true);
-    });
-    return Array.from(aliases.keys()).map(makeEntry);
-  });
-
-  // Parse query to determine which filter is active
-  const parseQuery = (q: string): { scope?: string; term: string; rawScope?: string } => {
-    const match = q.match(/^\s*([^:]+)\s*:\s*(.*)$/);
-    if (!match) return { term: q };
-    const rawScope = match[1] || "";
-    const term = match[2] || "";
-    const normalized = normalize(rawScope);
-    const found = entityAliases.find(a => a.alias === normalized);
-    return { scope: found?.typeName, term, rawScope };
-  };
-
-  // Parse query for UI (using full entityAliases for better matching)
-  const { scope, term, rawScope } = parseQuery(query);
-
-  // Build search items from all entity data
+  // Build search items from users data
   const searchItems = useMemo(() => {
     const items: SearchItem[] = [];
 
-    for (const [key, config] of Object.entries(entityConfigs)) {
-      try {
-        const data = config.getData();
-        if (!data || !Array.isArray(data)) continue;
-        
-        // Take first 10 items for initial load (can be expanded with search)
-        data.slice(0, 10).forEach((item: any) => {
-          items.push({
-            id: `${key}-${config.getId(item)}`,
-            title: config.getTitle(item),
-            description: config.getDescription(item),
-            url: config.getUrl(config.getId(item)),
-            type: config.name,
-            icon: config.icon
-          });
+    if (usersData && Array.isArray(usersData)) {
+      usersData.forEach((item: any) => {
+        items.push({
+          id: `users-${item.id}`,
+          title: `${item.firstName || ""} ${item.lastName || ""}`.trim() || item.email || "",
+          description: `${item.role || ""} ${item.department || ""}`.trim() || item.email || "",
+          url: `/users/${item.id}`,
+          type: "Users",
+          icon: <Users className="h-4 w-4" />
         });
-      } catch (error) {
-        // Silently skip entities that fail to load
-        console.warn(`Failed to process ${key} data:`, error);
-      }
+      });
     }
 
     return items;
-  }, [entityConfigs]);
+  }, [usersData]);
 
-  // Check if any data is still loading
-  const isLoading = eventsLoading || usersLoading || objectsLoading || issuesLoading || 
-    actsLoading || operationsLoading || proceduresLoading || actionsLoading || 
-    questionsLoading || actionReferencesLoading || actionRefTypesLoading ||
-    operationTypesLoading || locationsLoading || locationLevelsLoading || checklistsLoading ||
-    assetItemsLoading || assetModelsLoading;
+  const isLoading = usersLoading;
 
   const handleSelect = (url: string, item?: SearchItem) => {
     setOpen(false);
@@ -539,13 +118,12 @@ export function GlobalSearch() {
     router.push(url);
   };
 
-
   const filteredItems: SearchItem[] = (() => {
-    // Only show data when a filter is selected
-    if (!scope) {
+    // Only show data when users filter is selected
+    if (scope !== 'Users') {
       return [];
     }
-    // If scoped like "location: engine"
+    // If scoped like "user: john"
     const t = term.trim().toLowerCase();
     const itemsInScope = searchItems.filter(i => i.type === scope);
     if (!t) return itemsInScope;
@@ -563,18 +141,17 @@ export function GlobalSearch() {
     return acc;
   }, {} as Record<string, SearchItem[]>);
 
-  // Build filter suggestions (autocomplete before the colon)
+  // Build filter suggestions
   const beforeColon = (query.split(":")[0] || "").trim();
   const showingFilterSuggestions = query.indexOf(":") === -1 && beforeColon.length > 0;
-  const filterSuggestions = showingFilterSuggestions
-    ? entityAliases
-        .filter(a => a.alias.includes(normalize(beforeColon)))
-        // dedupe by display label (multiple aliases map to same display)
-        .reduce((acc: Array<typeof entityAliases[number]>, curr) => {
-          if (!acc.find(x => x.display === curr.display)) acc.push(curr);
-          return acc;
-        }, [])
-        .slice(0, 8)
+  const filterSuggestions = showingFilterSuggestions && (normalize(beforeColon).includes('user') || normalize(beforeColon).includes('users'))
+    ? [{
+        key: 'users',
+        typeName: 'Users',
+        alias: 'user',
+        display: 'user:',
+        icon: <Users className="h-4 w-4" />
+      }]
     : [];
 
   const insertFilter = (display: string) => {
@@ -679,26 +256,23 @@ export function GlobalSearch() {
                 )}
                 {query.trim() === "" && recent.length > 0 && (
                   <CommandGroup heading="Recent">
-                    {recent.map(r => {
-                      const cfg = Object.values(entityConfigs).find(c => c.name === r.type);
-                      return (
-                        <CommandItem
-                          key={`recent-${r.id}`}
-                          value={`${r.title} ${r.description || ""} ${r.type}`}
-                          onSelect={() => handleSelect(r.url)}
-                          className="flex items-center gap-3"
-                        >
-                          {cfg?.icon}
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">{r.title}</div>
-                            {r.description && (
-                              <div className="text-sm text-muted-foreground truncate">{r.description}</div>
-                            )}
-                          </div>
-                          <Badge variant="secondary" className="text-xs flex-shrink-0">{r.type}</Badge>
-                        </CommandItem>
-                      );
-                    })}
+                    {recent.map(r => (
+                      <CommandItem
+                        key={`recent-${r.id}`}
+                        value={`${r.title} ${r.description || ""} ${r.type}`}
+                        onSelect={() => handleSelect(r.url)}
+                        className="flex items-center gap-3"
+                      >
+                        <Users className="h-4 w-4" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{r.title}</div>
+                          {r.description && (
+                            <div className="text-sm text-muted-foreground truncate">{r.description}</div>
+                          )}
+                        </div>
+                        <Badge variant="secondary" className="text-xs flex-shrink-0">{r.type}</Badge>
+                      </CommandItem>
+                    ))}
                   </CommandGroup>
                 )}
                 {query.trim() !== "" && Object.entries(groupedFiltered).map(([type, items]) => (
