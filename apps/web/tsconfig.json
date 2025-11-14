@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "types": [],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@smartlogbook/ui/*": ["../../packages/ui/src/*"],
+      "@smartlogbook/hooks/*": ["../../packages/hooks/src/*"],
+      "@smartlogbook/lib/*": ["../../packages/lib/src/*"],
+      "@smartlogbook/config/*": ["../../packages/config/src/*"],
+      "@smartlogbook/mocks/*": ["../../packages/mocks/src/*"],
+      "@smartlogbook/types/*": ["../../packages/types/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/types/**/*.d.ts"],
+  "exclude": ["node_modules"]
+}

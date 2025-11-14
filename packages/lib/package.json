@@ -1,0 +1,68 @@
+{
+  "name": "@smartlogbook/lib",
+  "version": "0.1.0",
+  "description": "API client and utilities for SmartLogBook",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "private": true,
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.83.0",
+    "clsx": "2.1.1",
+    "tailwind-merge": "3.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.3",
+    "typescript": "^5.8.3"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./utils": "./src/utils.ts",
+    "./config": "./src/config.ts",
+    "./auth": "./src/auth.ts",
+    "./api": "./src/api.ts",
+    "./date": "./src/date.ts",
+    "./date-format": "./src/date-format.ts",
+    "./localStorage": "./src/localStorage.ts",
+    "./queryClient": "./src/queryClient.ts",
+    "./queryClient.server": "./src/queryClient.server.ts",
+    "./status-mapping": "./src/status-mapping.ts",
+    "./user-settings": "./src/user-settings.ts",
+    "./api/users": "./src/api/users.ts",
+    "./api/objects": "./src/api/objects.ts",
+    "./api/auth": "./src/api/auth.ts",
+    "./api/actions": "./src/api/actions.ts",
+    "./api/action-types": "./src/api/action-types.ts",
+    "./api/action-references": "./src/api/action-references.ts",
+    "./api/action-ref-types": "./src/api/action-ref-types.ts",
+    "./api/acts": "./src/api/acts.ts",
+    "./api/anomalies": "./src/api/anomalies.ts",
+    "./api/asset-items": "./src/api/asset-items.ts",
+    "./api/assetmodels": "./src/api/assetmodels.ts",
+    "./api/checklists": "./src/api/checklists.ts",
+    "./api/events": "./src/api/events.ts",
+    "./api/issues": "./src/api/issues.ts",
+    "./api/location-levels": "./src/api/location-levels.ts",
+    "./api/locations": "./src/api/locations.ts",
+    "./api/locomotives": "./src/api/locomotives.ts",
+    "./api/locomotive-models": "./src/api/locomotive-models.ts",
+    "./api/metadata-enums": "./src/api/metadata-enums.ts",
+    "./api/operation-types": "./src/api/operation-types.ts",
+    "./api/operations": "./src/api/operations.ts",
+    "./api/procedures": "./src/api/procedures.ts",
+    "./api/profiles": "./src/api/profiles.ts",
+    "./api/questions": "./src/api/questions.ts",
+    "./api/responses": "./src/api/responses.ts",
+    "./api/settings": "./src/api/settings.ts",
+    "./api/migration-helper": "./src/api/migration-helper.ts"
+  },
+  "typesVersions": {
+    "*": {
+      "*": [
+        "src/*"
+      ]
+    }
+  }
+}

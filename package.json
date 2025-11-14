@@ -1,0 +1,52 @@
+{
+  "name": "sunnybudget",
+  "version": "1.0.0",
+  "description": "Next.js monorepo boilerplate with modern architecture",
+  "private": true,
+  "author": "Ghassen MENAOUAR",
+  "company": "The Sunny Side",
+  "license": "MIT",
+  "workspaces": [
+    "apps/web"
+  ],
+  "keywords": [
+    "nextjs",
+    "react",
+    "typescript",
+    "monorepo",
+    "boilerplate"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter @sunnybudget/web dev",
+    "build": "pnpm --filter @sunnybudget/web build",
+    "lint": "pnpm --filter @sunnybudget/web lint",
+    "type-check": "pnpm --filter @sunnybudget/web type-check",
+    "type-check:packages": "pnpm --filter @sunnybudget/types type-check && pnpm --filter @sunnybudget/shared type-check && pnpm --filter @sunnybudget/lib type-check",
+    "install:all": "pnpm install",
+    "clean": "pnpm --filter @sunnybudget/web clean",
+    "clean:packages": "pnpm --filter './packages/*' exec -- rm -rf dist"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "19.1.8",
+      "@types/react-dom": "19.1.6"
+    }
+  }
+}
