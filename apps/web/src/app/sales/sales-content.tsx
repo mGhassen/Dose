@@ -146,20 +146,6 @@ export default function SalesContent() {
       ]}
       localStoragePrefix="sales"
       searchFields={["description"]}
-      filterOptions={[
-        {
-          key: "type",
-          label: "Type",
-          type: "select",
-          options: [
-            { value: "on_site", label: "On Site" },
-            { value: "delivery", label: "Delivery" },
-            { value: "takeaway", label: "Takeaway" },
-            { value: "catering", label: "Catering" },
-            { value: "other", label: "Other" },
-          ],
-        },
-      ]}
     />
   );
 }

@@ -202,36 +202,6 @@ export default function LeasingContent() {
         ]}
         localStoragePrefix="leasing"
         searchFields={["name", "description", "lessor"]}
-        filterOptions={[
-          {
-            key: "type",
-            label: "Type",
-            type: "select",
-            options: [
-              { value: "operating", label: "Operating" },
-              { value: "finance", label: "Finance" },
-            ],
-          },
-          {
-            key: "frequency",
-            label: "Frequency",
-            type: "select",
-            options: [
-              { value: "monthly", label: "Monthly" },
-              { value: "quarterly", label: "Quarterly" },
-              { value: "yearly", label: "Yearly" },
-            ],
-          },
-          {
-            key: "isActive",
-            label: "Status",
-            type: "select",
-            options: [
-              { value: "true", label: "Active" },
-              { value: "false", label: "Inactive" },
-            ],
-          },
-        ]}
       />
     </div>
   );

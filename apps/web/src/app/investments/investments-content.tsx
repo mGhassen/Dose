@@ -178,30 +178,6 @@ export default function InvestmentsContent() {
       ]}
       localStoragePrefix="investments"
       searchFields={["name", "description"]}
-      filterOptions={[
-        {
-          key: "type",
-          label: "Type",
-          type: "select",
-          options: [
-            { value: "equipment", label: "Equipment" },
-            { value: "renovation", label: "Renovation" },
-            { value: "technology", label: "Technology" },
-            { value: "vehicle", label: "Vehicle" },
-            { value: "other", label: "Other" },
-          ],
-        },
-        {
-          key: "depreciationMethod",
-          label: "Depreciation Method",
-          type: "select",
-          options: [
-            { value: "straight_line", label: "Straight Line" },
-            { value: "declining_balance", label: "Declining Balance" },
-            { value: "units_of_production", label: "Units of Production" },
-          ],
-        },
-      ]}
     />
   );
 }

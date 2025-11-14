@@ -175,18 +175,6 @@ export default function LoansContent() {
       ]}
       localStoragePrefix="loans"
       searchFields={["name", "loanNumber", "lender", "description"]}
-      filterOptions={[
-        {
-          key: "status",
-          label: "Status",
-          type: "select",
-          options: [
-            { value: "active", label: "Active" },
-            { value: "paid_off", label: "Paid Off" },
-            { value: "defaulted", label: "Defaulted" },
-          ],
-        },
-      ]}
     />
   );
 }

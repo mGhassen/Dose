@@ -208,44 +208,6 @@ export default function ExpensesContent() {
         ]}
         localStoragePrefix="expenses"
         searchFields={["name", "description", "vendor"]}
-        filterOptions={[
-          {
-            key: "category",
-            label: "Category",
-            type: "select",
-            options: [
-              { value: "rent", label: "Rent" },
-              { value: "utilities", label: "Utilities" },
-              { value: "supplies", label: "Supplies" },
-              { value: "marketing", label: "Marketing" },
-              { value: "insurance", label: "Insurance" },
-              { value: "maintenance", label: "Maintenance" },
-              { value: "professional_services", label: "Professional Services" },
-              { value: "other", label: "Other" },
-            ],
-          },
-          {
-            key: "recurrence",
-            label: "Recurrence",
-            type: "select",
-            options: [
-              { value: "one_time", label: "One Time" },
-              { value: "monthly", label: "Monthly" },
-              { value: "quarterly", label: "Quarterly" },
-              { value: "yearly", label: "Yearly" },
-              { value: "custom", label: "Custom" },
-            ],
-          },
-          {
-            key: "isActive",
-            label: "Status",
-            type: "select",
-            options: [
-              { value: "true", label: "Active" },
-              { value: "false", label: "Inactive" },
-            ],
-          },
-        ]}
       />
     </div>
   );

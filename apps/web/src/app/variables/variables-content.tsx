@@ -168,29 +168,6 @@ export default function VariablesContent() {
       ]}
       localStoragePrefix="variables"
       searchFields={["name", "description"]}
-      filterOptions={[
-        {
-          key: "type",
-          label: "Type",
-          type: "select",
-          options: [
-            { value: "cost", label: "Cost" },
-            { value: "tax", label: "Tax" },
-            { value: "inflation", label: "Inflation" },
-            { value: "exchange_rate", label: "Exchange Rate" },
-            { value: "other", label: "Other" },
-          ],
-        },
-        {
-          key: "isActive",
-          label: "Status",
-          type: "select",
-          options: [
-            { value: "true", label: "Active" },
-            { value: "false", label: "Inactive" },
-          ],
-        },
-      ]}
     />
   );
 }

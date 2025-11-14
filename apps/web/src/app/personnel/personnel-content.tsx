@@ -186,28 +186,6 @@ export default function PersonnelContent() {
       ]}
       localStoragePrefix="personnel"
       searchFields={["firstName", "lastName", "email", "position"]}
-      filterOptions={[
-        {
-          key: "type",
-          label: "Type",
-          type: "select",
-          options: [
-            { value: "full_time", label: "Full Time" },
-            { value: "part_time", label: "Part Time" },
-            { value: "contractor", label: "Contractor" },
-            { value: "intern", label: "Intern" },
-          ],
-        },
-        {
-          key: "isActive",
-          label: "Status",
-          type: "select",
-          options: [
-            { value: "true", label: "Active" },
-            { value: "false", label: "Inactive" },
-          ],
-        },
-      ]}
     />
   );
 }

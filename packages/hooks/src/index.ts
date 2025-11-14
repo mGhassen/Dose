@@ -21,6 +21,7 @@ export * from './client/useWorkingCapital';
 export * from './client/useBalanceSheet';
 export * from './client/useFinancialPlan';
 export * from './client/useDashboard';
+export * from './client/useBudgetProjections';
 
 // Server-side hooks (Next.js specific) - exported for convenience
 // Can also be imported directly: import { prefetchUsers } from '@kit/hooks/src/server/prefetchUsers';
