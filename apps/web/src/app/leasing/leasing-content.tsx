@@ -18,22 +18,6 @@ export default function LeasingContent() {
   const { data: leasing, isLoading } = useLeasing();
   const deleteMutation = useDeleteLeasing();
 
-  const totalMonthly = useMemo(() => {
-    if (!leasing) return 0;
-    return leasing.reduce((sum, lease) => {
-      switch (lease.frequency) {
-        case 'monthly':
-          return sum + lease.amount;
-        case 'quarterly':
-          return sum + lease.amount / 3;
-        case 'yearly':
-          return sum + lease.amount / 12;
-        default:
-          return sum + lease.amount;
-      }
-    }, 0);
-  }, [leasing]);
-
   const columns: ColumnDef<LeasingPayment>[] = useMemo(() => [
     {
       accessorKey: "name",
