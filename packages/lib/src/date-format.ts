@@ -424,3 +424,160 @@ export function getUserTimezone(): string {
     return 'Europe/Paris';
   }
 }
+
+/**
+ * Format month name (short) - e.g., "Jan", "Feb", "Mar"
+ */
+export function formatMonthShort(date: string | Date | null | undefined): string {
+  if (!date) {
+    return 'N/A';
+  }
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  if (isNaN(dateObj.getTime())) {
+    return 'Invalid Date';
+  }
+  
+  // Use default format during SSR
+  if (typeof window === 'undefined') {
+    return dateObj.toLocaleDateString('fr-FR', {
+      month: 'short'
+    });
+  }
+  
+  try {
+    const settings = getUserSettings();
+    const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+    const cleanedTimezone = cleanTimezone(settings.timezone);
+    
+    return dateObj.toLocaleDateString(locale, {
+      timeZone: cleanedTimezone,
+      month: 'short'
+    });
+  } catch (error) {
+    return dateObj.toLocaleDateString('fr-FR', {
+      month: 'short'
+    });
+  }
+}
+
+/**
+ * Format month and year (long) - e.g., "January 2025", "janvier 2025"
+ */
+export function formatMonthYear(date: string | Date | null | undefined): string {
+  if (!date) {
+    return 'N/A';
+  }
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  if (isNaN(dateObj.getTime())) {
+    return 'Invalid Date';
+  }
+  
+  // Use default format during SSR
+  if (typeof window === 'undefined') {
+    return dateObj.toLocaleDateString('fr-FR', {
+      month: 'long',
+      year: 'numeric'
+    });
+  }
+  
+  try {
+    const settings = getUserSettings();
+    const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+    const cleanedTimezone = cleanTimezone(settings.timezone);
+    
+    return dateObj.toLocaleDateString(locale, {
+      timeZone: cleanedTimezone,
+      month: 'long',
+      year: 'numeric'
+    });
+  } catch (error) {
+    return dateObj.toLocaleDateString('fr-FR', {
+      month: 'long',
+      year: 'numeric'
+    });
+  }
+}
+
+/**
+ * Format weekday name - e.g., "Monday", "Tuesday", "lundi", "mardi"
+ */
+export function formatWeekday(date: string | Date | null | undefined): string {
+  if (!date) {
+    return 'N/A';
+  }
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  if (isNaN(dateObj.getTime())) {
+    return 'Invalid Date';
+  }
+  
+  // Use default format during SSR
+  if (typeof window === 'undefined') {
+    return dateObj.toLocaleDateString('fr-FR', {
+      weekday: 'long'
+    });
+  }
+  
+  try {
+    const settings = getUserSettings();
+    const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+    const cleanedTimezone = cleanTimezone(settings.timezone);
+    
+    return dateObj.toLocaleDateString(locale, {
+      timeZone: cleanedTimezone,
+      weekday: 'long'
+    });
+  } catch (error) {
+    return dateObj.toLocaleDateString('fr-FR', {
+      weekday: 'long'
+    });
+  }
+}
+
+/**
+ * Format date in pretty format (similar to date-fns "PPP") - e.g., "January 16th, 2025"
+ */
+export function formatPrettyDate(date: string | Date | null | undefined): string {
+  if (!date) {
+    return 'N/A';
+  }
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  if (isNaN(dateObj.getTime())) {
+    return 'Invalid Date';
+  }
+  
+  // Use default format during SSR
+  if (typeof window === 'undefined') {
+    return dateObj.toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+  
+  try {
+    const settings = getUserSettings();
+    const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+    const cleanedTimezone = cleanTimezone(settings.timezone);
+    
+    return dateObj.toLocaleDateString(locale, {
+      timeZone: cleanedTimezone,
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch (error) {
+    return dateObj.toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+}

@@ -11,6 +11,7 @@ import AppLayout from "@/components/app-layout";
 import { useSubscriptions } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { formatMonthYear } from "@kit/lib/date-format";
 import { projectSubscription } from "@/lib/calculations/subscription-projections";
 import type { Subscription, SubscriptionProjection } from "@kit/types";
 import { EditableSubscriptionTimelineRow } from "./subscription-timeline-editable";
@@ -322,7 +323,7 @@ export default function SubscriptionsTimelinePage() {
                       <div className="flex items-center space-x-3">
                         <Calendar className="h-5 w-5 text-muted-foreground" />
                         <span className="font-medium text-lg">
-                          {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+                          {formatMonthYear(date)}
                         </span>
                         {isFuture && (
                           <Badge variant="secondary">Projected</Badge>

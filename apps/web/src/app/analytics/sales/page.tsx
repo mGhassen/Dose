@@ -22,7 +22,7 @@ import {
   Area
 } from 'recharts';
 import { formatCurrency } from "@kit/lib/config";
-import { formatDate } from "@kit/lib/date-format";
+import { formatDate, formatWeekday } from "@kit/lib/date-format";
 import { useSalesAnalytics } from "@kit/hooks";
 import { Award } from "lucide-react";
 
@@ -129,7 +129,7 @@ export default function SalesAnalyticsPage() {
                           <div>
                             <div className="font-medium">{formatDate(day.date)}</div>
                             <div className="text-sm text-muted-foreground">
-                              {new Date(day.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                              {formatWeekday(day.date)}
                             </div>
                           </div>
                         </div>

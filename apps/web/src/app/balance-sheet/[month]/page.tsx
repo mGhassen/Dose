@@ -9,6 +9,7 @@ import AppLayout from "@/components/app-layout";
 import { useBalanceSheetByMonth, useCalculateBalanceSheet } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 
 interface BalanceSheetDetailPageProps {
   params: Promise<{ month: string }>;
@@ -49,7 +50,7 @@ export default function BalanceSheetDetailPage({ params }: BalanceSheetDetailPag
   const monthDisplay = (() => {
     const [year, monthNum] = resolvedParams.month.split('-');
     const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+    return formatMonthYear(date);
   })();
 
   if (!balanceSheet) {
@@ -199,10 +200,10 @@ export default function BalanceSheetDetailPage({ params }: BalanceSheetDetailPag
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-muted-foreground">
               <div>
-                <span className="font-medium">Created:</span> {new Date(balanceSheet.createdAt).toLocaleDateString()}
+                <span className="font-medium">Created:</span> {formatDate(balanceSheet.createdAt)}
               </div>
               <div>
-                <span className="font-medium">Last Updated:</span> {new Date(balanceSheet.updatedAt).toLocaleDateString()}
+                <span className="font-medium">Last Updated:</span> {formatDate(balanceSheet.updatedAt)}
               </div>
             </div>
           </CardContent>

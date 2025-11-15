@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@kit/ui/badge';
 import { Settings } from 'lucide-react';
 import AppLayout from '@/components/app-layout';
-import { cleanTimezone } from '@kit/lib/date-format';
+import { cleanTimezone, formatDateTime } from '@kit/lib/date-format';
 import DateFormatTest from '@/components/date-format-test';
 
 export default function UserSettingsPage() {
@@ -67,32 +67,11 @@ export default function UserSettingsPage() {
                   // Clean the timezone value to remove any potential prefixes
                   const cleanedTimezone = cleanTimezone(settings.timezone);
                   
-                  return new Date().toLocaleDateString(
-                    settings.language === 'en' ? 'en-US' : 'fr-FR',
-                    {
-                      timeZone: cleanedTimezone,
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: settings.timeFormat === '12h'
-                    }
-                  );
+                  return formatDateTime(new Date());
                 } catch (error) {
                   console.error('Error formatting date with timezone:', error);
                   // Fallback to default formatting
-                  return new Date().toLocaleDateString(
-                    settings.language === 'en' ? 'en-US' : 'fr-FR',
-                    {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: settings.timeFormat === '12h'
-                    }
-                  );
+                  return formatDateTime(new Date());
                 }
               })()}
             </span>

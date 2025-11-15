@@ -12,6 +12,7 @@ import AppLayout from "@/components/app-layout";
 import { useCashFlowById, useUpdateCashFlow, useDeleteCashFlow } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 
 interface CashFlowDetailPageProps {
   params: Promise<{ id: string }>;
@@ -126,7 +127,7 @@ export default function CashFlowDetailPage({ params }: CashFlowDetailPageProps) 
   const monthDisplay = (() => {
     const [year, monthNum] = cashFlow.month.split('-');
     const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+    return formatMonthYear(date);
   })();
 
   const netCashFlow = formData.cashInflows && formData.cashOutflows
@@ -339,10 +340,10 @@ export default function CashFlowDetailPage({ params }: CashFlowDetailPageProps) 
                 <div className="pt-4 border-t">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-muted-foreground">
                     <div>
-                      <span className="font-medium">Created:</span> {new Date(cashFlow.createdAt).toLocaleDateString()}
+                      <span className="font-medium">Created:</span> {formatDate(cashFlow.createdAt)}
                     </div>
                     <div>
-                      <span className="font-medium">Last Updated:</span> {new Date(cashFlow.updatedAt).toLocaleDateString()}
+                      <span className="font-medium">Last Updated:</span> {formatDate(cashFlow.updatedAt)}
                     </div>
                   </div>
                 </div>

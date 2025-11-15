@@ -22,6 +22,7 @@ import {
   Area
 } from 'recharts';
 import { formatCurrency } from "@kit/lib/config";
+import { formatMonthShort, formatMonthYear } from "@kit/lib/date-format";
 import { useExpensesAnalytics } from "@kit/hooks";
 
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#8dd1e1', '#d084d0', '#ffb347', '#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
@@ -164,9 +165,45 @@ export default function ExpensesAnalyticsPage() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
+                      <XAxis 
+                        dataKey="month" 
+                        tickFormatter={(value) => {
+                          if (typeof value === 'string') {
+                            const date = new Date(value);
+                            if (!isNaN(date.getTime())) {
+                              return formatMonthShort(date);
+                            }
+                            // Fallback: extract month from "YYYY-MM" format
+                            const parts = value.split('-');
+                            if (parts.length >= 2) {
+                              const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                              const monthIndex = parseInt(parts[1], 10) - 1;
+                              if (monthIndex >= 0 && monthIndex < 12) {
+                                return monthNames[monthIndex];
+                              }
+                            }
+                          }
+                          return String(value);
+                        }}
+                      />
                       <YAxis />
-                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <Tooltip 
+                        formatter={(value: any) => {
+                          if (typeof value === 'number') {
+                            return formatCurrency(value);
+                          }
+                          return String(value);
+                        }}
+                        labelFormatter={(label) => {
+                          if (typeof label === 'string') {
+                            const date = new Date(label);
+                            if (!isNaN(date.getTime())) {
+                              return formatMonthYear(date);
+                            }
+                          }
+                          return String(label);
+                        }}
+                      />
                       <Legend />
                       <Area 
                         type="monotone" 
@@ -196,9 +233,45 @@ export default function ExpensesAnalyticsPage() {
                   <ResponsiveContainer width="100%" height={400}>
                     <LineChart data={expensesAnalytics.data.monthlyTrend}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
+                      <XAxis 
+                        dataKey="month" 
+                        tickFormatter={(value) => {
+                          if (typeof value === 'string') {
+                            const date = new Date(value);
+                            if (!isNaN(date.getTime())) {
+                              return formatMonthShort(date);
+                            }
+                            // Fallback: extract month from "YYYY-MM" format
+                            const parts = value.split('-');
+                            if (parts.length >= 2) {
+                              const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                              const monthIndex = parseInt(parts[1], 10) - 1;
+                              if (monthIndex >= 0 && monthIndex < 12) {
+                                return monthNames[monthIndex];
+                              }
+                            }
+                          }
+                          return String(value);
+                        }}
+                      />
                       <YAxis />
-                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <Tooltip 
+                        formatter={(value: any) => {
+                          if (typeof value === 'number') {
+                            return formatCurrency(value);
+                          }
+                          return String(value);
+                        }}
+                        labelFormatter={(label) => {
+                          if (typeof label === 'string') {
+                            const date = new Date(label);
+                            if (!isNaN(date.getTime())) {
+                              return formatMonthYear(date);
+                            }
+                          }
+                          return String(label);
+                        }}
+                      />
                       <Legend />
                       {expensesAnalytics.data.categoryBreakdown.slice(0, 6).map((cat, idx) => (
                         <Line

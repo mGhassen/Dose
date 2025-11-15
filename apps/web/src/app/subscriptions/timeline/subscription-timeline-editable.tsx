@@ -18,6 +18,7 @@ import { Plus, Trash2, MoreVertical } from "lucide-react";
 import { useCreateActualPayment, useDeleteActualPayment, useActualPayments } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 import type { SubscriptionProjection } from "@kit/types";
 
 interface EditableSubscriptionTimelineRowProps {
@@ -86,7 +87,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
       <TableRow className={isPastDue ? "bg-destructive/10" : isProjected && !isFullyPaid ? "bg-muted/50" : ""}>
         <TableCell className="font-medium">
           <div className="flex items-center space-x-2">
-            {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+            {formatMonthYear(date)}
             {isProjected && !isFullyPaid && (
               <Badge variant="secondary" className="text-xs">Declaration</Badge>
             )}
@@ -145,7 +146,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
               {actualPayments.map((payment) => (
                 <div key={payment.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2">
-                    <span>{new Date(payment.paymentDate).toLocaleDateString()}</span>
+                    <span>{formatDate(payment.paymentDate)}</span>
                     <span className="font-semibold">{formatCurrency(payment.amount)}</span>
                     {payment.notes && (
                       <span className="text-muted-foreground">- {payment.notes}</span>

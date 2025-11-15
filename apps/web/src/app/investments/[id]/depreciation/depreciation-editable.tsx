@@ -15,6 +15,7 @@ import { Edit2, Check, X, MoreVertical } from "lucide-react";
 import { useUpdateDepreciationEntry } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { formatMonthYear } from "@kit/lib/date-format";
 import type { DepreciationEntry } from "@kit/types";
 
 interface EditableDepreciationRowProps {
@@ -131,7 +132,7 @@ export function EditableDepreciationRow({ entry, investmentId, onUpdate }: Edita
     <TableRow className={isProjected ? "bg-muted/50" : ""}>
       <TableCell className="font-medium">
         <div className="flex items-center space-x-2">
-          {monthDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+          {formatMonthYear(monthDate)}
           {isProjected && (
             <Badge variant="secondary" className="text-xs">(Projected)</Badge>
           )}

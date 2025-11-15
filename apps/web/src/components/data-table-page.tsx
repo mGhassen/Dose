@@ -38,6 +38,7 @@ import { UnifiedFilter, FilterOption, FilterState } from "@/components/unified-f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import GridView, { GridColumn, GridRow } from "@/components/grid-view";
 import ViewToggle from "@/components/view-toggle";
+import { formatMonthYear } from "@kit/lib/date-format";
 
 interface DataTablePageProps<T> {
   title: string;
@@ -1110,7 +1111,7 @@ export default function DataTablePage<T>({
                   if (labelCol?.id === 'month' && typeof label === 'string' && /^\d{4}-\d{2}$/.test(label)) {
                     const [year, monthNum] = label.split('-');
                     const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-                    label = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+                    label = formatMonthYear(date);
                   }
                   
                   label = label || row.name || row.title || rowId;

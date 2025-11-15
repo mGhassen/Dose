@@ -52,10 +52,24 @@ export function projectExpense(
   }
 
   // Handle recurring expenses
+  // Ensure we start from the later of: year start or expense start
   let currentDate = new Date(Math.max(start.getTime(), expenseStart.getTime()));
+  // Normalize currentDate to first of month for consistent iteration
+  currentDate.setDate(1);
+  
+  // Ensure we end at the earlier of: year end or expense end (if exists)
+  // end is already the last day of the target month
   const finalDate = expenseEnd 
     ? new Date(Math.min(end.getTime(), expenseEnd.getTime())) 
-    : end;
+    : new Date(end);
+
+  // Only proceed if currentDate is not after finalDate
+  // Compare months by normalizing to first of month
+  const currentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const finalMonth = new Date(finalDate.getFullYear(), finalDate.getMonth(), 1);
+  if (currentMonth > finalMonth) {
+    return projections;
+  }
 
   while (currentDate <= finalDate) {
     const month = currentDate.toISOString().slice(0, 7); // YYYY-MM
@@ -70,11 +84,12 @@ export function projectExpense(
         break;
 
       case ExpenseRecurrence.QUARTERLY:
-        // Include every 3 months (Jan, Apr, Jul, Oct)
+        // Include every 3 months from the start month
         const monthNum = currentDate.getMonth();
         const startMonthNum = expenseStart.getMonth();
-        shouldInclude = (monthNum - startMonthNum) % 3 === 0 && 
-                       monthNum >= startMonthNum;
+        // Calculate months since start, accounting for year boundaries
+        const monthsSinceStart = (currentDate.getFullYear() - expenseStart.getFullYear()) * 12 + (monthNum - startMonthNum);
+        shouldInclude = monthsSinceStart >= 0 && monthsSinceStart % 3 === 0;
         break;
 
       case ExpenseRecurrence.YEARLY:

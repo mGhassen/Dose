@@ -10,7 +10,7 @@ import { Calendar } from "@kit/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@kit/ui/popover";
 import { Badge } from "@kit/ui/badge";
 import { CalendarIcon, Filter, X, Search, ChevronDown, ChevronUp } from "lucide-react";
-import { format } from "date-fns";
+import { formatPrettyDate, formatMonthShort } from "@kit/lib/date-format";
 import { cn } from "@kit/lib/utils";
 
 interface AdvancedFilterProps {
@@ -212,7 +212,7 @@ export function AdvancedFilter({
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {filters.dateFrom ? format(filters.dateFrom, "PPP") : "Pick a date"}
+                        {filters.dateFrom ? formatPrettyDate(filters.dateFrom) : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
@@ -238,7 +238,7 @@ export function AdvancedFilter({
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {filters.dateTo ? format(filters.dateTo, "PPP") : "Pick a date"}
+                        {filters.dateTo ? formatPrettyDate(filters.dateTo) : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
@@ -288,12 +288,12 @@ export function AdvancedFilter({
               )}
               {filters.dateFrom && (
                 <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">
-                  From: {format(filters.dateFrom, "MMM dd, yyyy")}
+                  From: {formatPrettyDate(filters.dateFrom)}
                 </span>
               )}
               {filters.dateTo && (
                 <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">
-                  To: {format(filters.dateTo, "MMM dd, yyyy")}
+                  To: {formatPrettyDate(filters.dateTo)}
                 </span>
               )}
             </div>

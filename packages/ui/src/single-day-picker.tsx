@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { formatPrettyDate } from "@kit/lib/date-format";
 
 import { useDisclosure } from "@kit/hooks/use-disclosure";
 
@@ -36,7 +36,7 @@ function SingleDayPicker({ id, onSelect, className, placeholder, labelVariant = 
           className={cn("group relative h-9 w-full justify-start whitespace-nowrap px-3 py-2 font-normal hover:bg-inherit", className)}
           {...props}
         >
-          {value && <span>{format(value, labelVariant)}</span>}
+          {value && <span>{formatPrettyDate(value)}</span>}
           {!value && <span className="text-muted-foreground">{placeholder}</span>}
         </Button>
       </PopoverTrigger>

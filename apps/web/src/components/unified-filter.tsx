@@ -21,7 +21,7 @@ import {
   PopoverTrigger,
 } from "@kit/ui/popover";
 import { Calendar } from "@kit/ui/calendar";
-import { format } from "date-fns";
+import { formatPrettyDate } from "@kit/lib/date-format";
 import { CalendarIcon, Filter, X, Search, RotateCcw, ChevronDown } from "lucide-react";
 import { cn } from "@kit/lib/utils";
 import { useDebounce } from "@kit/hooks";
@@ -246,7 +246,7 @@ export function UnifiedFilter({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {value ? format(value as Date, "PPP") : option.placeholder || "Pick a date"}
+                {value ? formatPrettyDate(value as Date) : option.placeholder || "Pick a date"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0">
@@ -273,7 +273,7 @@ export function UnifiedFilter({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateValue ? format(dateValue, "PPP") : option.placeholder || "Pick a date"}
+                {dateValue ? formatPrettyDate(dateValue) : option.placeholder || "Pick a date"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0">

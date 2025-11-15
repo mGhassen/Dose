@@ -9,7 +9,7 @@ import AppLayout from "@/components/app-layout";
 import { useLoanById, useLoanSchedule, useGenerateLoanSchedule } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
-import { formatDate } from "@kit/lib/date-format";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 import {
   Table,
   TableBody,
@@ -296,7 +296,7 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
                           <Calendar className="h-5 w-5 text-muted-foreground" />
                           <div>
                             <span className="font-medium text-lg">
-                              {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+                              {formatMonthYear(date)}
                             </span>
                             {isFuture && (
                               <Badge variant="secondary" className="ml-2">Upcoming</Badge>

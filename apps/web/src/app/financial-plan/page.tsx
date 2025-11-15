@@ -9,6 +9,7 @@ import { useFinancialPlan, useDeleteFinancialPlan } from "@kit/hooks";
 import type { FinancialPlan } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
+import { formatMonthYear } from "@kit/lib/date-format";
 import { toast } from "sonner";
 
 export default function FinancialPlanPage() {
@@ -24,7 +25,7 @@ export default function FinancialPlanPage() {
         const month = row.original.month;
         const [year, monthNum] = month.split('-');
         const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+        return formatMonthYear(date);
       },
     },
     {

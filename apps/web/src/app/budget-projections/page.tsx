@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useBudgetProjections } from "@kit/hooks";
 import { formatCurrency } from "@kit/lib/config";
+import { formatMonthYear } from "@kit/lib/date-format";
 import { toast } from "sonner";
 import { 
   LineChart, 
@@ -600,7 +601,7 @@ export default function BudgetProjectionsAgendaPage() {
             const data = monthlyProjections[month];
             const [year, monthNum] = month.split('-');
             const date = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
-            const monthName = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+            const monthName = formatMonthYear(date);
             const isPast = date < new Date();
             const isCurrent = date.getMonth() === new Date().getMonth() && date.getFullYear() === new Date().getFullYear();
 

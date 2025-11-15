@@ -11,7 +11,7 @@ import AppLayout from "@/components/app-layout";
 import { useLeasingById } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
-import { formatDate } from "@kit/lib/date-format";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 import { projectLeasingPayment } from "@/lib/calculations/leasing-timeline";
 import type { LeasingTimelineEntry } from "@/lib/calculations/leasing-timeline";
 import { EditableLeasingTimelineRow } from "./leasing-timeline-editable";
@@ -340,7 +340,7 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
                         <div className="flex items-center space-x-3">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           <span className="font-medium">
-                            {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+                            {formatMonthYear(date)}
                           </span>
                           {isFuture && (
                             <Badge variant="secondary" className="text-xs">Projected</Badge>

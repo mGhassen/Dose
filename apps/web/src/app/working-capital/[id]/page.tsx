@@ -11,6 +11,7 @@ import AppLayout from "@/components/app-layout";
 import { useWorkingCapitalById, useUpdateWorkingCapital, useDeleteWorkingCapital, useCalculateWorkingCapital } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 
 interface WorkingCapitalDetailPageProps {
   params: Promise<{ id: string }>;
@@ -154,7 +155,7 @@ export default function WorkingCapitalDetailPage({ params }: WorkingCapitalDetai
   const monthDisplay = (() => {
     const [year, monthNum] = workingCapital.month.split('-');
     const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+    return formatMonthYear(date);
   })();
 
   const currentAssets = parseFloat(formData.accountsReceivable || '0') + 
@@ -412,10 +413,10 @@ export default function WorkingCapitalDetailPage({ params }: WorkingCapitalDetai
                 <div className="pt-4 border-t">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-muted-foreground">
                     <div>
-                      <span className="font-medium">Created:</span> {new Date(workingCapital.createdAt).toLocaleDateString()}
+                      <span className="font-medium">Created:</span> {formatDate(workingCapital.createdAt)}
                     </div>
                     <div>
-                      <span className="font-medium">Last Updated:</span> {new Date(workingCapital.updatedAt).toLocaleDateString()}
+                      <span className="font-medium">Last Updated:</span> {formatDate(workingCapital.updatedAt)}
                     </div>
                   </div>
                 </div>

@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import AppLayout from "@/components/app-layout";
 import { formatCurrency } from "@kit/lib/config";
+import { formatMonthYear } from "@kit/lib/date-format";
 import { toast } from "sonner";
 import { 
   LineChart, 
@@ -76,7 +77,7 @@ export default function WorkingCapitalPage() {
         const month = row.original.month;
         const [year, monthNum] = month.split('-');
         const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+        return formatMonthYear(date);
       },
     },
     {

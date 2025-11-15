@@ -90,6 +90,19 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // Debug logging (remove in production if needed)
+    if (expenseProjections.length === 0 && expenses.length > 0) {
+      console.warn(`[Expenses Analytics] No projections generated for year ${year} despite ${expenses.length} expenses`);
+      console.warn('Sample expense:', expenses[0] ? {
+        id: expenses[0].id,
+        name: expenses[0].name,
+        startDate: expenses[0].startDate,
+        endDate: expenses[0].endDate,
+        recurrence: expenses[0].recurrence,
+        isActive: expenses[0].isActive
+      } : 'No expenses');
+    }
+
     // Format monthly data for chart
     const monthlyChartData = months.map(month => ({
       month: `${year}-${month}`,

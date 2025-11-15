@@ -8,7 +8,7 @@ import { useActualPayments, useDeleteActualPayment } from "@kit/hooks";
 import type { ActualPayment } from "@kit/lib";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
-import { formatDate } from "@kit/lib/date-format";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 import { toast } from "sonner";
 
 export default function OutputPaymentsContent() {
@@ -53,7 +53,7 @@ export default function OutputPaymentsContent() {
       header: "Month",
       cell: ({ row }) => {
         const [year, month] = row.original.month.split('-');
-        return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+        return formatMonthYear(new Date(parseInt(year), parseInt(month) - 1));
       },
     },
     {

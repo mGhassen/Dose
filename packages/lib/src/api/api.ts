@@ -26,7 +26,8 @@ const inflightRequests = new Map<string, Promise<any>>();
 export async function apiRequest<T>(
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   endpoint: string,
-  data?: any
+  data?: any,
+  signal?: AbortSignal
 ): Promise<T> {
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   let url = `${API_BASE_URL}${normalizedEndpoint}`;
@@ -70,11 +71,28 @@ export async function apiRequest<T>(
   }
   const doFetch = async (): Promise<T> => {
     try {
+      // Create a combined signal that aborts on timeout or external signal
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 4000);
+      
+      // If external signal is provided, abort our controller when it aborts
+      if (signal) {
+        if (signal.aborted) {
+          clearTimeout(timeout);
+          throw new DOMException('The operation was aborted.', 'AbortError');
+        }
+        signal.addEventListener('abort', () => {
+          clearTimeout(timeout);
+          controller.abort();
+        });
+      }
+      
+      // Use external signal if provided, otherwise use our timeout controller
+      const finalSignal = signal || controller.signal;
+      
       const response = await fetch(url, { 
         ...options, 
-        signal: controller.signal,
+        signal: finalSignal,
         ...(isServer && { cache: 'no-store' as RequestCache }), // Always fetch fresh on server
       });
       clearTimeout(timeout);
@@ -141,6 +159,10 @@ export async function apiRequest<T>(
       
       return result;
     } catch (error) {
+      // Don't log AbortError as it's expected when queries are cancelled
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error;
+      }
       console.error('API request error:', error);
       throw error;
     }

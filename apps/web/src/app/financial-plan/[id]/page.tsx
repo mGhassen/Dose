@@ -11,6 +11,7 @@ import AppLayout from "@/components/app-layout";
 import { useFinancialPlanById, useUpdateFinancialPlan, useDeleteFinancialPlan, useCalculateFinancialPlan } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 
 interface FinancialPlanDetailPageProps {
   params: Promise<{ id: string }>;
@@ -161,7 +162,7 @@ export default function FinancialPlanDetailPage({ params }: FinancialPlanDetailP
   const monthDisplay = (() => {
     const [year, monthNum] = financialPlan.month.split('-');
     const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+    return formatMonthYear(date);
   })();
 
   const totalSources = parseFloat(formData.equity || '0') + 
@@ -433,10 +434,10 @@ export default function FinancialPlanDetailPage({ params }: FinancialPlanDetailP
                 <div className="pt-4 border-t">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-muted-foreground">
                     <div>
-                      <span className="font-medium">Created:</span> {new Date(financialPlan.createdAt).toLocaleDateString()}
+                      <span className="font-medium">Created:</span> {formatDate(financialPlan.createdAt)}
                     </div>
                     <div>
-                      <span className="font-medium">Last Updated:</span> {new Date(financialPlan.updatedAt).toLocaleDateString()}
+                      <span className="font-medium">Last Updated:</span> {formatDate(financialPlan.updatedAt)}
                     </div>
                   </div>
                 </div>

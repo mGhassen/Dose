@@ -9,6 +9,7 @@ import AppLayout from "@/components/app-layout";
 import { useProfitLossByMonth, useCalculateProfitLoss } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 
 interface ProfitLossDetailPageProps {
   params: Promise<{ month: string }>;
@@ -49,7 +50,7 @@ export default function ProfitLossDetailPage({ params }: ProfitLossDetailPagePro
   const monthDisplay = (() => {
     const [year, monthNum] = resolvedParams.month.split('-');
     const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+    return formatMonthYear(date);
   })();
 
   if (!profitLoss) {
@@ -183,10 +184,10 @@ export default function ProfitLossDetailPage({ params }: ProfitLossDetailPagePro
               <div className="pt-4 border-t">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-muted-foreground">
                   <div>
-                    <span className="font-medium">Created:</span> {new Date(profitLoss.createdAt).toLocaleDateString()}
+                    <span className="font-medium">Created:</span> {formatDate(profitLoss.createdAt)}
                   </div>
                   <div>
-                    <span className="font-medium">Last Updated:</span> {new Date(profitLoss.updatedAt).toLocaleDateString()}
+                    <span className="font-medium">Last Updated:</span> {formatDate(profitLoss.updatedAt)}
                   </div>
                 </div>
               </div>

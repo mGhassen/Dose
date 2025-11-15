@@ -18,7 +18,7 @@ import { Plus, Trash2, MoreVertical } from "lucide-react";
 import { useCreateActualPayment, useDeleteActualPayment, useActualPayments } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
-import { formatDate } from "@kit/lib/date-format";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 import type { LeasingTimelineEntry } from "@/lib/calculations/leasing-timeline";
 
 interface EditableLeasingTimelineRowProps {
@@ -87,7 +87,7 @@ export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: Edita
       <TableRow className={isPastDue ? "bg-destructive/10" : isProjected && !isFullyPaid ? "bg-muted/50" : ""}>
         <TableCell className="font-medium">
           <div className="flex items-center space-x-2">
-            {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+            {formatMonthYear(date)}
             {isProjected && !isFullyPaid && (
               <Badge variant="secondary" className="text-xs">(Projected)</Badge>
             )}
