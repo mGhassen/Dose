@@ -1,7 +1,7 @@
 // React Query hooks for Loans
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { loansApi } from '@kit/lib';
+import { loansApi, type UpdateLoanScheduleEntryData } from '@kit/lib';
 import type { Loan, LoanScheduleEntry, CreateLoanData, UpdateLoanData } from '@kit/types';
 
 export function useLoans() {
@@ -70,6 +70,19 @@ export function useGenerateLoanSchedule() {
     mutationFn: loansApi.generateSchedule,
     onSuccess: (_, loanId) => {
       queryClient.invalidateQueries({ queryKey: ['loans', loanId, 'schedule'] });
+    },
+  });
+}
+
+export function useUpdateLoanScheduleEntry() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ loanId, scheduleId, data }: { loanId: string; scheduleId: string; data: UpdateLoanScheduleEntryData }) => 
+      loansApi.updateScheduleEntry(loanId, scheduleId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['loans', variables.loanId, 'schedule'] });
+      queryClient.invalidateQueries({ queryKey: ['loans', variables.loanId] });
     },
   });
 }

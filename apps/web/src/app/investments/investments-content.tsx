@@ -110,7 +110,7 @@ export default function InvestmentsContent() {
     if (!confirm("Are you sure you want to delete this investment?")) return;
     
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(String(id));
       toast.success("Investment deleted successfully");
     } catch (error) {
       toast.error("Failed to delete investment");
@@ -122,7 +122,7 @@ export default function InvestmentsContent() {
     if (!confirm(`Are you sure you want to delete ${ids.length} investment(s)?`)) return;
     
     try {
-      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
+      await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} investment(s) deleted successfully`);
     } catch (error) {
       toast.error("Failed to delete investments");

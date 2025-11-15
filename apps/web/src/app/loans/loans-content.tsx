@@ -115,7 +115,7 @@ export default function LoansContent() {
     if (!confirm("Are you sure you want to delete this loan?")) return;
     
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(String(id));
       toast.success("Loan deleted successfully");
     } catch (error) {
       toast.error("Failed to delete loan");
@@ -127,7 +127,7 @@ export default function LoansContent() {
     if (!confirm(`Are you sure you want to delete ${ids.length} loan(s)?`)) return;
     
     try {
-      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
+      await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} loan(s) deleted successfully`);
     } catch (error) {
       toast.error("Failed to delete loans");

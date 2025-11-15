@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
+import { useYear } from "@/contexts/year-context";
 import { 
   PieChart, 
   Pie, 

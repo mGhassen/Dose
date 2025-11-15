@@ -15,7 +15,8 @@
     ".": "./src/index.ts",
     "./user": "./src/user.ts",
     "./auth": "./src/auth.ts",
-    "./object": "./src/object.ts"
+    "./object": "./src/object.ts",
+    "./financial": "./src/financial.ts"
   },
   "typesVersions": {
     "*": {

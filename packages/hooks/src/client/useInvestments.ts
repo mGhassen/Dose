@@ -1,7 +1,7 @@
 // React Query hooks for Investments
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { investmentsApi } from '@kit/lib';
+import { investmentsApi, type UpdateDepreciationEntryData } from '@kit/lib';
 import type { Investment, DepreciationEntry, CreateInvestmentData, UpdateInvestmentData } from '@kit/types';
 
 export function useInvestments() {
@@ -70,6 +70,19 @@ export function useGenerateDepreciation() {
     mutationFn: investmentsApi.generateDepreciation,
     onSuccess: (_, investmentId) => {
       queryClient.invalidateQueries({ queryKey: ['investments', investmentId, 'depreciation'] });
+    },
+  });
+}
+
+export function useUpdateDepreciationEntry() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ investmentId, entryId, data }: { investmentId: string; entryId: string; data: UpdateDepreciationEntryData }) => 
+      investmentsApi.updateDepreciationEntry(investmentId, entryId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['investments', variables.investmentId, 'depreciation'] });
+      queryClient.invalidateQueries({ queryKey: ['investments', variables.investmentId] });
     },
   });
 }

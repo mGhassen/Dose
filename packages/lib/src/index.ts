@@ -36,6 +36,7 @@ export * from './api/balance-sheet';
 export * from './api/financial-plan';
 export * from './api/budgets';
 export * from './api/dashboard';
+export * from './api/actual-payments';
 
 // Export Supabase client
 export * from './supabase';

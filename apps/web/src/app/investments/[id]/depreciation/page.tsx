@@ -17,6 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@kit/ui/table";
+import { EditableDepreciationRow } from "./depreciation-editable";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface InvestmentDepreciationPageProps {
   params: Promise<{ id: string }>;
@@ -24,10 +26,17 @@ interface InvestmentDepreciationPageProps {
 
 export default function InvestmentDepreciationPage({ params }: InvestmentDepreciationPageProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: investment, isLoading: investmentLoading } = useInvestmentById(resolvedParams?.id || "");
   const { data: depreciation, isLoading: depreciationLoading } = useDepreciationSchedule(resolvedParams?.id || "");
   const generateDepreciation = useGenerateDepreciationSchedule();
+
+  const handleDepreciationUpdate = () => {
+    if (resolvedParams?.id) {
+      queryClient.invalidateQueries({ queryKey: ['investments', resolvedParams.id, 'depreciation'] });
+    }
+  };
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -186,16 +195,17 @@ export default function InvestmentDepreciationPage({ params }: InvestmentDepreci
                       <TableHead className="text-right">Depreciation Amount</TableHead>
                       <TableHead className="text-right">Accumulated Depreciation</TableHead>
                       <TableHead className="text-right">Book Value</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {depreciation.map((entry, index) => (
-                      <TableRow key={entry.id || index}>
-                        <TableCell className="font-medium">{entry.month}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(entry.depreciationAmount)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(entry.accumulatedDepreciation)}</TableCell>
-                        <TableCell className="text-right font-semibold">{formatCurrency(entry.bookValue)}</TableCell>
-                      </TableRow>
+                      <EditableDepreciationRow
+                        key={entry.id || index}
+                        entry={entry}
+                        investmentId={resolvedParams?.id || ""}
+                        onUpdate={handleDepreciationUpdate}
+                      />
                     ))}
                     <TableRow className="font-semibold bg-muted">
                       <TableCell>Total</TableCell>

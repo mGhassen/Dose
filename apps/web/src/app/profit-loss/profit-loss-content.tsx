@@ -137,7 +137,7 @@ export default function ProfitLossContent() {
     if (!confirm("Are you sure you want to delete this profit & loss statement?")) return;
     
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(String(id));
       toast.success("Profit & Loss statement deleted successfully");
     } catch (error) {
       toast.error("Failed to delete profit & loss statement");
@@ -149,7 +149,7 @@ export default function ProfitLossContent() {
     if (!confirm(`Are you sure you want to delete ${ids.length} profit & loss statement(s)?`)) return;
     
     try {
-      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
+      await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} profit & loss statement(s) deleted successfully`);
     } catch (error) {
       toast.error("Failed to delete profit & loss statements");

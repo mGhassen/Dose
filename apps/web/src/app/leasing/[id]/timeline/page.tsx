@@ -14,6 +14,8 @@ import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { projectLeasingPayment } from "@/lib/calculations/leasing-timeline";
 import type { LeasingTimelineEntry } from "@/lib/calculations/leasing-timeline";
+import { EditableLeasingTimelineRow } from "./leasing-timeline-editable";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Table,
   TableBody,
@@ -30,6 +32,7 @@ interface LeasingTimelinePageProps {
 
 export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: leasing, isLoading: leasingLoading } = useLeasingById(resolvedParams?.id || "");
   const [startMonth, setStartMonth] = useState(() => {
@@ -42,6 +45,10 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [timeline, setTimeline] = useState<LeasingTimelineEntry[]>([]);
+
+  const handleTimelineUpdate = () => {
+    queryClient.invalidateQueries({ queryKey: ['actual-payments'] });
+  };
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -276,32 +283,19 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
                       <TableHead>Payment Date</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {timeline.map((entry, index) => {
-                      const [year, month] = entry.month.split('-');
-                      const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-                      const paymentDate = new Date(entry.paymentDate);
-                      return (
-                        <TableRow key={`${entry.month}-${index}`}>
-                          <TableCell className="font-medium">
-                            {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
-                          </TableCell>
-                          <TableCell>
-                            {paymentDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                          </TableCell>
-                          <TableCell className="font-semibold">
-                            {formatCurrency(entry.amount)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={entry.isProjected ? "secondary" : "default"}>
-                              {entry.isProjected ? "Projected" : "Actual"}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {timeline.map((entry, index) => (
+                      <EditableLeasingTimelineRow
+                        key={`${entry.month}-${index}`}
+                        entry={entry}
+                        leasingId={Number(resolvedParams?.id || 0)}
+                        onUpdate={handleTimelineUpdate}
+                      />
+                    ))}
                     <TableRow className="font-semibold bg-muted">
                       <TableCell colSpan={2}>Total</TableCell>
                       <TableCell>{formatCurrency(totalAmount)}</TableCell>

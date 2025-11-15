@@ -19,6 +19,8 @@ import {
   TableRow,
 } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
+import { EditableScheduleRow } from "./loan-schedule-editable";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface LoanSchedulePageProps {
   params: Promise<{ id: string }>;
@@ -26,10 +28,17 @@ interface LoanSchedulePageProps {
 
 export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: loan, isLoading: loanLoading } = useLoanById(resolvedParams?.id || "");
   const { data: schedule, isLoading: scheduleLoading } = useLoanSchedule(resolvedParams?.id || "");
   const generateSchedule = useGenerateLoanSchedule();
+
+  const handleScheduleUpdate = () => {
+    if (resolvedParams?.id) {
+      queryClient.invalidateQueries({ queryKey: ['loans', resolvedParams.id, 'schedule'] });
+    }
+  };
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -229,27 +238,17 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
                       <TableHead className="text-right">Total Payment</TableHead>
                       <TableHead className="text-right">Remaining Balance</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {schedule.map((entry, index) => (
-                      <TableRow key={entry.id || index}>
-                        <TableCell className="font-medium">{entry.month}</TableCell>
-                        <TableCell>{formatDate(entry.paymentDate)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(entry.principalPayment)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(entry.interestPayment)}</TableCell>
-                        <TableCell className="text-right font-semibold">{formatCurrency(entry.totalPayment)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(entry.remainingBalance)}</TableCell>
-                        <TableCell>
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            entry.isPaid 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {entry.isPaid ? 'Paid' : 'Pending'}
-                          </span>
-                        </TableCell>
-                      </TableRow>
+                      <EditableScheduleRow
+                        key={entry.id || index}
+                        entry={entry}
+                        loanId={resolvedParams?.id || ""}
+                        onUpdate={handleScheduleUpdate}
+                      />
                     ))}
                     <TableRow className="font-semibold bg-muted">
                       <TableCell colSpan={2}>Total</TableCell>

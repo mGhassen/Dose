@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { projectExpense } from "@/lib/calculations/expense-projections";
 import type { Expense, ExpenseProjection } from "@kit/types";
+import { EditableExpenseTimelineRow } from "./expense-timeline-editable";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Table,
   TableBody,
@@ -25,7 +27,12 @@ import { Badge } from "@kit/ui/badge";
 
 export default function ExpensesTimelinePage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: expenses, isLoading } = useExpenses();
+
+  const handleTimelineUpdate = () => {
+    queryClient.invalidateQueries({ queryKey: ['actual-payments'] });
+  };
   const [startMonth, setStartMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -253,28 +260,17 @@ export default function ExpensesTimelinePage() {
                             <TableHead>Month</TableHead>
                             <TableHead>Amount</TableHead>
                             <TableHead>Status</TableHead>
+                            <TableHead>Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {projections.map((proj, idx) => {
-                            const [year, month] = proj.month.split('-');
-                            const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-                            return (
-                              <TableRow key={`${proj.month}-${idx}`}>
-                                <TableCell className="font-medium">
-                                  {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
-                                </TableCell>
-                                <TableCell className="font-semibold">
-                                  {formatCurrency(proj.amount)}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={proj.isProjected ? "secondary" : "default"}>
-                                    {proj.isProjected ? "Projected" : "Actual"}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
+                          {projections.map((proj, idx) => (
+                            <EditableExpenseTimelineRow
+                              key={`${proj.month}-${idx}`}
+                              projection={proj}
+                              onUpdate={handleTimelineUpdate}
+                            />
+                          ))}
                         </TableBody>
                       </Table>
                     </div>
