@@ -46,6 +46,7 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
     try {
       await createPayment.mutateAsync({
         paymentType: 'expense',
+        direction: 'output', // Expense payments are output (money going out)
         referenceId: projection.expenseId,
         month: projection.month,
         paymentDate: paidDate,

@@ -48,6 +48,7 @@ export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: Edita
     try {
       await createPayment.mutateAsync({
         paymentType: 'leasing',
+        direction: 'output', // Leasing payments are output (money going out)
         referenceId: leasingId,
         month: entry.month,
         paymentDate: paidDate,

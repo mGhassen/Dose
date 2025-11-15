@@ -77,6 +77,7 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
     try {
       await createPayment.mutateAsync({
         paymentType: 'loan',
+        direction: 'output', // Loan payments are output (money going out)
         referenceId: Number(loanId),
         scheduleEntryId: entry.id,
         month: entry.paymentDate.slice(0, 7),

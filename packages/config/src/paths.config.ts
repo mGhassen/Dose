@@ -40,7 +40,7 @@ export const pathsConfig: NavigationConfig = {
     },
     {
       title: "inputs",
-      url: "/inputs",
+      url: "#",
       icon: "Database",
       translationKey: "inputs",
       items: [
@@ -53,7 +53,7 @@ export const pathsConfig: NavigationConfig = {
     },
     {
       title: "outputs",
-      url: "/outputs",
+      url: "#",
       icon: "Database",
       translationKey: "outputs",
       items: [
@@ -90,8 +90,26 @@ export const pathsConfig: NavigationConfig = {
       ]
     },
     {
+      title: "payments",
+      url: "/payments",
+      icon: "CreditCard",
+      translationKey: "payments",
+      items: [
+        {
+          title: "input-payments",
+          url: "/payments/input",
+          translationKey: "inputPayments"
+        },
+        {
+          title: "output-payments",
+          url: "/payments/output",
+          translationKey: "outputPayments"
+        },
+      ]
+    },
+    {
       title: "financial-results",
-      url: "/financial-results",
+      url: "#",
       icon: "TrendingUp",
       translationKey: "financialResults",
       items: [
@@ -124,7 +142,7 @@ export const pathsConfig: NavigationConfig = {
     },
     {
       title: "analytics",
-      url: "/analytics",
+      url: "#",
       icon: "BarChart3",
       translationKey: "analytics",
       items: [
@@ -162,7 +180,7 @@ export const pathsConfig: NavigationConfig = {
     },
     {
       title: "budgeting",
-      url: "/budgeting",
+      url: "#",
       icon: "FileSpreadsheet",
       translationKey: "budgeting",
       items: [
