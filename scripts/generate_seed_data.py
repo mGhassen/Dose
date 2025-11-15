@@ -162,8 +162,9 @@ def generate_leasing_payments():
     return leases
 
 def generate_loans():
-    """Generate 15+ loans"""
-    loans = []
+    """Generate 15+ loans - returns both SQL strings and raw data"""
+    loans_sql = []
+    loans_data = []  # Raw data for schedule generation
     loan_id = 1
     
     base_loans = [
@@ -175,7 +176,8 @@ def generate_loans():
     ]
     
     for name, loan_num, principal, rate, duration, start_date, status in base_loans:
-        loans.append(f"({loan_id}, '{name}', '{loan_num}', {principal:.2f}, {rate:.2f}, {duration}, '{start_date}', '{status}', 'Bank {loan_id}', '{name} description')")
+        loans_sql.append(f"({loan_id}, '{name}', '{loan_num}', {principal:.2f}, {rate:.2f}, {duration}, '{start_date}', '{status}', 'Bank {loan_id}', '{name} description')")
+        loans_data.append((loan_id, principal, rate, duration, start_date))
         loan_id += 1
     
     # Generate more loans
@@ -185,21 +187,17 @@ def generate_loans():
         duration = 36 + (i * 6)
         month = (i % 12) + 1
         start_date = f"2024-{month:02d}-01"
-        loans.append(f"({i}, 'Loan {i}', 'Emprunt {i}', {principal:.2f}, {rate:.2f}, {duration}, '{start_date}', 'active', 'Bank {i}', 'Auto-generated loan {i}')")
+        loans_sql.append(f"({i}, 'Loan {i}', 'Emprunt {i}', {principal:.2f}, {rate:.2f}, {duration}, '{start_date}', 'active', 'Bank {i}', 'Auto-generated loan {i}')")
+        loans_data.append((i, principal, rate, duration, start_date))
     
-    return loans
+    return loans_sql, loans_data
 
 def generate_loan_schedules(loans_data):
     """Generate full loan schedules for all loans"""
     schedules = []
     schedule_id = 1
     
-    for loan_id, loan_info in enumerate(loans_data, 1):
-        # Parse loan info (name, loan_num, principal, rate, duration, start_date, status, lender, desc)
-        principal = float(loan_info.split(',')[2].strip())
-        rate = float(loan_info.split(',')[3].strip())
-        duration = int(loan_info.split(',')[4].strip())
-        start_date_str = loan_info.split(',')[5].strip().strip("'")
+    for loan_id, principal, rate, duration, start_date_str in loans_data:
         
         # Calculate monthly payment using amortization formula
         monthly_rate = rate / 100 / 12
@@ -317,7 +315,8 @@ def generate_sales(start_year=2024, end_year=2025):
             elif sale_id % 20 == 0:
                 description = 'Special event'
             
-            sales.append(f"({sale_id}, '{current_date}', '{sale_type}', {amount:.2f}, {quantity}, {f\"'{description}'\" if description else 'NULL'})")
+            desc_str = f"'{description}'" if description else 'NULL'
+            sales.append(f"({sale_id}, '{current_date}', '{sale_type}', {amount:.2f}, {quantity}, {desc_str})")
             sale_id += 1
         
         current_date += datetime.timedelta(days=1)
@@ -325,8 +324,9 @@ def generate_sales(start_year=2024, end_year=2025):
     return sales
 
 def generate_investments():
-    """Generate 50+ investments"""
-    investments = []
+    """Generate 50+ investments - returns both SQL strings and raw data"""
+    investments_sql = []
+    investments_data = []  # Raw data for depreciation generation
     inv_id = 1
     
     base_investments = [
@@ -339,7 +339,8 @@ def generate_investments():
     ]
     
     for name, inv_type, amount, purchase_date, useful_life, method, residual in base_investments:
-        investments.append(f"({inv_id}, '{name}', '{inv_type}', {amount:.2f}, '{purchase_date}', {useful_life}, '{method}', {residual:.2f}, '{name} investment')")
+        investments_sql.append(f"({inv_id}, '{name}', '{inv_type}', {amount:.2f}, '{purchase_date}', {useful_life}, '{method}', {residual:.2f}, '{name} investment')")
+        investments_data.append((inv_id, amount, purchase_date, useful_life, method, residual))
         inv_id += 1
     
     # Generate more investments
@@ -355,23 +356,17 @@ def generate_investments():
         method = methods[i % len(methods)]
         residual = amount * 0.1
         
-        investments.append(f"({i}, 'Investment {i}', '{inv_type}', {amount:.2f}, '{purchase_date}', {useful_life}, '{method}', {residual:.2f}, 'Auto-generated investment {i}')")
+        investments_sql.append(f"({i}, 'Investment {i}', '{inv_type}', {amount:.2f}, '{purchase_date}', {useful_life}, '{method}', {residual:.2f}, 'Auto-generated investment {i}')")
+        investments_data.append((i, amount, purchase_date, useful_life, method, residual))
     
-    return investments
+    return investments_sql, investments_data
 
 def generate_depreciation_entries(investments_data, months=24):
     """Generate depreciation entries for all investments"""
     entries = []
     entry_id = 1
     
-    for inv_id, inv_info in enumerate(investments_data, 1):
-        # Parse investment info
-        parts = inv_info.split(',')
-        amount = float(parts[2].strip())
-        purchase_date_str = parts[3].strip().strip("'")
-        useful_life = int(parts[4].strip())
-        method = parts[5].strip().strip("'")
-        residual = float(parts[6].strip())
+    for inv_id, amount, purchase_date_str, useful_life, method, residual in investments_data:
         
         purchase_date = datetime.datetime.strptime(purchase_date_str, '%Y-%m-%d').date()
         
@@ -494,6 +489,7 @@ def main():
     print("-- Comprehensive Seed Data for SunnyBudget")
     print("-- Generated by generate_seed_data.py")
     print("-- This file contains extensive sample data for development and testing")
+    print("-- Run with: supabase db reset (applies migrations then seed.sql)")
     print()
     
     # Generate all data
@@ -503,6 +499,7 @@ def main():
     subscriptions = generate_subscriptions()
     print("INSERT INTO subscriptions (id, name, category, amount, recurrence, start_date, end_date, description, vendor, is_active) VALUES")
     print(",\n".join(subscriptions) + ";")
+    print("SELECT setval('subscriptions_id_seq', (SELECT MAX(id) FROM subscriptions));")
     print()
     
     print("-- ============================================================================")
@@ -514,6 +511,7 @@ def main():
     if len(expenses) > 500:
         print("INSERT INTO expenses (id, name, category, amount, recurrence, start_date, expense_date, description, vendor, subscription_id) VALUES")
         print(",\n".join(expenses[500:]) + ";")
+    print("SELECT setval('expenses_id_seq', (SELECT MAX(id) FROM expenses));")
     print()
     
     print("-- ============================================================================")
@@ -522,25 +520,28 @@ def main():
     leases = generate_leasing_payments()
     print("INSERT INTO leasing_payments (id, name, type, amount, start_date, end_date, frequency, description, lessor, is_active) VALUES")
     print(",\n".join(leases) + ";")
+    print("SELECT setval('leasing_payments_id_seq', (SELECT MAX(id) FROM leasing_payments));")
     print()
     
     print("-- ============================================================================")
     print("-- LOANS (15+ loans)")
     print("-- ============================================================================")
-    loans = generate_loans()
+    loans_sql, loans_data = generate_loans()
     print("INSERT INTO loans (id, name, loan_number, principal_amount, interest_rate, duration_months, start_date, status, lender, description) VALUES")
-    print(",\n".join(loans) + ";")
+    print(",\n".join(loans_sql) + ";")
+    print("SELECT setval('loans_id_seq', (SELECT MAX(id) FROM loans));")
     print()
     
     print("-- ============================================================================")
     print("-- LOAN SCHEDULES (Full schedules for all loans)")
     print("-- ============================================================================")
-    schedules = generate_loan_schedules(loans)
+    schedules = generate_loan_schedules(loans_data)
     print("INSERT INTO loan_schedules (id, loan_id, month, payment_date, principal_payment, interest_payment, total_payment, remaining_balance, is_paid, paid_date) VALUES")
     print(",\n".join(schedules[:200]) + ";")  # First batch
     if len(schedules) > 200:
         print("INSERT INTO loan_schedules (id, loan_id, month, payment_date, principal_payment, interest_payment, total_payment, remaining_balance, is_paid, paid_date) VALUES")
         print(",\n".join(schedules[200:]) + ";")
+    print("SELECT setval('loan_schedules_id_seq', (SELECT MAX(id) FROM loan_schedules));")
     print()
     
     print("-- ============================================================================")
@@ -549,6 +550,7 @@ def main():
     personnel = generate_personnel()
     print("INSERT INTO personnel (id, first_name, last_name, email, position, type, base_salary, employer_charges, employer_charges_type, start_date, end_date, is_active, notes) VALUES")
     print(",\n".join(personnel) + ";")
+    print("SELECT setval('personnel_id_seq', (SELECT MAX(id) FROM personnel));")
     print()
     
     print("-- ============================================================================")
@@ -566,20 +568,22 @@ def main():
         print(",\n".join(batch) + ";")
         if i + batch_size < len(sales):
             print()
+    print("SELECT setval('sales_id_seq', (SELECT MAX(id) FROM sales));")
     print()
     
     print("-- ============================================================================")
     print("-- INVESTMENTS (50+ investments)")
     print("-- ============================================================================")
-    investments = generate_investments()
+    investments_sql, investments_data = generate_investments()
     print("INSERT INTO investments (id, name, type, amount, purchase_date, useful_life_months, depreciation_method, residual_value, description) VALUES")
-    print(",\n".join(investments) + ";")
+    print(",\n".join(investments_sql) + ";")
+    print("SELECT setval('investments_id_seq', (SELECT MAX(id) FROM investments));")
     print()
     
     print("-- ============================================================================")
     print("-- DEPRECIATION ENTRIES (Full depreciation for all investments)")
     print("-- ============================================================================")
-    depreciation = generate_depreciation_entries(investments, 24)
+    depreciation = generate_depreciation_entries(investments_data, 24)
     print(f"-- Generating {len(depreciation)} depreciation entries...")
     print("INSERT INTO depreciation_entries (id, investment_id, month, depreciation_amount, accumulated_depreciation, book_value) VALUES")
     batch_size = 500
@@ -590,6 +594,7 @@ def main():
         print(",\n".join(batch) + ";")
         if i + batch_size < len(depreciation):
             print()
+    print("SELECT setval('depreciation_entries_id_seq', (SELECT MAX(id) FROM depreciation_entries));")
     print()
     
     print("-- ============================================================================")
