@@ -34,7 +34,8 @@ import {
 export default function SubscriptionsTimelinePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: subscriptions, isLoading } = useSubscriptions();
+  const { data: subscriptionsResponse, isLoading } = useSubscriptions();
+  const subscriptions = subscriptionsResponse?.data || [];
 
   const handleTimelineUpdate = () => {
     queryClient.invalidateQueries({ queryKey: ['actual-payments'] });

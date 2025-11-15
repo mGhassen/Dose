@@ -27,12 +27,15 @@ interface ExpenseDetailsContentProps {
 export default function ExpenseDetailsContent({ expenseId }: ExpenseDetailsContentProps) {
   const router = useRouter();
   const { data: expense, isLoading } = useExpenseById(expenseId);
-  const { data: subscriptions } = useSubscriptions();
+  const { data: subscriptionsResponse } = useSubscriptions();
+  const subscriptions = subscriptionsResponse?.data || [];
   const deleteMutation = useDeleteExpense();
   
   const subscriptionMap = useMemo(() => {
     const map = new Map<number, string>();
-    subscriptions?.forEach(sub => map.set(sub.id, sub.name));
+    if (subscriptions && Array.isArray(subscriptions)) {
+      subscriptions.forEach(sub => map.set(sub.id, sub.name));
+    }
     return map;
   }, [subscriptions]);
 

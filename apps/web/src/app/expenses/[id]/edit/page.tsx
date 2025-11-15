@@ -24,7 +24,8 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: expense, isLoading } = useExpenseById(resolvedParams?.id || "");
   const updateExpense = useUpdateExpense();
-  const { data: subscriptions } = useSubscriptions();
+  const { data: subscriptionsResponse } = useSubscriptions();
+  const subscriptions = subscriptionsResponse?.data || [];
   
   const [formData, setFormData] = useState({
     name: "",

@@ -18,7 +18,8 @@ import type { ExpenseCategory } from "@kit/types";
 export default function CreateExpensePage() {
   const router = useRouter();
   const createExpense = useCreateExpense();
-  const { data: subscriptions } = useSubscriptions();
+  const { data: subscriptionsResponse } = useSubscriptions();
+  const subscriptions = subscriptionsResponse?.data || [];
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
