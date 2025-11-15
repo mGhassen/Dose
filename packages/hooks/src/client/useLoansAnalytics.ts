@@ -20,8 +20,10 @@ export interface LoansAnalytics {
 export function useLoansAnalytics() {
   return useQuery<LoansAnalytics>({
     queryKey: ['loans-analytics'],
-    queryFn: async () => {
-      const response = await fetch('/api/loans/analytics');
+    queryFn: async ({ signal }) => {
+      const response = await fetch('/api/loans/analytics', {
+        signal,
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch loans analytics');
       }

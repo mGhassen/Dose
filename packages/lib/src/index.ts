@@ -24,6 +24,7 @@ export type { LoginCredentials, RegisterData, AuthResponse, SessionData } from '
 // Export financial API modules
 export * from './api/expenses';
 export * from './api/subscriptions';
+export * from './api/vendors';
 export * from './api/leasing';
 export * from './api/loans';
 export * from './api/variables';

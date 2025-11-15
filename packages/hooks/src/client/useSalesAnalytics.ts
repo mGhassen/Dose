@@ -21,8 +21,10 @@ export function useSalesAnalytics(year?: string) {
 
   return useQuery<SalesAnalytics>({
     queryKey: ['sales-analytics', currentYear],
-    queryFn: async () => {
-      const response = await fetch(`/api/sales/analytics?year=${currentYear}`);
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`/api/sales/analytics?year=${currentYear}`, {
+        signal,
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch sales analytics');
       }

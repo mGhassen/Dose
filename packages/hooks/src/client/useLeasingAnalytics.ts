@@ -19,8 +19,10 @@ export function useLeasingAnalytics(year?: string) {
 
   return useQuery<LeasingAnalytics>({
     queryKey: ['leasing-analytics', currentYear],
-    queryFn: async () => {
-      const response = await fetch(`/api/leasing/analytics?year=${currentYear}`);
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`/api/leasing/analytics?year=${currentYear}`, {
+        signal,
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch leasing analytics');
       }

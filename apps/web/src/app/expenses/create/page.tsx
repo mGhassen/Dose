@@ -14,6 +14,7 @@ import AppLayout from "@/components/app-layout";
 import { useCreateExpense, useSubscriptions } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseCategory } from "@kit/types";
+import { UnifiedSelector } from "@/components/unified-selector";
 
 export default function CreateExpensePage() {
   const router = useRouter();
@@ -127,23 +128,26 @@ export default function CreateExpensePage() {
 
                 {/* Subscription (Optional) */}
                 <div className="space-y-2">
-                  <Label htmlFor="subscriptionId">Subscription (Optional)</Label>
-                  <Select
-                    value={formData.subscriptionId}
-                    onValueChange={(value) => handleInputChange('subscriptionId', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select subscription (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">None (One-time expense)</SelectItem>
-                      {subscriptions?.map(sub => (
-                        <SelectItem key={sub.id} value={sub.id.toString()}>
-                          {sub.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <UnifiedSelector
+                    mode="single"
+                    type="subscription"
+                    items={subscriptions.map(sub => ({
+                      id: sub.id,
+                      name: sub.name,
+                      description: sub.description,
+                    }))}
+                    selectedId={formData.subscriptionId ? parseInt(formData.subscriptionId) : undefined}
+                    onSelect={(item) => {
+                      handleInputChange('subscriptionId', item.id === 0 ? '' : item.id.toString());
+                    }}
+                    placeholder="Select subscription (optional)"
+                    searchPlaceholder="Search subscriptions..."
+                    label="Subscription (Optional)"
+                    manageLink={{
+                      href: '/subscriptions',
+                      text: 'Manage'
+                    }}
+                  />
                   <p className="text-xs text-muted-foreground">
                     Link this expense to a subscription payment
                   </p>

@@ -30,7 +30,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function SalesAnalyticsPage() {
   const { selectedYear } = useYear();
-  const salesAnalytics = useSalesAnalytics({ year: selectedYear });
+  const salesAnalytics = useSalesAnalytics(selectedYear);
 
   return (
     <AppLayout>

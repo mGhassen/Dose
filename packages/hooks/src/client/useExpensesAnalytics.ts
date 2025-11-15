@@ -20,8 +20,10 @@ export function useExpensesAnalytics(year?: string) {
 
   return useQuery<ExpensesAnalytics>({
     queryKey: ['expenses-analytics', currentYear],
-    queryFn: async () => {
-      const response = await fetch(`/api/expenses/analytics?year=${currentYear}`);
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`/api/expenses/analytics?year=${currentYear}`, {
+        signal,
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch expenses analytics');
       }

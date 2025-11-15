@@ -105,6 +105,35 @@ export interface CreateSubscriptionData {
 export interface UpdateSubscriptionData extends Partial<CreateSubscriptionData> {}
 
 // ============================================================================
+// VENDORS (Fournisseurs)
+// ============================================================================
+
+export interface Vendor {
+  id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  contactPerson?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateVendorData {
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  contactPerson?: string;
+  notes?: string;
+  isActive?: boolean;
+}
+
+export interface UpdateVendorData extends Partial<CreateVendorData> {}
+
+// ============================================================================
 // EXPENSES (Charges d'exploitation - one-time or linked to subscription)
 // ============================================================================
 

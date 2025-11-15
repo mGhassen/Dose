@@ -41,8 +41,10 @@ export interface InvestmentsAnalytics {
 export function useInvestmentsAnalytics() {
   return useQuery<InvestmentsAnalytics>({
     queryKey: ['investments-analytics'],
-    queryFn: async () => {
-      const response = await fetch('/api/investments/analytics');
+    queryFn: async ({ signal }) => {
+      const response = await fetch('/api/investments/analytics', {
+        signal,
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch investments analytics');
       }

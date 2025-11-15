@@ -21,8 +21,10 @@ export function usePersonnelAnalytics(year?: string) {
 
   return useQuery<PersonnelAnalytics>({
     queryKey: ['personnel-analytics', currentYear],
-    queryFn: async () => {
-      const response = await fetch(`/api/personnel/analytics?year=${currentYear}`);
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`/api/personnel/analytics?year=${currentYear}`, {
+        signal,
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch personnel analytics');
       }

@@ -2626,6 +2626,73 @@ export const mockMetadataEnumValues: Record<string, Array<{ id: number; name: st
 };
 
 // ============================================================================
+// VENDORS (Financial entities)
+// ============================================================================
+
+export const mockVendors = [
+  {
+    id: 1,
+    name: "Office Supplies Co.",
+    email: "contact@officesupplies.com",
+    phone: "+1 (555) 123-4567",
+    address: "123 Business St, New York, NY 10001",
+    contact_person: "John Smith",
+    notes: "Primary supplier for office materials",
+    is_active: true,
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z"
+  },
+  {
+    id: 2,
+    name: "Cloud Services Inc.",
+    email: "sales@cloudservices.com",
+    phone: "+1 (555) 234-5678",
+    address: "456 Tech Ave, San Francisco, CA 94102",
+    contact_person: "Sarah Johnson",
+    notes: "Monthly subscription services",
+    is_active: true,
+    created_at: "2024-01-02T00:00:00Z",
+    updated_at: "2024-01-02T00:00:00Z"
+  },
+  {
+    id: 3,
+    name: "Maintenance Solutions",
+    email: "info@maintenance.com",
+    phone: "+1 (555) 345-6789",
+    address: "789 Service Rd, Chicago, IL 60601",
+    contact_person: "Mike Davis",
+    notes: "Equipment maintenance and repairs",
+    is_active: true,
+    created_at: "2024-01-03T00:00:00Z",
+    updated_at: "2024-01-03T00:00:00Z"
+  },
+  {
+    id: 4,
+    name: "Marketing Agency Pro",
+    email: "hello@marketingpro.com",
+    phone: "+1 (555) 456-7890",
+    address: "321 Creative Blvd, Los Angeles, CA 90001",
+    contact_person: "Emily Chen",
+    notes: "Digital marketing and advertising services",
+    is_active: true,
+    created_at: "2024-01-04T00:00:00Z",
+    updated_at: "2024-01-04T00:00:00Z"
+  },
+  {
+    id: 5,
+    name: "Legal Advisors LLC",
+    email: "contact@legaladvisors.com",
+    phone: "+1 (555) 567-8901",
+    address: "654 Law St, Washington, DC 20001",
+    contact_person: "Robert Wilson",
+    notes: "Legal consultation and services",
+    is_active: false,
+    created_at: "2024-01-05T00:00:00Z",
+    updated_at: "2024-01-10T00:00:00Z"
+  }
+];
+
+// ============================================================================
 // COMBINED MOCK DATA OBJECT
 // ============================================================================
 
@@ -2662,7 +2729,8 @@ export const mockData = {
   settings: mockSettings,
   profiles: mockProfiles,
   metadataEnums: mockMetadataEnums,
-  metadataEnumValues: mockMetadataEnumValues
+  metadataEnumValues: mockMetadataEnumValues,
+  vendors: mockVendors
 };
 
 // ============================================================================

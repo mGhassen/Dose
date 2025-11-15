@@ -19,6 +19,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             staleTime: 5 * 60 * 1000, // 5 minutes instead of Infinity
             gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime) - keeps data in cache even when unused
             retry: (failureCount, error) => {
+              // Don't retry on abort errors (query cancellation)
+              if (error instanceof Error && error.name === 'AbortError') {
+                return false;
+              }
               // Retry up to 3 times for network errors
               if (failureCount < 3 && error instanceof Error && error.message.includes('fetch')) {
                 return true;

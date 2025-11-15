@@ -212,6 +212,11 @@ export const pathsConfig: NavigationConfig = {
           url: "/variables",
           translationKey: "variables"
         },
+        {
+          title: "vendors",
+          url: "/vendors",
+          translationKey: "vendors"
+        },
       ]
     },
   ],
