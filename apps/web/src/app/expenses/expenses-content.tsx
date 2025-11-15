@@ -526,7 +526,7 @@ export default function ExpensesContent() {
                   <div className="h-[300px] flex items-center justify-center">Loading...</div>
                 ) : analytics?.categoryBreakdown && analytics.categoryBreakdown.length > 0 ? (
                   <div className="space-y-3">
-                    {analytics.categoryBreakdown
+                    {[...analytics.categoryBreakdown]
                       .sort((a, b) => b.amount - a.amount)
                       .map((cat, idx) => (
                         <div key={cat.category} className="space-y-1">
@@ -559,29 +559,29 @@ export default function ExpensesContent() {
           </div>
         </TabsContent>
 
-        <TabsContent value="table" className="space-y-4">
+        <TabsContent value="table" className="space-y-4 -mx-6 px-6">
           <DataTablePage
-        title=""
-        description=""
-        createHref="/expenses/create"
-        data={expenses || []}
-        columns={columns}
-        loading={isLoading}
-        onRowClick={(expense) => router.push(`/expenses/${expense.id}`)}
-        onDelete={handleDelete}
-        onBulkDelete={handleBulkDelete}
-        onBulkCopy={handleBulkCopy}
-        onBulkExport={handleBulkExport}
-        filterColumns={[
-          { value: "category", label: "Category" },
-          { value: "recurrence", label: "Recurrence" },
-          { value: "isActive", label: "Status" },
-        ]}
-        sortColumns={[
-          { value: "name", label: "Name", type: "character varying" },
-          { value: "amount", label: "Amount", type: "numeric" },
-          { value: "startDate", label: "Start Date", type: "date" },
-        ]}
+            title=""
+            description=""
+            createHref="/expenses/create"
+            data={expenses || []}
+            columns={columns}
+            loading={isLoading}
+            onRowClick={(expense) => router.push(`/expenses/${expense.id}`)}
+            onDelete={handleDelete}
+            onBulkDelete={handleBulkDelete}
+            onBulkCopy={handleBulkCopy}
+            onBulkExport={handleBulkExport}
+            filterColumns={[
+              { value: "category", label: "Category" },
+              { value: "recurrence", label: "Recurrence" },
+              { value: "isActive", label: "Status" },
+            ]}
+            sortColumns={[
+              { value: "name", label: "Name", type: "character varying" },
+              { value: "amount", label: "Amount", type: "numeric" },
+              { value: "startDate", label: "Start Date", type: "date" },
+            ]}
             localStoragePrefix="expenses"
             searchFields={["name", "description", "vendor"]}
           />
