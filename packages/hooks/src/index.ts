@@ -12,6 +12,7 @@ export * from './client/useExpenses';
 export * from './client/useExpensesAnalytics';
 export * from './client/useSubscriptions';
 export * from './client/useVendors';
+export * from './client/useItems';
 export * from './client/useLoans';
 export * from './client/useLoansAnalytics';
 export * from './client/useSales';

@@ -134,6 +134,39 @@ export interface CreateVendorData {
 export interface UpdateVendorData extends Partial<CreateVendorData> {}
 
 // ============================================================================
+// ITEMS (Articles/Produits)
+// ============================================================================
+
+export interface Item {
+  id: number;
+  name: string;
+  description?: string;
+  category?: string;
+  sku?: string;
+  unit?: string;
+  unitPrice?: number;
+  vendorId?: number;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateItemData {
+  name: string;
+  description?: string;
+  category?: string;
+  sku?: string;
+  unit?: string;
+  unitPrice?: number;
+  vendorId?: number;
+  notes?: string;
+  isActive?: boolean;
+}
+
+export interface UpdateItemData extends Partial<CreateItemData> {}
+
+// ============================================================================
 // EXPENSES (Charges d'exploitation - one-time or linked to subscription)
 // ============================================================================
 

@@ -2693,6 +2693,83 @@ export const mockVendors = [
 ];
 
 // ============================================================================
+// ITEMS (Financial entities)
+// ============================================================================
+
+export const mockItems = [
+  {
+    id: 1,
+    name: "Premium Coffee Beans",
+    description: "High-quality arabica coffee beans",
+    category: "Food",
+    sku: "COFFEE-001",
+    unit: "kg",
+    unit_price: 25.99,
+    vendor_id: 1,
+    notes: "Best seller item",
+    is_active: true,
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z"
+  },
+  {
+    id: 2,
+    name: "Office Chairs",
+    description: "Ergonomic office chairs",
+    category: "Equipment",
+    sku: "CHAIR-001",
+    unit: "piece",
+    unit_price: 299.99,
+    vendor_id: 1,
+    notes: "Bulk order discount available",
+    is_active: true,
+    created_at: "2024-01-02T00:00:00Z",
+    updated_at: "2024-01-02T00:00:00Z"
+  },
+  {
+    id: 3,
+    name: "Cloud Storage License",
+    description: "Annual cloud storage subscription",
+    category: "Software",
+    sku: "CLOUD-001",
+    unit: "license",
+    unit_price: 1200.00,
+    vendor_id: 2,
+    notes: "Renews annually",
+    is_active: true,
+    created_at: "2024-01-03T00:00:00Z",
+    updated_at: "2024-01-03T00:00:00Z"
+  },
+  {
+    id: 4,
+    name: "Cleaning Supplies",
+    description: "General cleaning supplies and materials",
+    category: "Supplies",
+    sku: "CLEAN-001",
+    unit: "set",
+    unit_price: 45.50,
+    vendor_id: 3,
+    notes: "Monthly restock",
+    is_active: true,
+    created_at: "2024-01-04T00:00:00Z",
+    updated_at: "2024-01-04T00:00:00Z"
+  },
+  {
+    id: 5,
+    name: "Marketing Campaign Package",
+    description: "Complete digital marketing campaign",
+    category: "Services",
+    sku: "MKTG-001",
+    unit: "package",
+    unit_price: 5000.00,
+    vendor_id: 4,
+    notes: "Customizable based on needs",
+    is_active: false,
+    created_at: "2024-01-05T00:00:00Z",
+    updated_at: "2024-01-10T00:00:00Z"
+  }
+];
+
+// ============================================================================
 // COMBINED MOCK DATA OBJECT
 // ============================================================================
 
@@ -2730,7 +2807,8 @@ export const mockData = {
   profiles: mockProfiles,
   metadataEnums: mockMetadataEnums,
   metadataEnumValues: mockMetadataEnumValues,
-  vendors: mockVendors
+  vendors: mockVendors,
+  items: mockItems
 };
 
 // ============================================================================

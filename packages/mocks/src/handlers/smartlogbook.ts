@@ -337,10 +337,156 @@ const vendorsHandlers = [
   })
 ];
 
+// Items handlers with proper transformation
+const itemsHandlers = [
+  // GET all items
+  http.get('/api/items', () => {
+    const items = (mockData.items || []).map(item => ({
+      id: item.id,
+      name: item.name,
+      description: item.description || null,
+      category: item.category || null,
+      sku: item.sku || null,
+      unit: item.unit || null,
+      unitPrice: item.unit_price || null,
+      vendorId: item.vendor_id || null,
+      notes: item.notes || null,
+      isActive: item.is_active ?? true,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    }));
+    
+    return HttpResponse.json({
+      data: items,
+      pagination: {
+        page: 1,
+        limit: items.length,
+        total: items.length,
+        totalPages: 1,
+        hasMore: false,
+      },
+    });
+  }),
+
+  // GET item by ID
+  http.get('/api/items/:id', ({ params }) => {
+    const id = parseInt(params.id as string);
+    const item = mockData.items?.find(i => i.id === id);
+    
+    if (!item) {
+      return HttpResponse.json({ error: 'Item not found' }, { status: 404 });
+    }
+    
+    return HttpResponse.json({
+      id: item.id,
+      name: item.name,
+      description: item.description || null,
+      category: item.category || null,
+      sku: item.sku || null,
+      unit: item.unit || null,
+      unitPrice: item.unit_price || null,
+      vendorId: item.vendor_id || null,
+      notes: item.notes || null,
+      isActive: item.is_active ?? true,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    });
+  }),
+
+  // POST create item
+  http.post('/api/items', async ({ request }) => {
+    const body = await request.json() as any;
+    const newId = Math.max(...(mockData.items || []).map(i => i.id), 0) + 1;
+    const newItem = {
+      id: newId,
+      name: body.name,
+      description: body.description || null,
+      category: body.category || null,
+      sku: body.sku || null,
+      unit: body.unit || null,
+      unit_price: body.unitPrice || null,
+      vendor_id: body.vendorId || null,
+      notes: body.notes || null,
+      is_active: body.isActive ?? true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    mockData.items.push(newItem);
+    
+    return HttpResponse.json({
+      id: newItem.id,
+      name: newItem.name,
+      description: newItem.description,
+      category: newItem.category,
+      sku: newItem.sku,
+      unit: newItem.unit,
+      unitPrice: newItem.unit_price,
+      vendorId: newItem.vendor_id,
+      notes: newItem.notes,
+      isActive: newItem.is_active,
+      createdAt: newItem.created_at,
+      updatedAt: newItem.updated_at,
+    }, { status: 201 });
+  }),
+
+  // PUT update item
+  http.put('/api/items/:id', async ({ request, params }) => {
+    const id = parseInt(params.id as string);
+    const body = await request.json() as any;
+    const index = mockData.items.findIndex(i => i.id === id);
+    
+    if (index === -1) {
+      return HttpResponse.json({ error: 'Item not found' }, { status: 404 });
+    }
+    
+    if (body.name !== undefined) mockData.items[index].name = body.name;
+    if (body.description !== undefined) mockData.items[index].description = body.description;
+    if (body.category !== undefined) mockData.items[index].category = body.category;
+    if (body.sku !== undefined) mockData.items[index].sku = body.sku;
+    if (body.unit !== undefined) mockData.items[index].unit = body.unit;
+    if (body.unitPrice !== undefined) mockData.items[index].unit_price = body.unitPrice;
+    if (body.vendorId !== undefined) mockData.items[index].vendor_id = body.vendorId;
+    if (body.notes !== undefined) mockData.items[index].notes = body.notes;
+    if (body.isActive !== undefined) mockData.items[index].is_active = body.isActive;
+    mockData.items[index].updated_at = new Date().toISOString();
+    
+    const updated = mockData.items[index];
+    return HttpResponse.json({
+      id: updated.id,
+      name: updated.name,
+      description: updated.description,
+      category: updated.category,
+      sku: updated.sku,
+      unit: updated.unit,
+      unitPrice: updated.unit_price,
+      vendorId: updated.vendor_id,
+      notes: updated.notes,
+      isActive: updated.is_active,
+      createdAt: updated.created_at,
+      updatedAt: updated.updated_at,
+    });
+  }),
+
+  // DELETE item
+  http.delete('/api/items/:id', ({ params }) => {
+    const id = parseInt(params.id as string);
+    const index = mockData.items.findIndex(i => i.id === id);
+    
+    if (index === -1) {
+      return HttpResponse.json({ error: 'Item not found' }, { status: 404 });
+    }
+    
+    mockData.items.splice(index, 1);
+    return HttpResponse.json({}, { status: 204 });
+  })
+];
+
 // Combine all handlers
 export const allHandlers = [
   ...usersHandlers,
   ...vendorsHandlers,
+  ...itemsHandlers,
   // Add more entity handlers here as needed
   // Example: ...createCrudHandlers('entityname', mockData.entityname),
 ];
