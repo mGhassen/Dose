@@ -5,8 +5,8 @@
 
 // Currency configuration
 export const CURRENCY = {
-  code: process.env.NEXT_PUBLIC_CURRENCY_CODE || 'TND',
-  symbol: process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'TND',
+  code: process.env.NEXT_PUBLIC_CURRENCY_CODE || '€',
+  symbol: process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '€',
   locale: process.env.NEXT_PUBLIC_CURRENCY_LOCALE || 'fr-FR', // French locale for better TND support
 };
 
@@ -51,16 +51,16 @@ export const FORMAT_OPTIONS = {
 // Utility functions for consistent formatting
 export const formatCurrency = (amount: number | string): string => {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(numAmount)) return '0,00 TND';
+  if (isNaN(numAmount)) return `0,00 ${CURRENCY.symbol}`;
   
-  // Format the number with French locale (comma as decimal separator)
-  const formattedNumber = new Intl.NumberFormat('fr-FR', {
+  // Format the number with configured locale
+  const formattedNumber = new Intl.NumberFormat(CURRENCY.locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(numAmount);
   
-  // Always append TND
-  const result = `${formattedNumber} TND`;
+  // Use configured currency symbol
+  const result = `${formattedNumber} ${CURRENCY.symbol}`;
   
   return result;
 };

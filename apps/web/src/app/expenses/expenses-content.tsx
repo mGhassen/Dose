@@ -126,7 +126,7 @@ export default function ExpensesContent() {
     if (!confirm("Are you sure you want to delete this expense?")) return;
     
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(id.toString());
       toast.success("Expense deleted successfully");
     } catch (error) {
       toast.error("Failed to delete expense");
@@ -138,7 +138,7 @@ export default function ExpensesContent() {
     if (!confirm(`Are you sure you want to delete ${ids.length} expense(s)?`)) return;
     
     try {
-      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
+      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id.toString())));
       toast.success(`${ids.length} expense(s) deleted successfully`);
     } catch (error) {
       toast.error("Failed to delete expenses");

@@ -122,7 +122,7 @@ export default function BalanceSheetPage() {
     if (!confirm("Are you sure you want to delete this balance sheet?")) return;
     
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(id.toString());
       toast.success("Balance sheet deleted successfully");
     } catch (error) {
       toast.error("Failed to delete balance sheet");
@@ -134,7 +134,7 @@ export default function BalanceSheetPage() {
     if (!confirm(`Are you sure you want to delete ${ids.length} balance sheet(s)?`)) return;
     
     try {
-      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
+      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id.toString())));
       toast.success(`${ids.length} balance sheet(s) deleted successfully`);
     } catch (error) {
       toast.error("Failed to delete balance sheets");
@@ -307,7 +307,7 @@ export default function BalanceSheetPage() {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                        label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(1)}%`}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
@@ -342,7 +342,7 @@ export default function BalanceSheetPage() {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                        label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(1)}%`}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"

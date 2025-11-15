@@ -33,6 +33,7 @@ export * from './api/working-capital';
 export * from './api/profit-loss';
 export * from './api/balance-sheet';
 export * from './api/financial-plan';
+export * from './api/budgets';
 export * from './api/dashboard';
 
 // Export Supabase client

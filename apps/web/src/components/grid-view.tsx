@@ -366,7 +366,25 @@ export default function GridView({
 
           {/* Rows */}
           <div>
-            {flattenedRows.map((row) => {
+            {flattenedRows.length === 0 ? (
+              <div className="flex items-center justify-center h-64 text-muted-foreground">
+                <div className="text-center">
+                  <p className="text-sm">No data available</p>
+                  {onRowAdd && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onRowAdd?.()}
+                      className="mt-4"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add First Row
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              flattenedRows.map((row) => {
               const isEditing = editingCell?.rowId === row.id;
               const indent = (row.level || 0) * 24;
 
@@ -468,7 +486,7 @@ export default function GridView({
                   })}
                 </div>
               );
-            })}
+            }))}
           </div>
         </div>
       </div>

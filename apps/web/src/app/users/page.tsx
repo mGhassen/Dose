@@ -1,15 +1,12 @@
-import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
-import { prefetchUsers } from '@kit/hooks';
+"use client";
+
+import AppLayout from '@/components/app-layout';
 import UsersContent from './users-content';
 
-export const dynamic = 'force-dynamic';
-
-export default async function Page() {
-  const queryClient = await prefetchUsers();
-
+export default function Page() {
   return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
+    <AppLayout>
       <UsersContent />
-    </HydrationBoundary>
+    </AppLayout>
   );
 }

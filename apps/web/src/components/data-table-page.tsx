@@ -36,6 +36,8 @@ import { useTranslations } from 'next-intl';
 import DataTable from "@kit/ui/data-table";
 import { UnifiedFilter, FilterOption, FilterState } from "@/components/unified-filter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import GridView, { GridColumn, GridRow } from "@/components/grid-view";
+import ViewToggle from "@/components/view-toggle";
 
 interface DataTablePageProps<T> {
   title: string;
@@ -69,6 +71,9 @@ interface DataTablePageProps<T> {
     onPageChange: (page: number) => void;
     onPageSizeChange: (pageSize: number) => void;
   };
+  // Grid view props
+  enableGridView?: boolean;
+  defaultView?: 'table' | 'grid';
 }
 
 export default function DataTablePage<T>({
@@ -94,7 +99,9 @@ export default function DataTablePage<T>({
   isRowExpandable,
   expandedRows,
   onExpandedRowsChange,
-  pagination
+  pagination,
+  enableGridView = true,
+  defaultView = 'grid'
 }: DataTablePageProps<T>) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -103,6 +110,24 @@ export default function DataTablePage<T>({
   const tMessages = useTranslations('messages');
   const tForms = useTranslations('forms');
   const [filteredData, setFilteredData] = useState<T[]>([]);
+  
+  // View state - load from localStorage or use default
+  const [view, setView] = useState<'table' | 'grid'>(() => {
+    if (typeof window !== 'undefined' && enableGridView) {
+      const savedView = localStorage.getItem(`${localStoragePrefix}-view`);
+      if (savedView === 'table' || savedView === 'grid') {
+        return savedView;
+      }
+    }
+    return defaultView;
+  });
+
+  // Save view preference
+  useEffect(() => {
+    if (typeof window !== 'undefined' && enableGridView) {
+      localStorage.setItem(`${localStoragePrefix}-view`, view);
+    }
+  }, [view, localStoragePrefix, enableGridView]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [sortRules, setSortRules] = useState<Array<{id: string, column: string, direction: "asc" | "desc"}>>(() => {
@@ -580,13 +605,13 @@ export default function DataTablePage<T>({
   const hasHiddenColumns = visibleColumns.size < columns.length;
 
   return (
-    <div className="space-y-0">
+    <div className="space-y-0 flex flex-col h-full">
         <div className="px-4 py-3">
           <h1 className="text-xl font-semibold text-foreground">{title}</h1>
           <p className="text-sm text-muted-foreground mt-1">{description}</p>
         </div>
 
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-hidden flex-1 flex flex-col">
           <div className="bg-muted/50 border-b border-border px-4 py-2">
             <div className="flex items-center justify-between">
               {selectedRows.size > 0 ? (
@@ -957,6 +982,9 @@ export default function DataTablePage<T>({
                 </div>
               )}
               {headerActions}
+              {enableGridView && (
+                <ViewToggle view={view} onViewChange={setView} />
+              )}
               {createHref && (
                 <Button
                   className="bg-primary hover:bg-green-700 text-white"
@@ -981,7 +1009,111 @@ export default function DataTablePage<T>({
             />
           )}
 
-          <DataTable 
+          {/* Grid View */}
+          {view === 'grid' && enableGridView ? (
+            <div className="flex-1 border-t border-border" style={{ minHeight: '600px' }}>
+              {(() => {
+                // Convert table columns to grid columns
+                const gridColumns: GridColumn[] = columnOrder
+                  .map(key => columns.find((col, idx) => {
+                    const colKey = col.id || (col as any).accessorKey || `col-${idx}`;
+                    return colKey === key;
+                  }))
+                  .filter((col): col is ColumnDef<T> => col !== undefined && visibleColumns.has(col.id || (col as any).accessorKey || ''))
+                  .map((col, idx) => {
+                    const colKey = col.id || (col as any).accessorKey || `col-${idx}`;
+                    const header = typeof col.header === 'string' 
+                      ? col.header 
+                      : (col as any).header?.() || colKey;
+                    
+                    // Determine column type
+                    let type: 'text' | 'number' | 'currency' | 'date' = 'text';
+                    if (colKey.toLowerCase().includes('amount') || 
+                        colKey.toLowerCase().includes('price') ||
+                        colKey.toLowerCase().includes('cost') ||
+                        colKey.toLowerCase().includes('balance') ||
+                        colKey.toLowerCase().includes('total')) {
+                      type = 'currency';
+                    } else if (colKey.toLowerCase().includes('date')) {
+                      type = 'date';
+                    } else if (col.cell && typeof col.cell === 'function') {
+                      const cellStr = col.cell.toString();
+                      if (cellStr.includes('formatCurrency') || cellStr.includes('currency')) {
+                        type = 'currency';
+                      } else if (cellStr.includes('formatDate') || cellStr.includes('date')) {
+                        type = 'date';
+                      }
+                    }
+
+                    return {
+                      id: colKey,
+                      label: header,
+                      type,
+                      width: 150,
+                      editable: type === 'text' || type === 'number' || type === 'currency',
+                    };
+                  });
+
+                // Convert table rows to grid rows
+                const gridRows: GridRow[] = filteredData.map((row: any, index: number) => {
+                  const rowId = row.id?.toString() || `row-${index}`;
+                  const rowData: Record<string, any> = {};
+                  
+                  gridColumns.forEach((gridCol) => {
+                    const col = columns.find((c) => {
+                      const colKey = c.id || (c as any).accessorKey;
+                      return colKey === gridCol.id;
+                    });
+                    
+                    if (col) {
+                      const accessorKey = (col as any).accessorKey || col.id;
+                      if (accessorKey) {
+                        // Handle nested accessors
+                        const keys = accessorKey.split('.');
+                        let value: any = row;
+                        for (const key of keys) {
+                          value = value?.[key];
+                        }
+                        rowData[gridCol.id] = value ?? "";
+                      }
+                    }
+                  });
+
+                  // Get row label from first column or name/title field
+                  const labelCol = gridColumns[0];
+                  const label = rowData[labelCol?.id] || row.name || row.title || rowId;
+
+                  return {
+                    id: rowId,
+                    label: String(label),
+                    level: 0,
+                    data: rowData,
+                  };
+                });
+
+                return (
+                  <GridView
+                    columns={gridColumns}
+                    rows={gridRows}
+                    onCellChange={(rowId, columnId, value) => {
+                      // Find the row and update it
+                      const row = filteredData.find((r: any) => (r.id?.toString() || '') === rowId);
+                      if (row && onRowClick) {
+                        // Trigger row click to edit, or handle update directly
+                        console.log('Cell changed:', { rowId, columnId, value });
+                      }
+                    }}
+                    showAddRow={false}
+                    showAddColumn={false}
+                    frozenColumns={1}
+                    defaultColumnWidth={150}
+                  />
+                );
+              })()}
+            </div>
+          ) : (
+            /* Table View */
+            <DataTable 
             key={pagination ? `server-${pagination.page}-${pagination.pageSize}` : `client-${filteredData.length}`}
             columns={columnOrder
               .map(key => columns.find((col, idx) => {
@@ -1010,9 +1142,10 @@ export default function DataTablePage<T>({
             expandedRows={expandedRows}
             onExpandedRowsChange={onExpandedRowsChange}
           />
+          )}
 
-          {/* Server-side Pagination - only show when pagination prop is provided */}
-          {pagination && (
+          {/* Server-side Pagination - only show when pagination prop is provided and in table view */}
+          {pagination && view === 'table' && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-card">
               <div className="flex items-center gap-4">
                 <div className="text-sm text-muted-foreground">

@@ -542,6 +542,80 @@ export interface CreateFinancialPlanData {
 export interface UpdateFinancialPlanData extends Partial<CreateFinancialPlanData> {}
 
 // ============================================================================
+// BUDGETS
+// ============================================================================
+
+export interface Budget {
+  id: number;
+  name: string;
+  fiscalYearStart: string; // YYYY-MM
+  budgetPeriod: 'monthly' | 'quarterly' | 'yearly';
+  reportingTagId?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetAccount {
+  id: number;
+  budgetId: number;
+  accountPath: string; // Hierarchical path like "Profit and Loss/Income/Income/New subscription"
+  accountLabel: string; // Display label
+  accountType: 'income' | 'expense' | 'asset' | 'liability' | 'equity';
+  level: number; // Hierarchy level (0 = root)
+  parentPath?: string | null;
+  isGroup: boolean;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetEntry {
+  id: number;
+  budgetId: number;
+  accountPath: string;
+  month: string; // YYYY-MM
+  amount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetWithData extends Budget {
+  accounts: BudgetAccount[];
+  entries: BudgetEntry[];
+}
+
+export interface CreateBudgetData {
+  name: string;
+  fiscalYearStart: string;
+  budgetPeriod?: 'monthly' | 'quarterly' | 'yearly';
+  reportingTagId?: number | null;
+}
+
+export interface UpdateBudgetData extends Partial<CreateBudgetData> {}
+
+export interface CreateBudgetAccountData {
+  budgetId: number;
+  accountPath: string;
+  accountLabel: string;
+  accountType: 'income' | 'expense' | 'asset' | 'liability' | 'equity';
+  level: number;
+  parentPath?: string | null;
+  isGroup?: boolean;
+  displayOrder?: number;
+}
+
+export interface UpdateBudgetAccountData extends Partial<CreateBudgetAccountData> {}
+
+export interface CreateBudgetEntryData {
+  budgetId: number;
+  accountPath: string;
+  month: string;
+  amount: number;
+}
+
+export interface UpdateBudgetEntryData extends Partial<CreateBudgetEntryData> {}
+
+// ============================================================================
 // DASHBOARD KPIs
 // ============================================================================
 

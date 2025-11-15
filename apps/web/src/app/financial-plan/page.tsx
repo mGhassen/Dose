@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
+import AppLayout from "@/components/app-layout";
 import { useFinancialPlan, useDeleteFinancialPlan } from "@kit/hooks";
 import type { FinancialPlan } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
@@ -157,25 +158,27 @@ export default function FinancialPlanPage() {
   };
 
   return (
-    <DataTablePage
-      title="Financial Plan"
-      description="View and manage your financial plans (Plan de Financement)"
-      createHref="/financial-plan/create"
-      data={financialPlans || []}
-      columns={columns}
-      loading={isLoading}
-      onRowClick={(fp) => router.push(`/financial-plan/${fp.id}`)}
-      onDelete={handleDelete}
-      onBulkDelete={handleBulkDelete}
-      onBulkCopy={handleBulkCopy}
-      onBulkExport={handleBulkExport}
-      sortColumns={[
-        { value: "month", label: "Month", type: "character varying" },
-        { value: "netFinancing", label: "Net Financing", type: "numeric" },
-      ]}
-      localStoragePrefix="financial-plan"
-      searchFields={[]}
-    />
+    <AppLayout>
+      <DataTablePage
+        title="Financial Plan"
+        description="View and manage your financial plans (Plan de Financement)"
+        createHref="/financial-plan/create"
+        data={financialPlans || []}
+        columns={columns}
+        loading={isLoading}
+        onRowClick={(fp) => router.push(`/financial-plan/${fp.id}`)}
+        onDelete={handleDelete}
+        onBulkDelete={handleBulkDelete}
+        onBulkCopy={handleBulkCopy}
+        onBulkExport={handleBulkExport}
+        sortColumns={[
+          { value: "month", label: "Month", type: "character varying" },
+          { value: "netFinancing", label: "Net Financing", type: "numeric" },
+        ]}
+        localStoragePrefix="financial-plan"
+        searchFields={[]}
+      />
+    </AppLayout>
   );
 }
 

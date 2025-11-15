@@ -28,6 +28,8 @@ export * from './client/useBalanceSheet';
 export * from './client/useFinancialPlan';
 export * from './client/useDashboard';
 export * from './client/useBudgetProjections';
+export * from './client/useBudgets';
+export * from './client/useMetadataEnums';
 
 // Server-side hooks (Next.js specific) - exported for convenience
 // Can also be imported directly: import { prefetchUsers } from '@kit/hooks/src/server/prefetchUsers';
