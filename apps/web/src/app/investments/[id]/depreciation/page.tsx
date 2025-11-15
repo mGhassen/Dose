@@ -212,6 +212,7 @@ export default function InvestmentDepreciationPage({ params }: InvestmentDepreci
                       <TableCell className="text-right">{formatCurrency(totalDepreciation)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(totalDepreciation)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(currentBookValue)}</TableCell>
+                      <TableCell></TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>

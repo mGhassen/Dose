@@ -26,3 +26,6 @@ CREATE INDEX idx_actual_payments_payment_date ON actual_payments(payment_date);
 CREATE INDEX idx_actual_payments_leasing ON actual_payments(payment_type, reference_id, month) 
   WHERE payment_type = 'leasing' AND schedule_entry_id IS NULL;
 
+CREATE TRIGGER update_actual_payments_updated_at BEFORE UPDATE ON actual_payments
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+

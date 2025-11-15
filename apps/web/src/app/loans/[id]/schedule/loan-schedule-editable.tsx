@@ -137,6 +137,11 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
           />
         </TableCell>
         <TableCell>
+          <Badge variant={entry.isPaid ? "default" : "secondary"}>
+            {entry.isPaid ? 'Paid' : 'Pending'}
+          </Badge>
+        </TableCell>
+        <TableCell>
           <div className="flex items-center space-x-2">
             <Button
               size="sm"
