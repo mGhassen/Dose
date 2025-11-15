@@ -413,12 +413,15 @@ def generate_financial_statements(months=24):
         'financial_plan': [],
     }
     
-    start_date = datetime.date(2024, 1, 1)
+    start_year = 2024
+    start_month = 1
     opening_balance = 10000.00
     
     for i in range(months):
-        current_date = start_date + datetime.timedelta(days=30 * i)
-        month_str = f"{current_date.year}-{current_date.month:02d}"
+        # Properly increment months
+        year = start_year + (start_month + i - 1) // 12
+        month = ((start_month + i - 1) % 12) + 1
+        month_str = f"{year}-{month:02d}"
         
         # Cash Flow
         cash_inflows = 35000.00 + (i * 1000)
