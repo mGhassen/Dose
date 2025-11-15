@@ -8,11 +8,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { TableRow, TableCell } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
 import { Edit2, Check, X } from "lucide-react";
-import { useUpdateLoanScheduleEntry } from "@kit/hooks";
+import { useUpdateLoanScheduleEntry, useActualPayments, useCreateActualPayment, useDeleteActualPayment } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import type { LoanScheduleEntry } from "@kit/types";
+import { Plus, Trash2 } from "lucide-react";
 
 interface EditableScheduleRowProps {
   entry: LoanScheduleEntry;
@@ -23,6 +24,7 @@ interface EditableScheduleRowProps {
 export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableScheduleRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
+  const [showPayments, setShowPayments] = useState(false);
   const [editData, setEditData] = useState({
     paymentDate: entry.paymentDate.split('T')[0],
     principalPayment: entry.principalPayment.toString(),
@@ -31,6 +33,15 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
     remainingBalance: entry.remainingBalance.toString(),
   });
   const updateMutation = useUpdateLoanScheduleEntry();
+  const { data: actualPayments } = useActualPayments({
+    paymentType: 'loan',
+    referenceId: loanId,
+    scheduleEntryId: String(entry.id),
+  });
+  
+  const totalPaid = actualPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+  const isFullyPaid = totalPaid >= entry.totalPayment;
+  const remainingToPay = Math.max(0, entry.totalPayment - totalPaid);
 
   const handleSave = async () => {
     try {
@@ -53,38 +64,66 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
     }
   };
 
-  const handleMarkAsPaid = async (paidDate?: string) => {
+  const createPayment = useCreateActualPayment();
+  const deletePayment = useDeleteActualPayment();
+
+  const handleAddPayment = async (paidDate: string, amount: number, notes?: string) => {
     try {
-      await updateMutation.mutateAsync({
-        loanId,
-        scheduleId: String(entry.id),
-        data: {
-          isPaid: true,
-          paidDate: paidDate || new Date().toISOString().split('T')[0],
-        },
+      await createPayment.mutateAsync({
+        paymentType: 'loan',
+        referenceId: Number(loanId),
+        scheduleEntryId: entry.id,
+        month: entry.paymentDate.slice(0, 7),
+        paymentDate: paidDate,
+        amount: amount,
+        isPaid: true,
+        paidDate: paidDate,
+        notes: notes,
       });
+      
+      // Update schedule entry if fully paid
+      const newTotalPaid = totalPaid + amount;
+      if (newTotalPaid >= entry.totalPayment && !entry.isPaid) {
+        await updateMutation.mutateAsync({
+          loanId,
+          scheduleId: String(entry.id),
+          data: {
+            isPaid: true,
+            paidDate: paidDate,
+          },
+        });
+      }
+      
       setIsPaidDialogOpen(false);
       onUpdate();
-      toast.success("Payment marked as paid");
+      toast.success("Payment recorded");
     } catch (error: any) {
-      toast.error(error?.message || "Failed to mark payment as paid");
+      toast.error(error?.message || "Failed to record payment");
     }
   };
 
-  const handleUnmarkAsPaid = async () => {
+  const handleDeletePayment = async (paymentId: number) => {
     try {
-      await updateMutation.mutateAsync({
-        loanId,
-        scheduleId: String(entry.id),
-        data: {
-          isPaid: false,
-          paidDate: null,
-        },
-      });
+      await deletePayment.mutateAsync(String(paymentId));
+      
+      // Recalculate if still fully paid
+      const remainingPayments = actualPayments?.filter(p => p.id !== paymentId) || [];
+      const newTotalPaid = remainingPayments.reduce((sum, p) => sum + p.amount, 0);
+      if (newTotalPaid < entry.totalPayment && entry.isPaid) {
+        await updateMutation.mutateAsync({
+          loanId,
+          scheduleId: String(entry.id),
+          data: {
+            isPaid: false,
+            paidDate: null,
+          },
+        });
+      }
+      
       onUpdate();
-      toast.success("Payment unmarked");
+      toast.success("Payment deleted");
     } catch (error: any) {
-      toast.error(error?.message || "Failed to unmark payment");
+      toast.error(error?.message || "Failed to delete payment");
     }
   };
 
@@ -173,7 +212,7 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
     );
   }
 
-  const isPastDue = new Date(entry.paymentDate) < new Date() && !entry.isPaid;
+  const isPastDue = new Date(entry.paymentDate) < new Date() && !isFullyPaid;
   const isProjected = new Date(entry.paymentDate) > new Date();
 
   return (
@@ -190,18 +229,36 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
         </TableCell>
         <TableCell className="text-right">{formatCurrency(entry.principalPayment)}</TableCell>
         <TableCell className="text-right">{formatCurrency(entry.interestPayment)}</TableCell>
-        <TableCell className="text-right font-semibold">{formatCurrency(entry.totalPayment)}</TableCell>
+        <TableCell className="text-right font-semibold">
+          <div className="flex flex-col items-end">
+            {formatCurrency(entry.totalPayment)}
+            {totalPaid > 0 && (
+              <span className="text-xs text-muted-foreground">
+                Paid: {formatCurrency(totalPaid)}
+                {remainingToPay > 0 && ` (${formatCurrency(remainingToPay)} remaining)`}
+              </span>
+            )}
+          </div>
+        </TableCell>
         <TableCell className="text-right">{formatCurrency(entry.remainingBalance)}</TableCell>
         <TableCell>
           <div className="flex items-center space-x-2">
-            <Badge variant={entry.isPaid ? "default" : isPastDue ? "destructive" : "secondary"}>
-              {entry.isPaid ? 'Paid' : isPastDue ? 'Past Due' : 'Pending'}
+            <Badge variant={isFullyPaid ? "default" : isPastDue ? "destructive" : "secondary"}>
+              {isFullyPaid ? 'Paid' : totalPaid > 0 ? `Partial (${formatCurrency(totalPaid)})` : isPastDue ? 'Past Due' : 'Pending'}
             </Badge>
-            {entry.isPaid && entry.paidDate && (
-              <span className="text-xs text-muted-foreground">
-                ({formatDate(entry.paidDate)})
-              </span>
+            {actualPayments && actualPayments.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowPayments(!showPayments)}
+              >
+                {showPayments ? 'Hide' : `${actualPayments.length} payment(s)`}
+              </Button>
             )}
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center space-x-2">
             <Button
               size="sm"
               variant="ghost"
@@ -209,46 +266,85 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
             >
               <Edit2 className="h-4 w-4" />
             </Button>
-            {!entry.isPaid ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsPaidDialogOpen(true)}
-              >
-                <Check className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleUnmarkAsPaid}
-                disabled={updateMutation.isPending}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsPaidDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
         </TableCell>
       </TableRow>
       
+      {/* Show partial payments */}
+      {showPayments && actualPayments && actualPayments.length > 0 && (
+        <TableRow>
+          <TableCell colSpan={8} className="bg-muted/30 p-4">
+            <div className="space-y-2 py-2">
+              <div className="text-sm font-medium">Partial Payments:</div>
+              {actualPayments.map((payment) => (
+                <div key={payment.id} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center space-x-2">
+                    <span>{formatDate(payment.paymentDate)}</span>
+                    <span className="font-semibold">{formatCurrency(payment.amount)}</span>
+                    {payment.notes && (
+                      <span className="text-muted-foreground">- {payment.notes}</span>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDeletePayment(payment.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+      
       <Dialog open={isPaidDialogOpen} onOpenChange={setIsPaidDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mark Payment as Paid</DialogTitle>
+            <DialogTitle>Add Payment</DialogTitle>
             <DialogDescription>
-              Record the actual payment date for this schedule entry.
+              Record a partial or full payment for this schedule entry.
+              {remainingToPay > 0 && ` Remaining: ${formatCurrency(remainingToPay)}`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="paidDate">Paid Date</Label>
+              <Label htmlFor="paidDate">Payment Date</Label>
               <Input
                 id="paidDate"
                 type="date"
                 defaultValue={new Date().toISOString().split('T')[0]}
-                onChange={(e) => {
-                  // Store in state for later use
-                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="paymentAmount">Payment Amount</Label>
+              <Input
+                id="paymentAmount"
+                type="number"
+                step="0.01"
+                defaultValue={remainingToPay > 0 ? remainingToPay.toString() : entry.totalPayment.toString()}
+                max={remainingToPay > 0 ? remainingToPay : entry.totalPayment}
+              />
+              <p className="text-xs text-muted-foreground">
+                Total due: {formatCurrency(entry.totalPayment)} | 
+                Already paid: {formatCurrency(totalPaid)} | 
+                Remaining: {formatCurrency(remainingToPay)}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="paymentNotes">Notes (optional)</Label>
+              <Input
+                id="paymentNotes"
+                type="text"
+                placeholder="Payment reference, check number, etc."
               />
             </div>
           </div>
@@ -261,12 +357,18 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
             </Button>
             <Button
               onClick={() => {
-                const input = document.getElementById('paidDate') as HTMLInputElement;
-                handleMarkAsPaid(input?.value || new Date().toISOString().split('T')[0]);
+                const dateInput = document.getElementById('paidDate') as HTMLInputElement;
+                const amountInput = document.getElementById('paymentAmount') as HTMLInputElement;
+                const notesInput = document.getElementById('paymentNotes') as HTMLInputElement;
+                handleAddPayment(
+                  dateInput?.value || new Date().toISOString().split('T')[0],
+                  parseFloat(amountInput?.value || '0'),
+                  notesInput?.value || undefined
+                );
               }}
-              disabled={updateMutation.isPending}
+              disabled={createPayment.isPending}
             >
-              Mark as Paid
+              Add Payment
             </Button>
           </DialogFooter>
         </DialogContent>

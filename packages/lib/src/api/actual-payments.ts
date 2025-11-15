@@ -36,10 +36,11 @@ export interface UpdateActualPaymentData {
 }
 
 export const actualPaymentsApi = {
-  getAll: (params?: { paymentType?: string; referenceId?: string; month?: string }) => {
+  getAll: (params?: { paymentType?: string; referenceId?: string; scheduleEntryId?: string; month?: string }) => {
     const queryParams = new URLSearchParams();
     if (params?.paymentType) queryParams.append('paymentType', params.paymentType);
     if (params?.referenceId) queryParams.append('referenceId', params.referenceId);
+    if (params?.scheduleEntryId) queryParams.append('scheduleEntryId', params.scheduleEntryId);
     if (params?.month) queryParams.append('month', params.month);
     const query = queryParams.toString();
     return apiRequest<ActualPayment[]>(`GET`, `/api/actual-payments${query ? `?${query}` : ''}`);

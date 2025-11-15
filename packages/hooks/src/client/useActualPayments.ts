@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { actualPaymentsApi, type CreateActualPaymentData, type UpdateActualPaymentData } from '@kit/lib';
 import type { ActualPayment } from '@kit/lib';
 
-export function useActualPayments(params?: { paymentType?: string; referenceId?: string; month?: string }) {
+export function useActualPayments(params?: { paymentType?: string; referenceId?: string; scheduleEntryId?: string; month?: string }) {
   return useQuery({
     queryKey: ['actual-payments', params],
     queryFn: () => actualPaymentsApi.getAll(params),

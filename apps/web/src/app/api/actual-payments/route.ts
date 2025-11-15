@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const paymentType = searchParams.get('paymentType');
     const referenceId = searchParams.get('referenceId');
+    const scheduleEntryId = searchParams.get('scheduleEntryId');
     const month = searchParams.get('month');
 
     const supabase = createServerSupabaseClient();
@@ -77,6 +78,9 @@ export async function GET(request: NextRequest) {
     }
     if (referenceId) {
       query = query.eq('reference_id', referenceId);
+    }
+    if (scheduleEntryId) {
+      query = query.eq('schedule_entry_id', scheduleEntryId);
     }
     if (month) {
       query = query.eq('month', month);

@@ -7,8 +7,8 @@ import { Label } from "@kit/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 import { TableRow, TableCell } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
-import { Check, X } from "lucide-react";
-import { useCreateActualPayment, useUpdateActualPayment, useDeleteActualPayment, useActualPayments } from "@kit/hooks";
+import { Plus, Trash2 } from "lucide-react";
+import { useCreateActualPayment, useDeleteActualPayment, useActualPayments } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import type { ExpenseProjection } from "@kit/types";
@@ -20,8 +20,7 @@ interface EditableExpenseTimelineRowProps {
 
 export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExpenseTimelineRowProps) {
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
-  const [paidDate, setPaidDate] = useState(new Date().toISOString().split('T')[0]);
-  const [actualAmount, setActualAmount] = useState(projection.amount.toString());
+  const [showPayments, setShowPayments] = useState(false);
   
   const { data: actualPayments } = useActualPayments({
     paymentType: 'expense',
@@ -29,153 +28,171 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
     month: projection.month,
   });
   
-  const actualPayment = actualPayments?.[0];
-  const isActuallyPaid = actualPayment?.isPaid || false;
-  const hasActualPayment = !!actualPayment;
+  const totalPaid = actualPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+  const isFullyPaid = totalPaid >= projection.amount;
+  const remainingToPay = Math.max(0, projection.amount - totalPaid);
   
   const createPayment = useCreateActualPayment();
-  const updatePayment = useUpdateActualPayment();
   const deletePayment = useDeleteActualPayment();
 
-  const handleMarkAsPaid = async () => {
+  const handleAddPayment = async (paidDate: string, amount: number, notes?: string) => {
     try {
-      if (hasActualPayment) {
-        await updatePayment.mutateAsync({
-          id: String(actualPayment.id),
-          data: {
-            isPaid: true,
-            paidDate: paidDate,
-            amount: parseFloat(actualAmount),
-          },
-        });
-      } else {
-        await createPayment.mutateAsync({
-          paymentType: 'expense',
-          referenceId: projection.expenseId,
-          month: projection.month,
-          paymentDate: paidDate,
-          amount: parseFloat(actualAmount),
-          isPaid: true,
-          paidDate: paidDate,
-        });
-      }
+      await createPayment.mutateAsync({
+        paymentType: 'expense',
+        referenceId: projection.expenseId,
+        month: projection.month,
+        paymentDate: paidDate,
+        amount: amount,
+        isPaid: true,
+        paidDate: paidDate,
+        notes: notes,
+      });
+      
       setIsPaidDialogOpen(false);
       onUpdate();
-      toast.success("Expense marked as paid");
+      toast.success("Payment recorded");
     } catch (error: any) {
-      toast.error(error?.message || "Failed to mark expense as paid");
+      toast.error(error?.message || "Failed to record payment");
     }
   };
 
-  const handleUnmarkAsPaid = async () => {
-    if (!actualPayment) return;
-    
+  const handleDeletePayment = async (paymentId: number) => {
     try {
-      await deletePayment.mutateAsync(String(actualPayment.id));
+      await deletePayment.mutateAsync(String(paymentId));
       onUpdate();
-      toast.success("Expense unmarked");
+      toast.success("Payment deleted");
     } catch (error: any) {
-      toast.error(error?.message || "Failed to unmark expense");
+      toast.error(error?.message || "Failed to delete payment");
     }
   };
 
   const [year, month] = projection.month.split('-');
   const date = new Date(parseInt(year), parseInt(month) - 1, 1);
   const isProjected = projection.isProjected;
-  const isPastDue = date < new Date() && !isActuallyPaid;
-
-  // Use actual payment data if available, otherwise use projected
-  const displayAmount = actualPayment?.amount || projection.amount;
-  const displayIsPaid = isActuallyPaid;
+  const isPastDue = date < new Date() && !isFullyPaid;
 
   return (
     <>
-      <TableRow className={isPastDue ? "bg-destructive/10" : isProjected && !displayIsPaid ? "bg-muted/50" : ""}>
+      <TableRow className={isPastDue ? "bg-destructive/10" : isProjected && !isFullyPaid ? "bg-muted/50" : ""}>
         <TableCell className="font-medium">
           <div className="flex items-center space-x-2">
             {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
-            {isProjected && !displayIsPaid && (
+            {isProjected && !isFullyPaid && (
               <Badge variant="secondary" className="text-xs">(Projected)</Badge>
             )}
-            {hasActualPayment && (
+            {totalPaid > 0 && (
               <Badge variant="default" className="text-xs">(Actual)</Badge>
             )}
           </div>
         </TableCell>
         <TableCell className="font-semibold">
-          <div className="flex items-center space-x-2">
-            {formatCurrency(displayAmount)}
-            {hasActualPayment && displayAmount !== projection.amount && (
+          <div className="flex flex-col">
+            {formatCurrency(projection.amount)}
+            {totalPaid > 0 && (
               <span className="text-xs text-muted-foreground">
-                (was {formatCurrency(projection.amount)})
+                Paid: {formatCurrency(totalPaid)}
+                {remainingToPay > 0 && ` (${formatCurrency(remainingToPay)} remaining)`}
               </span>
             )}
           </div>
         </TableCell>
         <TableCell>
-          <Badge variant={displayIsPaid ? "default" : isProjected ? "secondary" : "outline"}>
-            {displayIsPaid ? "Paid" : isProjected ? "Projected" : "Actual"}
+          <Badge variant={isFullyPaid ? "default" : isPastDue ? "destructive" : isProjected ? "secondary" : "outline"}>
+            {isFullyPaid ? "Paid" : totalPaid > 0 ? `Partial (${formatCurrency(totalPaid)})` : isProjected ? "Projected" : "Pending"}
           </Badge>
-          {displayIsPaid && actualPayment?.paidDate && (
-            <span className="text-xs text-muted-foreground ml-2">
-              ({new Date(actualPayment.paidDate).toLocaleDateString()})
-            </span>
+          {actualPayments && actualPayments.length > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-2"
+              onClick={() => setShowPayments(!showPayments)}
+            >
+              {showPayments ? 'Hide' : `${actualPayments.length} payment(s)`}
+            </Button>
           )}
         </TableCell>
         <TableCell>
           <div className="flex items-center space-x-2">
-            {!displayIsPaid ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsPaidDialogOpen(true)}
-              >
-                <Check className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleUnmarkAsPaid}
-                disabled={deletePayment.isPending}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsPaidDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
         </TableCell>
       </TableRow>
       
+      {/* Show partial payments */}
+      {showPayments && actualPayments && actualPayments.length > 0 && (
+        <TableRow>
+          <TableCell colSpan={4} className="bg-muted/30 p-4">
+            <div className="space-y-2 py-2">
+              <div className="text-sm font-medium">Partial Payments:</div>
+              {actualPayments.map((payment) => (
+                <div key={payment.id} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center space-x-2">
+                    <span>{new Date(payment.paymentDate).toLocaleDateString()}</span>
+                    <span className="font-semibold">{formatCurrency(payment.amount)}</span>
+                    {payment.notes && (
+                      <span className="text-muted-foreground">- {payment.notes}</span>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDeletePayment(payment.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+      
       <Dialog open={isPaidDialogOpen} onOpenChange={setIsPaidDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mark Expense as Paid</DialogTitle>
+            <DialogTitle>Add Payment</DialogTitle>
             <DialogDescription>
-              Record the actual payment for this projected expense.
+              Record a partial or full payment for this expense.
+              {remainingToPay > 0 && ` Remaining: ${formatCurrency(remainingToPay)}`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="paidDate">Paid Date</Label>
+              <Label htmlFor="paidDate">Payment Date</Label>
               <Input
                 id="paidDate"
                 type="date"
-                value={paidDate}
-                onChange={(e) => setPaidDate(e.target.value)}
+                defaultValue={new Date().toISOString().split('T')[0]}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="actualAmount">Actual Amount</Label>
+              <Label htmlFor="paymentAmount">Payment Amount</Label>
               <Input
-                id="actualAmount"
+                id="paymentAmount"
                 type="number"
                 step="0.01"
-                value={actualAmount}
-                onChange={(e) => setActualAmount(e.target.value)}
+                defaultValue={remainingToPay > 0 ? remainingToPay.toString() : projection.amount.toString()}
+                max={remainingToPay > 0 ? remainingToPay : projection.amount}
               />
               <p className="text-xs text-muted-foreground">
-                Projected: {formatCurrency(projection.amount)}
+                Total due: {formatCurrency(projection.amount)} | 
+                Already paid: {formatCurrency(totalPaid)} | 
+                Remaining: {formatCurrency(remainingToPay)}
               </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="paymentNotes">Notes (optional)</Label>
+              <Input
+                id="paymentNotes"
+                type="text"
+                placeholder="Payment reference, check number, etc."
+              />
             </div>
           </div>
           <DialogFooter>
@@ -186,10 +203,19 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
               Cancel
             </Button>
             <Button
-              onClick={handleMarkAsPaid}
-              disabled={createPayment.isPending || updatePayment.isPending}
+              onClick={() => {
+                const dateInput = document.getElementById('paidDate') as HTMLInputElement;
+                const amountInput = document.getElementById('paymentAmount') as HTMLInputElement;
+                const notesInput = document.getElementById('paymentNotes') as HTMLInputElement;
+                handleAddPayment(
+                  dateInput?.value || new Date().toISOString().split('T')[0],
+                  parseFloat(amountInput?.value || '0'),
+                  notesInput?.value || undefined
+                );
+              }}
+              disabled={createPayment.isPending}
             >
-              Mark as Paid
+              Add Payment
             </Button>
           </DialogFooter>
         </DialogContent>
