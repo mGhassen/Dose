@@ -12,12 +12,13 @@ import {
 } from "@kit/ui/dropdown-menu";
 import { Badge } from "@kit/ui/badge";
 import { Edit2, Trash2, Calendar, MoreVertical } from "lucide-react";
+import { useMemo } from "react";
 import AppLayout from "@/components/app-layout";
-import { useExpenseById, useDeleteExpense } from "@kit/hooks";
+import { useExpenseById, useDeleteExpense, useSubscriptions } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
-import type { ExpenseCategory, ExpenseRecurrence } from "@kit/types";
+import type { ExpenseCategory } from "@kit/types";
 
 interface ExpenseDetailsContentProps {
   expenseId: string;
@@ -26,7 +27,14 @@ interface ExpenseDetailsContentProps {
 export default function ExpenseDetailsContent({ expenseId }: ExpenseDetailsContentProps) {
   const router = useRouter();
   const { data: expense, isLoading } = useExpenseById(expenseId);
+  const { data: subscriptions } = useSubscriptions();
   const deleteMutation = useDeleteExpense();
+  
+  const subscriptionMap = useMemo(() => {
+    const map = new Map<number, string>();
+    subscriptions?.forEach(sub => map.set(sub.id, sub.name));
+    return map;
+  }, [subscriptions]);
 
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this expense? This action cannot be undone.")) {
@@ -78,13 +86,6 @@ export default function ExpenseDetailsContent({ expenseId }: ExpenseDetailsConte
     other: "Other",
   };
 
-  const recurrenceLabels: Record<ExpenseRecurrence, string> = {
-    one_time: "One Time",
-    monthly: "Monthly",
-    quarterly: "Quarterly",
-    yearly: "Yearly",
-    custom: "Custom",
-  };
 
   return (
     <AppLayout>
@@ -102,10 +103,6 @@ export default function ExpenseDetailsContent({ expenseId }: ExpenseDetailsConte
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => router.push(`/expenses/${expenseId}/timeline`)}>
-                <Calendar className="mr-2 h-4 w-4" />
-                View Timeline
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push(`/expenses/${expenseId}/edit`)}>
                 <Edit2 className="mr-2 h-4 w-4" />
                 Edit
@@ -153,24 +150,24 @@ export default function ExpenseDetailsContent({ expenseId }: ExpenseDetailsConte
                 <p className="text-base font-semibold mt-1">{formatCurrency(expense.amount)}</p>
               </div>
 
-              {/* Recurrence */}
+              {/* Subscription */}
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Recurrence</label>
-                <p className="text-base mt-1">{recurrenceLabels[expense.recurrence] || expense.recurrence}</p>
+                <label className="text-sm font-medium text-muted-foreground">Subscription</label>
+                <div className="mt-1">
+                  {expense.subscriptionId && subscriptionMap.has(expense.subscriptionId) ? (
+                    <Badge variant="outline">
+                      {subscriptionMap.get(expense.subscriptionId)}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </div>
               </div>
 
-              {/* Start Date */}
+              {/* Expense Date */}
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Start Date</label>
-                <p className="text-base mt-1">{formatDate(expense.startDate)}</p>
-              </div>
-
-              {/* End Date */}
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">End Date</label>
-                <p className="text-base mt-1">
-                  {expense.endDate ? formatDate(expense.endDate) : <span className="text-muted-foreground">—</span>}
-                </p>
+                <label className="text-sm font-medium text-muted-foreground">Expense Date</label>
+                <p className="text-base mt-1">{formatDate(expense.expenseDate)}</p>
               </div>
 
               {/* Vendor */}
@@ -179,16 +176,6 @@ export default function ExpenseDetailsContent({ expenseId }: ExpenseDetailsConte
                 <p className="text-base mt-1">
                   {expense.vendor || <span className="text-muted-foreground">—</span>}
                 </p>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Status</label>
-                <div className="mt-1">
-                  <Badge variant={expense.isActive ? "default" : "secondary"}>
-                    {expense.isActive ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
               </div>
             </div>
 

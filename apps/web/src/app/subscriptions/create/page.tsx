@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
@@ -11,76 +11,49 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useExpenseById, useUpdateExpense, useSubscriptions } from "@kit/hooks";
+import { useCreateSubscription } from "@kit/hooks";
 import { toast } from "sonner";
-import type { ExpenseCategory } from "@kit/types";
+import type { ExpenseCategory, ExpenseRecurrence } from "@kit/types";
 
-interface EditExpensePageProps {
-  params: Promise<{ id: string }>;
-}
-
-export default function EditExpensePage({ params }: EditExpensePageProps) {
+export default function CreateSubscriptionPage() {
   const router = useRouter();
-  const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
-  const { data: expense, isLoading } = useExpenseById(resolvedParams?.id || "");
-  const updateExpense = useUpdateExpense();
-  const { data: subscriptions } = useSubscriptions();
-  
+  const createSubscription = useCreateSubscription();
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
     amount: "",
-    subscriptionId: "",
-    expenseDate: new Date().toISOString().split('T')[0],
+    recurrence: "monthly" as ExpenseRecurrence,
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: "",
     description: "",
     vendor: "",
+    isActive: true,
   });
-
-  useEffect(() => {
-    params.then(setResolvedParams);
-  }, [params]);
-
-  useEffect(() => {
-    if (expense) {
-      setFormData({
-        name: expense.name,
-        category: expense.category,
-        amount: expense.amount.toString(),
-        subscriptionId: expense.subscriptionId?.toString() || "",
-        expenseDate: expense.expenseDate.split('T')[0],
-        description: expense.description || "",
-        vendor: expense.vendor || "",
-      });
-    }
-  }, [expense]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.category || !formData.amount || !formData.expenseDate) {
+    if (!formData.name || !formData.category || !formData.amount || !formData.startDate) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    if (!resolvedParams?.id) return;
-
     try {
-      await updateExpense.mutateAsync({
-        id: resolvedParams.id,
-        data: {
-          name: formData.name,
-          category: formData.category as ExpenseCategory,
-          amount: parseFloat(formData.amount),
-          subscriptionId: formData.subscriptionId ? parseInt(formData.subscriptionId) : undefined,
-          expenseDate: formData.expenseDate,
-          description: formData.description || undefined,
-          vendor: formData.vendor || undefined,
-        },
+      await createSubscription.mutateAsync({
+        name: formData.name,
+        category: formData.category as ExpenseCategory,
+        amount: parseFloat(formData.amount),
+        recurrence: formData.recurrence,
+        startDate: formData.startDate,
+        endDate: formData.endDate || undefined,
+        description: formData.description || undefined,
+        vendor: formData.vendor || undefined,
+        isActive: formData.isActive,
       });
-      toast.success("Expense updated successfully");
-      router.push(`/expenses/${resolvedParams.id}`);
+      toast.success("Subscription created successfully");
+      router.push('/subscriptions');
     } catch (error: any) {
-      toast.error(error?.message || "Failed to update expense");
+      toast.error(error?.message || "Failed to create subscription");
     }
   };
 
@@ -88,42 +61,18 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  if (isLoading || !resolvedParams) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-        </div>
-      </AppLayout>
-    );
-  }
-
-  if (!expense) {
-    return (
-      <AppLayout>
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold">Expense Not Found</h1>
-            <p className="text-muted-foreground">The expense you're looking for doesn't exist.</p>
-          </div>
-          <Button onClick={() => router.push('/expenses')}>Back to Expenses</Button>
-        </div>
-      </AppLayout>
-    );
-  }
-
   return (
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Edit Expense</h1>
-          <p className="text-muted-foreground">Update expense information</p>
+          <h1 className="text-2xl font-bold">Create Subscription</h1>
+          <p className="text-muted-foreground">Add a new recurring subscription</p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Expense Information</CardTitle>
-            <CardDescription>Update the details for this expense</CardDescription>
+            <CardTitle>Subscription Information</CardTitle>
+            <CardDescription>Enter the details for this subscription</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -178,40 +127,49 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
                   />
                 </div>
 
-                {/* Subscription (Optional) */}
+                {/* Recurrence */}
                 <div className="space-y-2">
-                  <Label htmlFor="subscriptionId">Subscription (Optional)</Label>
+                  <Label htmlFor="recurrence">Recurrence *</Label>
                   <Select
-                    value={formData.subscriptionId}
-                    onValueChange={(value) => handleInputChange('subscriptionId', value)}
+                    value={formData.recurrence}
+                    onValueChange={(value) => handleInputChange('recurrence', value as ExpenseRecurrence)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select subscription (optional)" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None (One-time expense)</SelectItem>
-                      {subscriptions?.map(sub => (
-                        <SelectItem key={sub.id} value={sub.id.toString()}>
-                          {sub.name}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Link this expense to a subscription payment
-                  </p>
                 </div>
 
-                {/* Expense Date */}
+                {/* Start Date */}
                 <div className="space-y-2">
-                  <Label htmlFor="expenseDate">Expense Date *</Label>
+                  <Label htmlFor="startDate">Start Date *</Label>
                   <Input
-                    id="expenseDate"
+                    id="startDate"
                     type="date"
-                    value={formData.expenseDate}
-                    onChange={(e) => handleInputChange('expenseDate', e.target.value)}
+                    value={formData.startDate}
+                    onChange={(e) => handleInputChange('startDate', e.target.value)}
                     required
                   />
+                </div>
+
+                {/* End Date */}
+                <div className="space-y-2">
+                  <Label htmlFor="endDate">End Date (Optional)</Label>
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => handleInputChange('endDate', e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty for ongoing subscriptions
+                  </p>
                 </div>
 
                 {/* Vendor */}
@@ -224,6 +182,16 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
                     placeholder="Vendor name"
                   />
                 </div>
+
+                {/* Is Active */}
+                <div className="space-y-2 flex items-center space-x-2 pt-6">
+                  <Checkbox
+                    id="isActive"
+                    checked={formData.isActive}
+                    onCheckedChange={(checked) => handleInputChange('isActive', checked)}
+                  />
+                  <Label htmlFor="isActive" className="cursor-pointer">Active</Label>
+                </div>
               </div>
 
               {/* Description */}
@@ -233,7 +201,7 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
                   id="description"
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
-                  placeholder="Additional notes about this expense"
+                  placeholder="Additional notes about this subscription"
                   rows={3}
                 />
               </div>
@@ -243,14 +211,14 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => router.push(`/expenses/${resolvedParams.id}`)}
+                  onClick={() => router.push('/subscriptions')}
                 >
                   <X className="mr-2 h-4 w-4" />
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updateExpense.isPending}>
+                <Button type="submit" disabled={createSubscription.isPending}>
                   <Save className="mr-2 h-4 w-4" />
-                  {updateExpense.isPending ? "Updating..." : "Update Expense"}
+                  {createSubscription.isPending ? "Creating..." : "Create Subscription"}
                 </Button>
               </div>
             </form>

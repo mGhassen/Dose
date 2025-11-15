@@ -132,7 +132,9 @@ export default function SubscriptionsTimelinePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Subscriptions Timeline</h1>
-          <p className="text-muted-foreground">View evolution of all subscriptions over time</p>
+          <p className="text-muted-foreground">
+            View subscription declarations (projected payments) and record actual output payments
+          </p>
         </div>
         {allProjections.length > 0 && (
           <Button variant="outline" onClick={handleExport}>

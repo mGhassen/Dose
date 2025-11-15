@@ -6,7 +6,8 @@ import { createServerSupabaseClient } from '@kit/lib/supabase';
 
 export interface ActualPayment {
   id: number;
-  paymentType: 'loan' | 'leasing' | 'expense' | 'subscription';
+  paymentType: 'loan' | 'leasing' | 'expense' | 'subscription' | 'sale';
+  direction: 'input' | 'output'; // 'input' for money coming in, 'output' for money going out
   referenceId: number;
   scheduleEntryId?: number;
   month: string; // YYYY-MM
@@ -20,7 +21,8 @@ export interface ActualPayment {
 }
 
 export interface CreateActualPaymentData {
-  paymentType: 'loan' | 'leasing' | 'expense' | 'subscription';
+  paymentType: 'loan' | 'leasing' | 'expense' | 'subscription' | 'sale';
+  direction: 'input' | 'output'; // 'input' for money coming in, 'output' for money going out
   referenceId: number;
   scheduleEntryId?: number;
   month: string;
@@ -35,6 +37,7 @@ function transformActualPayment(row: any): ActualPayment {
   return {
     id: row.id,
     paymentType: row.payment_type,
+    direction: row.direction || 'output', // Default to 'output' for backward compatibility
     referenceId: row.reference_id,
     scheduleEntryId: row.schedule_entry_id,
     month: row.month,
@@ -51,6 +54,7 @@ function transformActualPayment(row: any): ActualPayment {
 function transformToSnakeCase(data: CreateActualPaymentData): any {
   return {
     payment_type: data.paymentType,
+    direction: data.direction || 'output', // Default to 'output' if not specified
     reference_id: data.referenceId,
     schedule_entry_id: data.scheduleEntryId || null,
     month: data.month,

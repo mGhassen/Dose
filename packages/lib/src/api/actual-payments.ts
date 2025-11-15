@@ -2,7 +2,8 @@ import { apiRequest } from './api';
 
 export interface ActualPayment {
   id: number;
-  paymentType: 'loan' | 'leasing' | 'expense' | 'subscription';
+  paymentType: 'loan' | 'leasing' | 'expense' | 'subscription' | 'sale';
+  direction: 'input' | 'output'; // 'input' for money coming in, 'output' for money going out
   referenceId: number;
   scheduleEntryId?: number;
   month: string; // YYYY-MM
@@ -16,7 +17,8 @@ export interface ActualPayment {
 }
 
 export interface CreateActualPaymentData {
-  paymentType: 'loan' | 'leasing' | 'expense' | 'subscription';
+  paymentType: 'loan' | 'leasing' | 'expense' | 'subscription' | 'sale';
+  direction: 'input' | 'output'; // 'input' for money coming in, 'output' for money going out
   referenceId: number;
   scheduleEntryId?: number;
   month: string;
@@ -36,9 +38,10 @@ export interface UpdateActualPaymentData {
 }
 
 export const actualPaymentsApi = {
-  getAll: (params?: { paymentType?: string; referenceId?: string; scheduleEntryId?: string; month?: string }) => {
+  getAll: (params?: { paymentType?: string; direction?: 'input' | 'output'; referenceId?: string; scheduleEntryId?: string; month?: string }) => {
     const queryParams = new URLSearchParams();
     if (params?.paymentType) queryParams.append('paymentType', params.paymentType);
+    if (params?.direction) queryParams.append('direction', params.direction);
     if (params?.referenceId) queryParams.append('referenceId', params.referenceId);
     if (params?.scheduleEntryId) queryParams.append('scheduleEntryId', params.scheduleEntryId);
     if (params?.month) queryParams.append('month', params.month);

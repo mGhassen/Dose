@@ -32,7 +32,8 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
   
   const { data: actualPayments } = useActualPayments({
     paymentType: 'subscription',
-    referenceId: subscriptionId,
+    direction: 'output', // Only get output payments for subscriptions
+    referenceId: subscriptionId.toString(),
     month: projection.month,
   });
   
@@ -47,7 +48,8 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
     try {
       await createPayment.mutateAsync({
         paymentType: 'subscription',
-        referenceId: subscriptionId,
+        direction: 'output', // Subscription payments are output (money going out)
+        referenceId: typeof subscriptionId === 'number' ? subscriptionId : projection.subscriptionId,
         month: projection.month,
         paymentDate: paidDate,
         amount: amount,
@@ -58,7 +60,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
       
       setIsPaidDialogOpen(false);
       onUpdate();
-      toast.success("Payment recorded");
+      toast.success("Output payment recorded");
     } catch (error: any) {
       toast.error(error?.message || "Failed to record payment");
     }
@@ -86,10 +88,10 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
           <div className="flex items-center space-x-2">
             {date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
             {isProjected && !isFullyPaid && (
-              <Badge variant="secondary" className="text-xs">(Projected)</Badge>
+              <Badge variant="secondary" className="text-xs">Declaration</Badge>
             )}
             {totalPaid > 0 && (
-              <Badge variant="default" className="text-xs">(Actual)</Badge>
+              <Badge variant="default" className="text-xs">Paid</Badge>
             )}
           </div>
         </TableCell>
@@ -105,9 +107,9 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
           </div>
         </TableCell>
         <TableCell>
-          <Badge variant={isFullyPaid ? "default" : isPastDue ? "destructive" : isProjected ? "secondary" : "outline"}>
-            {isFullyPaid ? "Paid" : totalPaid > 0 ? `Partial (${formatCurrency(totalPaid)})` : isProjected ? "Projected" : "Pending"}
-          </Badge>
+        <Badge variant={isFullyPaid ? "default" : isPastDue ? "destructive" : isProjected ? "secondary" : "outline"}>
+          {isFullyPaid ? "Fully Paid" : totalPaid > 0 ? `Partially Paid (${formatCurrency(totalPaid)})` : isProjected ? "Declaration (Unpaid)" : "Pending Payment"}
+        </Badge>
         </TableCell>
         <TableCell>
           <DropdownMenu>
@@ -119,7 +121,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setIsPaidDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
-                Add Payment
+                Record Output Payment
               </DropdownMenuItem>
               {actualPayments && actualPayments.length > 0 && (
                 <>
@@ -139,7 +141,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
         <TableRow>
           <TableCell colSpan={4} className="bg-muted/30 p-4">
             <div className="space-y-2 py-2">
-              <div className="text-sm font-medium">Partial Payments:</div>
+              <div className="text-sm font-medium">Output Payments Recorded:</div>
               {actualPayments.map((payment) => (
                 <div key={payment.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2">
@@ -166,9 +168,9 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
       <Dialog open={isPaidDialogOpen} onOpenChange={setIsPaidDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Payment</DialogTitle>
+            <DialogTitle>Record Output Payment</DialogTitle>
             <DialogDescription>
-              Record a partial or full payment for this subscription.
+              Record a partial or full output payment (money going out) for this subscription.
               {remainingToPay > 0 && ` Remaining: ${formatCurrency(remainingToPay)}`}
             </DialogDescription>
           </DialogHeader>
