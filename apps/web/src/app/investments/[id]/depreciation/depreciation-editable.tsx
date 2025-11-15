@@ -5,7 +5,13 @@ import { Button } from "@kit/ui/button";
 import { Input } from "@kit/ui/input";
 import { TableRow, TableCell } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
-import { Edit2, Check, X } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@kit/ui/dropdown-menu";
+import { Edit2, Check, X, MoreVertical } from "lucide-react";
 import { useUpdateDepreciationEntry } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -135,13 +141,19 @@ export function EditableDepreciationRow({ entry, investmentId, onUpdate }: Edita
       <TableCell className="text-right">{formatCurrency(entry.accumulatedDepreciation)}</TableCell>
       <TableCell className="text-right font-semibold">{formatCurrency(entry.bookValue)}</TableCell>
       <TableCell>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => setIsEditing(true)}
-        >
-          <Edit2 className="h-4 w-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="ghost">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setIsEditing(true)}>
+              <Edit2 className="mr-2 h-4 w-4" />
+              Edit Entry
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </TableCell>
     </TableRow>
   );

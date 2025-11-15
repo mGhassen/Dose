@@ -3,8 +3,15 @@
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@kit/ui/dropdown-menu";
 import { Badge } from "@kit/ui/badge";
-import { Edit, Trash2, Calendar } from "lucide-react";
+import { Edit2, Trash2, Calendar, MoreVertical } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useExpenseById, useDeleteExpense } from "@kit/hooks";
 import { toast } from "sonner";
@@ -88,30 +95,32 @@ export default function ExpenseDetailsContent({ expenseId }: ExpenseDetailsConte
             <h1 className="text-2xl font-bold">{expense.name}</h1>
             <p className="text-muted-foreground">Expense details and information</p>
           </div>
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/expenses/${expenseId}/timeline`)}
-            >
-              <Calendar className="mr-2 h-4 w-4" />
-              View Timeline
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/expenses/${expenseId}/edit`)}
-            >
-              <Edit className="mr-2 h-4 w-4" />
-              Edit
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => router.push(`/expenses/${expenseId}/timeline`)}>
+                <Calendar className="mr-2 h-4 w-4" />
+                View Timeline
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/expenses/${expenseId}/edit`)}>
+                <Edit2 className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+                className="text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Details Card */}

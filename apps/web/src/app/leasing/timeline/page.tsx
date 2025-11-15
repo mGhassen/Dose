@@ -6,7 +6,8 @@ import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
-import { Calendar, TrendingUp, Download, Eye } from "lucide-react";
+import { Calendar, TrendingUp, Download, Eye, MoreVertical } from "lucide-react";
+import AppLayout from "@/components/app-layout";
 import { useLeasing } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -23,6 +24,12 @@ import {
   TableRow,
 } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@kit/ui/dropdown-menu";
 
 export default function LeasingTimelinePage() {
   const router = useRouter();
@@ -114,7 +121,8 @@ export default function LeasingTimelinePage() {
   const activeLeasing = leasingPayments?.filter(l => l.isActive) || [];
 
   return (
-    <div className="space-y-6 p-6">
+    <AppLayout>
+      <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -227,21 +235,22 @@ export default function LeasingTimelinePage() {
                         <p className="text-lg font-semibold">{formatCurrency(leasingTotal)}</p>
                         <p className="text-xs text-muted-foreground">{timeline.length} payment(s)</p>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedLeasing(isExpanded ? null : leasing.id)}
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        {isExpanded ? "Hide" : "View"} Timeline
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push(`/leasing/${leasing.id}/timeline`)}
-                      >
-                        Detailed View
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setSelectedLeasing(isExpanded ? null : leasing.id)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            {isExpanded ? "Hide" : "View"} Timeline
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/leasing/${leasing.id}/timeline`)}>
+                            Detailed View
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </CardHeader>
@@ -324,7 +333,8 @@ export default function LeasingTimelinePage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </AppLayout>
   );
 }
 

@@ -5,14 +5,22 @@ import { Button } from "@kit/ui/button";
 import { Badge } from "@kit/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { Separator } from "@kit/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@kit/ui/dropdown-menu";
 import { 
-  Edit, 
+  Edit2, 
   Trash2, 
   Users,
   Mail,
   Calendar,
   Shield,
   AlertTriangle,
+  MoreVertical,
 } from "lucide-react";
 import Link from "next/link";
 import AppLayout from "@/components/app-layout";
@@ -87,18 +95,29 @@ export default function UserDetailsContent({ userId }: UserDetailsContentProps) 
               <p className="text-muted-foreground">User ID: {user.id}</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button asChild>
-              <Link href={`/users/${user.id}/edit`}>
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
-              </Link>
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/users/${user.id}/edit`}>
+                  <Edit2 className="mr-2 h-4 w-4" />
+                  Edit
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleDelete}
+                className="text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">

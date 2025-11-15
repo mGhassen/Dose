@@ -6,7 +6,7 @@ import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
-import { Calendar, TrendingUp, Download, Eye } from "lucide-react";
+import { Calendar, TrendingUp, Download, Eye, MoreVertical } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useExpenses, useExpenseProjections } from "@kit/hooks";
 import { toast } from "sonner";
@@ -24,6 +24,12 @@ import {
   TableRow,
 } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@kit/ui/dropdown-menu";
 
 export default function ExpensesTimelinePage() {
   const router = useRouter();
@@ -233,21 +239,22 @@ export default function ExpensesTimelinePage() {
                         <p className="text-lg font-semibold">{formatCurrency(expenseTotal)}</p>
                         <p className="text-xs text-muted-foreground">{projections.length} occurrence(s)</p>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedExpense(isExpanded ? null : expense.id)}
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        {isExpanded ? "Hide" : "View"} Timeline
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push(`/expenses/${expense.id}/timeline`)}
-                      >
-                        Detailed View
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setSelectedExpense(isExpanded ? null : expense.id)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            {isExpanded ? "Hide" : "View"} Timeline
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => router.push(`/expenses/${expense.id}/timeline`)}>
+                            Detailed View
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </CardHeader>

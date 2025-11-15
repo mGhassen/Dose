@@ -7,13 +7,19 @@ import { Label } from "@kit/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 import { TableRow, TableCell } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
-import { Edit2, Check, X } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@kit/ui/dropdown-menu";
+import { Edit2, Check, X, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useUpdateLoanScheduleEntry, useActualPayments, useCreateActualPayment, useDeleteActualPayment } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import type { LoanScheduleEntry } from "@kit/types";
-import { Plus, Trash2 } from "lucide-react";
 
 interface EditableScheduleRowProps {
   entry: LoanScheduleEntry;
@@ -242,38 +248,36 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
         </TableCell>
         <TableCell className="text-right">{formatCurrency(entry.remainingBalance)}</TableCell>
         <TableCell>
-          <div className="flex items-center space-x-2">
-            <Badge variant={isFullyPaid ? "default" : isPastDue ? "destructive" : "secondary"}>
-              {isFullyPaid ? 'Paid' : totalPaid > 0 ? `Partial (${formatCurrency(totalPaid)})` : isPastDue ? 'Past Due' : 'Pending'}
-            </Badge>
-            {actualPayments && actualPayments.length > 0 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setShowPayments(!showPayments)}
-              >
-                {showPayments ? 'Hide' : `${actualPayments.length} payment(s)`}
-              </Button>
-            )}
-          </div>
+          <Badge variant={isFullyPaid ? "default" : isPastDue ? "destructive" : "secondary"}>
+            {isFullyPaid ? 'Paid' : totalPaid > 0 ? `Partial (${formatCurrency(totalPaid)})` : isPastDue ? 'Past Due' : 'Pending'}
+          </Badge>
         </TableCell>
         <TableCell>
-          <div className="flex items-center space-x-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setIsEditing(true)}
-            >
-              <Edit2 className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setIsPaidDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="ghost">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                <Edit2 className="mr-2 h-4 w-4" />
+                Edit Entry
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsPaidDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Payment
+              </DropdownMenuItem>
+              {actualPayments && actualPayments.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowPayments(!showPayments)}>
+                    {showPayments ? 'Hide' : 'Show'} Payments ({actualPayments.length})
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </TableCell>
       </TableRow>
       

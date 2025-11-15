@@ -4,12 +4,19 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@kit/ui/dropdown-menu";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { Badge } from "@kit/ui/badge";
-import { Save, X, Trash2, Calendar } from "lucide-react";
+import { Save, X, Trash2, Calendar, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useLeasingById, useUpdateLeasing, useDeleteLeasing } from "@kit/hooks";
 import { toast } from "sonner";
@@ -165,29 +172,32 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
             </p>
           </div>
           {!isEditing && (
-            <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => router.push(`/leasing/${resolvedParams.id}/timeline`)}
-              >
-                <Calendar className="mr-2 h-4 w-4" />
-                View Timeline
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setIsEditing(true)}
-              >
-                Edit
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {deleteMutation.isPending ? "Deleting..." : "Delete"}
-              </Button>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => router.push(`/leasing/${resolvedParams.id}/timeline`)}>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  View Timeline
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                  <Edit2 className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                  className="text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
 

@@ -7,7 +7,14 @@ import { Label } from "@kit/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 import { TableRow, TableCell } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
-import { Plus, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@kit/ui/dropdown-menu";
+import { Plus, Trash2, MoreVertical } from "lucide-react";
 import { useCreateActualPayment, useDeleteActualPayment, useActualPayments } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -100,27 +107,29 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
           <Badge variant={isFullyPaid ? "default" : isPastDue ? "destructive" : isProjected ? "secondary" : "outline"}>
             {isFullyPaid ? "Paid" : totalPaid > 0 ? `Partial (${formatCurrency(totalPaid)})` : isProjected ? "Projected" : "Pending"}
           </Badge>
-          {actualPayments && actualPayments.length > 0 && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="ml-2"
-              onClick={() => setShowPayments(!showPayments)}
-            >
-              {showPayments ? 'Hide' : `${actualPayments.length} payment(s)`}
-            </Button>
-          )}
         </TableCell>
         <TableCell>
-          <div className="flex items-center space-x-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setIsPaidDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="ghost">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setIsPaidDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Payment
+              </DropdownMenuItem>
+              {actualPayments && actualPayments.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowPayments(!showPayments)}>
+                    {showPayments ? 'Hide' : 'Show'} Payments ({actualPayments.length})
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </TableCell>
       </TableRow>
       
