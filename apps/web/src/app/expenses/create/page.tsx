@@ -11,29 +11,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateExpense } from "@kit/hooks";
+import { useCreateExpense, useSubscriptions } from "@kit/hooks";
 import { toast } from "sonner";
-import type { ExpenseCategory, ExpenseRecurrence } from "@kit/types";
+import type { ExpenseCategory } from "@kit/types";
 
 export default function CreateExpensePage() {
   const router = useRouter();
   const createExpense = useCreateExpense();
+  const { data: subscriptions } = useSubscriptions();
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
     amount: "",
-    recurrence: "" as ExpenseRecurrence | "",
-    startDate: "",
-    endDate: "",
+    subscriptionId: "",
+    expenseDate: new Date().toISOString().split('T')[0],
     description: "",
     vendor: "",
-    isActive: true,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.category || !formData.amount || !formData.recurrence || !formData.startDate) {
+    if (!formData.name || !formData.category || !formData.amount || !formData.expenseDate) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -43,12 +42,10 @@ export default function CreateExpensePage() {
         name: formData.name,
         category: formData.category as ExpenseCategory,
         amount: parseFloat(formData.amount),
-        recurrence: formData.recurrence as ExpenseRecurrence,
-        startDate: formData.startDate,
-        endDate: formData.endDate || undefined,
+        subscriptionId: formData.subscriptionId ? parseInt(formData.subscriptionId) : undefined,
+        expenseDate: formData.expenseDate,
         description: formData.description || undefined,
         vendor: formData.vendor || undefined,
-        isActive: formData.isActive,
       });
       toast.success("Expense created successfully");
       router.push('/expenses');
@@ -127,47 +124,39 @@ export default function CreateExpensePage() {
                   />
                 </div>
 
-                {/* Recurrence */}
+                {/* Subscription (Optional) */}
                 <div className="space-y-2">
-                  <Label htmlFor="recurrence">Recurrence *</Label>
+                  <Label htmlFor="subscriptionId">Subscription (Optional)</Label>
                   <Select
-                    value={formData.recurrence}
-                    onValueChange={(value) => handleInputChange('recurrence', value)}
-                    required
+                    value={formData.subscriptionId}
+                    onValueChange={(value) => handleInputChange('subscriptionId', value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select recurrence" />
+                      <SelectValue placeholder="Select subscription (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="one_time">One Time</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="quarterly">Quarterly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
-                      <SelectItem value="custom">Custom</SelectItem>
+                      <SelectItem value="">None (One-time expense)</SelectItem>
+                      {subscriptions?.map(sub => (
+                        <SelectItem key={sub.id} value={sub.id.toString()}>
+                          {sub.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Link this expense to a subscription payment
+                  </p>
                 </div>
 
-                {/* Start Date */}
+                {/* Expense Date */}
                 <div className="space-y-2">
-                  <Label htmlFor="startDate">Start Date *</Label>
+                  <Label htmlFor="expenseDate">Expense Date *</Label>
                   <Input
-                    id="startDate"
+                    id="expenseDate"
                     type="date"
-                    value={formData.startDate}
-                    onChange={(e) => handleInputChange('startDate', e.target.value)}
+                    value={formData.expenseDate}
+                    onChange={(e) => handleInputChange('expenseDate', e.target.value)}
                     required
-                  />
-                </div>
-
-                {/* End Date */}
-                <div className="space-y-2">
-                  <Label htmlFor="endDate">End Date</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => handleInputChange('endDate', e.target.value)}
                   />
                 </div>
 
@@ -182,15 +171,6 @@ export default function CreateExpensePage() {
                   />
                 </div>
 
-                {/* Is Active */}
-                <div className="space-y-2 flex items-center space-x-2 pt-6">
-                  <Checkbox
-                    id="isActive"
-                    checked={formData.isActive}
-                    onCheckedChange={(checked) => handleInputChange('isActive', checked)}
-                  />
-                  <Label htmlFor="isActive" className="cursor-pointer">Active</Label>
-                </div>
               </div>
 
               {/* Description */}

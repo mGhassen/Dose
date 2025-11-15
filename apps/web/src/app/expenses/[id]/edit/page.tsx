@@ -11,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useExpenseById, useUpdateExpense } from "@kit/hooks";
+import { useExpenseById, useUpdateExpense, useSubscriptions } from "@kit/hooks";
 import { toast } from "sonner";
-import type { ExpenseCategory, ExpenseRecurrence } from "@kit/types";
+import type { ExpenseCategory } from "@kit/types";
 
 interface EditExpensePageProps {
   params: Promise<{ id: string }>;
@@ -24,17 +24,16 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: expense, isLoading } = useExpenseById(resolvedParams?.id || "");
   const updateExpense = useUpdateExpense();
+  const { data: subscriptions } = useSubscriptions();
   
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
     amount: "",
-    recurrence: "" as ExpenseRecurrence | "",
-    startDate: "",
-    endDate: "",
+    subscriptionId: "",
+    expenseDate: new Date().toISOString().split('T')[0],
     description: "",
     vendor: "",
-    isActive: true,
   });
 
   useEffect(() => {
@@ -47,12 +46,10 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
         name: expense.name,
         category: expense.category,
         amount: expense.amount.toString(),
-        recurrence: expense.recurrence,
-        startDate: expense.startDate.split('T')[0],
-        endDate: expense.endDate ? expense.endDate.split('T')[0] : "",
+        subscriptionId: expense.subscriptionId?.toString() || "",
+        expenseDate: expense.expenseDate.split('T')[0],
         description: expense.description || "",
         vendor: expense.vendor || "",
-        isActive: expense.isActive,
       });
     }
   }, [expense]);
@@ -60,7 +57,7 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.category || !formData.amount || !formData.recurrence || !formData.startDate) {
+    if (!formData.name || !formData.category || !formData.amount || !formData.expenseDate) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -74,12 +71,10 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
           name: formData.name,
           category: formData.category as ExpenseCategory,
           amount: parseFloat(formData.amount),
-          recurrence: formData.recurrence as ExpenseRecurrence,
-          startDate: formData.startDate,
-          endDate: formData.endDate || undefined,
+          subscriptionId: formData.subscriptionId ? parseInt(formData.subscriptionId) : undefined,
+          expenseDate: formData.expenseDate,
           description: formData.description || undefined,
           vendor: formData.vendor || undefined,
-          isActive: formData.isActive,
         },
       });
       toast.success("Expense updated successfully");
@@ -183,47 +178,39 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
                   />
                 </div>
 
-                {/* Recurrence */}
+                {/* Subscription (Optional) */}
                 <div className="space-y-2">
-                  <Label htmlFor="recurrence">Recurrence *</Label>
+                  <Label htmlFor="subscriptionId">Subscription (Optional)</Label>
                   <Select
-                    value={formData.recurrence}
-                    onValueChange={(value) => handleInputChange('recurrence', value)}
-                    required
+                    value={formData.subscriptionId}
+                    onValueChange={(value) => handleInputChange('subscriptionId', value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select recurrence" />
+                      <SelectValue placeholder="Select subscription (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="one_time">One Time</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="quarterly">Quarterly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
-                      <SelectItem value="custom">Custom</SelectItem>
+                      <SelectItem value="">None (One-time expense)</SelectItem>
+                      {subscriptions?.map(sub => (
+                        <SelectItem key={sub.id} value={sub.id.toString()}>
+                          {sub.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Link this expense to a subscription payment
+                  </p>
                 </div>
 
-                {/* Start Date */}
+                {/* Expense Date */}
                 <div className="space-y-2">
-                  <Label htmlFor="startDate">Start Date *</Label>
+                  <Label htmlFor="expenseDate">Expense Date *</Label>
                   <Input
-                    id="startDate"
+                    id="expenseDate"
                     type="date"
-                    value={formData.startDate}
-                    onChange={(e) => handleInputChange('startDate', e.target.value)}
+                    value={formData.expenseDate}
+                    onChange={(e) => handleInputChange('expenseDate', e.target.value)}
                     required
-                  />
-                </div>
-
-                {/* End Date */}
-                <div className="space-y-2">
-                  <Label htmlFor="endDate">End Date</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => handleInputChange('endDate', e.target.value)}
                   />
                 </div>
 

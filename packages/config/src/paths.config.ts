@@ -45,6 +45,19 @@ export const pathsConfig: NavigationConfig = {
       translationKey: "inputs",
       items: [
         {
+          title: "sales",
+          url: "/sales",
+          translationKey: "sales"
+        },
+      ]
+    },
+    {
+      title: "outputs",
+      url: "/outputs",
+      icon: "Database",
+      translationKey: "outputs",
+      items: [
+        {
           title: "expenses",
           url: "/expenses",
           translationKey: "expenses"
@@ -53,11 +66,6 @@ export const pathsConfig: NavigationConfig = {
           title: "subscriptions",
           url: "/subscriptions",
           translationKey: "subscriptions"
-        },
-        {
-          title: "sales",
-          url: "/sales",
-          translationKey: "sales"
         },
         {
           title: "personnel",
