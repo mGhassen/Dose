@@ -7,6 +7,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Badge } from "@kit/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
+import AppLayout from "@/components/app-layout";
 import { 
   Calendar, 
   TrendingUp, 
@@ -239,7 +240,8 @@ export default function BudgetProjectionsAgendaPage() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <AppLayout>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Budget Projections Agenda</h1>
@@ -696,7 +698,8 @@ export default function BudgetProjectionsAgendaPage() {
           )}
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </AppLayout>
   );
 }
 

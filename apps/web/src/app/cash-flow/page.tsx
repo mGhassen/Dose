@@ -9,6 +9,7 @@ import type { CashFlowEntry } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
+import AppLayout from "@/components/app-layout";
 import { formatCurrency } from "@kit/lib/config";
 import { toast } from "sonner";
 import { 
@@ -193,7 +194,8 @@ export default function CashFlowPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <AppLayout>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cash Flow</h1>
@@ -546,7 +548,8 @@ export default function CashFlowPage() {
           />
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </AppLayout>
   );
 }
 
