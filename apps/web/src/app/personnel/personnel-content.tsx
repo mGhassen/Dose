@@ -557,10 +557,11 @@ export default function PersonnelContent() {
         </TabsContent>
 
         <TabsContent value="table" className="space-y-4">
-          <DataTablePage
-            title=""
-            description=""
-            createHref="/personnel/create"
+          <div className="-mx-4">
+            <DataTablePage
+              title=""
+              description=""
+              createHref="/personnel/create"
             data={personnel || []}
             columns={columns}
             loading={isLoading}
@@ -581,6 +582,7 @@ export default function PersonnelContent() {
             localStoragePrefix="personnel"
             searchFields={["firstName", "lastName", "email", "position"]}
           />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

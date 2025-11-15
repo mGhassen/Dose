@@ -117,6 +117,12 @@ export const pathsConfig: NavigationConfig = {
       translationKey: "budgetProjections"
     },
     {
+      title: "budgets",
+      url: "/budgets",
+      icon: "FileSpreadsheet",
+      translationKey: "budgets"
+    },
+    {
       title: "users",
       url: "/users",
       icon: "Users",

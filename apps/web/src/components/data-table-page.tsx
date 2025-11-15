@@ -33,7 +33,6 @@ import { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from 'next-intl';
-import AppLayout from "@/components/app-layout";
 import DataTable from "@kit/ui/data-table";
 import { UnifiedFilter, FilterOption, FilterState } from "@/components/unified-filter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
@@ -581,8 +580,7 @@ export default function DataTablePage<T>({
   const hasHiddenColumns = visibleColumns.size < columns.length;
 
   return (
-    <AppLayout>
-      <div className="space-y-0">
+    <div className="space-y-0">
         <div className="px-4 py-3">
           <h1 className="text-xl font-semibold text-foreground">{title}</h1>
           <p className="text-sm text-muted-foreground mt-1">{description}</p>
@@ -1116,6 +1114,5 @@ export default function DataTablePage<T>({
           )}
         </div>
       </div>
-    </AppLayout>
   );
 }

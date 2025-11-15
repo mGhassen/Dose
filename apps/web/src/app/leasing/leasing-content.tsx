@@ -449,10 +449,11 @@ export default function LeasingContent() {
         </TabsContent>
 
         <TabsContent value="table" className="space-y-4">
-          <DataTablePage
-            title=""
-            description=""
-            createHref="/leasing/create"
+          <div className="-mx-4">
+            <DataTablePage
+              title=""
+              description=""
+              createHref="/leasing/create"
             data={leasing || []}
             columns={columns}
             loading={isLoading}
@@ -474,6 +475,7 @@ export default function LeasingContent() {
             localStoragePrefix="leasing"
             searchFields={["name", "description", "lessor"]}
           />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

@@ -574,10 +574,11 @@ export default function ProfitLossPage() {
         </TabsContent>
 
         <TabsContent value="table" className="space-y-4">
-          <DataTablePage
-            title=""
-            description=""
-            data={profitLoss || []}
+          <div className="-mx-4">
+            <DataTablePage
+              title=""
+              description=""
+              data={profitLoss || []}
             columns={columns}
             loading={isLoading}
             onRowClick={(pl) => router.push(`/profit-loss/${pl.month}`)}
@@ -592,6 +593,7 @@ export default function ProfitLossPage() {
             localStoragePrefix="profit-loss"
             searchFields={[]}
           />
+          </div>
         </TabsContent>
       </Tabs>
       </div>

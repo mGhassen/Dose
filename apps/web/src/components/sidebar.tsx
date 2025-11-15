@@ -33,6 +33,7 @@ import {
   Receipt,
   Calculator,
   Target,
+  FileSpreadsheet,
 } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
@@ -84,6 +85,7 @@ const iconMap = {
   Receipt,
   Calculator,
   Target,
+  FileSpreadsheet,
 } as const
 
 // Processed menu item type with React component icon
@@ -104,7 +106,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       return items.map((item: MenuItem) => ({
         title: item.translationKey ? t(item.translationKey) : item.title,
         url: item.url,
-        icon: iconMap[item.icon as keyof typeof iconMap],
+        icon: iconMap[item.icon as keyof typeof iconMap] || FileText,
         translationKey: item.translationKey,
         isActive: item.isActive,
         items: item.items ? processMenuItems(item.items) : undefined,

@@ -565,10 +565,11 @@ export default function BalanceSheetPage() {
         </TabsContent>
 
         <TabsContent value="table" className="space-y-4">
-          <DataTablePage
-            title=""
-            description=""
-            data={balanceSheets || []}
+          <div className="-mx-4">
+            <DataTablePage
+              title=""
+              description=""
+              data={balanceSheets || []}
             columns={columns}
             loading={isLoading}
             onRowClick={(bs) => router.push(`/balance-sheet/${bs.month}`)}
@@ -583,6 +584,7 @@ export default function BalanceSheetPage() {
             localStoragePrefix="balance-sheet"
             searchFields={[]}
           />
+          </div>
         </TabsContent>
       </Tabs>
       </div>

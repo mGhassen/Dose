@@ -509,10 +509,11 @@ export default function SalesContent() {
         </TabsContent>
 
         <TabsContent value="table" className="space-y-4">
-          <DataTablePage
-            title=""
-            description=""
-            createHref="/sales/create"
+          <div className="-mx-4">
+            <DataTablePage
+              title=""
+              description=""
+              createHref="/sales/create"
             data={sales || []}
             columns={columns}
             loading={isLoading}
@@ -531,6 +532,7 @@ export default function SalesContent() {
             localStoragePrefix="sales"
             searchFields={["description"]}
           />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

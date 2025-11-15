@@ -527,10 +527,11 @@ export default function CashFlowPage() {
         </TabsContent>
 
         <TabsContent value="table" className="space-y-4">
-          <DataTablePage
-            title=""
-            description=""
-            createHref="/cash-flow/create"
+          <div className="-mx-4">
+            <DataTablePage
+              title=""
+              description=""
+              createHref="/cash-flow/create"
             data={cashFlow || []}
             columns={columns}
             loading={isLoading}
@@ -546,6 +547,7 @@ export default function CashFlowPage() {
             localStoragePrefix="cash-flow"
             searchFields={["notes"]}
           />
+          </div>
         </TabsContent>
       </Tabs>
       </div>

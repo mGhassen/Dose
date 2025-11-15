@@ -483,10 +483,11 @@ export default function WorkingCapitalPage() {
         </TabsContent>
 
         <TabsContent value="table" className="space-y-4">
-          <DataTablePage
-            title=""
-            description=""
-            createHref="/working-capital/create"
+          <div className="-mx-4">
+            <DataTablePage
+              title=""
+              description=""
+              createHref="/working-capital/create"
             data={workingCapital || []}
             columns={columns}
             loading={isLoading}
@@ -502,6 +503,7 @@ export default function WorkingCapitalPage() {
             localStoragePrefix="working-capital"
             searchFields={[]}
           />
+          </div>
         </TabsContent>
       </Tabs>
       </div>

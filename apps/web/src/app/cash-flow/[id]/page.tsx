@@ -9,7 +9,7 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Save, X, Trash2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCashFlowEntryById, useUpdateCashFlowEntry, useDeleteCashFlowEntry } from "@kit/hooks";
+import { useCashFlowById, useUpdateCashFlow, useDeleteCashFlow } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 
@@ -21,9 +21,9 @@ export default function CashFlowDetailPage({ params }: CashFlowDetailPageProps) 
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const { data: cashFlow, isLoading } = useCashFlowEntryById(resolvedParams?.id || "");
-  const updateCashFlow = useUpdateCashFlowEntry();
-  const deleteMutation = useDeleteCashFlowEntry();
+  const { data: cashFlow, isLoading } = useCashFlowById(resolvedParams?.id || "");
+  const updateCashFlow = useUpdateCashFlow();
+  const deleteMutation = useDeleteCashFlow();
   
   const [formData, setFormData] = useState({
     month: "",
@@ -86,7 +86,7 @@ export default function CashFlowDetailPage({ params }: CashFlowDetailPageProps) 
     }
 
     try {
-      await deleteMutation.mutateAsync(Number(resolvedParams.id));
+      await deleteMutation.mutateAsync(resolvedParams.id);
       toast.success("Cash flow entry deleted successfully");
       router.push('/cash-flow');
     } catch (error) {

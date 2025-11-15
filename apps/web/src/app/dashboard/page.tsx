@@ -3,6 +3,7 @@
 import { useAuth } from "@kit/hooks";
 import { useFinancialKPIs, useRevenueChart, useExpensesChart, useProfitChart, useCashFlowChart } from "@kit/hooks";
 import { useTranslations } from 'next-intl';
+import { formatCurrency } from "@kit/lib/config";
 import AppLayout from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { 
@@ -16,24 +17,20 @@ import {
   BarChart3
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { format } from 'date-fns';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const t = useTranslations('dashboard');
   
-  // Get current month for KPIs
-  const currentMonth = format(new Date(), 'yyyy-MM');
-  const currentYear = format(new Date(), 'yyyy');
-  const startMonth = `${currentYear}-01`;
-  const endMonth = `${currentYear}-12`;
+  // Get current year for all dashboard queries
+  const currentYear = new Date().getFullYear().toString();
 
   // Fetch data
-  const { data: kpis, isLoading: kpisLoading } = useFinancialKPIs(currentMonth);
-  const { data: revenueData, isLoading: revenueLoading } = useRevenueChart(startMonth, endMonth);
-  const { data: expensesData, isLoading: expensesLoading } = useExpensesChart(startMonth, endMonth);
-  const { data: profitData, isLoading: profitLoading } = useProfitChart(startMonth, endMonth);
-  const { data: cashFlowData, isLoading: cashFlowLoading } = useCashFlowChart(startMonth, endMonth);
+  const { data: kpis, isLoading: kpisLoading } = useFinancialKPIs(currentYear);
+  const { data: revenueData, isLoading: revenueLoading } = useRevenueChart(currentYear);
+  const { data: expensesData, isLoading: expensesLoading } = useExpensesChart(currentYear);
+  const { data: profitData, isLoading: profitLoading } = useProfitChart(currentYear);
+  const { data: cashFlowData, isLoading: cashFlowLoading } = useCashFlowChart(currentYear);
 
   return (
     <AppLayout>
@@ -54,10 +51,10 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {kpisLoading ? '...' : kpis ? `€${kpis.totalRevenue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '€0.00'}
+                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.totalRevenue) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {kpis?.revenueGrowth ? `${kpis.revenueGrowth > 0 ? '+' : ''}${kpis.revenueGrowth.toFixed(1)}% growth` : 'No data'}
+                Revenue for {currentYear}
               </p>
             </CardContent>
           </Card>
@@ -69,10 +66,10 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {kpisLoading ? '...' : kpis ? `€${kpis.totalExpenses.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '€0.00'}
+                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.totalExpenses) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {kpis?.expenseRatio ? `${kpis.expenseRatio.toFixed(1)}% of revenue` : 'No data'}
+                {kpis && kpis.totalRevenue > 0 ? `${((kpis.totalExpenses / kpis.totalRevenue) * 100).toFixed(1)}% of revenue` : 'No data'}
               </p>
             </CardContent>
           </Card>
@@ -84,10 +81,10 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${kpis?.netProfit && kpis.netProfit < 0 ? 'text-red-500' : ''}`}>
-                {kpisLoading ? '...' : kpis ? `€${kpis.netProfit.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '€0.00'}
+                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.netProfit) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {kpis?.netMargin ? `${kpis.netMargin.toFixed(1)}% margin` : 'No data'}
+                {kpis && kpis.totalRevenue > 0 ? `${((kpis.netProfit / kpis.totalRevenue) * 100).toFixed(1)}% margin` : 'No data'}
               </p>
             </CardContent>
           </Card>
@@ -99,10 +96,10 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {kpisLoading ? '...' : kpis ? `€${kpis.cashBalance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '€0.00'}
+                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.cashBalance) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {kpis?.cashFlow ? `${kpis.cashFlow > 0 ? '+' : ''}€${kpis.cashFlow.toLocaleString('fr-FR')} this month` : 'No data'}
+                Current cash balance
               </p>
             </CardContent>
           </Card>
@@ -114,7 +111,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {kpisLoading ? '...' : kpis ? `€${kpis.workingCapital.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '€0.00'}
+                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.workingCapital) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
                 BFR (Working Capital Need)
@@ -129,10 +126,10 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {kpisLoading ? '...' : kpis ? `€${kpis.totalDebt.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '€0.00'}
+                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.totalDebt) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {kpis?.debtService ? `€${kpis.debtService.toLocaleString('fr-FR')}/month` : 'No data'}
+                Total active debt
               </p>
             </CardContent>
           </Card>
@@ -144,10 +141,10 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {kpisLoading ? '...' : kpis ? `€${kpis.totalPersonnelCost.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '€0.00'}
+                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.personnelCost) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {kpis?.headcount ? `${kpis.headcount} employees` : 'No data'}
+                Annual personnel cost
               </p>
             </CardContent>
           </Card>
@@ -159,10 +156,10 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {kpisLoading ? '...' : kpis ? `€${kpis.grossProfit.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '€0.00'}
+                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.grossProfit) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {kpis?.grossMargin ? `${kpis.grossMargin.toFixed(1)}% margin` : 'No data'}
+                {kpis && kpis.totalRevenue > 0 ? `${((kpis.grossProfit / kpis.totalRevenue) * 100).toFixed(1)}% margin` : 'No data'}
               </p>
             </CardContent>
           </Card>
@@ -183,7 +180,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => `€${value.toLocaleString('fr-FR')}`} />
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Legend />
                     <Line type="monotone" dataKey="revenue" stroke="#8884d8" strokeWidth={2} />
                   </LineChart>
@@ -209,7 +206,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => `€${value.toLocaleString('fr-FR')}`} />
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Legend />
                     <Line type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={2} />
                   </LineChart>
@@ -235,7 +232,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => `€${value.toLocaleString('fr-FR')}`} />
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Legend />
                     <Bar dataKey="profit" fill={profitData[0]?.profit < 0 ? "#ef4444" : "#22c55e"} />
                   </BarChart>
@@ -261,7 +258,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => `€${value.toLocaleString('fr-FR')}`} />
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Legend />
                     <Line type="monotone" dataKey="cashFlow" stroke="#3b82f6" strokeWidth={2} />
                     <Line type="monotone" dataKey="balance" stroke="#10b981" strokeWidth={2} />

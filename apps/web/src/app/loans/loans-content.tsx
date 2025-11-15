@@ -444,10 +444,11 @@ export default function LoansContent() {
         </TabsContent>
 
         <TabsContent value="table" className="space-y-4">
-          <DataTablePage
-            title=""
-            description=""
-            createHref="/loans/create"
+          <div className="-mx-4">
+            <DataTablePage
+              title=""
+              description=""
+              createHref="/loans/create"
             data={loans || []}
             columns={columns}
             loading={isLoading}
@@ -467,6 +468,7 @@ export default function LoansContent() {
             localStoragePrefix="loans"
             searchFields={["name", "loanNumber", "lender", "description"]}
           />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

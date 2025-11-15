@@ -559,32 +559,34 @@ export default function ExpensesContent() {
           </div>
         </TabsContent>
 
-        <TabsContent value="table" className="space-y-4 -mx-6 px-6">
-          <DataTablePage
-            title=""
-            description=""
-            createHref="/expenses/create"
-            data={expenses || []}
-            columns={columns}
-            loading={isLoading}
-            onRowClick={(expense) => router.push(`/expenses/${expense.id}`)}
-            onDelete={handleDelete}
-            onBulkDelete={handleBulkDelete}
-            onBulkCopy={handleBulkCopy}
-            onBulkExport={handleBulkExport}
-            filterColumns={[
-              { value: "category", label: "Category" },
-              { value: "recurrence", label: "Recurrence" },
-              { value: "isActive", label: "Status" },
-            ]}
-            sortColumns={[
-              { value: "name", label: "Name", type: "character varying" },
-              { value: "amount", label: "Amount", type: "numeric" },
-              { value: "startDate", label: "Start Date", type: "date" },
-            ]}
-            localStoragePrefix="expenses"
-            searchFields={["name", "description", "vendor"]}
-          />
+        <TabsContent value="table" className="space-y-4">
+          <div className="-mx-4">
+            <DataTablePage
+              title=""
+              description=""
+              createHref="/expenses/create"
+              data={expenses || []}
+              columns={columns}
+              loading={isLoading}
+              onRowClick={(expense) => router.push(`/expenses/${expense.id}`)}
+              onDelete={handleDelete}
+              onBulkDelete={handleBulkDelete}
+              onBulkCopy={handleBulkCopy}
+              onBulkExport={handleBulkExport}
+              filterColumns={[
+                { value: "category", label: "Category" },
+                { value: "recurrence", label: "Recurrence" },
+                { value: "isActive", label: "Status" },
+              ]}
+              sortColumns={[
+                { value: "name", label: "Name", type: "character varying" },
+                { value: "amount", label: "Amount", type: "numeric" },
+                { value: "startDate", label: "Start Date", type: "date" },
+              ]}
+              localStoragePrefix="expenses"
+              searchFields={["name", "description", "vendor"]}
+            />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
