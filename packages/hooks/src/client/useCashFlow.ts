@@ -7,7 +7,13 @@ import type { CashFlowEntry, CreateCashFlowEntryData, UpdateCashFlowEntryData } 
 export function useCashFlow() {
   return useQuery({
     queryKey: ['cash-flow'],
-    queryFn: cashFlowApi.getAll,
+    queryFn: async () => {
+      const result = await cashFlowApi.getAll();
+      // Ensure we return an array even if result is undefined
+      return result || [];
+    },
+    retry: 1,
+    retryDelay: 1000,
   });
 }
 

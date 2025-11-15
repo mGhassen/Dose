@@ -58,11 +58,20 @@ function transformToSnakeCase(data: CreateProfitAndLossData): any {
 }
 
 export async function GET(request: NextRequest) {
+  // Immediate response to verify route is accessible
+  console.log('[ProfitLoss API] ====== GET request received ======');
+  console.log('[ProfitLoss API] Timestamp:', new Date().toISOString());
+  console.log('[ProfitLoss API] Request URL:', request.url);
+  
   try {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month');
+    console.log('[ProfitLoss API] month param:', month);
 
+    console.log('[ProfitLoss API] Creating Supabase client...');
     const supabase = createServerSupabaseClient();
+    console.log('[ProfitLoss API] Supabase client created successfully');
+    
     let query = supabase
       .from('profit_and_loss')
       .select('*')
@@ -72,23 +81,41 @@ export async function GET(request: NextRequest) {
       query = query.eq('month', month).limit(1);
     }
 
+    console.log('[ProfitLoss API] Executing database query...');
+    const queryStart = Date.now();
     const { data, error } = await query;
+    const queryDuration = Date.now() - queryStart;
+    console.log('[ProfitLoss API] Query completed in', queryDuration, 'ms');
+    console.log('[ProfitLoss API] Query result - data length:', data?.length || 0);
+    if (error) {
+      console.error('[ProfitLoss API] Query error:', error);
+    }
 
-    if (error) throw error;
+    if (error) {
+      console.error('[ProfitLoss API] Query error details:', error);
+      throw error;
+    }
 
     if (month) {
       // Return single item for month query
       if (!data || data.length === 0) {
+        console.log('[ProfitLoss API] No data found for month:', month);
         return NextResponse.json(null);
       }
+      console.log('[ProfitLoss API] Returning single item for month:', month);
       return NextResponse.json(transformProfitAndLoss(data[0]));
     }
 
     const profitLoss: ProfitAndLoss[] = (data || []).map(transformProfitAndLoss);
+    console.log('[ProfitLoss API] Returning', profitLoss.length, 'items');
+    console.log('[ProfitLoss API] ====== Request completed successfully ======');
     
     return NextResponse.json(profitLoss);
   } catch (error: any) {
-    console.error('Error fetching profit and loss:', error);
+    console.error('[ProfitLoss API] ====== ERROR ======');
+    console.error('[ProfitLoss API] Error type:', error?.constructor?.name);
+    console.error('[ProfitLoss API] Error message:', error?.message);
+    console.error('[ProfitLoss API] Error stack:', error?.stack);
     return NextResponse.json(
       { error: 'Failed to fetch profit and loss', details: error.message },
       { status: 500 }

@@ -7,7 +7,12 @@ import type { WorkingCapital, CreateWorkingCapitalData, UpdateWorkingCapitalData
 export function useWorkingCapital() {
   return useQuery({
     queryKey: ['working-capital'],
-    queryFn: workingCapitalApi.getAll,
+    queryFn: async () => {
+      const result = await workingCapitalApi.getAll();
+      return result || [];
+    },
+    retry: 1,
+    retryDelay: 1000,
   });
 }
 

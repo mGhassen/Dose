@@ -7,7 +7,12 @@ import type { BalanceSheet, CreateBalanceSheetData, UpdateBalanceSheetData } fro
 export function useBalanceSheet() {
   return useQuery({
     queryKey: ['balance-sheet'],
-    queryFn: balanceSheetApi.getAll,
+    queryFn: async () => {
+      const result = await balanceSheetApi.getAll();
+      return result || [];
+    },
+    retry: 1,
+    retryDelay: 1000,
   });
 }
 

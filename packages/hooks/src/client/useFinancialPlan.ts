@@ -7,7 +7,12 @@ import type { FinancialPlan, CreateFinancialPlanData, UpdateFinancialPlanData } 
 export function useFinancialPlan() {
   return useQuery({
     queryKey: ['financial-plan'],
-    queryFn: financialPlanApi.getAll,
+    queryFn: async () => {
+      const result = await financialPlanApi.getAll();
+      return result || [];
+    },
+    retry: 1,
+    retryDelay: 1000,
   });
 }
 

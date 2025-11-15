@@ -7,7 +7,25 @@ import type { ProfitAndLoss, CreateProfitAndLossData, UpdateProfitAndLossData } 
 export function useProfitLoss() {
   return useQuery({
     queryKey: ['profit-loss'],
-    queryFn: profitLossApi.getAll,
+    queryFn: async () => {
+      console.log('[useProfitLoss] Calling profitLossApi.getAll...');
+      try {
+        const result = await profitLossApi.getAll();
+        console.log('[useProfitLoss] API call successful, got', result?.length || 0, 'items');
+        console.log('[useProfitLoss] Result type:', typeof result);
+        console.log('[useProfitLoss] Result is array?', Array.isArray(result));
+        console.log('[useProfitLoss] First item:', result?.[0]);
+        // Ensure we return an array even if result is undefined
+        const data = result || [];
+        console.log('[useProfitLoss] Returning data, length:', data.length);
+        return data;
+      } catch (error) {
+        console.error('[useProfitLoss] API call failed:', error);
+        throw error;
+      }
+    },
+    retry: 1,
+    retryDelay: 1000,
   });
 }
 
