@@ -4,7 +4,7 @@ import { z } from 'zod';
 export interface MenuItem {
   title: string;
   url: string;
-  icon: string;
+  icon?: string;
   translationKey?: string;
   isActive?: boolean;
   items?: MenuItem[];
@@ -15,7 +15,7 @@ export const MenuItemSchema: z.ZodType<MenuItem> = z.lazy(() =>
   z.object({
     title: z.string(),
     url: z.string(),
-    icon: z.string(),
+    icon: z.string().optional(),
     translationKey: z.string().optional(),
     isActive: z.boolean().optional(),
     items: z.array(MenuItemSchema).optional(),
@@ -39,94 +39,149 @@ export const pathsConfig: NavigationConfig = {
       translationKey: "dashboard"
     },
     {
-      title: "expenses",
-      url: "/expenses",
-      icon: "Receipt",
-      translationKey: "expenses"
+      title: "inputs",
+      url: "/inputs",
+      icon: "Database",
+      translationKey: "inputs",
+      items: [
+        {
+          title: "expenses",
+          url: "/expenses",
+          translationKey: "expenses"
+        },
+        {
+          title: "sales",
+          url: "/sales",
+          translationKey: "sales"
+        },
+        {
+          title: "personnel",
+          url: "/personnel",
+          translationKey: "personnel"
+        },
+        {
+          title: "loans",
+          url: "/loans",
+          translationKey: "loans"
+        },
+        {
+          title: "leasing",
+          url: "/leasing",
+          translationKey: "leasing"
+        },
+        {
+          title: "investments",
+          url: "/investments",
+          translationKey: "investments"
+        },
+      ]
     },
     {
-      title: "sales",
-      url: "/sales",
+      title: "financial-results",
+      url: "/financial-results",
       icon: "TrendingUp",
-      translationKey: "sales"
+      translationKey: "financialResults",
+      items: [
+        {
+          title: "profit-loss",
+          url: "/profit-loss",
+          translationKey: "profitLoss"
+        },
+        {
+          title: "cash-flow",
+          url: "/cash-flow",
+          translationKey: "cashFlow"
+        },
+        {
+          title: "balance-sheet",
+          url: "/balance-sheet",
+          translationKey: "balanceSheet"
+        },
+        {
+          title: "working-capital",
+          url: "/working-capital",
+          translationKey: "workingCapital"
+        },
+        {
+          title: "financial-plan",
+          url: "/financial-plan",
+          translationKey: "financialPlan"
+        },
+      ]
     },
     {
-      title: "personnel",
-      url: "/personnel",
-      icon: "Briefcase",
-      translationKey: "personnel"
-    },
-    {
-      title: "loans",
-      url: "/loans",
-      icon: "CreditCard",
-      translationKey: "loans"
-    },
-    {
-      title: "leasing",
-      url: "/leasing",
-      icon: "Building2",
-      translationKey: "leasing"
-    },
-    {
-      title: "investments",
-      url: "/investments",
-      icon: "PiggyBank",
-      translationKey: "investments"
-    },
-    {
-      title: "variables",
-      url: "/variables",
-      icon: "Hash",
-      translationKey: "variables"
-    },
-    {
-      title: "cash-flow",
-      url: "/cash-flow",
-      icon: "Wallet",
-      translationKey: "cashFlow"
-    },
-    {
-      title: "profit-loss",
-      url: "/profit-loss",
+      title: "analytics",
+      url: "/analytics",
       icon: "BarChart3",
-      translationKey: "profitLoss"
+      translationKey: "analytics",
+      items: [
+        {
+          title: "expenses-analytics",
+          url: "/analytics/expenses",
+          translationKey: "expensesAnalytics"
+        },
+        {
+          title: "sales-analytics",
+          url: "/analytics/sales",
+          translationKey: "salesAnalytics"
+        },
+        {
+          title: "personnel-analytics",
+          url: "/analytics/personnel",
+          translationKey: "personnelAnalytics"
+        },
+        {
+          title: "loans-analytics",
+          url: "/analytics/loans",
+          translationKey: "loansAnalytics"
+        },
+        {
+          title: "leasing-analytics",
+          url: "/analytics/leasing",
+          translationKey: "leasingAnalytics"
+        },
+        {
+          title: "investments-analytics",
+          url: "/analytics/investments",
+          translationKey: "investmentsAnalytics"
+        },
+      ]
     },
     {
-      title: "balance-sheet",
-      url: "/balance-sheet",
-      icon: "FileText",
-      translationKey: "balanceSheet"
-    },
-    {
-      title: "working-capital",
-      url: "/working-capital",
-      icon: "Calculator",
-      translationKey: "workingCapital"
-    },
-    {
-      title: "financial-plan",
-      url: "/financial-plan",
-      icon: "Target",
-      translationKey: "financialPlan"
-    },
-    {
-      title: "budget-projections",
-      url: "/budget-projections",
-      icon: "Calendar",
-      translationKey: "budgetProjections"
-    },
-    {
-      title: "budgets",
-      url: "/budgets",
+      title: "budgeting",
+      url: "/budgeting",
       icon: "FileSpreadsheet",
-      translationKey: "budgets"
+      translationKey: "budgeting",
+      items: [
+        {
+          title: "budget-projections",
+          url: "/budget-projections",
+          translationKey: "budgetProjections"
+        },
+        {
+          title: "budgets",
+          url: "/budgets",
+          translationKey: "budgets"
+        },
+      ]
     },
     {
-      title: "users",
-      url: "/users",
-      icon: "Users",
-      translationKey: "users"
+      title: "settings",
+      url: "/settings",
+      icon: "Settings",
+      translationKey: "settings",
+      items: [
+        {
+          title: "users",
+          url: "/users",
+          translationKey: "users"
+        },
+        {
+          title: "variables",
+          url: "/variables",
+          translationKey: "variables"
+        },
+      ]
     },
   ],
   navSecondary: [

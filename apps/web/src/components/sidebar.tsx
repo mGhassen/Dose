@@ -106,7 +106,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       return items.map((item: MenuItem) => ({
         title: item.translationKey ? t(item.translationKey) : item.title,
         url: item.url,
-        icon: iconMap[item.icon as keyof typeof iconMap] || FileText,
+        icon: item.icon ? (iconMap[item.icon as keyof typeof iconMap] || FileText) : FileText,
         translationKey: item.translationKey,
         isActive: item.isActive,
         items: item.items ? processMenuItems(item.items) : undefined,
