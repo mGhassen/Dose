@@ -5,6 +5,7 @@ import { useFinancialKPIs, useRevenueChart, useExpensesChart, useProfitChart, us
 import { useTranslations } from 'next-intl';
 import { formatCurrency } from "@kit/lib/config";
 import AppLayout from "@/components/app-layout";
+import { useYear } from "@/contexts/year-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { 
   TrendingUp, 
@@ -21,16 +22,14 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 export default function Dashboard() {
   const { user } = useAuth();
   const t = useTranslations('dashboard');
+  const { selectedYear } = useYear();
   
-  // Get current year for all dashboard queries
-  const currentYear = new Date().getFullYear().toString();
-
-  // Fetch data
-  const { data: kpis, isLoading: kpisLoading } = useFinancialKPIs(currentYear);
-  const { data: revenueData, isLoading: revenueLoading } = useRevenueChart(currentYear);
-  const { data: expensesData, isLoading: expensesLoading } = useExpensesChart(currentYear);
-  const { data: profitData, isLoading: profitLoading } = useProfitChart(currentYear);
-  const { data: cashFlowData, isLoading: cashFlowLoading } = useCashFlowChart(currentYear);
+  // Fetch data using selectedYear from context
+  const { data: kpis, isLoading: kpisLoading } = useFinancialKPIs(selectedYear);
+  const { data: revenueData, isLoading: revenueLoading } = useRevenueChart(selectedYear);
+  const { data: expensesData, isLoading: expensesLoading } = useExpensesChart(selectedYear);
+  const { data: profitData, isLoading: profitLoading } = useProfitChart(selectedYear);
+  const { data: cashFlowData, isLoading: cashFlowLoading } = useCashFlowChart(selectedYear);
 
   return (
     <AppLayout>
@@ -54,7 +53,7 @@ export default function Dashboard() {
                 {kpisLoading ? '...' : kpis ? formatCurrency(kpis.totalRevenue) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Revenue for {currentYear}
+                Revenue for {selectedYear}
               </p>
             </CardContent>
           </Card>

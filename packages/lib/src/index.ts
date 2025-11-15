@@ -13,6 +13,7 @@ export * from './localStorage';
 export * from './queryClient';
 export * from './status-mapping';
 export * from './user-settings';
+export * from './year-utils';
 
 // Export all API modules
 export * from './api/users';
