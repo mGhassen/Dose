@@ -2,7 +2,7 @@ import { apiRequest } from './api';
 
 export interface ActualPayment {
   id: number;
-  paymentType: 'loan' | 'leasing' | 'expense';
+  paymentType: 'loan' | 'leasing' | 'expense' | 'subscription';
   referenceId: number;
   scheduleEntryId?: number;
   month: string; // YYYY-MM
@@ -16,7 +16,7 @@ export interface ActualPayment {
 }
 
 export interface CreateActualPaymentData {
-  paymentType: 'loan' | 'leasing' | 'expense';
+  paymentType: 'loan' | 'leasing' | 'expense' | 'subscription';
   referenceId: number;
   scheduleEntryId?: number;
   month: string;

@@ -79,12 +79,39 @@ export async function DELETE(
     const { id } = await params;
     const supabase = createServerSupabaseClient();
     
+    // First, fetch the payment to check if it's a subscription payment
+    const { data: payment, error: fetchError } = await supabase
+      .from('actual_payments')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Delete the payment
     const { error } = await supabase
       .from('actual_payments')
       .delete()
       .eq('id', id);
 
     if (error) throw error;
+
+    // If this was a subscription payment, delete the associated expense
+    if (payment.payment_type === 'subscription') {
+      // Find and delete the expense that was created for this payment
+      // We match by subscription_id, amount, and expense_date
+      const { error: expenseError } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('subscription_id', payment.reference_id)
+        .eq('amount', payment.amount)
+        .eq('expense_date', payment.payment_date);
+
+      if (expenseError) {
+        console.error('Error deleting associated expense:', expenseError);
+        // Don't fail the payment deletion if expense deletion fails
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

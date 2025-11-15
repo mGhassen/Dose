@@ -1,25 +1,30 @@
 "use client";
 
 import { useMemo } from "react";
-import { useYear } from "@/contexts/year-context";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useExpenses, useDeleteExpense } from "@kit/hooks";
-import type { Expense, ExpenseCategory, ExpenseRecurrence } from "@kit/types";
+import { useExpenses, useDeleteExpense, useSubscriptions } from "@kit/hooks";
+import type { Expense, ExpenseCategory } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
-import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
-import { TrendingUp, TrendingDown, DollarSign, Receipt, Calendar } from "lucide-react";
+import { DollarSign, Receipt } from "lucide-react";
 
 export default function ExpensesContent() {
   const router = useRouter();
-  const { selectedYear } = useYear();
   const { data: expenses, isLoading } = useExpenses();
+  const { data: subscriptions } = useSubscriptions();
   const deleteMutation = useDeleteExpense();
+  
+  // Create a map of subscription IDs to names for display
+  const subscriptionMap = useMemo(() => {
+    const map = new Map<number, string>();
+    subscriptions?.forEach(sub => map.set(sub.id, sub.name));
+    return map;
+  }, [subscriptions]);
 
   const columns: ColumnDef<Expense>[] = useMemo(() => [
     {
@@ -57,50 +62,31 @@ export default function ExpensesContent() {
       cell: ({ row }) => formatCurrency(row.original.amount),
     },
     {
-      accessorKey: "recurrence",
-      header: "Recurrence",
+      accessorKey: "subscriptionId",
+      header: "Subscription",
       cell: ({ row }) => {
-        const recurrence = row.original.recurrence;
-        const recurrenceLabels: Record<ExpenseRecurrence, string> = {
-          one_time: "One Time",
-          monthly: "Monthly",
-          quarterly: "Quarterly",
-          yearly: "Yearly",
-          custom: "Custom",
-        };
-        return (
-          <span className="text-sm text-muted-foreground">
-            {recurrenceLabels[recurrence] || recurrence}
-          </span>
-        );
+        const subscriptionId = row.original.subscriptionId;
+        if (subscriptionId && subscriptionMap.has(subscriptionId)) {
+          return (
+            <Badge variant="outline">
+              {subscriptionMap.get(subscriptionId)}
+            </Badge>
+          );
+        }
+        return <span className="text-muted-foreground">—</span>;
       },
     },
     {
-      accessorKey: "startDate",
-      header: "Start Date",
-      cell: ({ row }) => formatDate(row.original.startDate),
-    },
-    {
-      accessorKey: "endDate",
-      header: "End Date",
-      cell: ({ row }) => 
-        row.original.endDate ? formatDate(row.original.endDate) : <span className="text-muted-foreground">—</span>
+      accessorKey: "expenseDate",
+      header: "Expense Date",
+      cell: ({ row }) => formatDate(row.original.expenseDate),
     },
     {
       accessorKey: "vendor",
       header: "Vendor",
       cell: ({ row }) => row.original.vendor || <span className="text-muted-foreground">—</span>,
     },
-    {
-      accessorKey: "isActive",
-      header: "Status",
-      cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? "default" : "secondary"}>
-          {row.original.isActive ? "Active" : "Inactive"}
-        </Badge>
-      ),
-    },
-  ], []);
+  ], [subscriptionMap]);
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this expense?")) return;
@@ -130,14 +116,13 @@ export default function ExpensesContent() {
     const expensesToCopy = type === 'selected' ? data : data;
     
     const csv = [
-      ['Name', 'Category', 'Amount', 'Recurrence', 'Start Date', 'End Date', 'Vendor', 'Description'].join(','),
+      ['Name', 'Category', 'Amount', 'Subscription', 'Expense Date', 'Vendor', 'Description'].join(','),
       ...expensesToCopy.map(exp => [
         exp.name,
         exp.category,
         exp.amount,
-        exp.recurrence,
-        exp.startDate,
-        exp.endDate || '',
+        exp.subscriptionId ? subscriptionMap.get(exp.subscriptionId) || '' : '',
+        exp.expenseDate,
         exp.vendor || '',
         exp.description || '',
       ].join(','))
@@ -151,14 +136,13 @@ export default function ExpensesContent() {
     const expensesToExport = type === 'selected' ? data : data;
     
     const csv = [
-      ['Name', 'Category', 'Amount', 'Recurrence', 'Start Date', 'End Date', 'Vendor', 'Description'].join(','),
+      ['Name', 'Category', 'Amount', 'Subscription', 'Expense Date', 'Vendor', 'Description'].join(','),
       ...expensesToExport.map(exp => [
         exp.name,
         exp.category,
         exp.amount,
-        exp.recurrence,
-        exp.startDate,
-        exp.endDate || '',
+        exp.subscriptionId ? subscriptionMap.get(exp.subscriptionId) || '' : '',
+        exp.expenseDate,
         exp.vendor || '',
         exp.description || '',
       ].join(','))
@@ -175,24 +159,9 @@ export default function ExpensesContent() {
   };
 
   // Calculate summary stats
-  const totalMonthly = useMemo(() => {
+  const totalExpenses = useMemo(() => {
     if (!expenses) return 0;
-    return expenses.reduce((sum, exp) => {
-      switch (exp.recurrence) {
-        case 'monthly':
-          return sum + exp.amount;
-        case 'quarterly':
-          return sum + exp.amount / 3;
-        case 'yearly':
-          return sum + exp.amount / 12;
-        default:
-          return sum + exp.amount;
-      }
-    }, 0);
-  }, [expenses]);
-
-  const activeExpenses = useMemo(() => {
-    return expenses?.filter(e => e.isActive) || [];
+    return expenses.reduce((sum, exp) => sum + exp.amount, 0);
   }, [expenses]);
 
   return (
@@ -203,15 +172,6 @@ export default function ExpensesContent() {
           <p className="text-muted-foreground mt-2">
             Manage and analyze your business expenses and charges
           </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => router.push('/expenses/timeline')}
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            View Timeline
-          </Button>
         </div>
       </div>
 
@@ -225,20 +185,20 @@ export default function ExpensesContent() {
           <CardContent>
             <div className="text-2xl font-bold">{expenses?.length || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {activeExpenses.length} active
+              Total expenses
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Total</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalMonthly)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
             <p className="text-xs text-muted-foreground">
-              Monthly total
+              All expenses
             </p>
           </CardContent>
         </Card>
@@ -246,28 +206,28 @@ export default function ExpensesContent() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg per Expense</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
               {expenses && expenses.length > 0 
-                ? formatCurrency(totalMonthly / expenses.length)
+                ? formatCurrency(totalExpenses / expenses.length)
                 : formatCurrency(0)}
             </div>
-            <p className="text-xs text-muted-foreground">Monthly average</p>
+            <p className="text-xs text-muted-foreground">Average amount</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Categories</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            <Receipt className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
               {new Set(expenses?.map(e => e.category) || []).size}
             </div>
-            <p className="text-xs text-muted-foreground">Active categories</p>
+            <p className="text-xs text-muted-foreground">Unique categories</p>
           </CardContent>
         </Card>
       </div>
@@ -288,13 +248,12 @@ export default function ExpensesContent() {
               onBulkExport={handleBulkExport}
               filterColumns={[
                 { value: "category", label: "Category" },
-                { value: "recurrence", label: "Recurrence" },
-                { value: "isActive", label: "Status" },
+                { value: "subscriptionId", label: "Subscription" },
               ]}
               sortColumns={[
                 { value: "name", label: "Name", type: "character varying" },
                 { value: "amount", label: "Amount", type: "numeric" },
-                { value: "startDate", label: "Start Date", type: "date" },
+                { value: "expenseDate", label: "Expense Date", type: "date" },
               ]}
               localStoragePrefix="expenses"
               searchFields={["name", "description", "vendor"]}
@@ -303,3 +262,4 @@ export default function ExpensesContent() {
     </div>
   );
 }
+

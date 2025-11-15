@@ -16,8 +16,12 @@ export function useCreateActualPayment() {
   
   return useMutation({
     mutationFn: actualPaymentsApi.create,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['actual-payments'] });
+      // If this is a subscription payment, also invalidate expenses since an expense was created
+      if (data.paymentType === 'subscription') {
+        queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      }
     },
   });
 }
@@ -41,6 +45,8 @@ export function useDeleteActualPayment() {
     mutationFn: actualPaymentsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['actual-payments'] });
+      // Also invalidate expenses in case a subscription payment was deleted (which deletes an expense)
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
     },
   });
 }

@@ -6,7 +6,7 @@ import { createServerSupabaseClient } from '@kit/lib/supabase';
 
 export interface ActualPayment {
   id: number;
-  paymentType: 'loan' | 'leasing' | 'expense';
+  paymentType: 'loan' | 'leasing' | 'expense' | 'subscription';
   referenceId: number;
   scheduleEntryId?: number;
   month: string; // YYYY-MM
@@ -20,7 +20,7 @@ export interface ActualPayment {
 }
 
 export interface CreateActualPaymentData {
-  paymentType: 'loan' | 'leasing' | 'expense';
+  paymentType: 'loan' | 'leasing' | 'expense' | 'subscription';
   referenceId: number;
   scheduleEntryId?: number;
   month: string;
@@ -107,15 +107,49 @@ export async function POST(request: NextRequest) {
     const body: CreateActualPaymentData = await request.json();
 
     const supabase = createServerSupabaseClient();
-    const { data, error } = await supabase
+    
+    // Create the actual payment record
+    const { data: paymentData, error: paymentError } = await supabase
       .from('actual_payments')
       .insert(transformToSnakeCase(body))
       .select()
       .single();
 
-    if (error) throw error;
+    if (paymentError) throw paymentError;
 
-    return NextResponse.json(transformActualPayment(data), { status: 201 });
+    // If this is a subscription payment, automatically create an expense entry
+    if (body.paymentType === 'subscription') {
+      // Fetch the subscription to get its details
+      const { data: subscription, error: subscriptionError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('id', body.referenceId)
+        .single();
+
+      if (!subscriptionError && subscription) {
+        // Create an expense entry linked to this subscription
+        const expenseData = {
+          name: `${subscription.name} - Payment ${body.month}`,
+          category: subscription.category,
+          amount: body.amount,
+          subscription_id: body.referenceId,
+          expense_date: body.paymentDate,
+          description: body.notes || `Payment for subscription: ${subscription.name}`,
+          vendor: subscription.vendor || null,
+        };
+
+        const { error: expenseError } = await supabase
+          .from('expenses')
+          .insert(expenseData);
+
+        if (expenseError) {
+          console.error('Error creating expense for subscription payment:', expenseError);
+          // Don't fail the payment creation if expense creation fails
+        }
+      }
+    }
+
+    return NextResponse.json(transformActualPayment(paymentData), { status: 201 });
   } catch (error: any) {
     console.error('Error creating actual payment:', error);
     return NextResponse.json(

@@ -3,11 +3,13 @@
 -- Run with: supabase db reset (applies migrations then seed.sql)
 
 -- ============================================================================
--- EXPENSES
+-- SUBSCRIPTIONS (Recurring Expenses)
 -- ============================================================================
-INSERT INTO expenses (name, category, amount, recurrence, start_date, end_date, description, vendor, is_active) VALUES
+INSERT INTO subscriptions (name, category, amount, recurrence, start_date, end_date, description, vendor, is_active) VALUES
+-- Rent Subscriptions
 ('Rent - Main Location', 'rent', 5000.00, 'monthly', '2024-01-01', NULL, 'Monthly rent for main restaurant location', 'Property Management Co.', true),
 ('Rent - Secondary Location', 'rent', 3500.00, 'monthly', '2024-03-01', NULL, 'Monthly rent for secondary location', 'Property Management Co.', true),
+-- Utilities Subscriptions
 ('Electricity', 'utilities', 800.00, 'monthly', '2024-01-01', NULL, 'Monthly electricity bill', 'Tunisian Electricity Company', true),
 ('Electricity - Secondary', 'utilities', 600.00, 'monthly', '2024-03-01', NULL, 'Monthly electricity for secondary location', 'Tunisian Electricity Company', true),
 ('Water', 'utilities', 200.00, 'monthly', '2024-01-01', NULL, 'Monthly water bill', 'SONEDE', true),
@@ -15,24 +17,47 @@ INSERT INTO expenses (name, category, amount, recurrence, start_date, end_date, 
 ('Internet & Phone', 'utilities', 150.00, 'monthly', '2024-01-01', NULL, 'Business internet and phone service', 'Tunisie Telecom', true),
 ('Internet - Secondary', 'utilities', 120.00, 'monthly', '2024-03-01', NULL, 'Internet for secondary location', 'Tunisie Telecom', true),
 ('Gas', 'utilities', 300.00, 'monthly', '2024-01-01', NULL, 'Monthly gas bill', 'STEG', true),
+-- Supplies Subscriptions
 ('Kitchen Supplies', 'supplies', 1200.00, 'monthly', '2024-01-01', NULL, 'Monthly kitchen supplies and ingredients', 'Food Supplier Inc.', true),
 ('Kitchen Supplies - Secondary', 'supplies', 800.00, 'monthly', '2024-03-01', NULL, 'Kitchen supplies for secondary location', 'Food Supplier Inc.', true),
 ('Cleaning Supplies', 'supplies', 250.00, 'monthly', '2024-01-01', NULL, 'Monthly cleaning supplies', 'Cleaning Supply Co.', true),
 ('Office Supplies', 'supplies', 150.00, 'monthly', '2024-01-01', NULL, 'Monthly office supplies', 'Office Depot', true),
+-- Marketing Subscriptions
 ('Marketing Campaign - Q1', 'marketing', 2000.00, 'quarterly', '2024-01-01', '2024-12-31', 'Quarterly marketing campaign', 'Marketing Agency', true),
 ('Social Media Marketing', 'marketing', 800.00, 'monthly', '2024-01-01', NULL, 'Monthly social media advertising', 'Digital Marketing Co.', true),
 ('Print Advertising', 'marketing', 500.00, 'monthly', '2024-01-01', NULL, 'Monthly print ads', 'Print Media Co.', true),
+-- Insurance Subscriptions
 ('Insurance - Annual', 'insurance', 3000.00, 'yearly', '2024-01-01', NULL, 'Annual business insurance', 'Insurance Co.', true),
 ('Equipment Insurance', 'insurance', 200.00, 'monthly', '2024-01-01', NULL, 'Monthly equipment insurance', 'Insurance Co.', true),
+-- Maintenance Subscriptions
 ('Equipment Maintenance', 'maintenance', 500.00, 'monthly', '2024-01-01', NULL, 'Regular equipment maintenance', 'Maintenance Services', true),
 ('Building Maintenance', 'maintenance', 300.00, 'monthly', '2024-01-01', NULL, 'Monthly building maintenance', 'Maintenance Services', true),
 ('HVAC Maintenance', 'maintenance', 200.00, 'quarterly', '2024-01-01', NULL, 'Quarterly HVAC maintenance', 'HVAC Services', true),
+-- Professional Services Subscriptions
 ('Legal Services', 'professional_services', 1500.00, 'quarterly', '2024-01-01', NULL, 'Quarterly legal consultation', 'Law Firm', true),
 ('Accounting Services', 'professional_services', 1200.00, 'monthly', '2024-01-01', NULL, 'Monthly accounting services', 'Accounting Firm', true),
-('Consulting Services', 'professional_services', 1000.00, 'monthly', '2024-02-01', NULL, 'Monthly business consulting', 'Consulting Co.', true),
-('One-time Setup Cost', 'other', 5000.00, 'one_time', '2024-01-15', NULL, 'Initial setup and installation costs', 'Setup Company', false),
-('Security System', 'other', 2500.00, 'one_time', '2024-02-01', NULL, 'One-time security system installation', 'Security Co.', false),
-('Signage', 'other', 1800.00, 'one_time', '2024-01-20', NULL, 'One-time signage installation', 'Signage Co.', false);
+('Consulting Services', 'professional_services', 1000.00, 'monthly', '2024-02-01', NULL, 'Monthly business consulting', 'Consulting Co.', true);
+
+-- ============================================================================
+-- EXPENSES (One-time expenses and payments linked to subscriptions)
+-- ============================================================================
+-- One-time expenses
+INSERT INTO expenses (name, category, amount, recurrence, start_date, expense_date, description, vendor, subscription_id) VALUES
+('One-time Setup Cost', 'other', 5000.00, 'one_time', '2024-01-15', '2024-01-15', 'Initial setup and installation costs', 'Setup Company', NULL),
+('Security System', 'other', 2500.00, 'one_time', '2024-02-01', '2024-02-01', 'One-time security system installation', 'Security Co.', NULL),
+('Signage', 'other', 1800.00, 'one_time', '2024-01-20', '2024-01-20', 'One-time signage installation', 'Signage Co.', NULL);
+
+-- Sample expense payments linked to subscriptions (January 2024 payments)
+INSERT INTO expenses (name, category, amount, recurrence, start_date, expense_date, description, vendor, subscription_id) VALUES
+('Rent Payment - Jan 2024', 'rent', 5000.00, 'one_time', '2024-01-01', '2024-01-01', 'January rent payment for main location', 'Property Management Co.', 1),
+('Electricity Payment - Jan 2024', 'utilities', 800.00, 'one_time', '2024-01-05', '2024-01-05', 'January electricity bill', 'Tunisian Electricity Company', 3),
+('Water Payment - Jan 2024', 'utilities', 200.00, 'one_time', '2024-01-05', '2024-01-05', 'January water bill', 'SONEDE', 5),
+('Internet Payment - Jan 2024', 'utilities', 150.00, 'one_time', '2024-01-10', '2024-01-10', 'January internet and phone', 'Tunisie Telecom', 7),
+('Kitchen Supplies Payment - Jan 2024', 'supplies', 1200.00, 'one_time', '2024-01-15', '2024-01-15', 'January kitchen supplies', 'Food Supplier Inc.', 10),
+('Social Media Marketing Payment - Jan 2024', 'marketing', 800.00, 'one_time', '2024-01-20', '2024-01-20', 'January social media advertising', 'Digital Marketing Co.', 16),
+('Equipment Insurance Payment - Jan 2024', 'insurance', 200.00, 'one_time', '2024-01-25', '2024-01-25', 'January equipment insurance', 'Insurance Co.', 19),
+('Equipment Maintenance Payment - Jan 2024', 'maintenance', 500.00, 'one_time', '2024-01-28', '2024-01-28', 'January equipment maintenance', 'Maintenance Services', 20),
+('Accounting Services Payment - Jan 2024', 'professional_services', 1200.00, 'one_time', '2024-01-30', '2024-01-30', 'January accounting services', 'Accounting Firm', 24);
 
 -- ============================================================================
 -- LEASING PAYMENTS
@@ -725,7 +750,8 @@ INSERT INTO budget_projections (projection_type, reference_id, month, amount, ca
 -- NOTES
 -- ============================================================================
 -- This seed data provides:
--- - 26 expenses (various categories and recurrence patterns)
+-- - 24 subscriptions (recurring expenses: monthly, quarterly, yearly)
+-- - 12 expenses (3 one-time expenses + 9 subscription payment examples for Jan 2024)
 -- - 7 leasing payments (operating and finance leases)
 -- - 3 loans (different amounts and terms)
 -- - 6 variables (taxes, inflation, exchange rates)
@@ -737,9 +763,15 @@ INSERT INTO budget_projections (projection_type, reference_id, month, amount, ca
 -- - 150+ budget projections (expenses, personnel, leasing for Jan-Dec 2024)
 -- - 12 months of cash flow, working capital, P&L, balance sheet, and financial plan data
 --
+-- ORGANIZATION:
+-- 1. Subscriptions: All recurring expenses (monthly, quarterly, yearly)
+-- 2. Expenses: One-time expenses and actual payments linked to subscriptions
+-- 3. Other entities: Leasing, Loans, Variables, Personnel, Sales, Investments, etc.
+--
 -- All dates are set to 2024 for consistency
 -- All amounts are in Tunisian Dinars (TND)
 -- Budget projections include both actual (is_projected=false) and projected (is_projected=true) data
 -- Loan schedules show payment history and future payments
 -- Depreciation entries track monthly depreciation for investments
+-- Subscription payments can be recorded as expenses linked to subscriptions via subscription_id
 
