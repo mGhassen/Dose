@@ -2,7 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { Sale, CreateSaleData } from '@kit/types';
+import type { Sale, CreateSaleData, PaginatedResponse } from '@kit/types';
+import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
 function transformSale(row: any): Sale {
   return {
@@ -32,8 +33,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month');
     const type = searchParams.get('type');
+    const { page, limit, offset } = getPaginationParams(searchParams);
 
     const supabase = createServerSupabaseClient();
+    
+    // Build count query
+    let countQuery = supabase
+      .from('sales')
+      .select('*', { count: 'exact', head: true });
+
+    // Build data query
     let query = supabase
       .from('sales')
       .select('*')
@@ -49,19 +58,39 @@ export async function GET(request: NextRequest) {
       query = query
         .gte('date', startOfMonth)
         .lte('date', endDate);
+      countQuery = countQuery
+        .gte('date', startOfMonth)
+        .lte('date', endDate);
     }
 
     if (type) {
       query = query.eq('type', type);
+      countQuery = countQuery.eq('type', type);
     }
 
-    const { data, error } = await query;
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    // Execute queries
+    const [{ data, error }, { count, error: countError }] = await Promise.all([
+      query,
+      countQuery,
+    ]);
 
     if (error) throw error;
+    if (countError) throw countError;
 
     const sales: Sale[] = (data || []).map(transformSale);
+    const total = count || 0;
     
-    return NextResponse.json(sales);
+    const response: PaginatedResponse<Sale> = createPaginatedResponse(
+      sales,
+      total,
+      page,
+      limit
+    );
+    
+    return NextResponse.json(response);
   } catch (error: any) {
     console.error('Error fetching sales:', error);
     return NextResponse.json(

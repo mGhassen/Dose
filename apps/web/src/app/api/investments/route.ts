@@ -2,7 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { Investment, CreateInvestmentData } from '@kit/types';
+import type { Investment, CreateInvestmentData, PaginatedResponse } from '@kit/types';
+import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
 function transformInvestment(row: any): Investment {
   return {
@@ -35,17 +36,43 @@ function transformToSnakeCase(data: CreateInvestmentData): any {
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const { page, limit, offset } = getPaginationParams(searchParams);
+
     const supabase = createServerSupabaseClient();
-    const { data, error } = await supabase
+    
+    // Count query
+    const countQuery = supabase
+      .from('investments')
+      .select('*', { count: 'exact', head: true });
+
+    // Data query
+    const query = supabase
       .from('investments')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    // Execute queries
+    const [{ data, error }, { count, error: countError }] = await Promise.all([
+      query,
+      countQuery,
+    ]);
 
     if (error) throw error;
+    if (countError) throw countError;
 
     const investments: Investment[] = (data || []).map(transformInvestment);
+    const total = count || 0;
     
-    return NextResponse.json(investments);
+    const response: PaginatedResponse<Investment> = createPaginatedResponse(
+      investments,
+      total,
+      page,
+      limit
+    );
+    
+    return NextResponse.json(response);
   } catch (error: any) {
     console.error('Error fetching investments:', error);
     return NextResponse.json(

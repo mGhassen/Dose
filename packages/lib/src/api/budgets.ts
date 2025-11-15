@@ -9,17 +9,21 @@ import type {
   BudgetEntry,
   CreateBudgetEntryData,
   UpdateBudgetEntryData,
-  BudgetWithData
+  BudgetWithData,
+  PaginatedResponse,
+  PaginationParams
 } from '@kit/types';
 
 export const budgetsApi = {
-  getAll: (options?: { fiscalYear?: string; includeAccounts?: boolean; includeEntries?: boolean }) => {
+  getAll: (options?: { fiscalYear?: string; includeAccounts?: boolean; includeEntries?: boolean } & PaginationParams) => {
     const params = new URLSearchParams();
     if (options?.fiscalYear) params.append('fiscalYear', options.fiscalYear);
     if (options?.includeAccounts) params.append('includeAccounts', 'true');
     if (options?.includeEntries) params.append('includeEntries', 'true');
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
     const query = params.toString();
-    return apiRequest<Budget[]>(`GET`, `/api/budgets${query ? `?${query}` : ''}`);
+    return apiRequest<PaginatedResponse<Budget>>(`GET`, `/api/budgets${query ? `?${query}` : ''}`);
   },
   
   getById: (id: number, options?: { includeAccounts?: boolean; includeEntries?: boolean }) => {

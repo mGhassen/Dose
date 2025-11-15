@@ -2,7 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { Budget, CreateBudgetData, BudgetAccount, BudgetEntry } from '@kit/types';
+import type { Budget, CreateBudgetData, BudgetAccount, BudgetEntry, PaginatedResponse } from '@kit/types';
+import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
 function transformBudget(row: any): Budget {
   return {
@@ -59,8 +60,16 @@ export async function GET(request: NextRequest) {
     const fiscalYear = searchParams.get('fiscalYear');
     const includeAccounts = searchParams.get('includeAccounts') === 'true';
     const includeEntries = searchParams.get('includeEntries') === 'true';
+    const { page, limit, offset } = getPaginationParams(searchParams);
 
     const supabase = createServerSupabaseClient();
+    
+    // Build count query
+    let countQuery = supabase
+      .from('budgets')
+      .select('*', { count: 'exact', head: true });
+
+    // Build data query
     let query = supabase
       .from('budgets')
       .select('*')
@@ -68,11 +77,20 @@ export async function GET(request: NextRequest) {
 
     if (fiscalYear) {
       query = query.eq('fiscal_year_start', fiscalYear);
+      countQuery = countQuery.eq('fiscal_year_start', fiscalYear);
     }
 
-    const { data, error } = await query;
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    // Execute queries
+    const [{ data, error }, { count, error: countError }] = await Promise.all([
+      query,
+      countQuery,
+    ]);
 
     if (error) throw error;
+    if (countError) throw countError;
 
     const budgets: Budget[] = (data || []).map(transformBudget);
 
@@ -105,7 +123,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(budgets);
+    const total = count || 0;
+    const response: PaginatedResponse<Budget> = createPaginatedResponse(
+      budgets,
+      total,
+      page,
+      limit
+    );
+
+    return NextResponse.json(response);
   } catch (error: any) {
     console.error('Error fetching budgets:', error);
     return NextResponse.json(

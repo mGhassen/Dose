@@ -1,5 +1,5 @@
 import { apiRequest } from './api';
-import type { Loan, LoanScheduleEntry, CreateLoanData, UpdateLoanData } from '@kit/types';
+import type { Loan, LoanScheduleEntry, CreateLoanData, UpdateLoanData, PaginatedResponse, PaginationParams } from '@kit/types';
 
 export interface UpdateLoanScheduleEntryData {
   paymentDate?: string;
@@ -12,7 +12,13 @@ export interface UpdateLoanScheduleEntryData {
 }
 
 export const loansApi = {
-  getAll: () => apiRequest<Loan[]>('GET', '/api/loans'),
+  getAll: (params?: PaginationParams) => {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    const query = searchParams.toString();
+    return apiRequest<PaginatedResponse<Loan>>('GET', `/api/loans${query ? `?${query}` : ''}`);
+  },
   getById: (id: string) => apiRequest<Loan>('GET', `/api/loans/${id}`),
   create: (data: CreateLoanData) => apiRequest<Loan>('POST', '/api/loans', data),
   update: (id: string, data: UpdateLoanData) => apiRequest<Loan>('PUT', `/api/loans/${id}`, data),

@@ -1,5 +1,5 @@
 import { apiRequest } from './api';
-import type { Investment, DepreciationEntry, CreateInvestmentData, UpdateInvestmentData } from '@kit/types';
+import type { Investment, DepreciationEntry, CreateInvestmentData, UpdateInvestmentData, PaginatedResponse, PaginationParams } from '@kit/types';
 
 export interface UpdateDepreciationEntryData {
   month?: string;
@@ -9,7 +9,13 @@ export interface UpdateDepreciationEntryData {
 }
 
 export const investmentsApi = {
-  getAll: () => apiRequest<Investment[]>('GET', '/api/investments'),
+  getAll: (params?: PaginationParams) => {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    const query = searchParams.toString();
+    return apiRequest<PaginatedResponse<Investment>>('GET', `/api/investments${query ? `?${query}` : ''}`);
+  },
   getById: (id: string) => apiRequest<Investment>('GET', `/api/investments/${id}`),
   create: (data: CreateInvestmentData) => apiRequest<Investment>('POST', '/api/investments', data),
   update: (id: string, data: UpdateInvestmentData) => apiRequest<Investment>('PUT', `/api/investments/${id}`, data),

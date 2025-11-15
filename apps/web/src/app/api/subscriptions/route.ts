@@ -3,7 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { Subscription, CreateSubscriptionData } from '@kit/types';
+import type { Subscription, CreateSubscriptionData, PaginatedResponse } from '@kit/types';
+import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
 // Helper functions for transformation
 function transformSubscription(row: any): Subscription {
@@ -42,8 +43,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const isActive = searchParams.get('isActive');
+    const { page, limit, offset } = getPaginationParams(searchParams);
 
     const supabase = createServerSupabaseClient();
+    
+    // Build count query
+    let countQuery = supabase
+      .from('subscriptions')
+      .select('*', { count: 'exact', head: true });
+
+    // Build data query
     let query = supabase
       .from('subscriptions')
       .select('*')
@@ -52,19 +61,37 @@ export async function GET(request: NextRequest) {
     // Apply filters
     if (category) {
       query = query.eq('category', category);
+      countQuery = countQuery.eq('category', category);
     }
 
     if (isActive !== null) {
       query = query.eq('is_active', isActive === 'true');
+      countQuery = countQuery.eq('is_active', isActive === 'true');
     }
 
-    const { data, error } = await query;
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    // Execute queries
+    const [{ data, error }, { count, error: countError }] = await Promise.all([
+      query,
+      countQuery,
+    ]);
 
     if (error) throw error;
+    if (countError) throw countError;
 
     const subscriptions: Subscription[] = (data || []).map(transformSubscription);
+    const total = count || 0;
     
-    return NextResponse.json(subscriptions);
+    const response: PaginatedResponse<Subscription> = createPaginatedResponse(
+      subscriptions,
+      total,
+      page,
+      limit
+    );
+    
+    return NextResponse.json(response);
   } catch (error: any) {
     console.error('Error fetching subscriptions:', error);
     return NextResponse.json(

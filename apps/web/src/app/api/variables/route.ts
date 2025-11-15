@@ -2,7 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { Variable, CreateVariableData } from '@kit/types';
+import type { Variable, CreateVariableData, PaginatedResponse } from '@kit/types';
+import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
 function transformVariable(row: any): Variable {
   return {
@@ -37,8 +38,16 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
+    const { page, limit, offset } = getPaginationParams(searchParams);
 
     const supabase = createServerSupabaseClient();
+    
+    // Build count query
+    let countQuery = supabase
+      .from('variables')
+      .select('*', { count: 'exact', head: true });
+
+    // Build data query
     let query = supabase
       .from('variables')
       .select('*')
@@ -46,15 +55,32 @@ export async function GET(request: NextRequest) {
 
     if (type) {
       query = query.eq('type', type);
+      countQuery = countQuery.eq('type', type);
     }
 
-    const { data, error } = await query;
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    // Execute queries
+    const [{ data, error }, { count, error: countError }] = await Promise.all([
+      query,
+      countQuery,
+    ]);
 
     if (error) throw error;
+    if (countError) throw countError;
 
     const variables: Variable[] = (data || []).map(transformVariable);
+    const total = count || 0;
     
-    return NextResponse.json(variables);
+    const response: PaginatedResponse<Variable> = createPaginatedResponse(
+      variables,
+      total,
+      page,
+      limit
+    );
+    
+    return NextResponse.json(response);
   } catch (error: any) {
     console.error('Error fetching variables:', error);
     return NextResponse.json(

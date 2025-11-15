@@ -3,7 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { Expense, CreateExpenseData } from '@kit/types';
+import type { Expense, CreateExpenseData, PaginatedResponse } from '@kit/types';
+import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
 // Helper functions for transformation
 function transformExpense(row: any): Expense {
@@ -38,8 +39,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const month = searchParams.get('month');
+    const { page, limit, offset } = getPaginationParams(searchParams);
 
     const supabase = createServerSupabaseClient();
+    
+    // Build base query for counting
+    let countQuery = supabase
+      .from('expenses')
+      .select('*', { count: 'exact', head: true });
+
+    // Build query for data
     let query = supabase
       .from('expenses')
       .select('*')
@@ -48,6 +57,7 @@ export async function GET(request: NextRequest) {
     // Apply filters
     if (category) {
       query = query.eq('category', category);
+      countQuery = countQuery.eq('category', category);
     }
 
     if (month) {
@@ -61,15 +71,34 @@ export async function GET(request: NextRequest) {
       query = query
         .gte('expense_date', startOfMonth)
         .lte('expense_date', lastDayOfMonth);
+      countQuery = countQuery
+        .gte('expense_date', startOfMonth)
+        .lte('expense_date', lastDayOfMonth);
     }
 
-    const { data, error } = await query;
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    // Execute queries
+    const [{ data, error }, { count, error: countError }] = await Promise.all([
+      query,
+      countQuery,
+    ]);
 
     if (error) throw error;
+    if (countError) throw countError;
 
     const expenses: Expense[] = (data || []).map(transformExpense);
+    const total = count || 0;
     
-    return NextResponse.json(expenses);
+    const response: PaginatedResponse<Expense> = createPaginatedResponse(
+      expenses,
+      total,
+      page,
+      limit
+    );
+    
+    return NextResponse.json(response);
   } catch (error: any) {
     console.error('Error fetching expenses:', error);
     return NextResponse.json(
