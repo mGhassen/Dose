@@ -72,10 +72,10 @@ export enum LeasingType {
 }
 
 // ============================================================================
-// EXPENSES (Charges d'exploitation)
+// SUBSCRIPTIONS (Abonnements récurrents)
 // ============================================================================
 
-export interface Expense {
+export interface Subscription {
   id: number;
   name: string;
   category: ExpenseCategory;
@@ -90,7 +90,7 @@ export interface Expense {
   updatedAt: string;
 }
 
-export interface CreateExpenseData {
+export interface CreateSubscriptionData {
   name: string;
   category: ExpenseCategory;
   amount: number;
@@ -102,7 +102,45 @@ export interface CreateExpenseData {
   isActive?: boolean;
 }
 
+export interface UpdateSubscriptionData extends Partial<CreateSubscriptionData> {}
+
+// ============================================================================
+// EXPENSES (Charges d'exploitation - one-time or linked to subscription)
+// ============================================================================
+
+export interface Expense {
+  id: number;
+  name: string;
+  category: ExpenseCategory;
+  amount: number;
+  subscriptionId?: number; // Optional link to subscription
+  description?: string;
+  vendor?: string;
+  expenseDate: string; // ISO date - when the expense occurred
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateExpenseData {
+  name: string;
+  category: ExpenseCategory;
+  amount: number;
+  subscriptionId?: number; // Optional link to subscription
+  description?: string;
+  vendor?: string;
+  expenseDate: string; // ISO date - when the expense occurred
+}
+
 export interface UpdateExpenseData extends Partial<CreateExpenseData> {}
+
+export interface SubscriptionProjection {
+  month: string; // YYYY-MM
+  subscriptionId: number;
+  subscriptionName: string;
+  category: ExpenseCategory;
+  amount: number;
+  isProjected: boolean; // true if subscription payment hasn't occurred yet
+}
 
 export interface ExpenseProjection {
   month: string; // YYYY-MM

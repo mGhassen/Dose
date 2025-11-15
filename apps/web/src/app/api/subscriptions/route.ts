@@ -1,35 +1,39 @@
-// Expenses API Route
-// Handles CRUD operations for expenses
+// Subscriptions API Route
+// Handles CRUD operations for subscriptions
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { Expense, CreateExpenseData } from '@kit/types';
+import type { Subscription, CreateSubscriptionData } from '@kit/types';
 
 // Helper functions for transformation
-function transformExpense(row: any): Expense {
+function transformSubscription(row: any): Subscription {
   return {
     id: row.id,
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
-    subscriptionId: row.subscription_id || undefined,
+    recurrence: row.recurrence,
+    startDate: row.start_date,
+    endDate: row.end_date,
     description: row.description,
     vendor: row.vendor,
-    expenseDate: row.expense_date || row.start_date, // Fallback to start_date for migration
+    isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-function transformToSnakeCase(data: CreateExpenseData): any {
+function transformToSnakeCase(data: CreateSubscriptionData): any {
   return {
     name: data.name,
     category: data.category,
     amount: data.amount,
-    subscription_id: data.subscriptionId || null,
+    recurrence: data.recurrence,
+    start_date: data.startDate,
+    end_date: data.endDate,
     description: data.description,
     vendor: data.vendor,
-    expense_date: data.expenseDate,
+    is_active: data.isActive ?? true,
   };
 }
 
@@ -37,11 +41,11 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
-    const month = searchParams.get('month');
+    const isActive = searchParams.get('isActive');
 
     const supabase = createServerSupabaseClient();
     let query = supabase
-      .from('expenses')
+      .from('subscriptions')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -50,30 +54,21 @@ export async function GET(request: NextRequest) {
       query = query.eq('category', category);
     }
 
-    if (month) {
-      // Filter expenses by expense_date in this month
-      const startOfMonth = month + '-01';
-      const endOfMonth = new Date(month + '-01');
-      endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-      endOfMonth.setDate(0); // Last day of month
-      const lastDayOfMonth = endOfMonth.toISOString().split('T')[0];
-
-      query = query
-        .gte('expense_date', startOfMonth)
-        .lte('expense_date', lastDayOfMonth);
+    if (isActive !== null) {
+      query = query.eq('is_active', isActive === 'true');
     }
 
     const { data, error } = await query;
 
     if (error) throw error;
 
-    const expenses: Expense[] = (data || []).map(transformExpense);
+    const subscriptions: Subscription[] = (data || []).map(transformSubscription);
     
-    return NextResponse.json(expenses);
+    return NextResponse.json(subscriptions);
   } catch (error: any) {
-    console.error('Error fetching expenses:', error);
+    console.error('Error fetching subscriptions:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch expenses', details: error.message },
+      { error: 'Failed to fetch subscriptions', details: error.message },
       { status: 500 }
     );
   }
@@ -81,10 +76,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateExpenseData = await request.json();
+    const body: CreateSubscriptionData = await request.json();
     
     // Basic validation
-    if (!body.name || !body.category || !body.amount || !body.expenseDate) {
+    if (!body.name || !body.category || !body.amount || !body.recurrence || !body.startDate) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -93,18 +88,18 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
-      .from('expenses')
+      .from('subscriptions')
       .insert(transformToSnakeCase(body))
       .select()
       .single();
 
     if (error) throw error;
 
-    return NextResponse.json(transformExpense(data), { status: 201 });
+    return NextResponse.json(transformSubscription(data), { status: 201 });
   } catch (error: any) {
-    console.error('Error creating expense:', error);
+    console.error('Error creating subscription:', error);
     return NextResponse.json(
-      { error: 'Failed to create expense', details: error.message },
+      { error: 'Failed to create subscription', details: error.message },
       { status: 500 }
     );
   }

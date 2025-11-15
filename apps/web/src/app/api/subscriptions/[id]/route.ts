@@ -1,33 +1,39 @@
-// Expense by ID API Route
+// Subscription API Route (by ID)
+// Handles GET, PUT, DELETE operations for a specific subscription
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { Expense, UpdateExpenseData } from '@kit/types';
+import type { Subscription, UpdateSubscriptionData } from '@kit/types';
 
-function transformExpense(row: any): Expense {
+function transformSubscription(row: any): Subscription {
   return {
     id: row.id,
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
-    subscriptionId: row.subscription_id || undefined,
+    recurrence: row.recurrence,
+    startDate: row.start_date,
+    endDate: row.end_date,
     description: row.description,
     vendor: row.vendor,
-    expenseDate: row.expense_date || row.start_date, // Fallback to start_date for migration
+    isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-function transformToSnakeCase(data: UpdateExpenseData): any {
+function transformToSnakeCase(data: UpdateSubscriptionData): any {
   const result: any = {};
   if (data.name !== undefined) result.name = data.name;
   if (data.category !== undefined) result.category = data.category;
   if (data.amount !== undefined) result.amount = data.amount;
-  if (data.subscriptionId !== undefined) result.subscription_id = data.subscriptionId || null;
-  if (data.expenseDate !== undefined) result.expense_date = data.expenseDate;
+  if (data.recurrence !== undefined) result.recurrence = data.recurrence;
+  if (data.startDate !== undefined) result.start_date = data.startDate;
+  if (data.endDate !== undefined) result.end_date = data.endDate;
   if (data.description !== undefined) result.description = data.description;
   if (data.vendor !== undefined) result.vendor = data.vendor;
+  if (data.isActive !== undefined) result.is_active = data.isActive;
+
   result.updated_at = new Date().toISOString();
   return result;
 }
@@ -41,23 +47,23 @@ export async function GET(
     const supabase = createServerSupabaseClient();
     
     const { data, error } = await supabase
-      .from('expenses')
+      .from('subscriptions')
       .select('*')
       .eq('id', id)
       .single();
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
       }
       throw error;
     }
 
-    return NextResponse.json(transformExpense(data));
+    return NextResponse.json(transformSubscription(data));
   } catch (error: any) {
-    console.error('Error fetching expense:', error);
+    console.error('Error fetching subscription:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch expense', details: error.message },
+      { error: 'Failed to fetch subscription', details: error.message },
       { status: 500 }
     );
   }
@@ -69,11 +75,11 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateExpenseData = await request.json();
+    const body: UpdateSubscriptionData = await request.json();
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
-      .from('expenses')
+      .from('subscriptions')
       .update(transformToSnakeCase(body))
       .eq('id', id)
       .select()
@@ -81,16 +87,16 @@ export async function PUT(
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
       }
       throw error;
     }
 
-    return NextResponse.json(transformExpense(data));
+    return NextResponse.json(transformSubscription(data));
   } catch (error: any) {
-    console.error('Error updating expense:', error);
+    console.error('Error updating subscription:', error);
     return NextResponse.json(
-      { error: 'Failed to update expense', details: error.message },
+      { error: 'Failed to update subscription', details: error.message },
       { status: 500 }
     );
   }
@@ -105,7 +111,7 @@ export async function DELETE(
     const supabase = createServerSupabaseClient();
     
     const { error } = await supabase
-      .from('expenses')
+      .from('subscriptions')
       .delete()
       .eq('id', id);
 
@@ -113,9 +119,9 @@ export async function DELETE(
 
     return NextResponse.json({}, { status: 204 });
   } catch (error: any) {
-    console.error('Error deleting expense:', error);
+    console.error('Error deleting subscription:', error);
     return NextResponse.json(
-      { error: 'Failed to delete expense', details: error.message },
+      { error: 'Failed to delete subscription', details: error.message },
       { status: 500 }
     );
   }
