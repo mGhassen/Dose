@@ -18,15 +18,25 @@ import {
   LogOut,
   Monitor,
   Moon,
-  Sun
+  Sun,
+  Calendar
 } from "lucide-react";
 import Link from "next/link";
 import { SidebarTrigger } from "@kit/ui/sidebar";
 import { GlobalSearch } from "@/components/global-search";
 import { useTheme } from "@/components/theme-provider";
+import { useYear } from "@/contexts/year-context";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@kit/ui/select";
 
 export function Navbar() {
   const { theme, setTheme } = useTheme();
+  const { selectedYear, setSelectedYear, availableYears } = useYear();
 
   const getThemeIcon = () => {
     switch (theme) {
@@ -55,6 +65,23 @@ export function Navbar() {
         {/* Navigation */}
         <div className="flex items-center gap-6 ml-auto">
           <nav className="flex items-center gap-4">
+            {/* Year Selector */}
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger className="w-[100px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map((year) => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
             {/* Theme Switcher */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

@@ -8,7 +8,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { ArrowLeft, Calendar, TrendingUp, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLeasingPaymentById } from "@kit/hooks";
+import { useLeasingById } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -31,7 +31,7 @@ interface LeasingTimelinePageProps {
 export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps) {
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
-  const { data: leasing, isLoading: leasingLoading } = useLeasingPaymentById(resolvedParams?.id || "");
+  const { data: leasing, isLoading: leasingLoading } = useLeasingById(resolvedParams?.id || "");
   const [startMonth, setStartMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;

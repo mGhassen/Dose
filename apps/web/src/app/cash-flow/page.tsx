@@ -28,10 +28,11 @@ import {
   ComposedChart
 } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, ArrowUpRight, ArrowDownRight, Wallet } from "lucide-react";
+import { useYear } from "@/contexts/year-context";
 
 export default function CashFlowPage() {
   const router = useRouter();
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const { selectedYear } = useYear();
   const { data: cashFlow, isLoading } = useCashFlow();
   const deleteMutation = useDeleteCashFlow();
 
@@ -203,15 +204,6 @@ export default function CashFlowPage() {
             Monitor and analyze your cash flow and treasury position
           </p>
         </div>
-        <select
-          className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
-        >
-          {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-            <option key={year} value={year.toString()}>{year}</option>
-          ))}
-        </select>
       </div>
 
       {/* Summary Cards */}

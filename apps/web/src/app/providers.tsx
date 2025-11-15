@@ -5,6 +5,7 @@ import { getQueryFn } from "@kit/lib/queryClient";
 import { MSWProvider } from "@/components/msw-provider";
 import { UserSettingsProvider } from "@/components/user-settings-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { YearProvider } from "@/contexts/year-context";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = React.useState(
@@ -38,7 +39,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <UserSettingsProvider>
           <ThemeProvider>
-            {children}
+            <YearProvider>
+              {children}
+            </YearProvider>
           </ThemeProvider>
         </UserSettingsProvider>
       </QueryClientProvider>

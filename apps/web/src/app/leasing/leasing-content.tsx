@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useYear } from "@/contexts/year-context";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
@@ -36,7 +37,7 @@ const COLORS = ['#a855f7', '#3b82f6'];
 
 export default function LeasingContent() {
   const router = useRouter();
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const { selectedYear } = useYear();
   const { data: leasing, isLoading } = useLeasing();
   const { data: analytics, isLoading: analyticsLoading } = useLeasingAnalytics(selectedYear);
   const deleteMutation = useDeleteLeasing();
@@ -219,15 +220,6 @@ export default function LeasingContent() {
           </p>
         </div>
         <div className="flex gap-2">
-          <select
-            className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-          >
-            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-              <option key={year} value={year.toString()}>{year}</option>
-            ))}
-          </select>
           <Button
             variant="outline"
             onClick={() => router.push('/leasing/timeline')}

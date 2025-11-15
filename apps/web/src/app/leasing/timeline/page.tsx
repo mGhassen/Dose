@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Calendar, TrendingUp, Download, Eye } from "lucide-react";
-import { useLeasingPayments } from "@kit/hooks";
+import { useLeasing } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { projectLeasingPayment, projectLeasingPaymentsForRange } from "@/lib/calculations/leasing-timeline";
@@ -24,7 +24,7 @@ import { Badge } from "@kit/ui/badge";
 
 export default function LeasingTimelinePage() {
   const router = useRouter();
-  const { data: leasingPayments, isLoading } = useLeasingPayments();
+  const { data: leasingPayments, isLoading } = useLeasing();
   const [startMonth, setStartMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;

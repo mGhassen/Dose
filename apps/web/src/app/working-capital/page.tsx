@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useYear } from "@/contexts/year-context";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
@@ -30,7 +31,7 @@ import { TrendingUp, TrendingDown, DollarSign, Wallet, BarChart3, ArrowUpDown } 
 
 export default function WorkingCapitalPage() {
   const router = useRouter();
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const { selectedYear } = useYear();
   const { data: workingCapital, isLoading } = useWorkingCapital();
   const deleteMutation = useDeleteWorkingCapital();
 
@@ -197,15 +198,6 @@ export default function WorkingCapitalPage() {
             Track your working capital needs and cash flow requirements
           </p>
         </div>
-        <select
-          className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
-        >
-          {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-            <option key={year} value={year.toString()}>{year}</option>
-          ))}
-        </select>
       </div>
 
       {/* Summary Cards */}

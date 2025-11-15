@@ -36,7 +36,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 
 export default function PersonnelContent() {
   const router = useRouter();
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const { selectedYear } = useYear();
   const { data: personnel, isLoading } = usePersonnel();
   const { data: analytics, isLoading: analyticsLoading } = usePersonnelAnalytics(selectedYear);
   const deleteMutation = useDeletePersonnel();
@@ -210,15 +210,6 @@ export default function PersonnelContent() {
             Manage and analyze your team costs and headcount
           </p>
         </div>
-        <select
-          className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(e.target.value)}
-        >
-          {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-            <option key={year} value={year.toString()}>{year}</option>
-          ))}
-        </select>
       </div>
 
       {/* Summary Cards */}
@@ -495,7 +486,7 @@ export default function PersonnelContent() {
                   <div className="h-[300px] flex items-center justify-center">Loading...</div>
                 ) : analytics?.typeBreakdown && analytics.typeBreakdown.length > 0 ? (
                   <div className="space-y-3">
-                    {analytics.typeBreakdown
+                    {[...analytics.typeBreakdown]
                       .sort((a, b) => b.monthlyCost - a.monthlyCost)
                       .map((type, idx) => (
                         <div key={type.type} className="space-y-1">
