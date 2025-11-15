@@ -24,12 +24,10 @@ function transformExpense(row: any): Expense {
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
-    recurrence: row.recurrence,
-    startDate: row.start_date,
-    endDate: row.end_date,
+    subscriptionId: row.subscription_id || undefined,
     description: row.description,
     vendor: row.vendor,
-    isActive: row.is_active,
+    expenseDate: row.expense_date || row.start_date, // Fallback for migration
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -109,35 +107,55 @@ export async function GET(request: NextRequest) {
     endDateObj.setDate(0);
     const endDate = endDateObj.toISOString().split('T')[0];
 
-    const [salesResult, expensesResult, leasingResult, personnelResult, loansResult] = await Promise.all([
+    const [salesResult, expensesResult, subscriptionsResult, leasingResult, personnelResult, loansResult, actualPaymentsResult] = await Promise.all([
       supabase.from('sales').select('*').gte('date', startDate).lte('date', endDate),
-      supabase.from('expenses').select('*').eq('is_active', true),
+      supabase.from('expenses').select('*'),
+      supabase.from('subscriptions').select('*').eq('is_active', true),
       supabase.from('leasing_payments').select('*').eq('is_active', true),
       supabase.from('personnel').select('*').eq('is_active', true),
       supabase.from('loan_schedules').select('*').gte('payment_date', startDate).lte('payment_date', endDate),
+      supabase.from('actual_payments').select('*').gte('month', startMonth).lte('month', endMonth),
     ]);
 
     if (salesResult.error) throw salesResult.error;
     if (expensesResult.error) throw expensesResult.error;
+    if (subscriptionsResult.error) throw subscriptionsResult.error;
     if (leasingResult.error) throw leasingResult.error;
     if (personnelResult.error) throw personnelResult.error;
     if (loansResult.error) throw loansResult.error;
+    if (actualPaymentsResult.error) throw actualPaymentsResult.error;
 
     const sales: Sale[] = (salesResult.data || []).map(transformSale);
     const expenses: Expense[] = (expensesResult.data || []).map(transformExpense);
+    const subscriptions = subscriptionsResult.data || [];
     const leasing: LeasingPayment[] = (leasingResult.data || []).map(transformLeasing);
     const personnel: Personnel[] = (personnelResult.data || []).map(transformPersonnel);
     const loanPayments: LoanScheduleEntry[] = (loansResult.data || []).map(transformLoanSchedule);
+    const actualPayments = actualPaymentsResult.data || [];
 
-    // Project expenses for the date range
-    const { projectExpense, expenseProjectionsToBudgetProjections } = await import('@/lib/calculations/expense-projections');
-    const expenseProjections: Array<{ month: string; amount: number }> = [];
-    const fullExpenseProjections: any[] = [];
-    for (const expense of expenses) {
-      const projections = projectExpense(expense, startMonth, endMonth);
+    // Separate actual payments by direction
+    const inputPayments = actualPayments.filter((p: any) => p.direction === 'input' || !p.direction); // Default to input if missing
+    const outputPayments = actualPayments.filter((p: any) => p.direction === 'output');
+
+    // Project subscriptions for the date range (recurring expenses)
+    const { projectSubscription } = await import('@/lib/calculations/subscription-projections');
+    const subscriptionProjections: Array<{ month: string; amount: number }> = [];
+    for (const subscription of subscriptions) {
+      const projections = projectSubscription(subscription, startMonth, endMonth);
       for (const proj of projections) {
-        expenseProjections.push({ month: proj.month, amount: proj.amount });
-        fullExpenseProjections.push(proj);
+        subscriptionProjections.push({ month: proj.month, amount: proj.amount });
+      }
+    }
+
+    // Get one-time expenses for the date range
+    const oneTimeExpenses: Array<{ month: string; amount: number }> = [];
+    for (const expense of expenses) {
+      const expenseDate = expense.expenseDate || (expense as any).startDate; // Fallback for migration
+      if (expenseDate) {
+        const expenseMonth = expenseDate.slice(0, 7);
+        if (expenseMonth >= startMonth && expenseMonth <= endMonth) {
+          oneTimeExpenses.push({ month: expenseMonth, amount: expense.amount });
+        }
       }
     }
 
@@ -167,43 +185,96 @@ export async function GET(request: NextRequest) {
       current.setMonth(current.getMonth() + 1);
     }
 
-    // Calculate inflows (sales)
-    for (const sale of sales) {
-      const month = sale.date.slice(0, 7);
-      if (monthlyData[month]) {
-        monthlyData[month].cashInflows += sale.amount;
+    // Calculate inflows using actual input payments first, then fall back to sales declarations
+    // Group input payments by month
+    const inputPaymentsByMonth: Record<string, number> = {};
+    for (const payment of inputPayments) {
+      const month = payment.month;
+      if (!inputPaymentsByMonth[month]) {
+        inputPaymentsByMonth[month] = 0;
+      }
+      inputPaymentsByMonth[month] += parseFloat(payment.amount);
+    }
+
+    // Use actual input payments when available, otherwise use sales declarations
+    for (const month of Object.keys(monthlyData)) {
+      if (inputPaymentsByMonth[month]) {
+        monthlyData[month].cashInflows = inputPaymentsByMonth[month];
+      } else {
+        // Fall back to sales declarations
+        for (const sale of sales) {
+          const saleMonth = sale.date.slice(0, 7);
+          if (saleMonth === month) {
+            monthlyData[month].cashInflows += sale.amount;
+          }
+        }
       }
     }
 
-    // Calculate outflows
-    // Expenses
-    for (const proj of expenseProjections) {
-      if (monthlyData[proj.month]) {
-        monthlyData[proj.month].cashOutflows += proj.amount;
+    // Calculate outflows using actual output payments first, then fall back to projections
+    // Group output payments by month
+    const outputPaymentsByMonth: Record<string, number> = {};
+    for (const payment of outputPayments) {
+      const month = payment.month;
+      if (!outputPaymentsByMonth[month]) {
+        outputPaymentsByMonth[month] = 0;
       }
+      outputPaymentsByMonth[month] += parseFloat(payment.amount);
     }
 
-    // Leasing (now using projections)
-    for (const proj of leasingProjections) {
-      if (monthlyData[proj.month]) {
-        monthlyData[proj.month].cashOutflows += proj.amount;
+    // Use actual output payments when available, otherwise use projections
+    for (const month of Object.keys(monthlyData)) {
+      if (outputPaymentsByMonth[month]) {
+        monthlyData[month].cashOutflows = outputPaymentsByMonth[month];
+      } else {
+        // Fall back to projections (subscriptions, one-time expenses, leasing, personnel, loans)
+        // Subscription projections (recurring expenses)
+        for (const proj of subscriptionProjections) {
+          if (proj.month === month) {
+            monthlyData[month].cashOutflows += proj.amount;
+          }
+        }
+
+        // One-time expenses
+        for (const expense of oneTimeExpenses) {
+          if (expense.month === month) {
+            monthlyData[month].cashOutflows += expense.amount;
+          }
+        }
+
+        // Leasing
+        for (const proj of leasingProjections) {
+          if (proj.month === month) {
+            monthlyData[month].cashOutflows += proj.amount;
+          }
+        }
       }
     }
 
     // Save projections to database
-    // Save expense projections
-    if (fullExpenseProjections.length > 0) {
-      const budgetExpenseProjections = expenseProjectionsToBudgetProjections(fullExpenseProjections);
+    // Save subscription projections (recurring expenses)
+    if (subscriptionProjections.length > 0) {
+      const budgetSubscriptionProjections = subscriptionProjections.map(proj => ({
+        projection_type: 'subscription',
+        reference_id: null, // We don't track individual subscription IDs in budget_projections
+        month: proj.month,
+        amount: proj.amount,
+        category: null,
+        is_projected: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+
       await supabase
         .from('budget_projections')
         .delete()
-        .eq('projection_type', 'expense')
+        .eq('projection_type', 'subscription')
         .gte('month', startMonth)
         .lte('month', endMonth);
       
       await supabase
         .from('budget_projections')
-        .upsert(budgetExpenseProjections, {
+        .upsert(budgetSubscriptionProjections, {
           onConflict: 'projection_type,reference_id,month',
           ignoreDuplicates: false
         });
@@ -228,30 +299,30 @@ export async function GET(request: NextRequest) {
     }
 
 
-    // Personnel
-    for (const person of personnel) {
-      const personStart = new Date(person.startDate);
-      const personEnd = person.endDate ? new Date(person.endDate) : null;
-      let current = new Date(Math.max(new Date(startMonth + '-01').getTime(), personStart.getTime()));
-      const finalDate = personEnd ? new Date(Math.min(end.getTime(), personEnd.getTime())) : end;
-
-      while (current <= finalDate) {
-        const month = current.toISOString().slice(0, 7);
-        if (monthlyData[month]) {
-          const charges = person.employerChargesType === 'percentage'
-            ? person.baseSalary * (person.employerCharges / 100)
-            : person.employerCharges;
-          monthlyData[month].cashOutflows += person.baseSalary + charges;
+    // Add personnel and loan payments only if no actual output payments exist for that month
+    for (const month of Object.keys(monthlyData)) {
+      if (!outputPaymentsByMonth[month]) {
+        // Personnel
+        for (const person of personnel) {
+          const personStart = new Date(person.startDate);
+          const personEnd = person.endDate ? new Date(person.endDate) : null;
+          const monthDate = new Date(month + '-01');
+          
+          if (monthDate >= personStart && (!personEnd || monthDate <= personEnd)) {
+            const charges = person.employerChargesType === 'percentage'
+              ? person.baseSalary * (person.employerCharges / 100)
+              : person.employerCharges;
+            monthlyData[month].cashOutflows += person.baseSalary + charges;
+          }
         }
-        current.setMonth(current.getMonth() + 1);
-      }
-    }
 
-    // Loan payments
-    for (const payment of loanPayments) {
-      const month = payment.paymentDate.slice(0, 7);
-      if (monthlyData[month]) {
-        monthlyData[month].cashOutflows += payment.totalPayment;
+        // Loan payments
+        for (const payment of loanPayments) {
+          const paymentMonth = payment.paymentDate.slice(0, 7);
+          if (paymentMonth === month) {
+            monthlyData[month].cashOutflows += payment.totalPayment;
+          }
+        }
       }
     }
 

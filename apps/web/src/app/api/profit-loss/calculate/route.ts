@@ -25,12 +25,10 @@ function transformExpense(row: any): Expense {
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
-    recurrence: row.recurrence,
-    startDate: row.start_date,
-    endDate: row.end_date,
+    subscriptionId: row.subscription_id || undefined,
     description: row.description,
     vendor: row.vendor,
-    isActive: row.is_active,
+    expenseDate: row.expense_date || row.start_date, // Fallback for migration
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -134,26 +132,35 @@ export async function POST(request: NextRequest) {
     const endDate = endDateObj.toISOString().split('T')[0];
 
     // Fetch all related data
-    const [salesResult, expensesResult, personnelResult, leasingResult, depreciationResult, loansResult, variablesResult] = await Promise.all([
+    const [salesResult, expensesResult, personnelResult, leasingResult, depreciationResult, loansResult, variablesResult, actualPaymentsResult] = await Promise.all([
       supabase.from('sales').select('*').gte('date', startDate).lte('date', endDate),
-      supabase.from('expenses').select('*').eq('is_active', true),
+      supabase.from('expenses').select('*'),
       supabase.from('personnel').select('*').eq('is_active', true),
       supabase.from('leasing_payments').select('*').eq('is_active', true),
       supabase.from('depreciation_entries').select('*').eq('month', month),
       supabase.from('loan_schedules').select('*').gte('payment_date', startDate).lte('payment_date', endDate),
       supabase.from('variables').select('*').eq('type', 'tax').eq('is_active', true).lte('effective_date', endDate).or(`end_date.is.null,end_date.gte.${startDate}`),
+      supabase.from('actual_payments').select('*').eq('month', month),
     ]);
 
     if (salesResult.error) throw salesResult.error;
     if (expensesResult.error) throw expensesResult.error;
+    if (subscriptionsResult.error) throw subscriptionsResult.error;
     if (personnelResult.error) throw personnelResult.error;
     if (leasingResult.error) throw leasingResult.error;
     if (depreciationResult.error) throw depreciationResult.error;
     if (loansResult.error) throw loansResult.error;
     if (variablesResult.error) throw variablesResult.error;
+    if (actualPaymentsResult.error) throw actualPaymentsResult.error;
 
     const sales: Sale[] = (salesResult.data || []).map(transformSale);
     const expenses: Expense[] = (expensesResult.data || []).map(transformExpense);
+    const subscriptions = subscriptionsResult.data || [];
+    const actualPayments = actualPaymentsResult.data || [];
+
+    // Separate actual payments by direction
+    const inputPayments = actualPayments.filter((p: any) => p.direction === 'input' || !p.direction);
+    const outputPayments = actualPayments.filter((p: any) => p.direction === 'output');
     const personnel: Personnel[] = (personnelResult.data || []).map(transformPersonnel);
     const leasing: LeasingPayment[] = (leasingResult.data || []).map(transformLeasing);
     const depreciation: DepreciationEntry[] = (depreciationResult.data || []).map(transformDepreciation);
@@ -165,15 +172,24 @@ export async function POST(request: NextRequest) {
       ? taxVariables.sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0].value
       : 0;
 
-    // Project expenses for the month
-    const { projectExpense } = await import('@/lib/calculations/expense-projections');
-    const monthExpenses: Expense[] = [];
-    for (const expense of expenses) {
-      const projections = projectExpense(expense, month, month);
-      if (projections.length > 0) {
-        monthExpenses.push({
-          ...expense,
-          amount: projections[0].amount,
+    // Get expenses for the month (one-time expenses only, subscriptions are handled separately)
+    const monthExpenses: Expense[] = expenses.filter(e => {
+      const expenseDate = e.expenseDate || (e as any).startDate; // Fallback for migration
+      if (!expenseDate) return false;
+      const expenseMonth = expenseDate.slice(0, 7);
+      return expenseMonth === month;
+    });
+
+    // Project subscriptions for the month
+    const { projectSubscription } = await import('@/lib/calculations/subscription-projections');
+    const subscriptionProjections: Array<{ month: string; amount: number; category: string }> = [];
+    for (const subscription of subscriptions) {
+      const projections = projectSubscription(subscription, month, month);
+      for (const proj of projections) {
+        subscriptionProjections.push({
+          month: proj.month,
+          amount: proj.amount,
+          category: proj.category,
         });
       }
     }
@@ -208,11 +224,55 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Calculate P&L
+    // Use actual payments when available, otherwise use declarations
+    // For revenue: use input payments if available, otherwise use sales
+    let actualRevenue = 0;
+    if (inputPayments.length > 0) {
+      actualRevenue = inputPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+    } else {
+      actualRevenue = sales.reduce((sum, s) => sum + s.amount, 0);
+    }
+
+    // For expenses: use output payments if available, otherwise use expense/subscription declarations
+    let actualExpensesTotal = 0;
+    if (outputPayments.length > 0) {
+      // Filter output payments by expense-related types
+      const expensePayments = outputPayments.filter((p: any) => 
+        ['expense', 'subscription', 'leasing'].includes(p.payment_type)
+      );
+      actualExpensesTotal = expensePayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+    } else {
+      // Use declarations: one-time expenses + subscription projections
+      actualExpensesTotal = monthExpenses.reduce((sum, e) => sum + e.amount, 0) +
+        subscriptionProjections.reduce((sum, p) => sum + p.amount, 0);
+    }
+
+    // Calculate P&L with actual payments
+    // Create modified sales array with actual revenue
+    const actualSales: Sale[] = actualRevenue > 0 ? [{
+      id: 0,
+      date: `${month}-01`,
+      type: 'other' as any,
+      amount: actualRevenue,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }] : sales;
+
+    // Create modified expenses array with actual expenses
+    const actualExpensesArray: Expense[] = actualExpensesTotal > 0 ? [{
+      id: 0,
+      name: 'Actual Expenses',
+      category: 'other' as any,
+      amount: actualExpensesTotal,
+      expenseDate: `${month}-01`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }] : monthExpenses;
+
     const profitAndLoss = calculateProfitAndLoss(
       month,
-      sales,
-      monthExpenses,
+      actualSales,
+      actualExpensesArray,
       activePersonnel,
       activeLeasing,
       depreciation,
