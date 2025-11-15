@@ -1,6 +1,13 @@
+"use client";
+
+import AppLayout from '@/components/app-layout';
 import ItemsContent from "./items-content";
 
 export default function ItemsPage() {
-  return <ItemsContent />;
+  return (
+    <AppLayout>
+      <ItemsContent />
+    </AppLayout>
+  );
 }
 

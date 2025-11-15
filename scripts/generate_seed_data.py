@@ -1,105 +1,164 @@
 #!/usr/bin/env python3
 """
-Generate comprehensive seed data for SunnyBudget
-This script generates SQL INSERT statements for all tables
+Generate comprehensive seed data for SunnyBudget - Coffee Shop Edition
+This script generates SQL INSERT statements for all tables with coffee shop-specific data
 """
 
 import datetime
 from decimal import Decimal
 
+def generate_vendors():
+    """Generate 30+ vendor records for coffee shop"""
+    vendors = []
+    vendor_id = 1
+    
+    vendor_names = [
+        ('Premium Coffee Roasters', 'orders@premiumcoffee.com', '+1 (555) 100-0001', '123 Coffee Bean Ave, Seattle, WA 98101', 'John Coffee', 'Primary coffee bean supplier'),
+        ('Milk & Dairy Distributor', 'sales@milkdist.com', '+1 (555) 100-0002', '456 Dairy Lane, Portland, OR 97201', 'Sarah Milk', 'Fresh milk and dairy products'),
+        ('Pastry Supplier Co.', 'orders@pastryco.com', '+1 (555) 100-0003', '789 Bakery St, San Francisco, CA 94102', 'Mike Baker', 'Fresh pastries and baked goods'),
+        ('Equipment Solutions', 'info@equipment.com', '+1 (555) 100-0004', '321 Machine Blvd, Los Angeles, CA 90001', 'Emily Tech', 'Coffee machines and equipment'),
+        ('Cleaning Services Pro', 'contact@cleaning.com', '+1 (555) 100-0005', '654 Clean Way, Chicago, IL 60601', 'Robert Clean', 'Professional cleaning services'),
+        ('Marketing Agency', 'hello@marketing.com', '+1 (555) 100-0006', '987 Ad Ave, New York, NY 10001', 'Lisa Market', 'Digital marketing and social media'),
+        ('Insurance Provider', 'info@insurance.com', '+1 (555) 100-0007', '147 Policy St, Boston, MA 02101', 'David Insure', 'Business insurance'),
+        ('Utilities Company', 'service@utilities.com', '+1 (555) 100-0008', '258 Power Rd, Miami, FL 33101', 'Jennifer Power', 'Electricity and water'),
+        ('Internet Provider', 'support@internet.com', '+1 (555) 100-0009', '369 Web Blvd, Austin, TX 78701', 'Michael Net', 'Internet and phone services'),
+        ('Legal Services', 'contact@legal.com', '+1 (555) 100-0010', '741 Law St, Denver, CO 80201', 'James Law', 'Legal consultation'),
+    ]
+    
+    for name, email, phone, address, contact, notes in vendor_names:
+        vendors.append(f"({vendor_id}, '{name}', '{email}', '{phone}', '{address}', '{contact}', '{notes}', true)")
+        vendor_id += 1
+    
+    # Generate more vendors
+    vendor_types = ['Supplier', 'Service Provider', 'Distributor']
+    cities = ['Seattle', 'Portland', 'San Francisco', 'Los Angeles', 'Chicago', 'New York', 'Boston', 'Miami', 'Austin', 'Denver']
+    
+    for i in range(vendor_id, 31):
+        vendor_type = vendor_types[i % len(vendor_types)]
+        city = cities[i % len(cities)]
+        name = f"{vendor_type} {i}"
+        email = f"contact@{name.lower().replace(' ', '')}.com"
+        phone = f"+1 (555) {100 + i:03d}-{2000 + i:04d}"
+        address = f"{100 + i} {vendor_type} St, {city}, {['WA', 'OR', 'CA', 'CA', 'IL', 'NY', 'MA', 'FL', 'TX', 'CO'][i % 10]} {10000 + i}"
+        contact = f"Contact Person {i}"
+        notes = f"Auto-generated vendor {i}"
+        
+        vendors.append(f"({i}, '{name}', '{email}', '{phone}', '{address}', '{contact}', '{notes}', true)")
+    
+    return vendors
+
+def generate_items():
+    """Generate 50+ item records for coffee shop"""
+    items = []
+    item_id = 1
+    
+    base_items = [
+        ('Premium Arabica Beans', 'High-quality arabica coffee beans from Colombia', 'Coffee', 'COFFEE-ARAB-001', 'kg', 28.50, 1, 'Best seller - premium quality'),
+        ('Robusta Beans', 'Strong robusta coffee beans', 'Coffee', 'COFFEE-ROB-001', 'kg', 22.00, 1, 'For espresso blends'),
+        ('Organic Milk', 'Fresh organic whole milk', 'Dairy', 'MILK-ORG-001', 'liter', 4.50, 2, 'Premium option'),
+        ('Regular Milk', 'Standard whole milk', 'Dairy', 'MILK-REG-001', 'liter', 3.20, 2, 'Standard option'),
+        ('Oat Milk', 'Plant-based oat milk', 'Dairy', 'MILK-OAT-001', 'liter', 5.50, 2, 'Vegan option'),
+        ('Almond Milk', 'Plant-based almond milk', 'Dairy', 'MILK-ALM-001', 'liter', 6.00, 2, 'Vegan option'),
+        ('Croissants', 'Fresh butter croissants', 'Pastry', 'PASTRY-CRO-001', 'piece', 2.50, 3, 'Daily delivery'),
+        ('Muffins', 'Assorted muffins', 'Pastry', 'PASTRY-MUF-001', 'piece', 3.00, 3, 'Daily delivery'),
+        ('Bagels', 'Fresh bagels', 'Pastry', 'PASTRY-BAG-001', 'piece', 2.00, 3, 'Daily delivery'),
+        ('Espresso Machine', 'Commercial espresso machine', 'Equipment', 'EQUIP-ESP-001', 'unit', 8500.00, 4, 'Main equipment'),
+        ('Grinder', 'Commercial coffee grinder', 'Equipment', 'EQUIP-GRIND-001', 'unit', 1200.00, 4, 'Coffee grinder'),
+        ('Refrigerator', 'Commercial refrigerator', 'Equipment', 'EQUIP-FRIDGE-001', 'unit', 3500.00, 4, 'Storage'),
+        ('Paper Cups', 'Disposable coffee cups', 'Supplies', 'SUPPLY-CUP-001', 'box', 25.00, 1, '500 cups per box'),
+        ('Lids', 'Cup lids', 'Supplies', 'SUPPLY-LID-001', 'box', 12.00, 1, '500 lids per box'),
+        ('Napkins', 'Paper napkins', 'Supplies', 'SUPPLY-NAP-001', 'pack', 8.00, 1, '1000 napkins per pack'),
+        ('Sugar Packets', 'Sugar packets', 'Supplies', 'SUPPLY-SUG-001', 'box', 15.00, 1, '1000 packets per box'),
+        ('Syrup - Vanilla', 'Vanilla syrup', 'Supplies', 'SUPPLY-SYR-VAN-001', 'bottle', 12.00, 1, '750ml bottle'),
+        ('Syrup - Caramel', 'Caramel syrup', 'Supplies', 'SUPPLY-SYR-CAR-001', 'bottle', 12.00, 1, '750ml bottle'),
+        ('Syrup - Hazelnut', 'Hazelnut syrup', 'Supplies', 'SUPPLY-SYR-HAZ-001', 'bottle', 12.00, 1, '750ml bottle'),
+        ('Cleaning Supplies', 'General cleaning supplies', 'Supplies', 'SUPPLY-CLEAN-001', 'set', 45.00, 5, 'Monthly restock'),
+    ]
+    
+    for name, desc, category, sku, unit, price, vendor_id, notes in base_items:
+        items.append(f"({item_id}, '{name}', '{desc}', '{category}', '{sku}', '{unit}', {price:.2f}, {vendor_id}, '{notes}', true)")
+        item_id += 1
+    
+    # Generate more items
+    categories = ['Coffee', 'Dairy', 'Pastry', 'Equipment', 'Supplies', 'Food']
+    units = ['piece', 'kg', 'liter', 'box', 'bottle', 'pack', 'set']
+    
+    for i in range(item_id, 51):
+        category = categories[i % len(categories)]
+        unit = units[i % len(units)]
+        name = f"Item {i}"
+        sku = f"ITEM-{i:03d}"
+        price = 5.00 + (i * 2)
+        vendor_id = (i % 30) + 1  # Reference to vendors 1-30
+        desc = f"Description for {name}"
+        notes = f"Auto-generated item {i}"
+        
+        items.append(f"({i}, '{name}', '{desc}', '{category}', '{sku}', '{unit}', {price:.2f}, {vendor_id}, '{notes}', true)")
+    
+    return items
+
 def generate_subscriptions():
-    """Generate 100+ subscriptions"""
+    """Generate subscriptions for coffee shop"""
     subscriptions = []
+    sub_id = 1
+    
     categories = {
         'rent': [
-            ('Rent - Main Location', 5000.00, 'monthly', '2024-01-01'),
-            ('Rent - Secondary Location', 3500.00, 'monthly', '2024-03-01'),
-            ('Rent - Warehouse', 2000.00, 'monthly', '2024-05-01'),
-            ('Rent - Office Space', 1800.00, 'monthly', '2024-02-01'),
-            ('Rent - Parking Lot', 500.00, 'monthly', '2024-01-01'),
+            ('Rent - Main Location', 4500.00, 'monthly', '2024-01-01'),
+            ('Rent - Storage Unit', 300.00, 'monthly', '2024-01-01'),
         ],
         'utilities': [
-            ('Electricity', 800.00, 'monthly', '2024-01-01'),
-            ('Electricity - Secondary', 600.00, 'monthly', '2024-03-01'),
-            ('Water', 200.00, 'monthly', '2024-01-01'),
-            ('Water - Secondary', 150.00, 'monthly', '2024-03-01'),
-            ('Internet & Phone', 150.00, 'monthly', '2024-01-01'),
-            ('Internet - Secondary', 120.00, 'monthly', '2024-03-01'),
-            ('Gas', 300.00, 'monthly', '2024-01-01'),
-            ('Waste Management', 100.00, 'monthly', '2024-01-01'),
-            ('Security System Monitoring', 80.00, 'monthly', '2024-01-01'),
+            ('Electricity', 650.00, 'monthly', '2024-01-01'),
+            ('Water', 180.00, 'monthly', '2024-01-01'),
+            ('Internet & Phone', 120.00, 'monthly', '2024-01-01'),
+            ('Gas', 250.00, 'monthly', '2024-01-01'),
+            ('Waste Management', 80.00, 'monthly', '2024-01-01'),
         ],
         'supplies': [
-            ('Kitchen Supplies', 1200.00, 'monthly', '2024-01-01'),
-            ('Kitchen Supplies - Secondary', 800.00, 'monthly', '2024-03-01'),
-            ('Cleaning Supplies', 250.00, 'monthly', '2024-01-01'),
-            ('Office Supplies', 150.00, 'monthly', '2024-01-01'),
-            ('Paper Products', 200.00, 'monthly', '2024-01-01'),
-            ('Beverage Supplies', 600.00, 'monthly', '2024-01-01'),
-            ('Packaging Materials', 180.00, 'monthly', '2024-01-01'),
-            ('Uniforms & Linens', 300.00, 'quarterly', '2024-01-01'),
+            ('Coffee Beans - Monthly', 2800.00, 'monthly', '2024-01-01'),
+            ('Milk & Dairy - Weekly', 600.00, 'monthly', '2024-01-01'),
+            ('Pastries - Daily', 1200.00, 'monthly', '2024-01-01'),
+            ('Paper Products', 180.00, 'monthly', '2024-01-01'),
+            ('Cleaning Supplies', 150.00, 'monthly', '2024-01-01'),
         ],
         'marketing': [
-            ('Marketing Campaign - Q1', 2000.00, 'quarterly', '2024-01-01'),
-            ('Social Media Marketing', 800.00, 'monthly', '2024-01-01'),
-            ('Print Advertising', 500.00, 'monthly', '2024-01-01'),
-            ('Radio Advertising', 600.00, 'monthly', '2024-02-01'),
-            ('TV Advertising', 1500.00, 'monthly', '2024-03-01'),
-            ('SEO Services', 400.00, 'monthly', '2024-01-01'),
-            ('Content Creation', 350.00, 'monthly', '2024-01-01'),
+            ('Social Media Marketing', 500.00, 'monthly', '2024-01-01'),
+            ('Local Advertising', 300.00, 'monthly', '2024-02-01'),
         ],
         'insurance': [
-            ('Insurance - Annual', 3000.00, 'yearly', '2024-01-01'),
-            ('Equipment Insurance', 200.00, 'monthly', '2024-01-01'),
-            ('Vehicle Insurance', 150.00, 'monthly', '2024-01-01'),
-            ('Liability Insurance', 250.00, 'monthly', '2024-01-01'),
-            ('Health Insurance Contribution', 500.00, 'monthly', '2024-01-01'),
+            ('Business Insurance', 350.00, 'monthly', '2024-01-01'),
+            ('Equipment Insurance', 120.00, 'monthly', '2024-01-01'),
         ],
         'maintenance': [
-            ('Equipment Maintenance', 500.00, 'monthly', '2024-01-01'),
-            ('Building Maintenance', 300.00, 'monthly', '2024-01-01'),
-            ('HVAC Maintenance', 200.00, 'quarterly', '2024-01-01'),
-            ('Vehicle Maintenance', 400.00, 'monthly', '2024-01-01'),
-            ('IT Support', 300.00, 'monthly', '2024-01-01'),
-            ('Landscaping', 150.00, 'monthly', '2024-02-01'),
+            ('Equipment Maintenance', 200.00, 'monthly', '2024-01-01'),
+            ('Cleaning Service', 400.00, 'monthly', '2024-01-01'),
         ],
         'professional_services': [
-            ('Legal Services', 1500.00, 'quarterly', '2024-01-01'),
-            ('Accounting Services', 1200.00, 'monthly', '2024-01-01'),
-            ('Consulting Services', 1000.00, 'monthly', '2024-02-01'),
-            ('Tax Preparation', 800.00, 'quarterly', '2024-01-01'),
-            ('Audit Services', 2000.00, 'yearly', '2024-01-01'),
-            ('HR Services', 600.00, 'monthly', '2024-01-01'),
+            ('Accounting Services', 600.00, 'monthly', '2024-01-01'),
+            ('Legal Services', 200.00, 'quarterly', '2024-01-01'),
         ],
     }
     
-    sub_id = 1
     for category, items in categories.items():
         for name, amount, recurrence, start_date in items:
-            subscriptions.append(f"({sub_id}, '{name}', '{category}', {amount:.2f}, '{recurrence}', '{start_date}', NULL, '{name} subscription', 'Vendor {sub_id}', true)")
+            vendor_id = (sub_id % 30) + 1
+            subscriptions.append(f"({sub_id}, '{name}', '{category}', {amount:.2f}, '{recurrence}', '{start_date}', NULL, '{name} subscription', 'Vendor {vendor_id}', true)")
             sub_id += 1
-    
-    # Add more subscriptions
-    for i in range(sub_id, 101):
-        category = list(categories.keys())[i % len(categories)]
-        subscriptions.append(f"({i}, 'Subscription {i}', '{category}', {100.00 + (i * 10):.2f}, 'monthly', '2024-01-01', NULL, 'Auto-generated subscription {i}', 'Vendor {i}', true)")
     
     return subscriptions
 
-def generate_expenses_for_subscriptions(num_subs=100, months=24):
-    """Generate expense payments for all subscriptions across all months"""
+def generate_expenses_for_subscriptions(subscriptions_data, months=24):
+    """Generate expense payments for subscriptions"""
     expenses = []
     expense_id = 1
     
-    # One-time expenses first
+    # One-time expenses
     one_time = [
-        ('One-time Setup Cost', 'other', 5000.00, '2024-01-15'),
-        ('Security System', 'other', 2500.00, '2024-02-01'),
-        ('Signage', 'other', 1800.00, '2024-01-20'),
-        ('Initial Marketing Campaign', 'marketing', 5000.00, '2024-01-10'),
-        ('Legal Setup', 'professional_services', 3000.00, '2024-01-05'),
-        ('Equipment Purchase', 'other', 15000.00, '2024-02-15'),
-        ('Renovation Costs', 'other', 25000.00, '2024-01-25'),
+        ('Initial Setup Cost', 'other', 5000.00, '2024-01-05'),
+        ('Signage Installation', 'other', 1800.00, '2024-01-10'),
+        ('Initial Marketing Campaign', 'marketing', 3000.00, '2024-01-15'),
+        ('Equipment Purchase', 'other', 15000.00, '2024-02-01'),
+        ('Renovation Costs', 'other', 12000.00, '2024-01-20'),
     ]
     
     for name, category, amount, date in one_time:
@@ -113,66 +172,56 @@ def generate_expenses_for_subscriptions(num_subs=100, months=24):
         year = current_date.year
         month = current_date.month
         
-        for sub_id in range(1, num_subs + 1):
-            # Skip some to make it realistic (not all subscriptions paid every month)
-            if sub_id % 7 == 0:  # Skip every 7th subscription
+        for sub_id, amount, recurrence, start_date_str in subscriptions_data:
+            sub_start = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            if current_date < sub_start:
                 continue
             
-            # Vary payment dates
-            payment_day = 1 + (sub_id % 28)
-            payment_date = f"{year}-{month:02d}-{payment_day:02d}"
+            # Check if subscription should be paid this month based on recurrence
+            months_since_start = (current_date.year - sub_start.year) * 12 + (current_date.month - sub_start.month)
             
-            amount = 100.00 + (sub_id * 10)
-            expenses.append(f"({expense_id}, 'Payment - Sub {sub_id} - {year}-{month:02d}', 'rent', {amount:.2f}, 'one_time', '{payment_date}', '{payment_date}', 'Payment for subscription {sub_id}', 'Vendor {sub_id}', {sub_id})")
-            expense_id += 1
+            should_pay = False
+            if recurrence == 'monthly' and months_since_start >= 0:
+                should_pay = True
+            elif recurrence == 'quarterly' and months_since_start >= 0 and months_since_start % 3 == 0:
+                should_pay = True
+            elif recurrence == 'yearly' and months_since_start >= 0 and months_since_start % 12 == 0:
+                should_pay = True
+            
+            if should_pay:
+                payment_day = 1 + (sub_id % 28)
+                payment_date = f"{year}-{month:02d}-{payment_day:02d}"
+                expenses.append(f"({expense_id}, 'Payment - Sub {sub_id} - {year}-{month:02d}', 'rent', {amount:.2f}, 'one_time', '{payment_date}', '{payment_date}', 'Payment for subscription {sub_id}', 'Vendor {sub_id}', {sub_id})")
+                expense_id += 1
     
     return expenses, expense_id
 
 def generate_leasing_payments():
-    """Generate 30+ leasing payments"""
+    """Generate leasing payments for coffee shop"""
     leases = []
     lease_id = 1
     
     base_leases = [
-        ('Vehicle Lease - Delivery Van', 'operating', 800.00, '2024-01-01', '2026-12-31', 'monthly'),
-        ('Vehicle Lease - Second Van', 'operating', 750.00, '2024-03-01', '2027-02-28', 'monthly'),
-        ('Equipment Lease - Kitchen', 'finance', 1200.00, '2024-01-01', '2027-12-31', 'monthly'),
-        ('Equipment Lease - Refrigeration', 'finance', 900.00, '2024-02-01', '2027-01-31', 'monthly'),
-        ('Office Space Lease', 'operating', 1500.00, '2024-01-01', None, 'monthly'),
-        ('Storage Unit Lease', 'operating', 400.00, '2024-01-01', None, 'monthly'),
-        ('Equipment Lease - POS Systems', 'finance', 300.00, '2024-01-01', '2026-12-31', 'monthly'),
-        ('Vehicle Lease - Third Van', 'operating', 850.00, '2024-06-01', '2027-05-31', 'monthly'),
-        ('Equipment Lease - Dishwasher', 'finance', 450.00, '2024-02-01', '2027-01-31', 'monthly'),
-        ('Equipment Lease - Oven', 'finance', 600.00, '2024-01-01', '2027-12-31', 'monthly'),
+        ('Espresso Machine Lease', 'finance', 450.00, '2024-01-01', '2027-12-31', 'monthly'),
+        ('Delivery Vehicle Lease', 'operating', 650.00, '2024-02-01', '2027-01-31', 'monthly'),
+        ('Refrigeration Unit Lease', 'finance', 280.00, '2024-01-01', '2027-12-31', 'monthly'),
     ]
     
     for name, lease_type, amount, start_date, end_date, frequency in base_leases:
-        end_date_str = f"'{end_date}'" if end_date else "NULL"
-        leases.append(f"({lease_id}, '{name}', '{lease_type}', {amount:.2f}, '{start_date}', {end_date_str}, '{frequency}', '{name} lease', 'Lessor {lease_id}', true)")
+        leases.append(f"({lease_id}, '{name}', '{lease_type}', {amount:.2f}, '{start_date}', '{end_date}', '{frequency}', '{name} lease', 'Lessor {lease_id}', true)")
         lease_id += 1
-    
-    # Generate more leases
-    for i in range(lease_id, 31):
-        lease_type = 'operating' if i % 2 == 0 else 'finance'
-        amount = 300.00 + (i * 50)
-        start_date = f"2024-{(i % 12) + 1:02d}-01"
-        end_date = f"'{2027 + (i % 3)}-12-31'" if i % 3 == 0 else "NULL"
-        leases.append(f"({i}, 'Lease {i}', '{lease_type}', {amount:.2f}, '{start_date}', {end_date}, 'monthly', 'Auto-generated lease {i}', 'Lessor {i}', true)")
     
     return leases
 
 def generate_loans():
-    """Generate 15+ loans - returns both SQL strings and raw data"""
+    """Generate loans for coffee shop"""
     loans_sql = []
-    loans_data = []  # Raw data for schedule generation
+    loans_data = []
     loan_id = 1
     
     base_loans = [
-        ('Business Startup Loan', 'Emprunt 1', 50000.00, 6.5, 60, '2024-01-01', 'active'),
-        ('Equipment Financing', 'Emprunt 2', 30000.00, 5.5, 36, '2024-02-01', 'active'),
-        ('Expansion Loan', 'Emprunt 3', 75000.00, 7.0, 84, '2024-03-01', 'active'),
-        ('Working Capital Loan', 'Emprunt 4', 40000.00, 6.0, 48, '2024-04-01', 'active'),
-        ('Renovation Loan', 'Emprunt 5', 60000.00, 6.8, 72, '2024-05-01', 'active'),
+        ('Coffee Shop Startup Loan', 'LOAN-001', 40000.00, 6.5, 60, '2024-01-01', 'active'),
+        ('Equipment Financing', 'LOAN-002', 25000.00, 5.5, 36, '2024-02-01', 'active'),
     ]
     
     for name, loan_num, principal, rate, duration, start_date, status in base_loans:
@@ -180,43 +229,30 @@ def generate_loans():
         loans_data.append((loan_id, principal, rate, duration, start_date))
         loan_id += 1
     
-    # Generate more loans
-    for i in range(loan_id, 16):
-        principal = 20000.00 + (i * 5000)
-        rate = 5.0 + (i * 0.2)
-        duration = 36 + (i * 6)
-        month = (i % 12) + 1
-        start_date = f"2024-{month:02d}-01"
-        loans_sql.append(f"({i}, 'Loan {i}', 'Emprunt {i}', {principal:.2f}, {rate:.2f}, {duration}, '{start_date}', 'active', 'Bank {i}', 'Auto-generated loan {i}')")
-        loans_data.append((i, principal, rate, duration, start_date))
-    
     return loans_sql, loans_data
 
 def generate_loan_schedules(loans_data):
-    """Generate full loan schedules for all loans"""
+    """Generate loan schedules"""
     schedules = []
     schedule_id = 1
     
     for loan_id, principal, rate, duration, start_date_str in loans_data:
-        
-        # Calculate monthly payment using amortization formula
         monthly_rate = rate / 100 / 12
         if monthly_rate > 0:
             monthly_payment = principal * (monthly_rate * (1 + monthly_rate)**duration) / ((1 + monthly_rate)**duration - 1)
         else:
             monthly_payment = principal / duration
         
-        # Generate schedule
         remaining_balance = principal
         start = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
         
-        for month in range(1, min(duration + 1, 25)):  # Generate up to 24 months
+        for month in range(1, min(duration + 1, 25)):  # Up to 24 months
             payment_date = start + datetime.timedelta(days=30 * (month - 1))
             interest_payment = remaining_balance * monthly_rate
             principal_payment = monthly_payment - interest_payment
             remaining_balance -= principal_payment
             
-            is_paid = month <= 6  # First 6 months paid
+            is_paid = month <= 12  # First 12 months paid
             paid_date = f"'{payment_date}'" if is_paid else "NULL"
             
             schedules.append(f"({schedule_id}, {loan_id}, {month}, '{payment_date}', {principal_payment:.2f}, {interest_payment:.2f}, {monthly_payment:.2f}, {max(remaining_balance, 0):.2f}, {str(is_paid).lower()}, {paid_date})")
@@ -225,95 +261,79 @@ def generate_loan_schedules(loans_data):
     return schedules
 
 def generate_personnel():
-    """Generate 100+ personnel records"""
+    """Generate personnel for coffee shop"""
     personnel = []
     person_id = 1
     
     positions = [
-        ('Head Chef', 2500.00, 'full_time'),
-        ('Sous Chef', 1800.00, 'full_time'),
-        ('Line Cook', 1400.00, 'full_time'),
-        ('Prep Cook', 1100.00, 'full_time'),
-        ('Waiter', 1200.00, 'full_time'),
-        ('Waitress', 1200.00, 'full_time'),
-        ('Cashier', 1000.00, 'full_time'),
-        ('Manager', 3500.00, 'full_time'),
-        ('Assistant Manager', 2200.00, 'full_time'),
-        ('Delivery Driver', 800.00, 'part_time'),
-        ('Dishwasher', 900.00, 'full_time'),
-        ('Hostess', 1000.00, 'full_time'),
-        ('Accountant', 2000.00, 'contractor'),
-        ('Security Guard', 1500.00, 'contractor'),
-        ('Marketing Specialist', 1800.00, 'contractor'),
+        ('Barista', 1400.00, 'full_time'),
+        ('Senior Barista', 1600.00, 'full_time'),
+        ('Shift Manager', 2000.00, 'full_time'),
+        ('Store Manager', 2800.00, 'full_time'),
+        ('Cashier', 1200.00, 'part_time'),
+        ('Kitchen Assistant', 1100.00, 'part_time'),
+        ('Delivery Driver', 1300.00, 'part_time'),
+        ('Cleaning Staff', 1000.00, 'part_time'),
     ]
     
-    first_names = ['Ahmed', 'Fatima', 'Mohamed', 'Salma', 'Youssef', 'Amira', 'Karim', 'Leila', 'Hassan', 'Nour', 'Omar', 'Ines', 'Mehdi', 'Sana', 'Tarek', 'Rania', 'Bilel', 'Hiba', 'Wassim', 'Sami', 'Lina', 'Khalil', 'Mariem', 'Yasmine', 'Zied']
-    last_names = ['Ben Ali', 'Trabelsi', 'Jebali', 'Khelifi', 'Mansouri', 'Bouazizi', 'Hamdi', 'Slimani', 'Mezghani', 'Ben Ammar', 'Chaabane', 'Ghanmi', 'Bouazza', 'Mahjoub', 'Bouslama', 'Fadhel', 'Khelil', 'Zarrouk', 'Ben Youssef', 'Gharbi', 'Bouhlel', 'Masmoudi', 'Ben Salah', 'Karray', 'Bouaziz']
+    first_names = ['Ahmed', 'Fatima', 'Mohamed', 'Salma', 'Youssef', 'Amira', 'Karim', 'Leila', 'Hassan', 'Nour', 'Omar', 'Ines', 'Mehdi', 'Sana', 'Tarek']
+    last_names = ['Ben Ali', 'Trabelsi', 'Jebali', 'Khelifi', 'Mansouri', 'Bouazizi', 'Hamdi', 'Slimani', 'Mezghani', 'Ben Ammar', 'Chaabane', 'Ghanmi', 'Bouslama', 'Fadhel', 'Khelil']
     
     for i, (position, base_salary, emp_type) in enumerate(positions):
-        for j in range(5):  # 5 of each position
-            first = first_names[(i * 5 + j) % len(first_names)]
-            last = last_names[(i * 5 + j) % len(last_names)]
-            email = f"{first.lower()}.{last.lower().replace(' ', '')}@restaurant.com"
+        for j in range(3):  # 3 of each position
+            first = first_names[(i * 3 + j) % len(first_names)]
+            last = last_names[(i * 3 + j) % len(last_names)]
+            email = f"{first.lower()}.{last.lower().replace(' ', '')}@coffeeshop.com"
             
             employer_charges = base_salary * 0.1875 if emp_type != 'contractor' else 0
             charges_type = 'percentage' if emp_type != 'contractor' else 'fixed'
             
-            start_month = (i * 5 + j) % 12 + 1
+            start_month = (i * 3 + j) % 12 + 1
             start_date = f"2024-{start_month:02d}-01"
             
             personnel.append(f"({person_id}, '{first}', '{last}', '{email}', '{position}', '{emp_type}', {base_salary:.2f}, {employer_charges:.2f}, '{charges_type}', '{start_date}', NULL, true, NULL)")
             person_id += 1
     
-    # Generate more personnel
-    for i in range(person_id, 101):
-        first = first_names[i % len(first_names)]
-        last = last_names[i % len(last_names)]
-        position = positions[i % len(positions)][0]
-        base_salary = 800.00 + (i * 20)
-        emp_type = 'full_time' if i % 3 != 0 else ('part_time' if i % 3 == 1 else 'contractor')
-        email = f"{first.lower()}.{last.lower().replace(' ', '')}{i}@restaurant.com"
-        
-        employer_charges = base_salary * 0.1875 if emp_type != 'contractor' else 0
-        charges_type = 'percentage' if emp_type != 'contractor' else 'fixed'
-        
-        start_month = (i % 12) + 1
-        start_date = f"2024-{start_month:02d}-01"
-        
-        personnel.append(f"({person_id}, '{first}', '{last}', '{email}', '{position} {i}', '{emp_type}', {base_salary:.2f}, {employer_charges:.2f}, '{charges_type}', '{start_date}', NULL, true, NULL)")
-        person_id += 1
-    
     return personnel
 
 def generate_sales(start_year=2024, end_year=2025):
-    """Generate sales data for full years"""
+    """Generate sales data for coffee shop - 2 years"""
     sales = []
     sale_id = 1
     
-    sales_types = ['on_site', 'delivery', 'takeaway', 'catering']
-    base_amounts = {'on_site': 950, 'delivery': 650, 'takeaway': 380, 'catering': 2500}
+    sales_types = ['on_site', 'delivery', 'takeaway']
+    base_amounts = {'on_site': 850, 'delivery': 550, 'takeaway': 320}
     
     current_date = datetime.date(start_year, 1, 1)
     end_date = datetime.date(end_year, 12, 31)
     
     while current_date <= end_date:
-        # Generate 2-5 sales per day
-        num_sales = 2 + (sale_id % 4)
+        # Coffee shops are busier on weekdays and weekends
+        is_weekend = current_date.weekday() >= 5
+        is_holiday = current_date.month == 12 and current_date.day >= 20  # Holiday season
+        
+        # Generate 15-30 sales per day (realistic for coffee shop)
+        num_sales = 20 if is_weekend else 25
+        if is_holiday:
+            num_sales = int(num_sales * 1.3)
         
         for _ in range(num_sales):
             sale_type = sales_types[sale_id % len(sales_types)]
             base_amount = base_amounts[sale_type]
             
             # Add variation
-            amount = base_amount + (sale_id % 500) - 250
-            quantity = 30 + (sale_id % 50)
+            amount = base_amount + (sale_id % 400) - 200
+            quantity = 1 + (sale_id % 3)  # 1-3 items per sale
             
             description = None
-            if current_date.weekday() >= 5:  # Weekend
-                amount *= 1.2
-                description = 'Weekend special'
-            elif sale_id % 20 == 0:
-                description = 'Special event'
+            if is_weekend:
+                amount *= 1.15
+                description = 'Weekend sale'
+            elif is_holiday:
+                amount *= 1.25
+                description = 'Holiday special'
+            elif sale_id % 50 == 0:
+                description = 'Special promotion'
             
             desc_str = f"'{description}'" if description else 'NULL'
             sales.append(f"({sale_id}, '{current_date}', '{sale_type}', {amount:.2f}, {quantity}, {desc_str})")
@@ -324,18 +344,18 @@ def generate_sales(start_year=2024, end_year=2025):
     return sales
 
 def generate_investments():
-    """Generate 50+ investments - returns both SQL strings and raw data"""
+    """Generate investments for coffee shop"""
     investments_sql = []
-    investments_data = []  # Raw data for depreciation generation
+    investments_data = []
     inv_id = 1
     
     base_investments = [
-        ('Commercial Oven', 'equipment', 15000.00, '2024-01-01', 120, 'straight_line', 1500.00),
-        ('Refrigeration System', 'equipment', 12000.00, '2024-01-01', 96, 'straight_line', 1200.00),
-        ('Delivery Vehicle', 'vehicle', 35000.00, '2024-02-01', 60, 'declining_balance', 5000.00),
-        ('POS System', 'technology', 5000.00, '2024-01-01', 36, 'straight_line', 500.00),
-        ('Kitchen Renovation', 'renovation', 45000.00, '2024-01-15', 120, 'straight_line', 0.00),
-        ('Dining Area Furniture', 'other', 18000.00, '2024-01-01', 84, 'straight_line', 2000.00),
+        ('Commercial Espresso Machine', 'equipment', 8500.00, '2024-01-01', 60, 'straight_line', 850.00),
+        ('Coffee Grinder', 'equipment', 1200.00, '2024-01-01', 48, 'straight_line', 120.00),
+        ('Refrigeration System', 'equipment', 3500.00, '2024-01-01', 84, 'straight_line', 350.00),
+        ('POS System', 'technology', 3000.00, '2024-01-01', 36, 'straight_line', 300.00),
+        ('Store Renovation', 'renovation', 18000.00, '2024-01-15', 120, 'straight_line', 0.00),
+        ('Furniture & Seating', 'other', 12000.00, '2024-01-01', 84, 'straight_line', 1200.00),
     ]
     
     for name, inv_type, amount, purchase_date, useful_life, method, residual in base_investments:
@@ -343,38 +363,20 @@ def generate_investments():
         investments_data.append((inv_id, amount, purchase_date, useful_life, method, residual))
         inv_id += 1
     
-    # Generate more investments
-    inv_types = ['equipment', 'vehicle', 'technology', 'renovation', 'other']
-    methods = ['straight_line', 'declining_balance']
-    
-    for i in range(inv_id, 51):
-        inv_type = inv_types[i % len(inv_types)]
-        amount = 5000.00 + (i * 1000)
-        month = (i % 12) + 1
-        purchase_date = f"2024-{month:02d}-01"
-        useful_life = 60 + (i % 60)
-        method = methods[i % len(methods)]
-        residual = amount * 0.1
-        
-        investments_sql.append(f"({i}, 'Investment {i}', '{inv_type}', {amount:.2f}, '{purchase_date}', {useful_life}, '{method}', {residual:.2f}, 'Auto-generated investment {i}')")
-        investments_data.append((i, amount, purchase_date, useful_life, method, residual))
-    
     return investments_sql, investments_data
 
 def generate_depreciation_entries(investments_data, months=24):
-    """Generate depreciation entries for all investments"""
+    """Generate depreciation entries"""
     entries = []
     entry_id = 1
     
     for inv_id, amount, purchase_date_str, useful_life, method, residual in investments_data:
-        
         purchase_date = datetime.datetime.strptime(purchase_date_str, '%Y-%m-%d').date()
         
-        # Calculate depreciation
         if method == 'straight_line':
             monthly_dep = (amount - residual) / useful_life
-        else:  # declining_balance
-            rate = 2.0 / useful_life  # Double declining balance
+        else:
+            rate = 2.0 / useful_life
             monthly_dep = amount * rate / 12
         
         accumulated = 0
@@ -395,7 +397,6 @@ def generate_depreciation_entries(investments_data, months=24):
             entries.append(f"({entry_id}, {inv_id}, '{month_str}', {monthly_dep:.2f}, {accumulated:.2f}, {book_value:.2f})")
             entry_id += 1
             
-            # Move to next month
             if current_date.month == 12:
                 current_date = current_date.replace(year=current_date.year + 1, month=1)
             else:
@@ -404,7 +405,7 @@ def generate_depreciation_entries(investments_data, months=24):
     return entries
 
 def generate_financial_statements(months=24):
-    """Generate cash flow, working capital, P&L, balance sheet, financial plan data"""
+    """Generate financial statements for 2 years"""
     statements = {
         'cash_flow': [],
         'working_capital': [],
@@ -415,17 +416,17 @@ def generate_financial_statements(months=24):
     
     start_year = 2024
     start_month = 1
-    opening_balance = 10000.00
+    opening_balance = 15000.00
     
     for i in range(months):
-        # Properly increment months
         year = start_year + (start_month + i - 1) // 12
         month = ((start_month + i - 1) % 12) + 1
         month_str = f"{year}-{month:02d}"
         
-        # Cash Flow
-        cash_inflows = 35000.00 + (i * 1000)
-        cash_outflows = 28000.00 + (i * 800)
+        # Coffee shop cash flow - seasonal variations
+        seasonal_multiplier = 1.1 if month in [11, 12, 1, 2] else 0.95 if month in [6, 7, 8] else 1.0
+        cash_inflows = (28000.00 + (i * 500)) * seasonal_multiplier
+        cash_outflows = (22000.00 + (i * 400)) * seasonal_multiplier
         net_cash = cash_inflows - cash_outflows
         closing_balance = opening_balance + net_cash
         
@@ -433,25 +434,25 @@ def generate_financial_statements(months=24):
         opening_balance = closing_balance
         
         # Working Capital
-        ar = 5000.00 + (i * 200)
-        inventory = 8000.00 + (i * 300)
-        ap = 6000.00 + (i * 250)
-        oca = 2000.00 + (i * 100)
-        ocl = 1500.00 + (i * 50)
+        ar = 3500.00 + (i * 150)
+        inventory = 5000.00 + (i * 200)
+        ap = 4000.00 + (i * 180)
+        oca = 1500.00 + (i * 80)
+        ocl = 1200.00 + (i * 40)
         wc_need = ar + inventory + oca - ap - ocl
         
         statements['working_capital'].append(f"('{month_str}', {ar:.2f}, {inventory:.2f}, {ap:.2f}, {oca:.2f}, {ocl:.2f}, {wc_need:.2f})")
         
         # P&L
-        revenue = 35000.00 + (i * 1000)
-        cogs = revenue * 0.4
-        op_exp = 8500.00 + (i * 200)
-        personnel = 12000.00 + (i * 300)
-        leasing = 3500.00 + (i * 100)
-        depreciation = 1200.00 + (i * 50)
-        interest = 450.00
-        taxes = 1500.00 + (i * 50)
-        other = 500.00
+        revenue = cash_inflows
+        cogs = revenue * 0.35
+        op_exp = 6000.00 + (i * 150)
+        personnel = 18000.00 + (i * 200)
+        leasing = 1380.00
+        depreciation = 800.00 + (i * 30)
+        interest = 350.00
+        taxes = 1200.00 + (i * 40)
+        other = 400.00
         gross_profit = revenue - cogs
         op_profit = gross_profit - op_exp - personnel - leasing - depreciation
         net_profit = op_profit - interest - taxes - other
@@ -459,28 +460,28 @@ def generate_financial_statements(months=24):
         statements['profit_loss'].append(f"('{month_str}', {revenue:.2f}, {cogs:.2f}, {op_exp:.2f}, {personnel:.2f}, {leasing:.2f}, {depreciation:.2f}, {interest:.2f}, {taxes:.2f}, {other:.2f}, {gross_profit:.2f}, {op_profit:.2f}, {net_profit:.2f})")
         
         # Balance Sheet
-        current_assets = 25000.00 + (i * 1000)
-        fixed_assets = 125000.00 - (i * 500)
+        current_assets = 18000.00 + (i * 800)
+        fixed_assets = 45000.00 - (i * 200)
         intangible = 0.00
         total_assets = current_assets + fixed_assets + intangible
-        current_liab = 15000.00 + (i * 500)
-        long_term_debt = 155000.00 - (i * 1000)
+        current_liab = 10000.00 + (i * 400)
+        long_term_debt = 65000.00 - (i * 800)
         total_liab = current_liab + long_term_debt
-        share_capital = 50000.00
-        retained_earnings = -20000.00 + (i * 1000)
+        share_capital = 30000.00
+        retained_earnings = -15000.00 + (i * 800)
         total_equity = share_capital + retained_earnings
         
         statements['balance_sheet'].append(f"('{month_str}', {current_assets:.2f}, {fixed_assets:.2f}, {intangible:.2f}, {total_assets:.2f}, {current_liab:.2f}, {long_term_debt:.2f}, {total_liab:.2f}, {share_capital:.2f}, {retained_earnings:.2f}, {total_equity:.2f})")
         
         # Financial Plan
-        equity = 50000.00
-        loans = 155000.00 - (i * 1000)
+        equity = 30000.00
+        loans = 65000.00 - (i * 800)
         other_sources = 0.00
         total_sources = equity + loans + other_sources
-        investments = 125000.00 if i == 0 else 0.00
+        investments = 45000.00 if i == 0 else 0.00
         wc = wc_need
-        loan_repayments = 2500.00
-        other_uses = 5000.00 if i == 0 else 3000.00
+        loan_repayments = 1800.00
+        other_uses = 3000.00 if i == 0 else 2000.00
         total_uses = investments + wc + loan_repayments + other_uses
         net_financing = total_sources - total_uses
         
@@ -489,36 +490,60 @@ def generate_financial_statements(months=24):
     return statements
 
 def main():
-    print("-- Comprehensive Seed Data for SunnyBudget")
+    print("-- Comprehensive Seed Data for SunnyBudget - Coffee Shop Edition")
     print("-- Generated by generate_seed_data.py")
-    print("-- This file contains extensive sample data for development and testing")
+    print("-- This file contains 2 years (2024-2025) of coffee shop sample data")
     print("-- Run with: supabase db reset (applies migrations then seed.sql)")
     print()
     
     # Generate all data
     print("-- ============================================================================")
-    print("-- SUBSCRIPTIONS (100+ recurring expenses)")
+    print("-- VENDORS (30 vendor records)")
+    print("-- ============================================================================")
+    vendors = generate_vendors()
+    print("INSERT INTO vendors (id, name, email, phone, address, contact_person, notes, is_active) VALUES")
+    print(",\n".join(vendors) + ";")
+    print("SELECT setval('vendors_id_seq', (SELECT MAX(id) FROM vendors));")
+    print()
+    
+    print("-- ============================================================================")
+    print("-- ITEMS (50 inventory items)")
+    print("-- ============================================================================")
+    items = generate_items()
+    print("INSERT INTO items (id, name, description, category, sku, unit, unit_price, vendor_id, notes, is_active) VALUES")
+    print(",\n".join(items) + ";")
+    print("SELECT setval('items_id_seq', (SELECT MAX(id) FROM items));")
+    print()
+    
+    print("-- ============================================================================")
+    print("-- SUBSCRIPTIONS (Recurring expenses)")
     print("-- ============================================================================")
     subscriptions = generate_subscriptions()
+    subscriptions_data = [(i+1, 100.00 + (i * 10), 'monthly', '2024-01-01') for i in range(len(subscriptions))]  # Simplified for expense generation
     print("INSERT INTO subscriptions (id, name, category, amount, recurrence, start_date, end_date, description, vendor, is_active) VALUES")
     print(",\n".join(subscriptions) + ";")
     print("SELECT setval('subscriptions_id_seq', (SELECT MAX(id) FROM subscriptions));")
     print()
     
     print("-- ============================================================================")
-    print("-- EXPENSES (1000+ expense payments)")
+    print("-- EXPENSES (Expense payments)")
     print("-- ============================================================================")
-    expenses, next_expense_id = generate_expenses_for_subscriptions(100, 24)
+    expenses, _ = generate_expenses_for_subscriptions(subscriptions_data, 24)
     print("INSERT INTO expenses (id, name, category, amount, recurrence, start_date, expense_date, description, vendor, subscription_id) VALUES")
-    print(",\n".join(expenses[:500]) + ";")  # First batch
-    if len(expenses) > 500:
-        print("INSERT INTO expenses (id, name, category, amount, recurrence, start_date, expense_date, description, vendor, subscription_id) VALUES")
-        print(",\n".join(expenses[500:]) + ";")
+    # Print in batches
+    batch_size = 500
+    for i in range(0, len(expenses), batch_size):
+        batch = expenses[i:i+batch_size]
+        if i > 0:
+            print("INSERT INTO expenses (id, name, category, amount, recurrence, start_date, expense_date, description, vendor, subscription_id) VALUES")
+        print(",\n".join(batch) + ";")
+        if i + batch_size < len(expenses):
+            print()
     print("SELECT setval('expenses_id_seq', (SELECT MAX(id) FROM expenses));")
     print()
     
     print("-- ============================================================================")
-    print("-- LEASING PAYMENTS (30+ leases)")
+    print("-- LEASING PAYMENTS (3 leases)")
     print("-- ============================================================================")
     leases = generate_leasing_payments()
     print("INSERT INTO leasing_payments (id, name, type, amount, start_date, end_date, frequency, description, lessor, is_active) VALUES")
@@ -527,7 +552,7 @@ def main():
     print()
     
     print("-- ============================================================================")
-    print("-- LOANS (15+ loans)")
+    print("-- LOANS (2 loans)")
     print("-- ============================================================================")
     loans_sql, loans_data = generate_loans()
     print("INSERT INTO loans (id, name, loan_number, principal_amount, interest_rate, duration_months, start_date, status, lender, description) VALUES")
@@ -536,19 +561,16 @@ def main():
     print()
     
     print("-- ============================================================================")
-    print("-- LOAN SCHEDULES (Full schedules for all loans)")
+    print("-- LOAN SCHEDULES")
     print("-- ============================================================================")
     schedules = generate_loan_schedules(loans_data)
     print("INSERT INTO loan_schedules (id, loan_id, month, payment_date, principal_payment, interest_payment, total_payment, remaining_balance, is_paid, paid_date) VALUES")
-    print(",\n".join(schedules[:200]) + ";")  # First batch
-    if len(schedules) > 200:
-        print("INSERT INTO loan_schedules (id, loan_id, month, payment_date, principal_payment, interest_payment, total_payment, remaining_balance, is_paid, paid_date) VALUES")
-        print(",\n".join(schedules[200:]) + ";")
+    print(",\n".join(schedules) + ";")
     print("SELECT setval('loan_schedules_id_seq', (SELECT MAX(id) FROM loan_schedules));")
     print()
     
     print("-- ============================================================================")
-    print("-- PERSONNEL (100+ personnel records)")
+    print("-- PERSONNEL (24 personnel records)")
     print("-- ============================================================================")
     personnel = generate_personnel()
     print("INSERT INTO personnel (id, first_name, last_name, email, position, type, base_salary, employer_charges, employer_charges_type, start_date, end_date, is_active, notes) VALUES")
@@ -557,12 +579,11 @@ def main():
     print()
     
     print("-- ============================================================================")
-    print("-- SALES (Full year 2024-2025)")
+    print("-- SALES (2 years: 2024-2025)")
     print("-- ============================================================================")
     sales = generate_sales(2024, 2025)
     print(f"-- Generating {len(sales)} sales records...")
     print("INSERT INTO sales (id, date, type, amount, quantity, description) VALUES")
-    # Print in batches
     batch_size = 500
     for i in range(0, len(sales), batch_size):
         batch = sales[i:i+batch_size]
@@ -575,7 +596,7 @@ def main():
     print()
     
     print("-- ============================================================================")
-    print("-- INVESTMENTS (50+ investments)")
+    print("-- INVESTMENTS (6 investments)")
     print("-- ============================================================================")
     investments_sql, investments_data = generate_investments()
     print("INSERT INTO investments (id, name, type, amount, purchase_date, useful_life_months, depreciation_method, residual_value, description) VALUES")
@@ -584,7 +605,7 @@ def main():
     print()
     
     print("-- ============================================================================")
-    print("-- DEPRECIATION ENTRIES (Full depreciation for all investments)")
+    print("-- DEPRECIATION ENTRIES (24 months)")
     print("-- ============================================================================")
     depreciation = generate_depreciation_entries(investments_data, 24)
     print(f"-- Generating {len(depreciation)} depreciation entries...")
@@ -601,7 +622,7 @@ def main():
     print()
     
     print("-- ============================================================================")
-    print("-- FINANCIAL STATEMENTS (24 months)")
+    print("-- FINANCIAL STATEMENTS (24 months: 2024-2025)")
     print("-- ============================================================================")
     statements = generate_financial_statements(24)
     
@@ -646,4 +667,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
