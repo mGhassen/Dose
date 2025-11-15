@@ -6,17 +6,40 @@ import { Button } from "@kit/ui/button";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Badge } from "@kit/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import { 
   Calendar, 
   TrendingUp, 
   Receipt, 
   Users, 
   Building2, 
-  Download
+  Download,
+  DollarSign,
+  Wallet
 } from "lucide-react";
 import { useBudgetProjections } from "@kit/hooks";
 import { formatCurrency } from "@kit/lib/config";
 import { toast } from "sonner";
+import { 
+  LineChart, 
+  Line, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  ComposedChart,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
+
+const COLORS = ['#ef4444', '#3b82f6', '#a855f7', '#22c55e'];
 
 interface MonthlyProjection {
   month: string;
@@ -105,6 +128,45 @@ export default function BudgetProjectionsAgendaPage() {
     return Object.keys(monthlyProjections).sort();
   }, [monthlyProjections]);
 
+  // Calculate summary stats
+  const summary = useMemo(() => {
+    const months = Object.values(monthlyProjections);
+    if (months.length === 0) return null;
+
+    const totalExpenses = months.reduce((sum, m) => sum + m.expenses, 0);
+    const totalPersonnel = months.reduce((sum, m) => sum + m.personnel, 0);
+    const totalLeasing = months.reduce((sum, m) => sum + m.leasing, 0);
+    const totalSales = months.reduce((sum, m) => sum + m.sales, 0);
+    const totalNet = months.reduce((sum, m) => sum + m.total, 0);
+    const avgMonthly = months.length > 0 ? totalNet / months.length : 0;
+
+    return {
+      totalExpenses,
+      totalPersonnel,
+      totalLeasing,
+      totalSales,
+      totalNet,
+      avgMonthly,
+      monthCount: months.length,
+    };
+  }, [monthlyProjections]);
+
+  // Chart data
+  const chartData = useMemo(() => {
+    return sortedMonths.map(month => {
+      const data = monthlyProjections[month];
+      return {
+        month,
+        expenses: data.expenses,
+        personnel: data.personnel,
+        leasing: data.leasing,
+        sales: data.sales,
+        total: data.total,
+        outflows: data.expenses + data.personnel + data.leasing,
+      };
+    });
+  }, [sortedMonths, monthlyProjections]);
+
   const handleExport = () => {
     const csv = [
       ['Month', 'Expenses', 'Personnel', 'Leasing', 'Sales', 'Net Total'].join(','),
@@ -182,7 +244,7 @@ export default function BudgetProjectionsAgendaPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Budget Projections Agenda</h1>
           <p className="text-muted-foreground mt-2">
-            View all budget projections organized by month
+            Comprehensive view of your financial projections and budget planning
           </p>
         </div>
         <Button onClick={handleExport} variant="outline">
@@ -190,6 +252,78 @@ export default function BudgetProjectionsAgendaPage() {
           Export
         </Button>
       </div>
+
+      {/* Summary Cards */}
+      {summary && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+              <Receipt className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(summary.totalExpenses)}</div>
+              <p className="text-xs text-muted-foreground">
+                {summary.monthCount} months
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Personnel</CardTitle>
+              <Users className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">{formatCurrency(summary.totalPersonnel)}</div>
+              <p className="text-xs text-muted-foreground">
+                {summary.monthCount} months
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Leasing</CardTitle>
+              <Building2 className="h-4 w-4 text-purple-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">{formatCurrency(summary.totalLeasing)}</div>
+              <p className="text-xs text-muted-foreground">
+                {summary.monthCount} months
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
+              <TrendingUp className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(summary.totalSales)}</div>
+              <p className="text-xs text-muted-foreground">
+                {summary.monthCount} months
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Net Total</CardTitle>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${summary.totalNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(summary.totalNet)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Avg: {formatCurrency(summary.avgMonthly)}/mo
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Filters */}
       <Card>
@@ -251,23 +385,215 @@ export default function BudgetProjectionsAgendaPage() {
         </CardContent>
       </Card>
 
-      {/* Monthly Projections */}
-      {isLoading ? (
-        <Card>
-          <CardContent className="py-10">
-            <div className="text-center text-muted-foreground">Loading projections...</div>
-          </CardContent>
-        </Card>
-      ) : sortedMonths.length === 0 ? (
-        <Card>
-          <CardContent className="py-10">
-            <div className="text-center text-muted-foreground">
-              No projections found for the selected date range
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
+      {/* Charts and Data */}
+      <Tabs defaultValue="charts" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="charts">Charts & Trends</TabsTrigger>
+          <TabsTrigger value="agenda">Monthly Agenda</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="charts" className="space-y-4">
+          {/* Projection Trends */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Projection Trends</CardTitle>
+              <CardDescription>Monthly evolution of all projection types</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="h-[400px] flex items-center justify-center">Loading...</div>
+              ) : chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={400}>
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorPersonnel" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorLeasing" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#a855f7" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                    <Legend />
+                    <Area 
+                      type="monotone" 
+                      dataKey="expenses" 
+                      stackId="1"
+                      stroke="#ef4444" 
+                      fill="url(#colorExpenses)" 
+                      name="Expenses"
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="personnel" 
+                      stackId="1"
+                      stroke="#3b82f6" 
+                      fill="url(#colorPersonnel)" 
+                      name="Personnel"
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="leasing" 
+                      stackId="1"
+                      stroke="#a855f7" 
+                      fill="url(#colorLeasing)" 
+                      name="Leasing"
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="sales" 
+                      stroke="#22c55e" 
+                      fill="url(#colorSales)" 
+                      name="Sales"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                  No data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Inflows vs Outflows */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Inflows vs Outflows</CardTitle>
+                <CardDescription>Sales vs total expenses</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-[300px] flex items-center justify-center">Loading...</div>
+                ) : chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <Legend />
+                      <Bar dataKey="sales" fill="#22c55e" name="Sales (Inflows)" />
+                      <Bar dataKey="outflows" fill="#ef4444" name="Total Outflows" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    No data available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Net Total Trend */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Net Total Trend</CardTitle>
+                <CardDescription>Monthly net position (Sales - Outflows)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-[300px] flex items-center justify-center">Loading...</div>
+                ) : chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <ComposedChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <Legend />
+                      <Bar 
+                        dataKey="total" 
+                        fill={(entry: any) => entry.total >= 0 ? '#22c55e' : '#ef4444'}
+                        name="Net Total"
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="total" 
+                        stroke="#8884d8" 
+                        strokeWidth={2}
+                        name="Trend"
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    No data available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Type Breakdown */}
+          {summary && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Total Breakdown</CardTitle>
+                <CardDescription>Overall distribution of projection types</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Expenses', value: summary.totalExpenses },
+                        { name: 'Personnel', value: summary.totalPersonnel },
+                        { name: 'Leasing', value: summary.totalLeasing },
+                        { name: 'Sales', value: summary.totalSales },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {[summary.totalExpenses, summary.totalPersonnel, summary.totalLeasing, summary.totalSales].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="agenda" className="space-y-4">
+          {/* Monthly Projections */}
+          {isLoading ? (
+            <Card>
+              <CardContent className="py-10">
+                <div className="text-center text-muted-foreground">Loading projections...</div>
+              </CardContent>
+            </Card>
+          ) : sortedMonths.length === 0 ? (
+            <Card>
+              <CardContent className="py-10">
+                <div className="text-center text-muted-foreground">
+                  No projections found for the selected date range
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
           {sortedMonths.map(month => {
             const data = monthlyProjections[month];
             const [year, monthNum] = month.split('-');
@@ -366,8 +692,10 @@ export default function BudgetProjectionsAgendaPage() {
               </Card>
             );
           })}
-        </div>
-      )}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
