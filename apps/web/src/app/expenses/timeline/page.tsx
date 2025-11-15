@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Calendar, TrendingUp, Download, Eye } from "lucide-react";
+import AppLayout from "@/components/app-layout";
 import { useExpenses, useExpenseProjections } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -112,7 +113,8 @@ export default function ExpensesTimelinePage() {
   const activeExpenses = expenses?.filter(e => e.isActive) || [];
 
   return (
-    <div className="space-y-6 p-6">
+    <AppLayout>
+      <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -330,7 +332,8 @@ export default function ExpensesTimelinePage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </AppLayout>
   );
 }
 

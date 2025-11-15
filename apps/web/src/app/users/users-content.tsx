@@ -29,7 +29,7 @@ import DataTablePage from "@/components/data-table-page";
 import { useUsers, useDeleteUser } from "@kit/hooks";
 import { RelatedDataLinks, ClickableBadges } from "@/components/related-data-link";
 import { useDateFormat } from '@kit/hooks/use-date-format';
-import { useEnumValues } from '@kit/hooks/useMetadataEnums';
+import { useEnumValues } from '@kit/hooks';
 import { User as ApiUser } from "@kit/lib/api/users";
 import { toast } from '@kit/hooks/use-toast';
 import { ConfirmationDialog } from "@/components/confirmation-dialog";

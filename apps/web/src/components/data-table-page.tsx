@@ -1028,19 +1028,27 @@ export default function DataTablePage<T>({
                     
                     // Determine column type
                     let type: 'text' | 'number' | 'currency' | 'date' = 'text';
-                    if (colKey.toLowerCase().includes('amount') || 
-                        colKey.toLowerCase().includes('price') ||
-                        colKey.toLowerCase().includes('cost') ||
-                        colKey.toLowerCase().includes('balance') ||
-                        colKey.toLowerCase().includes('total')) {
+                    const colKeyLower = colKey.toLowerCase();
+                    if (colKeyLower.includes('amount') || 
+                        colKeyLower.includes('price') ||
+                        colKeyLower.includes('cost') ||
+                        colKeyLower.includes('balance') ||
+                        colKeyLower.includes('total') ||
+                        colKeyLower.includes('inflow') ||
+                        colKeyLower.includes('outflow') ||
+                        colKeyLower.includes('flow') ||
+                        colKeyLower.includes('revenue') ||
+                        colKeyLower.includes('expense') ||
+                        colKeyLower.includes('profit') ||
+                        colKeyLower.includes('loss')) {
                       type = 'currency';
-                    } else if (colKey.toLowerCase().includes('date')) {
+                    } else if (colKeyLower.includes('date') || colKeyLower === 'month') {
                       type = 'date';
                     } else if (col.cell && typeof col.cell === 'function') {
                       const cellStr = col.cell.toString();
                       if (cellStr.includes('formatCurrency') || cellStr.includes('currency')) {
                         type = 'currency';
-                      } else if (cellStr.includes('formatDate') || cellStr.includes('date')) {
+                      } else if (cellStr.includes('formatDate') || cellStr.includes('date') || cellStr.includes('toLocaleDateString')) {
                         type = 'date';
                       }
                     }
@@ -1074,14 +1082,38 @@ export default function DataTablePage<T>({
                         for (const key of keys) {
                           value = value?.[key];
                         }
-                        rowData[gridCol.id] = value ?? "";
+                        // For currency/number types, ensure we have the raw numeric value
+                        if (gridCol.type === 'currency' || gridCol.type === 'number') {
+                          value = value != null ? (typeof value === 'number' ? value : parseFloat(value) || 0) : 0;
+                        } else if (value != null) {
+                          // For other types, convert to string but preserve the value
+                          value = String(value);
+                        } else {
+                          value = "";
+                        }
+                        rowData[gridCol.id] = value;
+                      } else {
+                        // If no accessorKey, try to get value directly from row using column id
+                        rowData[gridCol.id] = row[gridCol.id] ?? "";
                       }
+                    } else {
+                      // Column not found, try direct access
+                      rowData[gridCol.id] = row[gridCol.id] ?? "";
                     }
                   });
 
                   // Get row label from first column or name/title field
                   const labelCol = gridColumns[0];
-                  const label = rowData[labelCol?.id] || row.name || row.title || rowId;
+                  let label = rowData[labelCol?.id];
+                  
+                  // If label is a date string (YYYY-MM format), format it nicely
+                  if (labelCol?.id === 'month' && typeof label === 'string' && /^\d{4}-\d{2}$/.test(label)) {
+                    const [year, monthNum] = label.split('-');
+                    const date = new Date(parseInt(year), parseInt(monthNum) - 1);
+                    label = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+                  }
+                  
+                  label = label || row.name || row.title || rowId;
 
                   return {
                     id: rowId,

@@ -79,11 +79,29 @@ export async function apiRequest<T>(
       });
       clearTimeout(timeout);
       
-      
+      // Check if response is HTML (likely a 404 page or error page)
+      const contentType = response.headers.get('content-type') || '';
+      const isHtml = contentType.includes('text/html');
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`API Error Response Body: ${errorText}`);
+        
+        // If we got HTML instead of JSON, it's likely a routing issue
+        if (isHtml && response.status === 404) {
+          console.error(`[API Error] Got HTML 404 page instead of JSON. This usually means:`);
+          console.error(`  1. The API route doesn't exist: ${endpoint}`);
+          console.error(`  2. Next.js dev server needs to be restarted`);
+          console.error(`  3. Port mismatch - server is on ${url.split('/')[2]}, but dev server might be on different port`);
+          console.error(`  4. Route file has syntax errors preventing it from being registered`);
+          
+          const error = new Error(`API route not found: ${endpoint}. Got HTML 404 page. Check if the route exists and restart the dev server.`);
+          (error as any).status = 404;
+          (error as any).isHtml = true;
+          (error as any).url = url;
+          throw error;
+        }
+        
+        console.error(`API Error Response Body: ${errorText.substring(0, 500)}${errorText.length > 500 ? '...' : ''}`);
         
         // Try to parse error details for better error messages
         let errorDetails: any = {};
@@ -99,13 +117,19 @@ export async function apiRequest<T>(
             errorDetails = parsedError;
           }
         } catch {
-          // If parsing fails, use the raw text
+          // If parsing fails, use the raw text (but limit length)
+          errorDetails = { message: errorText.substring(0, 200) };
         }
         
         const error = new Error(`API request failed: ${method} ${endpoint} -> ${response.status} ${response.statusText}`);
         (error as any).status = response.status;
         (error as any).data = errorDetails;
         throw error;
+      }
+      
+      // Also check if we got HTML when we expected JSON (even if status is 200)
+      if (isHtml) {
+        console.error(`[API Warning] Got HTML response instead of JSON for ${endpoint}. This might indicate a routing issue.`);
       }
 
       // Handle empty responses (like DELETE)

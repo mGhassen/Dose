@@ -18,7 +18,7 @@ import Link from "next/link";
 import AppLayout from "@/components/app-layout";
 import { useUser, useDeleteUser } from "@kit/hooks";
 import { useDateFormat } from '@kit/hooks/use-date-format';
-import { useEnumValues } from '@kit/hooks/useMetadataEnums';
+import { useEnumValues } from '@kit/hooks';
 import RelatedDataLink from "@/components/related-data-link";
 
 interface UserDetailsContentProps {
