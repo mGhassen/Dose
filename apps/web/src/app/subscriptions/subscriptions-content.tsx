@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useSubscriptions, useDeleteSubscription } from "@kit/hooks";
+import { useYear } from "@/contexts/year-context";
 import type { Subscription, ExpenseCategory, ExpenseRecurrence } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Button } from "@kit/ui/button";
@@ -15,7 +16,35 @@ import { Calendar } from "lucide-react";
 
 export default function SubscriptionsContent() {
   const router = useRouter();
-  const { data: subscriptions, isLoading } = useSubscriptions();
+  const { selectedYear } = useYear();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  
+  const { data: subscriptionsResponse, isLoading } = useSubscriptions({ 
+    page, 
+    limit: 1000 // Fetch all for year filtering, then paginate client-side
+  });
+  
+  // Filter by year (subscriptions active in the selected year) and paginate client-side
+  const filteredSubscriptions = useMemo(() => {
+    if (!subscriptionsResponse?.data) return [];
+    return subscriptionsResponse.data.filter(sub => {
+      const startDate = sub.startDate;
+      const endDate = sub.endDate;
+      const yearStart = `${selectedYear}-01-01`;
+      const yearEnd = `${selectedYear}-12-31`;
+      
+      // Include if started before or during the year and (no end date or ended after year start)
+      return startDate <= yearEnd && (!endDate || endDate >= yearStart);
+    });
+  }, [subscriptionsResponse?.data, selectedYear]);
+  
+  const paginatedSubscriptions = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return filteredSubscriptions.slice(startIndex, startIndex + pageSize);
+  }, [filteredSubscriptions, page, pageSize]);
+  
+  const totalPages = Math.ceil(filteredSubscriptions.length / pageSize);
   const deleteMutation = useDeleteSubscription();
 
   const columns: ColumnDef<Subscription>[] = useMemo(() => [
@@ -197,7 +226,7 @@ export default function SubscriptionsContent() {
           title=""
           description=""
           createHref="/subscriptions/create"
-          data={subscriptions || []}
+          data={paginatedSubscriptions}
           columns={columns}
           loading={isLoading}
           onRowClick={(subscription) => router.push(`/subscriptions/${subscription.id}`)}
@@ -217,6 +246,17 @@ export default function SubscriptionsContent() {
           ]}
           localStoragePrefix="subscriptions"
           searchFields={["name", "description", "vendor"]}
+          pagination={{
+            page,
+            pageSize,
+            totalCount: filteredSubscriptions.length,
+            totalPages,
+            onPageChange: setPage,
+            onPageSizeChange: (newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            },
+          }}
         />
       </div>
     </div>

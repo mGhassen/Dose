@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useExpenses, useDeleteExpense, useSubscriptions } from "@kit/hooks";
+import { useYear } from "@/contexts/year-context";
 import type { Expense, ExpenseCategory } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
@@ -15,16 +16,46 @@ import { DollarSign, Receipt } from "lucide-react";
 
 export default function ExpensesContent() {
   const router = useRouter();
-  const { data: expenses, isLoading } = useExpenses();
-  const { data: subscriptions } = useSubscriptions();
+  const { selectedYear } = useYear();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  
+  const { data: expensesResponse, isLoading } = useExpenses({ 
+    page, 
+    limit: 1000 // Fetch all for year filtering, then paginate client-side
+  });
+  
+  const { data: subscriptionsResponse } = useSubscriptions();
+  const subscriptions = subscriptionsResponse?.data || [];
+  
+  // Filter by year and paginate client-side
+  const filteredExpenses = useMemo(() => {
+    if (!expensesResponse?.data) return [];
+    return expensesResponse.data.filter(exp => exp.expenseDate.startsWith(selectedYear));
+  }, [expensesResponse?.data, selectedYear]);
+  
+  const paginatedExpenses = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return filteredExpenses.slice(startIndex, startIndex + pageSize);
+  }, [filteredExpenses, page, pageSize]);
+  
+  const totalPages = Math.ceil(filteredExpenses.length / pageSize);
   const deleteMutation = useDeleteExpense();
   
   // Create a map of subscription IDs to names for display
   const subscriptionMap = useMemo(() => {
     const map = new Map<number, string>();
-    subscriptions?.forEach(sub => map.set(sub.id, sub.name));
+    if (subscriptions && Array.isArray(subscriptions)) {
+      subscriptions.forEach(sub => map.set(sub.id, sub.name));
+    }
     return map;
   }, [subscriptions]);
+  
+  // Calculate summary stats from filtered expenses
+  const totalExpenses = useMemo(() => {
+    if (!filteredExpenses || !Array.isArray(filteredExpenses)) return 0;
+    return filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+  }, [filteredExpenses]);
 
   const columns: ColumnDef<Expense>[] = useMemo(() => [
     {
@@ -158,11 +189,6 @@ export default function ExpensesContent() {
     toast.success(`${expensesToExport.length} expense(s) exported`);
   };
 
-  // Calculate summary stats
-  const totalExpenses = useMemo(() => {
-    if (!expenses) return 0;
-    return expenses.reduce((sum, exp) => sum + exp.amount, 0);
-  }, [expenses]);
 
   return (
     <div className="space-y-6">
@@ -183,9 +209,9 @@ export default function ExpensesContent() {
             <Receipt className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{expenses?.length || 0}</div>
+            <div className="text-2xl font-bold">{filteredExpenses.length}</div>
             <p className="text-xs text-muted-foreground">
-              Total expenses
+              Total expenses for {selectedYear}
             </p>
           </CardContent>
         </Card>
@@ -198,7 +224,7 @@ export default function ExpensesContent() {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
             <p className="text-xs text-muted-foreground">
-              All expenses
+              All expenses for {selectedYear}
             </p>
           </CardContent>
         </Card>
@@ -210,8 +236,8 @@ export default function ExpensesContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {expenses && expenses.length > 0 
-                ? formatCurrency(totalExpenses / expenses.length)
+              {filteredExpenses.length > 0 
+                ? formatCurrency(totalExpenses / filteredExpenses.length)
                 : formatCurrency(0)}
             </div>
             <p className="text-xs text-muted-foreground">Average amount</p>
@@ -225,7 +251,7 @@ export default function ExpensesContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {new Set(expenses?.map(e => e.category) || []).size}
+              {new Set(filteredExpenses.map(e => e.category)).size}
             </div>
             <p className="text-xs text-muted-foreground">Unique categories</p>
           </CardContent>
@@ -238,7 +264,7 @@ export default function ExpensesContent() {
               title=""
               description=""
               createHref="/expenses/create"
-              data={expenses || []}
+              data={paginatedExpenses}
               columns={columns}
               loading={isLoading}
               onRowClick={(expense) => router.push(`/expenses/${expense.id}`)}
@@ -257,6 +283,17 @@ export default function ExpensesContent() {
               ]}
               localStoragePrefix="expenses"
               searchFields={["name", "description", "vendor"]}
+              pagination={{
+                page,
+                pageSize,
+                totalCount: filteredExpenses.length,
+                totalPages,
+                onPageChange: setPage,
+                onPageSizeChange: (newSize) => {
+                  setPageSize(newSize);
+                  setPage(1);
+                },
+              }}
             />
       </div>
     </div>

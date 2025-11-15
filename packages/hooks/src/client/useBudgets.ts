@@ -18,7 +18,11 @@ import type {
 export function useBudgets(options?: { fiscalYear?: string; includeAccounts?: boolean; includeEntries?: boolean } & Omit<UseQueryOptions<Budget[]>, 'queryKey' | 'queryFn'>) {
   return useQuery({
     queryKey: ['budgets', options?.fiscalYear, options?.includeAccounts, options?.includeEntries],
-    queryFn: () => budgetsApi.getAll(options),
+    queryFn: async () => {
+      const result = await budgetsApi.getAll(options);
+      // Extract data from paginated response
+      return result?.data || [];
+    },
     ...options,
   });
 }

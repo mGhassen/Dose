@@ -7,7 +7,11 @@ import type { Loan, LoanScheduleEntry, CreateLoanData, UpdateLoanData } from '@k
 export function useLoans() {
   return useQuery({
     queryKey: ['loans'],
-    queryFn: loansApi.getAll,
+    queryFn: async () => {
+      const result = await loansApi.getAll();
+      // Extract data from paginated response
+      return result?.data || [];
+    },
   });
 }
 

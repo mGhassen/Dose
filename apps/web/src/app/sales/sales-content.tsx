@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useSales, useDeleteSale } from "@kit/hooks";
+import { useYear } from "@/contexts/year-context";
 import type { Sale, SalesType } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
@@ -13,7 +14,27 @@ import { toast } from "sonner";
 
 export default function SalesContent() {
   const router = useRouter();
-  const { data: sales, isLoading } = useSales();
+  const { selectedYear } = useYear();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  
+  const { data: salesResponse, isLoading } = useSales({ 
+    page, 
+    limit: 1000 // Fetch all for year filtering, then paginate client-side
+  });
+  
+  // Filter by year and paginate client-side
+  const filteredSales = useMemo(() => {
+    if (!salesResponse?.data) return [];
+    return salesResponse.data.filter(sale => sale.date.startsWith(selectedYear));
+  }, [salesResponse?.data, selectedYear]);
+  
+  const paginatedSales = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return filteredSales.slice(startIndex, startIndex + pageSize);
+  }, [filteredSales, page, pageSize]);
+  
+  const totalPages = Math.ceil(filteredSales.length / pageSize);
   const deleteMutation = useDeleteSale();
 
   const columns: ColumnDef<Sale>[] = useMemo(() => [
@@ -142,7 +163,7 @@ export default function SalesContent() {
           title=""
           description=""
           createHref="/sales/create"
-          data={sales || []}
+          data={paginatedSales}
           columns={columns}
           loading={isLoading}
           onRowClick={(sale) => router.push(`/sales/${sale.id}`)}
@@ -159,6 +180,17 @@ export default function SalesContent() {
           ]}
           localStoragePrefix="sales"
           searchFields={["description"]}
+          pagination={{
+            page,
+            pageSize,
+            totalCount: filteredSales.length,
+            totalPages,
+            onPageChange: setPage,
+            onPageSizeChange: (newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            },
+          }}
         />
       </div>
     </div>

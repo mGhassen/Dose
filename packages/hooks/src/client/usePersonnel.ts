@@ -4,10 +4,45 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { personnelApi } from '@kit/lib';
 import type { Personnel, PersonnelProjection, CreatePersonnelData, UpdatePersonnelData } from '@kit/types';
 
-export function usePersonnel() {
+export function usePersonnel(params?: { page?: number; limit?: number }) {
   return useQuery({
-    queryKey: ['personnel'],
-    queryFn: personnelApi.getAll,
+    queryKey: ['personnel', params],
+    queryFn: async () => {
+      try {
+        const result = await personnelApi.getAll(params);
+        // Return full paginated response
+        if (result && result !== null && typeof result === 'object' && 'data' in result && 'pagination' in result) {
+          return result;
+        }
+        // If result is already an array (fallback for backward compatibility)
+        if (Array.isArray(result)) {
+          return {
+            data: result,
+            pagination: {
+              page: 1,
+              limit: result.length,
+              total: result.length,
+              totalPages: 1,
+              hasMore: false,
+            },
+          };
+        }
+        console.warn('[usePersonnel] Unexpected response format:', result);
+        return {
+          data: [],
+          pagination: {
+            page: 1,
+            limit: 20,
+            total: 0,
+            totalPages: 0,
+            hasMore: false,
+          },
+        };
+      } catch (error) {
+        console.error('[usePersonnel] Error fetching personnel:', error);
+        throw error;
+      }
+    },
   });
 }
 

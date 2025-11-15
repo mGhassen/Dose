@@ -7,7 +7,11 @@ import type { Variable, CreateVariableData, UpdateVariableData } from '@kit/type
 export function useVariables() {
   return useQuery({
     queryKey: ['variables'],
-    queryFn: variablesApi.getAll,
+    queryFn: async () => {
+      const result = await variablesApi.getAll();
+      // Extract data from paginated response
+      return result?.data || [];
+    },
   });
 }
 
@@ -22,7 +26,11 @@ export function useVariableById(id: string) {
 export function useVariablesByType(type: string) {
   return useQuery({
     queryKey: ['variables', 'type', type],
-    queryFn: () => variablesApi.getByType(type),
+    queryFn: async () => {
+      const result = await variablesApi.getByType(type);
+      // Extract data from paginated response
+      return result?.data || [];
+    },
     enabled: !!type,
   });
 }

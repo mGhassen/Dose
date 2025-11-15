@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { usePersonnel, useDeletePersonnel } from "@kit/hooks";
+import { useYear } from "@/contexts/year-context";
 import type { Personnel, PersonnelType } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
@@ -13,7 +14,35 @@ import { toast } from "sonner";
 
 export default function PersonnelContent() {
   const router = useRouter();
-  const { data: personnel, isLoading } = usePersonnel();
+  const { selectedYear } = useYear();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  
+  const { data: personnelResponse, isLoading } = usePersonnel({ 
+    page, 
+    limit: 1000 // Fetch all for year filtering, then paginate client-side
+  });
+  
+  // Filter by year (personnel active in the selected year) and paginate client-side
+  const filteredPersonnel = useMemo(() => {
+    if (!personnelResponse?.data) return [];
+    return personnelResponse.data.filter(person => {
+      const startDate = person.startDate;
+      const endDate = person.endDate;
+      const yearStart = `${selectedYear}-01-01`;
+      const yearEnd = `${selectedYear}-12-31`;
+      
+      // Include if started before or during the year and (no end date or ended after year start)
+      return startDate <= yearEnd && (!endDate || endDate >= yearStart);
+    });
+  }, [personnelResponse?.data, selectedYear]);
+  
+  const paginatedPersonnel = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return filteredPersonnel.slice(startIndex, startIndex + pageSize);
+  }, [filteredPersonnel, page, pageSize]);
+  
+  const totalPages = Math.ceil(filteredPersonnel.length / pageSize);
   const deleteMutation = useDeletePersonnel();
 
   const columns: ColumnDef<Personnel>[] = useMemo(() => [
@@ -179,7 +208,7 @@ export default function PersonnelContent() {
               title=""
               description=""
               createHref="/personnel/create"
-            data={personnel || []}
+            data={paginatedPersonnel}
             columns={columns}
             loading={isLoading}
             onRowClick={(person) => router.push(`/personnel/${person.id}`)}
@@ -198,6 +227,17 @@ export default function PersonnelContent() {
             ]}
             localStoragePrefix="personnel"
             searchFields={["firstName", "lastName", "email", "position"]}
+            pagination={{
+              page,
+              pageSize,
+              totalCount: filteredPersonnel.length,
+              totalPages,
+              onPageChange: setPage,
+              onPageSizeChange: (newSize) => {
+                setPageSize(newSize);
+                setPage(1);
+              },
+            }}
           />
           </div>
     </div>

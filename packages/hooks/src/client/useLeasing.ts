@@ -7,7 +7,11 @@ import type { LeasingPayment, CreateLeasingPaymentData, UpdateLeasingPaymentData
 export function useLeasing() {
   return useQuery({
     queryKey: ['leasing'],
-    queryFn: leasingApi.getAll,
+    queryFn: async () => {
+      const result = await leasingApi.getAll();
+      // Extract data from paginated response
+      return result?.data || [];
+    },
   });
 }
 

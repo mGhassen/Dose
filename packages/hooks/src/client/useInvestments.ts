@@ -7,7 +7,11 @@ import type { Investment, DepreciationEntry, CreateInvestmentData, UpdateInvestm
 export function useInvestments() {
   return useQuery({
     queryKey: ['investments'],
-    queryFn: investmentsApi.getAll,
+    queryFn: async () => {
+      const result = await investmentsApi.getAll();
+      // Extract data from paginated response
+      return result?.data || [];
+    },
   });
 }
 
