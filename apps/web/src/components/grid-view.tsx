@@ -427,7 +427,7 @@ export default function GridView({
                               onChange={(e) => setCellValue(e.target.value)}
                               onBlur={saveCell}
                               className="h-7 text-sm"
-                              type={column.type === 'number' || column.type === 'currency' ? 'number' : 'text'}
+                              type="text"
                             />
                           ) : (
                             <div
@@ -471,7 +471,7 @@ export default function GridView({
                             onChange={(e) => setCellValue(e.target.value)}
                             onBlur={saveCell}
                             className="h-7 text-sm"
-                            type={column.type === 'number' || column.type === 'currency' ? 'number' : 'text'}
+                            type="text"
                           />
                         ) : (
                           <div

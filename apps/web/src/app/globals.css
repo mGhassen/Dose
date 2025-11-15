@@ -185,6 +185,17 @@ body {
 }
 
 /* Prevent horizontal overflow on small screens */
+
+/* Hide number input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
 @media (max-width: 1024px) {
   .table-container {
     margin-left: -1rem;
