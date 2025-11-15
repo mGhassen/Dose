@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { mockUsers } from '@kit/mocks/data';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export async function GET(request: NextRequest) {
   const useRealAPI = process.env.MIGRATION_USE_API_AUTH === 'true';
@@ -31,35 +34,66 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Mock implementation when not using real API
+  // Supabase implementation
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return NextResponse.json(
+      { success: false, error: 'Supabase configuration missing' },
+      { status: 500 }
+    );
+  }
+
   const token = authHeader.replace('Bearer ', '');
-  const userId = token.replace('mock-token-', '');
+  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+  // Verify the session and get user using the access token
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
   
-  const user = mockUsers.find(u => u.id.toString() === userId);
+  if (authError || !authUser) {
+    return NextResponse.json({ success: false, user: null }, { status: 401 });
+  }
+
+  // Get account and profile data
+  const { data: account, error: accountError } = await supabase
+    .from('accounts')
+    .select(`
+      id,
+      email,
+      status,
+      is_admin,
+      profile_id,
+      profiles (
+        id,
+        first_name,
+        last_name,
+        phone,
+        profile_email,
+        address,
+        profession
+      )
+    `)
+    .eq('auth_user_id', authUser.id)
+    .single();
   
-  if (!user) {
+  if (accountError || !account) {
     return NextResponse.json({ success: false, user: null }, { status: 401 });
   }
   
+  const profile = account.profiles as any;
+  
   // Transform user data to match expected format
   const transformedUser = {
-    id: user.id.toString(),
-    account_id: `acc_${user.id}`,
-    email: user.email,
-    profileEmail: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    phone: '',
-    age: 0,
-    profession: '',
-    address: '',
-    isAdmin: user.role === 'administrator',
-    status: user.status,
-    role: user.role === 'administrator' ? 'admin' as const : user.role === 'manager' ? 'manager' as const : 'user' as const,
-    credit: 0,
-    userType: user.role,
-    accessiblePortals: user.role === 'administrator' ? ['admin', 'manager', 'conductor'] : user.role === 'manager' ? ['manager'] : ['conductor'],
-    member_id: `mem_${user.id}`,
+    id: authUser.id,
+    account_id: account.id,
+    email: account.email,
+    profileEmail: profile?.profile_email || account.email,
+    firstName: profile?.first_name || null,
+    lastName: profile?.last_name || null,
+    phone: profile?.phone || null,
+    profession: profile?.profession || null,
+    address: profile?.address || null,
+    isAdmin: account.is_admin || false,
+    status: account.status,
+    role: account.is_admin ? 'admin' as const : 'user' as const,
     provider: 'email'
   };
   

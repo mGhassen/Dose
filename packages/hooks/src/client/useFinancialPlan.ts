@@ -7,8 +7,8 @@ import type { FinancialPlan, CreateFinancialPlanData, UpdateFinancialPlanData } 
 export function useFinancialPlan() {
   return useQuery({
     queryKey: ['financial-plan'],
-    queryFn: async () => {
-      const result = await financialPlanApi.getAll();
+    queryFn: async ({ signal }) => {
+      const result = await financialPlanApi.getAll(signal);
       return result || [];
     },
     retry: 1,
@@ -19,7 +19,7 @@ export function useFinancialPlan() {
 export function useFinancialPlanById(id: string) {
   return useQuery({
     queryKey: ['financial-plan', id],
-    queryFn: () => financialPlanApi.getById(id),
+    queryFn: ({ signal }) => financialPlanApi.getById(id, signal),
     enabled: !!id,
   });
 }
@@ -27,7 +27,7 @@ export function useFinancialPlanById(id: string) {
 export function useFinancialPlanByMonth(month: string) {
   return useQuery({
     queryKey: ['financial-plan', 'month', month],
-    queryFn: () => financialPlanApi.getByMonth(month),
+    queryFn: ({ signal }) => financialPlanApi.getByMonth(month, signal),
     enabled: !!month,
   });
 }

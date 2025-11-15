@@ -71,28 +71,26 @@ export async function apiRequest<T>(
   }
   const doFetch = async (): Promise<T> => {
     try {
-      // Create a combined signal that aborts on timeout or external signal
+      // If external signal is already aborted, throw immediately
+      if (signal?.aborted) {
+        throw new DOMException('The operation was aborted.', 'AbortError');
+      }
+      
+      // Create a controller for timeout
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 4000);
       
       // If external signal is provided, abort our controller when it aborts
       if (signal) {
-        if (signal.aborted) {
-          clearTimeout(timeout);
-          throw new DOMException('The operation was aborted.', 'AbortError');
-        }
         signal.addEventListener('abort', () => {
           clearTimeout(timeout);
           controller.abort();
         });
       }
       
-      // Use external signal if provided, otherwise use our timeout controller
-      const finalSignal = signal || controller.signal;
-      
       const response = await fetch(url, { 
         ...options, 
-        signal: finalSignal,
+        signal: controller.signal,
         ...(isServer && { cache: 'no-store' as RequestCache }), // Always fetch fresh on server
       });
       clearTimeout(timeout);

@@ -2,12 +2,12 @@ import { apiRequest } from './api';
 import type { FinancialPlan, CreateFinancialPlanData, UpdateFinancialPlanData } from '@kit/types';
 
 export const financialPlanApi = {
-  getAll: () => apiRequest<FinancialPlan[]>('GET', '/api/financial-plan'),
-  getById: (id: string) => apiRequest<FinancialPlan>('GET', `/api/financial-plan/${id}`),
-  create: (data: CreateFinancialPlanData) => apiRequest<FinancialPlan>('POST', '/api/financial-plan', data),
-  update: (id: string, data: UpdateFinancialPlanData) => apiRequest<FinancialPlan>('PUT', `/api/financial-plan/${id}`, data),
-  delete: (id: string) => apiRequest<void>('DELETE', `/api/financial-plan/${id}`),
-  getByMonth: (month: string) => apiRequest<FinancialPlan>('GET', `/api/financial-plan?month=${month}`),
-  calculate: (month: string) => apiRequest<FinancialPlan>('POST', `/api/financial-plan/calculate?month=${month}`),
+  getAll: (signal?: AbortSignal) => apiRequest<FinancialPlan[]>('GET', '/api/financial-plan', undefined, signal),
+  getById: (id: string, signal?: AbortSignal) => apiRequest<FinancialPlan>('GET', `/api/financial-plan/${id}`, undefined, signal),
+  create: (data: CreateFinancialPlanData, signal?: AbortSignal) => apiRequest<FinancialPlan>('POST', '/api/financial-plan', data, signal),
+  update: (id: string, data: UpdateFinancialPlanData, signal?: AbortSignal) => apiRequest<FinancialPlan>('PUT', `/api/financial-plan/${id}`, data, signal),
+  delete: (id: string, signal?: AbortSignal) => apiRequest<void>('DELETE', `/api/financial-plan/${id}`, undefined, signal),
+  getByMonth: (month: string, signal?: AbortSignal) => apiRequest<FinancialPlan>('GET', `/api/financial-plan?month=${month}`, undefined, signal),
+  calculate: (month: string, signal?: AbortSignal) => apiRequest<FinancialPlan>('POST', `/api/financial-plan/calculate?month=${month}`, undefined, signal),
 };
 
