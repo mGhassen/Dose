@@ -66,8 +66,9 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Check account status
-    if (account.status === 'pending') {
+    // Check account status (case-insensitive)
+    const accountStatus = (account.status || 'active').toLowerCase();
+    if (accountStatus === 'pending') {
       return NextResponse.json(
         { 
           error: 'Account pending approval',
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    if (account.status === 'suspended' || account.status === 'archived') {
+    if (accountStatus === 'suspended' || accountStatus === 'archived') {
       return NextResponse.json(
         { error: 'Account is suspended or archived' },
         { status: 403 }
@@ -85,6 +86,9 @@ export async function POST(request: NextRequest) {
     }
     
     const profile = account.profiles as any;
+    const accessiblePortals = account.is_admin
+      ? ['admin', 'manager', 'conductor']
+      : ['conductor'];
     
     // Transform user data to match expected format
     const transformedUser = {
@@ -98,9 +102,11 @@ export async function POST(request: NextRequest) {
       profession: profile?.profession || null,
       address: profile?.address || null,
       isAdmin: account.is_admin || false,
-      status: account.status,
+      isMember: !account.is_admin,
+      status: accountStatus,
       role: account.is_admin ? 'admin' as const : 'user' as const,
-      provider: 'email'
+      provider: 'email',
+      accessiblePortals
     };
     
     return NextResponse.json({

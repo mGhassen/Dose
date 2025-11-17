@@ -55,12 +55,25 @@ export async function apiFetch<T = any>(
     
     // Handle 401 Unauthorized
     if (response.status === 401) {
-      // Clear invalid token
-      setAuthToken(null);
-      // Redirect to login with return URL
-      const returnUrl = window.location.pathname + window.location.search;
-      window.location.href = `/auth/login?returnTo=${encodeURIComponent(returnUrl)}`;
-      throw new Error('Session expired. Please log in again.');
+      // For auth endpoints, don't clear tokens here - let the auth hook handle refresh
+      // Only clear tokens for non-auth endpoints
+      const isAuthEndpoint = url.includes('/api/auth/');
+      
+      if (!isAuthEndpoint) {
+        // For non-auth endpoints, clear token and redirect
+        setAuthToken(null);
+        const returnUrl = window.location.pathname + window.location.search;
+        window.location.href = `/auth/login?returnTo=${encodeURIComponent(returnUrl)}`;
+        throw new Error('Session expired. Please log in again.');
+      } else {
+        // For auth endpoints, just throw the error - let the auth hook handle it
+        // This allows the session route to return needsRefresh and trigger refresh
+        const errorData = await response.json().catch(() => ({}));
+        const error = new Error(errorData.error || 'Authentication failed');
+        (error as any).status = 401;
+        (error as any).needsRefresh = errorData.needsRefresh;
+        throw error;
+      }
     }
     
     // Handle other error statuses

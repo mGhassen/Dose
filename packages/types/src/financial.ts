@@ -146,6 +146,7 @@ export interface Item {
   unit?: string;
   unitPrice?: number;
   vendorId?: number;
+  recipeId?: number;
   notes?: string;
   isActive: boolean;
   createdAt: string;
@@ -160,6 +161,7 @@ export interface CreateItemData {
   unit?: string;
   unitPrice?: number;
   vendorId?: number;
+  recipeId?: number;
   notes?: string;
   isActive?: boolean;
 }
@@ -744,5 +746,378 @@ export interface FinancialKPIs {
   headcount: number;
   // Period
   period: string; // YYYY-MM or YYYY
+}
+
+// ============================================================================
+// INVENTORY MANAGEMENT
+// ============================================================================
+
+// ============================================================================
+// INGREDIENTS
+// ============================================================================
+
+export interface Ingredient {
+  id: number;
+  name: string;
+  description?: string;
+  unit: string;
+  category?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateIngredientData {
+  name: string;
+  description?: string;
+  unit: string;
+  category?: string;
+  isActive?: boolean;
+}
+
+export interface UpdateIngredientData extends Partial<CreateIngredientData> {}
+
+// ============================================================================
+// RECIPES
+// ============================================================================
+
+export interface Recipe {
+  id: number;
+  name: string;
+  description?: string;
+  servingSize?: number;
+  preparationTime?: number;
+  cookingTime?: number;
+  instructions?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecipeIngredient {
+  id: number;
+  recipeId: number;
+  ingredientId: number;
+  quantity: number;
+  unit: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Populated fields
+  ingredient?: Ingredient;
+}
+
+export interface RecipeWithIngredients extends Recipe {
+  ingredients: RecipeIngredient[];
+}
+
+export interface CreateRecipeData {
+  name: string;
+  description?: string;
+  servingSize?: number;
+  preparationTime?: number;
+  cookingTime?: number;
+  instructions?: string;
+  notes?: string;
+  isActive?: boolean;
+  ingredients?: Array<{
+    ingredientId: number;
+    quantity: number;
+    unit: string;
+    notes?: string;
+  }>;
+}
+
+export interface UpdateRecipeData extends Partial<CreateRecipeData> {}
+
+export interface CreateRecipeIngredientData {
+  recipeId: number;
+  ingredientId: number;
+  quantity: number;
+  unit: string;
+  notes?: string;
+}
+
+export interface UpdateRecipeIngredientData extends Partial<CreateRecipeIngredientData> {}
+
+// ============================================================================
+// SUPPLIERS
+// ============================================================================
+
+export interface Supplier {
+  id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  contactPerson?: string;
+  paymentTerms?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSupplierData {
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  contactPerson?: string;
+  paymentTerms?: string;
+  notes?: string;
+  isActive?: boolean;
+}
+
+export interface UpdateSupplierData extends Partial<CreateSupplierData> {}
+
+// ============================================================================
+// SUPPLIER CATALOGS
+// ============================================================================
+
+export interface SupplierCatalog {
+  id: number;
+  supplierId: number;
+  ingredientId: number;
+  supplierSku?: string;
+  unitPrice: number;
+  unit: string;
+  minimumOrderQuantity?: number;
+  leadTimeDays?: number;
+  isActive: boolean;
+  effectiveDate: string;
+  expiryDate?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Populated fields
+  supplier?: Supplier;
+  ingredient?: Ingredient;
+}
+
+export interface CreateSupplierCatalogData {
+  supplierId: number;
+  ingredientId: number;
+  supplierSku?: string;
+  unitPrice: number;
+  unit: string;
+  minimumOrderQuantity?: number;
+  leadTimeDays?: number;
+  isActive?: boolean;
+  effectiveDate?: string;
+  expiryDate?: string;
+  notes?: string;
+}
+
+export interface UpdateSupplierCatalogData extends Partial<CreateSupplierCatalogData> {}
+
+// ============================================================================
+// SUPPLIER ORDERS
+// ============================================================================
+
+export enum SupplierOrderStatus {
+  PENDING = 'pending',
+  CONFIRMED = 'confirmed',
+  IN_TRANSIT = 'in_transit',
+  DELIVERED = 'delivered',
+  CANCELLED = 'cancelled'
+}
+
+export interface SupplierOrderItem {
+  id: number;
+  orderId: number;
+  ingredientId: number;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  totalPrice: number;
+  receivedQuantity?: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Populated fields
+  ingredient?: Ingredient;
+}
+
+export interface SupplierOrder {
+  id: number;
+  supplierId: number;
+  orderNumber?: string;
+  orderDate: string;
+  expectedDeliveryDate?: string;
+  actualDeliveryDate?: string;
+  status: SupplierOrderStatus;
+  totalAmount?: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Populated fields
+  supplier?: Supplier;
+  items?: SupplierOrderItem[];
+}
+
+export interface CreateSupplierOrderData {
+  supplierId: number;
+  orderNumber?: string;
+  orderDate?: string;
+  expectedDeliveryDate?: string;
+  status?: SupplierOrderStatus;
+  notes?: string;
+  items: Array<{
+    ingredientId: number;
+    quantity: number;
+    unit: string;
+    unitPrice: number;
+    notes?: string;
+  }>;
+}
+
+export interface UpdateSupplierOrderData extends Partial<Omit<CreateSupplierOrderData, 'items'>> {
+  items?: Array<{
+    id?: number;
+    ingredientId: number;
+    quantity: number;
+    unit: string;
+    unitPrice: number;
+    notes?: string;
+  }>;
+}
+
+export interface CreateSupplierOrderItemData {
+  orderId: number;
+  ingredientId: number;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  notes?: string;
+}
+
+export interface UpdateSupplierOrderItemData extends Partial<CreateSupplierOrderItemData> {}
+
+// ============================================================================
+// STOCK LEVELS
+// ============================================================================
+
+export interface StockLevel {
+  id: number;
+  ingredientId: number;
+  quantity: number;
+  unit: string;
+  location?: string;
+  minimumStockLevel?: number;
+  maximumStockLevel?: number;
+  lastUpdated: string;
+  createdAt: string;
+  updatedAt: string;
+  // Populated fields
+  ingredient?: Ingredient;
+}
+
+export interface CreateStockLevelData {
+  ingredientId: number;
+  quantity: number;
+  unit: string;
+  location?: string;
+  minimumStockLevel?: number;
+  maximumStockLevel?: number;
+}
+
+export interface UpdateStockLevelData extends Partial<CreateStockLevelData> {}
+
+// ============================================================================
+// STOCK MOVEMENTS
+// ============================================================================
+
+export enum StockMovementType {
+  IN = 'in',
+  OUT = 'out',
+  ADJUSTMENT = 'adjustment',
+  TRANSFER = 'transfer',
+  WASTE = 'waste',
+  EXPIRED = 'expired'
+}
+
+export enum StockMovementReferenceType {
+  SUPPLIER_ORDER = 'supplier_order',
+  RECIPE = 'recipe',
+  MANUAL = 'manual',
+  WASTE = 'waste',
+  EXPIRY = 'expiry'
+}
+
+export interface StockMovement {
+  id: number;
+  ingredientId: number;
+  movementType: StockMovementType;
+  quantity: number;
+  unit: string;
+  referenceType?: StockMovementReferenceType;
+  referenceId?: number;
+  location?: string;
+  notes?: string;
+  movementDate: string;
+  createdBy?: number;
+  createdAt: string;
+  // Populated fields
+  ingredient?: Ingredient;
+}
+
+export interface CreateStockMovementData {
+  ingredientId: number;
+  movementType: StockMovementType;
+  quantity: number;
+  unit: string;
+  referenceType?: StockMovementReferenceType;
+  referenceId?: number;
+  location?: string;
+  notes?: string;
+  movementDate?: string;
+}
+
+export interface UpdateStockMovementData extends Partial<CreateStockMovementData> {}
+
+// ============================================================================
+// EXPIRY DATES
+// ============================================================================
+
+export interface ExpiryDate {
+  id: number;
+  ingredientId: number;
+  stockMovementId?: number;
+  quantity: number;
+  unit: string;
+  expiryDate: string;
+  location?: string;
+  isExpired: boolean;
+  disposedDate?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Populated fields
+  ingredient?: Ingredient;
+}
+
+export interface CreateExpiryDateData {
+  ingredientId: number;
+  stockMovementId?: number;
+  quantity: number;
+  unit: string;
+  expiryDate: string;
+  location?: string;
+  notes?: string;
+}
+
+export interface UpdateExpiryDateData extends Partial<CreateExpiryDateData> {
+  disposedDate?: string;
+}
+
+// ============================================================================
+// UPDATE ITEM TYPE
+// ============================================================================
+
+// Extended Item interface with populated recipe
+export interface ItemWithRecipe extends Item {
+  recipe?: Recipe;
 }
 

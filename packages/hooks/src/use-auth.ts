@@ -95,15 +95,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [user, isLoading]);
 
-  // Fetch user session
+  // Fetch user session - optimized to only refresh when token is actually expired
   const fetchSession = async (token: string) => {
-    
     try {
-      
-      
-      // Add timeout to prevent hanging
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       
       const response = await fetch('/api/auth/session', {
         headers: {
@@ -117,62 +113,101 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       clearTimeout(timeoutId);
 
-      
-
-      if (!response.ok) {
-        // If MSW wasn't ready yet, wait and retry once in dev
-        if (
-          response.status === 501 &&
-          typeof window !== 'undefined' &&
-          process.env.NODE_ENV === 'development' &&
-          (window as any).__MSW_ENABLED__
-        ) {
-          try {
-            const ready = (window as any).__MSW_READY__ as Promise<any> | undefined;
-            if (ready && typeof ready.then === 'function') {
-              await Promise.race([
-                ready,
-                new Promise((resolve) => setTimeout(resolve, 1200)),
-              ]);
-            }
-            const retry = await fetch('/api/auth/session', {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-              },
-              credentials: 'include',
-            });
-            if (retry.ok) {
-              const data = await retry.json();
-              
-              if (data.success && data.user) {
-                setUser(data.user);
-                setAuthError(null);
-                return data.user;
-              }
-            }
-          } catch {}
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.user) {
+          setUser(data.user);
+          setAuthError(null);
+          return data.user;
         }
+      }
+
+      // Handle 401 - token expired or invalid
+      if (response.status === 401) {
         const errorData = await response.json().catch(() => ({}));
         
-        
-        // Handle specific status codes
-        if (response.status === 403) {
-          // User is pending, suspended, or other restricted status
-          if (errorData.status === 'pending') {
-            // Redirect to waiting approval page
-            router.push('/auth/waiting-approval');
-            setAuthError(errorData.error || 'Account pending approval');
+        // Only refresh if explicitly needed
+        if (errorData.needsRefresh) {
+          const refreshToken = safeLocalStorage.getItem('refresh_token');
+          
+          if (refreshToken) {
+            try {
+              const refreshResponse = await fetch('/api/auth/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refreshToken })
+              });
+              
+              if (refreshResponse.ok) {
+                const refreshData = await refreshResponse.json();
+                
+                // Update access token
+                safeLocalStorage.setItem('access_token', refreshData.access_token);
+                // Only update refresh token if a new one is provided (Supabase rotates tokens)
+                if (refreshData.refresh_token) {
+                  safeLocalStorage.setItem('refresh_token', refreshData.refresh_token);
+                }
+                if (typeof window !== 'undefined') {
+                  window.__authToken = refreshData.access_token;
+                }
+                
+                // Retry session with new token
+                const retryResponse = await fetch('/api/auth/session', {
+                  headers: {
+                    'Authorization': `Bearer ${refreshData.access_token}`,
+                    'Content-Type': 'application/json'
+                  },
+                  credentials: 'include'
+                });
+                
+                if (retryResponse.ok) {
+                  const retryData = await retryResponse.json();
+                  if (retryData.success && retryData.user) {
+                    setUser(retryData.user);
+                    setAuthError(null);
+                    return retryData.user;
+                  }
+                }
+                // If retry fails, keep tokens - might be temporary
+                setAuthError('Session validation failed. Please try again.');
+                return null;
+              } else {
+                // Refresh failed - only clear if permanent error
+                if (refreshResponse.status === 401) {
+                  // Refresh token is invalid - clear everything
+                  safeLocalStorage.removeItem('access_token');
+                  safeLocalStorage.removeItem('refresh_token');
+                  if (typeof window !== 'undefined') {
+                    delete window.__authToken;
+                  }
+                  setUser(null);
+                  router.push('/auth/login');
+                  setAuthError('Your session has expired. Please log in again.');
+                  return null;
+                }
+                // Temporary error - keep tokens
+                setAuthError('Session refresh failed. Please try again.');
+                return null;
+              }
+            } catch (refreshError) {
+              // Network error - keep tokens
+              setAuthError('Network error. Please try again.');
+              return null;
+            }
+          } else {
+            // No refresh token - clear and redirect
+            safeLocalStorage.removeItem('access_token');
+            safeLocalStorage.removeItem('refresh_token');
+            if (typeof window !== 'undefined') {
+              delete window.__authToken;
+            }
+            setUser(null);
+            router.push('/auth/login');
+            setAuthError('Your session has expired. Please log in again.');
             return null;
           }
-          setAuthError(errorData.error || 'Account access denied');
-          return null;
-        }
-        
-        if (response.status === 401) {
-          
-          // Clear invalid token
+        } else {
+          // Not a refreshable error - clear tokens
           safeLocalStorage.removeItem('access_token');
           safeLocalStorage.removeItem('refresh_token');
           if (typeof window !== 'undefined') {
@@ -180,49 +215,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
           setUser(null);
           router.push('/auth/login');
-          setAuthError('Your session has expired or is invalid. Please log in again.');
+          setAuthError('Authentication failed. Please log in again.');
           return null;
         }
-        
-        setAuthError(errorData.error || 'Failed to fetch session');
+      }
+
+      // Handle 403 - account status issues
+      if (response.status === 403) {
+        const errorData = await response.json().catch(() => ({}));
+        if (errorData.status === 'pending') {
+          router.push('/auth/waiting-approval');
+          setAuthError(errorData.error || 'Account pending approval');
+          return null;
+        }
+        setAuthError(errorData.error || 'Account access denied');
         return null;
       }
 
-      const data = await response.json();
-      
-      
-      if (data.success && data.user) {
-        
-        setUser(data.user);
-        setAuthError(null); // Clear any previous errors
-        return data.user;
-      }
-      
-      // Only clear tokens if we got a specific error response, not just missing data
-      if (data.error || data.message) {
-        
-        safeLocalStorage.removeItem('access_token');
-        safeLocalStorage.removeItem('refresh_token');
-        if (typeof window !== 'undefined') {
-          delete window.__authToken;
-        }
-      }
-      setUser(null);
+      setAuthError('Failed to fetch session');
       return null;
     } catch (error) {
-      console.error('Session fetch error:', error);
-      
-      // Handle abort error (timeout)
+      // Network/timeout errors - don't clear tokens
       if (error instanceof Error && error.name === 'AbortError') {
-        
         setAuthError('Session check timed out. Please try again.');
-      } else {
-        setAuthError(
-          error instanceof Error && error.message.includes('expired')
-            ? 'Your session has expired. Please log in again.'
-            : 'An unexpected authentication error occurred. Please try again.'
-        );
+        return null;
       }
+      
+      if (error instanceof Error && (
+        error.message.includes('fetch') ||
+        error.message.includes('network')
+      )) {
+        setAuthError('Network error. Please check your connection.');
+        return null;
+      }
+      
+      setAuthError('An unexpected error occurred.');
       return null;
     }
   };
@@ -292,29 +319,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
         
         const user = await fetchSession(token);
         
-        if (!user) {
-          // Session was invalid, tokens already cleared in fetchSession
-          
-          setUser(null);
+        if (user) {
+          // Session is valid
+          setUser(user);
+          setAuthError(null);
         } else {
-          
+          // Session check failed
+          // Check if tokens still exist - if they do, don't clear user state yet
+          // The fetchSession function handles token clearing for permanent errors
+          const remainingToken = safeLocalStorage.getItem('access_token');
+          if (!remainingToken) {
+            // Tokens were cleared by fetchSession (permanent error)
+            setUser(null);
+          }
+          // If token still exists, it might be a refreshable error
+          // Don't clear user state - let the error message show
         }
       } catch (error) {
         console.error('Session check failed:', error);
-        // Only clear tokens for authentication-specific errors, not network errors
+        // DON'T clear tokens in catch block during initial auth check
+        // The fetchSession function handles token clearing for permanent errors
+        // For network errors, keep tokens - might be temporary
         if (error instanceof Error && (
           error.message.includes('401') || 
           error.message.includes('403') || 
           error.message.includes('expired') ||
           error.message.includes('invalid')
         )) {
-          safeLocalStorage.removeItem('access_token');
-          safeLocalStorage.removeItem('refresh_token');
-          if (typeof window !== 'undefined') {
-            delete window.__authToken;
-          }
-          setUser(null);
-          setAuthError('Session expired. Please log in again.');
+          // Don't clear tokens - fetchSession will handle it if needed
+          setAuthError('Session validation failed. Please refresh the page.');
         } else {
           // For network errors, just set error but don't clear tokens
           setAuthError('Network error. Please check your connection.');

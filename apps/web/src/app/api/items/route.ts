@@ -15,6 +15,7 @@ function transformItem(row: any): Item {
     unit: row.unit,
     unitPrice: row.unit_price ? parseFloat(row.unit_price) : undefined,
     vendorId: row.vendor_id || undefined,
+    recipeId: row.recipe_id || undefined,
     notes: row.notes,
     isActive: row.is_active,
     createdAt: row.created_at,
@@ -31,6 +32,7 @@ function transformToSnakeCase(data: CreateItemData): any {
     unit: data.unit,
     unit_price: data.unitPrice,
     vendor_id: data.vendorId,
+    recipe_id: data.recipeId,
     notes: data.notes,
     is_active: data.isActive ?? true,
   };

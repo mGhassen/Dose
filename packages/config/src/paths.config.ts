@@ -197,6 +197,54 @@ export const pathsConfig: NavigationConfig = {
       ]
     },
     {
+      title: "inventory",
+      url: "#",
+      icon: "Package",
+      translationKey: "inventory",
+      items: [
+        {
+          title: "ingredients",
+          url: "/ingredients",
+          translationKey: "ingredients"
+        },
+        {
+          title: "recipes",
+          url: "/recipes",
+          translationKey: "recipes"
+        },
+        {
+          title: "suppliers",
+          url: "/inventory-suppliers",
+          translationKey: "suppliers"
+        },
+        {
+          title: "supplier-catalogs",
+          url: "/supplier-catalogs",
+          translationKey: "supplierCatalogs"
+        },
+        {
+          title: "supplier-orders",
+          url: "/supplier-orders",
+          translationKey: "supplierOrders"
+        },
+        {
+          title: "stock-levels",
+          url: "/stock-levels",
+          translationKey: "stockLevels"
+        },
+        {
+          title: "stock-movements",
+          url: "/stock-movements",
+          translationKey: "stockMovements"
+        },
+        {
+          title: "expiry-dates",
+          url: "/expiry-dates",
+          translationKey: "expiryDates"
+        },
+      ]
+    },
+    {
       title: "settings",
       url: "/settings",
       icon: "Settings",

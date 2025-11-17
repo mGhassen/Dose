@@ -4,6 +4,31 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
+/**
+ * Decode JWT to check expiration without verification
+ * This is safe because we'll verify with Supabase anyway
+ */
+function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    
+    const payload = JSON.parse(atob(parts[1]));
+    const exp = payload.exp;
+    
+    if (!exp) return true;
+    
+    // Check if token expires in less than 5 minutes (refresh proactively)
+    const expiresAt = exp * 1000;
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+    
+    return expiresAt < (now + fiveMinutes);
+  } catch {
+    return true; // If we can't decode, assume expired
+  }
+}
+
 export async function GET(request: NextRequest) {
   const useRealAPI = process.env.MIGRATION_USE_API_AUTH === 'true';
   const apiBase = process.env.NEXT_PUBLIC_API_URL;
@@ -43,13 +68,58 @@ export async function GET(request: NextRequest) {
   }
 
   const token = authHeader.replace('Bearer ', '');
-  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  
+  if (!token || token.trim() === '') {
+    return NextResponse.json({ 
+      success: false, 
+      user: null,
+      error: 'No token provided'
+    }, { status: 401 });
+  }
 
-  // Verify the session and get user using the access token
+  // Check if token is expired before making API call
+  if (isTokenExpired(token)) {
+    return NextResponse.json({ 
+      success: false, 
+      user: null,
+      error: 'Token expired',
+      needsRefresh: true
+    }, { status: 401 });
+  }
+  
+  // Create Supabase client
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    }
+  });
+
+  // Validate token with Supabase
   const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
   
   if (authError || !authUser) {
-    return NextResponse.json({ success: false, user: null }, { status: 401 });
+    // Only return needsRefresh if it's an expiration error
+    const errorMessage = authError?.message?.toLowerCase() || '';
+    const isExpired = errorMessage.includes('expired') || 
+                     errorMessage.includes('jwt') ||
+                     authError?.status === 401;
+    
+    if (isExpired) {
+      return NextResponse.json({ 
+        success: false, 
+        user: null,
+        error: 'Token expired',
+        needsRefresh: true
+      }, { status: 401 });
+    }
+    
+    return NextResponse.json({ 
+      success: false, 
+      user: null,
+      error: authError?.message || 'Invalid session'
+    }, { status: 401 });
   }
 
   // Get account and profile data

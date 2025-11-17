@@ -211,41 +211,68 @@ async function createTestUsers() {
       }
       
       // Step 2: Check if account exists
-      const { data: existingAccount } = await supabase
+      const { data: existingAccount, error: accountLookupError } = await supabase
         .from('accounts')
-        .select('id, profile_id')
+        .select('id, profile_id, status')
         .eq('auth_user_id', authUserId)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to avoid errors when not found
       
       let profileId;
       
-      if (existingAccount && existingAccount.profile_id) {
-        // Account and profile exist, update them
-        profileId = existingAccount.profile_id;
-        console.log(`✅ Account already exists, updating...`);
+      if (existingAccount) {
+        // Account exists - update it
+        console.log(`✅ Account already exists (current status: ${existingAccount.status}), updating...`);
         
-        await supabase
-          .from('profiles')
-          .update({
-            first_name: user.firstName,
-            last_name: user.lastName,
-            phone: user.phone,
-            profile_email: user.profileEmail,
-            address: user.address,
-            profession: user.profession
-          })
-          .eq('id', profileId);
+        // If account has a profile_id, update the profile
+        if (existingAccount.profile_id) {
+          profileId = existingAccount.profile_id;
+          await supabase
+            .from('profiles')
+            .update({
+              first_name: user.firstName,
+              last_name: user.lastName,
+              phone: user.phone,
+              profile_email: user.profileEmail,
+              address: user.address,
+              profession: user.profession
+            })
+            .eq('id', profileId);
+        } else {
+          // Account exists but no profile - create one
+          const { data: profileRecord, error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              first_name: user.firstName,
+              last_name: user.lastName,
+              phone: user.phone,
+              profile_email: user.profileEmail,
+              address: user.address,
+              profession: user.profession
+            })
+            .select()
+            .single();
+          
+          if (profileError) {
+            console.error(`❌ Profile creation error: ${profileError.message}`);
+            continue;
+          }
+          
+          profileId = profileRecord.id;
+          console.log(`✅ Profile record created: ${profileId}`);
+        }
         
+        // Always update account status to what admin wants (active for admin-created users)
         await supabase
           .from('accounts')
           .update({
             email: user.email,
-            status: user.status,
-            is_admin: user.isAdmin || false
+            status: user.status, // This will be 'active' for admin-created users
+            is_admin: user.isAdmin || false,
+            profile_id: profileId
           })
           .eq('id', existingAccount.id);
         
-        console.log(`✅ User ${user.email} updated successfully!\n`);
+        console.log(`✅ User ${user.email} updated successfully! (Status set to: ${user.status})\n`);
         continue;
       }
       

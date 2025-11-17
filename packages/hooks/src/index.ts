@@ -35,6 +35,16 @@ export * from './client/useBudgets';
 export * from './client/useMetadataEnums';
 export * from './client/useActualPayments';
 
+// Export inventory management hooks
+export * from './client/useIngredients';
+export * from './client/useRecipes';
+export * from './client/useInventorySuppliers';
+export * from './client/useSupplierCatalogs';
+export * from './client/useSupplierOrders';
+export * from './client/useStockLevels';
+export * from './client/useStockMovements';
+export * from './client/useExpiryDates';
+
 // Server-side hooks (Next.js specific) - exported for convenience
 // Can also be imported directly: import { prefetchUsers } from '@kit/hooks/src/server/prefetchUsers';
 export * from './server/prefetchUsers';

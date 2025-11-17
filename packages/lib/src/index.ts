@@ -41,5 +41,15 @@ export * from './api/budgets';
 export * from './api/dashboard';
 export * from './api/actual-payments';
 
+// Export inventory management API modules
+export * from './api/ingredients';
+export * from './api/recipes';
+export * from './api/inventory-suppliers';
+export * from './api/supplier-catalogs';
+export * from './api/supplier-orders';
+export * from './api/stock-levels';
+export * from './api/stock-movements';
+export * from './api/expiry-dates';
+
 // Export Supabase client
 export * from './supabase';

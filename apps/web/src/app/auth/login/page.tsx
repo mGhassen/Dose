@@ -161,7 +161,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">
-            Welcome to SmartLogBook
+            Welcome to SunnyBudget
           </CardTitle>
           <CardDescription>Sign in to your account to continue</CardDescription>
         </CardHeader>
@@ -255,11 +255,11 @@ export default function LoginPage() {
                 <p className="text-sm text-muted-foreground text-center">
                   Quick Login (Development) - Test Different Roles
                 </p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handlePrefilledLogin("admin@kit.com", "password123")}
+                    onClick={() => handlePrefilledLogin("admin@sunnybudget.com", "password123")}
                     disabled={isLoading}
                     className="text-xs"
                   >
@@ -275,7 +275,7 @@ export default function LoginPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handlePrefilledLogin("marie.martin@kit.com", "password123")}
+                    onClick={() => handlePrefilledLogin("manager@sunnybudget.com", "password123")}
                     disabled={isLoading}
                     className="text-xs"
                   >
@@ -291,7 +291,7 @@ export default function LoginPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handlePrefilledLogin("jean.dupont@kit.com", "password123")}
+                    onClick={() => handlePrefilledLogin("user@sunnybudget.com", "password123")}
                     disabled={isLoading}
                     className="text-xs"
                   >
@@ -304,11 +304,27 @@ export default function LoginPage() {
                       "User"
                     )}
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePrefilledLogin("analyst@sunnybudget.com", "password123")}
+                    disabled={isLoading}
+                    className="text-xs"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        Logging in...
+                      </>
+                    ) : (
+                      "Analyst"
+                    )}
+                  </Button>
                 </div>
                 <div className="text-xs text-muted-foreground text-center space-y-1">
-                  <p><strong>Admin:</strong> Full sidebar with all features</p>
-                  <p><strong>Manager:</strong> Procedures, Checklists, Responses</p>
-                  <p><strong>User:</strong> Checklists only</p>
+                  <p><strong>Admin:</strong> Full access to all features</p>
+                  <p><strong>Manager:</strong> Administrative access</p>
+                  <p><strong>User/Analyst:</strong> Standard user access</p>
                 </div>
               </div>
             </div>
