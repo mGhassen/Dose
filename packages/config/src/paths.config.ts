@@ -91,7 +91,7 @@ export const pathsConfig: NavigationConfig = {
     },
     {
       title: "payments",
-      url: "/payments",
+      url: "#",
       icon: "CreditCard",
       translationKey: "payments",
       items: [
@@ -246,7 +246,7 @@ export const pathsConfig: NavigationConfig = {
     },
     {
       title: "settings",
-      url: "/settings",
+      url: "#",
       icon: "Settings",
       translationKey: "settings",
       items: [

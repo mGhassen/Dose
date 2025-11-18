@@ -126,88 +126,75 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (response.status === 401) {
         const errorData = await response.json().catch(() => ({}));
         
-        // Only refresh if explicitly needed
-        if (errorData.needsRefresh) {
-          const refreshToken = safeLocalStorage.getItem('refresh_token');
-          
-          if (refreshToken) {
-            try {
-              const refreshResponse = await fetch('/api/auth/refresh', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refresh_token: refreshToken })
+        // Always try refresh on 401 - session route always returns needsRefresh: true
+        const refreshToken = safeLocalStorage.getItem('refresh_token');
+        
+        if (refreshToken) {
+          try {
+            const refreshResponse = await fetch('/api/auth/refresh', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refresh_token: refreshToken })
+            });
+            
+            if (refreshResponse.ok) {
+              const refreshData = await refreshResponse.json();
+              
+              // Update access token
+              safeLocalStorage.setItem('access_token', refreshData.access_token);
+              // Only update refresh token if a new one is provided (Supabase rotates tokens)
+              if (refreshData.refresh_token) {
+                safeLocalStorage.setItem('refresh_token', refreshData.refresh_token);
+              }
+              if (typeof window !== 'undefined') {
+                window.__authToken = refreshData.access_token;
+              }
+              
+              // Retry session with new token
+              const retryResponse = await fetch('/api/auth/session', {
+                headers: {
+                  'Authorization': `Bearer ${refreshData.access_token}`,
+                  'Content-Type': 'application/json'
+                },
+                credentials: 'include'
               });
               
-              if (refreshResponse.ok) {
-                const refreshData = await refreshResponse.json();
-                
-                // Update access token
-                safeLocalStorage.setItem('access_token', refreshData.access_token);
-                // Only update refresh token if a new one is provided (Supabase rotates tokens)
-                if (refreshData.refresh_token) {
-                  safeLocalStorage.setItem('refresh_token', refreshData.refresh_token);
+              if (retryResponse.ok) {
+                const retryData = await retryResponse.json();
+                if (retryData.success && retryData.user) {
+                  setUser(retryData.user);
+                  setAuthError(null);
+                  return retryData.user;
                 }
+              }
+              // If retry fails, keep tokens - might be temporary
+              setAuthError('Session validation failed. Please try again.');
+              return null;
+            } else {
+              // Refresh failed - only clear if permanent error (401)
+              if (refreshResponse.status === 401) {
+                // Refresh token is invalid - clear everything
+                safeLocalStorage.removeItem('access_token');
+                safeLocalStorage.removeItem('refresh_token');
                 if (typeof window !== 'undefined') {
-                  window.__authToken = refreshData.access_token;
+                  delete window.__authToken;
                 }
-                
-                // Retry session with new token
-                const retryResponse = await fetch('/api/auth/session', {
-                  headers: {
-                    'Authorization': `Bearer ${refreshData.access_token}`,
-                    'Content-Type': 'application/json'
-                  },
-                  credentials: 'include'
-                });
-                
-                if (retryResponse.ok) {
-                  const retryData = await retryResponse.json();
-                  if (retryData.success && retryData.user) {
-                    setUser(retryData.user);
-                    setAuthError(null);
-                    return retryData.user;
-                  }
-                }
-                // If retry fails, keep tokens - might be temporary
-                setAuthError('Session validation failed. Please try again.');
-                return null;
-              } else {
-                // Refresh failed - only clear if permanent error
-                if (refreshResponse.status === 401) {
-                  // Refresh token is invalid - clear everything
-                  safeLocalStorage.removeItem('access_token');
-                  safeLocalStorage.removeItem('refresh_token');
-                  if (typeof window !== 'undefined') {
-                    delete window.__authToken;
-                  }
-                  setUser(null);
-                  router.push('/auth/login');
-                  setAuthError('Your session has expired. Please log in again.');
-                  return null;
-                }
-                // Temporary error - keep tokens
-                setAuthError('Session refresh failed. Please try again.');
+                setUser(null);
+                router.push('/auth/login');
+                setAuthError('Your session has expired. Please log in again.');
                 return null;
               }
-            } catch (refreshError) {
-              // Network error - keep tokens
-              setAuthError('Network error. Please try again.');
+              // Temporary error - keep tokens
+              setAuthError('Session refresh failed. Please try again.');
               return null;
             }
-          } else {
-            // No refresh token - clear and redirect
-            safeLocalStorage.removeItem('access_token');
-            safeLocalStorage.removeItem('refresh_token');
-            if (typeof window !== 'undefined') {
-              delete window.__authToken;
-            }
-            setUser(null);
-            router.push('/auth/login');
-            setAuthError('Your session has expired. Please log in again.');
+          } catch (refreshError) {
+            // Network error - keep tokens
+            setAuthError('Network error. Please try again.');
             return null;
           }
         } else {
-          // Not a refreshable error - clear tokens
+          // No refresh token - clear and redirect
           safeLocalStorage.removeItem('access_token');
           safeLocalStorage.removeItem('refresh_token');
           if (typeof window !== 'undefined') {
@@ -215,7 +202,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
           setUser(null);
           router.push('/auth/login');
-          setAuthError('Authentication failed. Please log in again.');
+          setAuthError('Your session has expired. Please log in again.');
           return null;
         }
       }

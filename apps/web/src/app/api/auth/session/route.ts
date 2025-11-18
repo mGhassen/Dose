@@ -4,30 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-/**
- * Decode JWT to check expiration without verification
- * This is safe because we'll verify with Supabase anyway
- */
-function isTokenExpired(token: string): boolean {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return true;
-    
-    const payload = JSON.parse(atob(parts[1]));
-    const exp = payload.exp;
-    
-    if (!exp) return true;
-    
-    // Check if token expires in less than 5 minutes (refresh proactively)
-    const expiresAt = exp * 1000;
-    const now = Date.now();
-    const fiveMinutes = 5 * 60 * 1000;
-    
-    return expiresAt < (now + fiveMinutes);
-  } catch {
-    return true; // If we can't decode, assume expired
-  }
-}
+// Removed isTokenExpired - we rely on Supabase's validation instead
 
 export async function GET(request: NextRequest) {
   const useRealAPI = process.env.MIGRATION_USE_API_AUTH === 'true';
@@ -77,16 +54,6 @@ export async function GET(request: NextRequest) {
     }, { status: 401 });
   }
 
-  // Check if token is expired before making API call
-  if (isTokenExpired(token)) {
-    return NextResponse.json({ 
-      success: false, 
-      user: null,
-      error: 'Token expired',
-      needsRefresh: true
-    }, { status: 401 });
-  }
-  
   // Create Supabase client
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
@@ -96,15 +63,25 @@ export async function GET(request: NextRequest) {
     }
   });
 
-  // Validate token with Supabase
+  // Validate token with Supabase - this is the source of truth
+  // Don't check expiration ourselves - let Supabase handle it
   const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
   
   if (authError || !authUser) {
-    // Only return needsRefresh if it's an expiration error
+    // Log the actual error for debugging
+    console.error('[Session] Token validation failed:', {
+      error: authError?.message,
+      status: authError?.status,
+      name: authError?.name,
+      hasToken: !!token,
+      tokenLength: token?.length
+    });
+    
+    // Check if it's an expiration error from Supabase
     const errorMessage = authError?.message?.toLowerCase() || '';
     const isExpired = errorMessage.includes('expired') || 
                      errorMessage.includes('jwt') ||
-                     authError?.status === 401;
+                     errorMessage.includes('token');
     
     if (isExpired) {
       return NextResponse.json({ 
@@ -115,40 +92,59 @@ export async function GET(request: NextRequest) {
       }, { status: 401 });
     }
     
+    // Other errors - don't try refresh, just fail
     return NextResponse.json({ 
       success: false, 
       user: null,
-      error: authError?.message || 'Invalid session'
+      error: authError?.message || 'Invalid token'
     }, { status: 401 });
   }
+  
+  // Log successful token validation
+  console.log('[Session] Token validated successfully for user:', authUser.id);
 
-  // Get account and profile data
+  // Get account data first (without nested profile to avoid PGRST116)
   const { data: account, error: accountError } = await supabase
     .from('accounts')
-    .select(`
-      id,
-      email,
-      status,
-      is_admin,
-      profile_id,
-      profiles (
-        id,
-        first_name,
-        last_name,
-        phone,
-        profile_email,
-        address,
-        profession
-      )
-    `)
+    .select('id, email, status, is_admin, profile_id')
     .eq('auth_user_id', authUser.id)
-    .single();
+    .maybeSingle();
   
-  if (accountError || !account) {
-    return NextResponse.json({ success: false, user: null }, { status: 401 });
+  if (accountError) {
+    console.error('[Session] Account lookup error:', {
+      error: accountError?.message,
+      code: accountError?.code,
+      userId: authUser.id
+    });
+    return NextResponse.json({ 
+      success: false, 
+      user: null,
+      error: 'Account lookup failed'
+    }, { status: 401 });
   }
   
-  const profile = account.profiles as any;
+  if (!account) {
+    console.error('[Session] Account not found for user:', authUser.id);
+    return NextResponse.json({ 
+      success: false, 
+      user: null,
+      error: 'Account not found'
+    }, { status: 401 });
+  }
+  
+  // Get profile data separately if profile_id exists
+  let profile = null;
+  if (account.profile_id) {
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, phone, profile_email, address, profession')
+      .eq('id', account.profile_id)
+      .maybeSingle();
+    
+    if (!profileError && profileData) {
+      profile = profileData;
+    }
+  }
   
   // Transform user data to match expected format
   const transformedUser = {

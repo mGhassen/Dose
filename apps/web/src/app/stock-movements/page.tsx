@@ -1,8 +1,13 @@
 "use client";
 
+import AppLayout from "@/components/app-layout";
 import StockMovementsContent from "./stock-movements-content";
 
 export default function StockMovementsPage() {
-  return <StockMovementsContent />;
+  return (
+    <AppLayout>
+      <StockMovementsContent />
+    </AppLayout>
+  );
 }
 
