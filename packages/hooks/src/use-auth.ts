@@ -122,11 +122,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }
 
+      // Handle 404 - account missing (token is valid, but account doesn't exist)
+      if (response.status === 404) {
+        const errorData = await response.json().catch(() => ({}));
+        if (errorData.accountMissing) {
+          // Account is missing - don't refresh, just show error
+          setAuthError('Account not found. Please contact support.');
+          setUser(null);
+          // Don't clear tokens - token is valid, account is just missing
+          return null;
+        }
+      }
+      
       // Handle 401 - token expired or invalid
       if (response.status === 401) {
         const errorData = await response.json().catch(() => ({}));
         
-        // Always try refresh on 401 - session route always returns needsRefresh: true
+        // Only refresh if explicitly needed (token expired)
+        if (!errorData.needsRefresh) {
+          // Not a refreshable error - clear tokens
+          safeLocalStorage.removeItem('access_token');
+          safeLocalStorage.removeItem('refresh_token');
+          if (typeof window !== 'undefined') {
+            delete window.__authToken;
+          }
+          setUser(null);
+          router.push('/auth/login');
+          setAuthError('Authentication failed. Please log in again.');
+          return null;
+        }
+        
         const refreshToken = safeLocalStorage.getItem('refresh_token');
         
         if (refreshToken) {

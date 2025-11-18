@@ -222,13 +222,6 @@ CREATE INDEX idx_expiry_dates_is_expired ON expiry_dates(is_expired);
 CREATE INDEX idx_expiry_dates_stock_movement_id ON expiry_dates(stock_movement_id);
 
 -- ============================================================================
--- UPDATE ITEMS TABLE
--- ============================================================================
--- Add recipe_id to items table to link items to recipes
-ALTER TABLE items ADD COLUMN recipe_id BIGINT REFERENCES recipes(id) ON DELETE SET NULL;
-CREATE INDEX idx_items_recipe_id ON items(recipe_id);
-
--- ============================================================================
 -- TRIGGERS FOR UPDATED_AT
 -- ============================================================================
 -- Auto-update updated_at timestamp

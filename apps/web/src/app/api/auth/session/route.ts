@@ -54,8 +54,13 @@ export async function GET(request: NextRequest) {
     }, { status: 401 });
   }
 
-  // Create Supabase client
+  // Create Supabase client with the token in headers for RLS
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: authHeader
+      }
+    },
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -65,7 +70,7 @@ export async function GET(request: NextRequest) {
 
   // Validate token with Supabase - this is the source of truth
   // Don't check expiration ourselves - let Supabase handle it
-  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !authUser) {
     // Log the actual error for debugging
@@ -124,12 +129,15 @@ export async function GET(request: NextRequest) {
   }
   
   if (!account) {
-    console.error('[Session] Account not found for user:', authUser.id);
+    console.error('[Session] Account not found for user:', authUser.id, 'email:', authUser.email);
+    // Don't return 401 here - token is valid, account is just missing
+    // Return 404 instead so client doesn't try to refresh
     return NextResponse.json({ 
       success: false, 
       user: null,
-      error: 'Account not found'
-    }, { status: 401 });
+      error: 'Account not found. Please contact support.',
+      accountMissing: true
+    }, { status: 404 });
   }
   
   // Get profile data separately if profile_id exists
