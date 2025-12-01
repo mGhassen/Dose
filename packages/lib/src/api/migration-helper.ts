@@ -43,6 +43,12 @@ export async function handleMigrationRequest(
     // 3. There's a configuration issue
     
     const mswEnabled = process.env.NEXT_PUBLIC_ENABLE_MSW !== 'false';
+    
+    // If MSW is not enabled, fall back to real API instead of erroring
+    if (!mswEnabled) {
+      return proxyToBackend(path, request);
+    }
+    
     console.error(`[Migration] ${functionality} → Should use MSW but reached API route. MSW enabled: ${mswEnabled}`);
     console.error(`[Migration] If you see this, MSW handlers for ${functionality} are NOT registered. Check:`);
     console.error(`[Migration] 1. Did you restart the dev server after changing env vars?`);

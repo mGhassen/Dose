@@ -51,5 +51,8 @@ export * from './api/stock-levels';
 export * from './api/stock-movements';
 export * from './api/expiry-dates';
 
+// Export metadata enums API
+export * from './api/metadata-enums';
+
 // Export Supabase client
 export * from './supabase';

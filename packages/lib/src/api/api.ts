@@ -121,23 +121,45 @@ export async function apiRequest<T>(
         
         // Try to parse error details for better error messages
         let errorDetails: any = {};
+        let errorMessage = `API request failed: ${method} ${endpoint} -> ${response.status} ${response.statusText}`;
         try {
           const parsedError = JSON.parse(errorText);
           if (parsedError.error) {
-            try {
-              errorDetails = JSON.parse(parsedError.error);
-            } catch {
-              errorDetails = parsedError;
+            // If error is a string, use it directly
+            if (typeof parsedError.error === 'string') {
+              errorMessage = parsedError.error;
+            } else {
+              errorDetails = parsedError.error;
+              errorMessage = parsedError.error.message || parsedError.error.error || errorMessage;
             }
+          } else if (parsedError.message) {
+            errorMessage = parsedError.message;
           } else {
             errorDetails = parsedError;
           }
+          
+          // Include details if available
+          if (parsedError.details) {
+            errorDetails = { ...errorDetails, ...parsedError.details };
+          }
         } catch {
-          // If parsing fails, use the raw text (but limit length)
-          errorDetails = { message: errorText.substring(0, 200) };
+          // If not JSON, use the raw text as error message
+          if (errorText && errorText.length > 0) {
+            errorMessage = errorText.length > 200 ? errorText.substring(0, 200) + '...' : errorText;
+            errorDetails = { message: errorText.substring(0, 200) };
+          }
         }
         
-        const error = new Error(`API request failed: ${method} ${endpoint} -> ${response.status} ${response.statusText}`);
+        // For 403, provide more helpful context
+        if (response.status === 403) {
+          console.error(`[API] 403 Forbidden for ${method} ${endpoint}`);
+          console.error(`[API] This usually means:`);
+          console.error(`  - User lacks required permissions/role`);
+          console.error(`  - Token is invalid or expired`);
+          console.error(`  - Backend RLS policies blocking access`);
+        }
+        
+        const error = new Error(errorMessage);
         (error as any).status = response.status;
         (error as any).data = errorDetails;
         throw error;

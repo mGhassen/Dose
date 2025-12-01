@@ -270,6 +270,11 @@ export const pathsConfig: NavigationConfig = {
           url: "/items",
           translationKey: "items"
         },
+        {
+          title: "metadata-enums",
+          url: "/metadata-enums",
+          translationKey: "metadataEnums"
+        },
       ]
     },
   ],

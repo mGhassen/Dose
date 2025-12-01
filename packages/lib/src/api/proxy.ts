@@ -30,6 +30,13 @@ export async function proxyToBackend(path: string, request: NextRequest): Promis
   const cookie = request.headers.get('cookie');
   if (authorization) {
     defaultHeaders['Authorization'] = authorization;
+    // Log token presence (but not the full token for security)
+    const tokenPreview = authorization.length > 20 
+      ? `${authorization.substring(0, 20)}...` 
+      : authorization;
+    console.log(`[Proxy] Forwarding auth token for ${method} ${path}: ${tokenPreview}`);
+  } else {
+    console.warn(`[Proxy] No authorization header found for ${method} ${path}`);
   }
   if (cookie) {
     defaultHeaders['Cookie'] = cookie;
@@ -90,13 +97,51 @@ export async function proxyToBackend(path: string, request: NextRequest): Promis
       );
     }
 
+    console.log(`[Proxy] Sending ${method} request to backend: ${url}`);
     const response = await fetch(url, init);
     
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
-      console.error(`[Proxy] ${method} ${url} returned ${response.status}:`, errorText);
+      console.error(`[Proxy] ${method} ${url} returned ${response.status}`);
+      console.error(`[Proxy] Response headers:`, Object.fromEntries(response.headers.entries()));
+      console.error(`[Proxy] Error body:`, errorText.substring(0, 1000));
+      
+      // Try to parse JSON error response
+      let errorMessage = errorText || `Backend returned ${response.status}`;
+      let errorDetails: any = {};
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetails = errorJson;
+        if (errorJson.error) {
+          errorMessage = typeof errorJson.error === 'string' 
+            ? errorJson.error 
+            : JSON.stringify(errorJson.error);
+        } else if (errorJson.message) {
+          errorMessage = errorJson.message;
+        }
+      } catch {
+        // If not JSON, use the text as-is (but limit length)
+        if (errorText && errorText.length > 0) {
+          errorMessage = errorText.length > 500 ? errorText.substring(0, 500) + '...' : errorText;
+        }
+      }
+      
+      // For 403, provide more context
+      if (response.status === 403) {
+        console.error(`[Proxy] 403 Forbidden - Possible causes:`);
+        console.error(`  - User lacks required permissions/role`);
+        console.error(`  - Token is invalid or expired`);
+        console.error(`  - Backend RLS policies blocking access`);
+        console.error(`  - Backend expects different token format`);
+      }
+      
       return NextResponse.json(
-        { error: errorText || `Backend returned ${response.status}` },
+        { 
+          error: errorMessage,
+          details: errorDetails,
+          status: response.status,
+          url: url
+        },
         { status: response.status }
       );
     }

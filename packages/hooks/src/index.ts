@@ -62,6 +62,7 @@ export * from './server/prefetchWorkingCapital';
 export * from './server/prefetchBalanceSheet';
 export * from './server/prefetchFinancialPlan';
 export * from './server/prefetchDashboard';
+export * from './server/prefetchMetadataEnums';
 
 // Platform-specific hooks (may need adapters for mobile)
 // use-auth.ts - uses Next.js router
