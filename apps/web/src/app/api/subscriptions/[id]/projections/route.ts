@@ -106,6 +106,53 @@ export async function POST(
       
       if (error) throw error;
       projectionEntry = data;
+      
+      // Ensure the entry exists for the projection (needed for payments, even partial ones)
+      const { data: subscriptionData } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('id', parseInt(id))
+        .single();
+
+      if (subscriptionData) {
+        // Check if entry already exists
+        const { data: existingEntry } = await supabase
+          .from('entries')
+          .select('id')
+          .eq('reference_id', parseInt(id))
+          .eq('schedule_entry_id', projectionEntry.id)
+          .eq('entry_type', 'subscription_payment')
+          .maybeSingle();
+
+        if (!existingEntry) {
+          // Create OUTPUT entry
+          // IMPORTANT: entry amount should always be the projected amount (body.amount), not actualAmount
+          // actualAmount is only for tracking payments, not for the entry's expected amount
+          const { data: entryData, error: entryError } = await supabase
+            .from('entries')
+            .insert({
+              direction: 'output',
+              entry_type: 'subscription_payment',
+              name: `${subscriptionData.name} - ${body.month}`,
+              amount: body.amount, // Always use projected amount, not actualAmount
+              description: body.notes || `Subscription payment for ${body.month}`,
+              category: subscriptionData.category,
+              vendor: subscriptionData.vendor,
+              entry_date: body.paidDate || `${body.month}-01`,
+              due_date: body.paidDate || `${body.month}-01`,
+              reference_id: parseInt(id),
+              schedule_entry_id: projectionEntry.id,
+              is_active: subscriptionData.is_active,
+            })
+            .select()
+            .single();
+
+          if (entryError) {
+            console.error('Error creating entry for subscription projection:', entryError);
+            // Continue even if entry creation fails
+          }
+        }
+      }
     } else {
       // Create new entry
       const { data, error } = await supabase
@@ -145,13 +192,15 @@ export async function POST(
 
         if (!existingEntry) {
           // Create OUTPUT entry
+          // IMPORTANT: entry amount should always be the projected amount (body.amount), not actualAmount
+          // actualAmount is only for tracking payments, not for the entry's expected amount
           const { data: entryData, error: entryError } = await supabase
             .from('entries')
             .insert({
               direction: 'output',
               entry_type: 'subscription_payment',
               name: `${subscriptionData.name} - ${body.month}`,
-              amount: body.actualAmount || body.amount,
+              amount: body.amount, // Always use projected amount, not actualAmount
               description: body.notes || `Subscription payment for ${body.month}`,
               category: subscriptionData.category,
               vendor: subscriptionData.vendor,

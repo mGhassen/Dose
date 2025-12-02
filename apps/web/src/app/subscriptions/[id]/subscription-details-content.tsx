@@ -535,10 +535,9 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                       </TableHeader>
                       <TableBody>
                         {mergedProjections.map((projection: any, index: number) => {
-                          // Use stored entry ID if available, otherwise use month + index for uniqueness
-                          const uniqueKey = projection.id 
-                            ? `stored-${projection.id}` 
-                            : `calc-${projection.month}-${projection.subscriptionId}-${index}`;
+                          // Use month + subscriptionId + index for uniqueness (month is unique per subscription)
+                          // Include stored ID in key if available, but month is the primary unique identifier
+                          const uniqueKey = `sub-${subscription.id}-month-${projection.month}-${projection.id || 'calc'}-idx-${index}`;
                           
                           return (
                             <EditableSubscriptionTimelineRow

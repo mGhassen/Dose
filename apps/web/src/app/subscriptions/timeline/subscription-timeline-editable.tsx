@@ -164,6 +164,37 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
         if (data?.data && data.data.length > 0) {
           currentEntryId = data.data[0].id.toString();
           setEntryId(currentEntryId);
+        } else {
+          // Entry doesn't exist yet, create it by updating the projection entry
+          // This will trigger the API to create the entry
+          await createOrUpdateProjectionEntry.mutateAsync({
+            subscriptionId: subscriptionId.toString(),
+            data: {
+              month: projection.month,
+              amount: projection.amount,
+              isProjected: projection.isProjected,
+              isPaid: false,
+              paidDate: null,
+              actualAmount: null,
+              notes: null,
+            },
+          });
+          
+          // Fetch entry ID after creating (with retry in case of timing issues)
+          let retries = 3;
+          while (!currentEntryId && retries > 0) {
+            const retryResponse = await fetch(`/api/entries?referenceId=${subscriptionId}&scheduleEntryId=${projectionEntry.id}&entryType=subscription_payment`);
+            const retryData = await retryResponse.json();
+            if (retryData?.data && retryData.data.length > 0) {
+              currentEntryId = retryData.data[0].id.toString();
+              setEntryId(currentEntryId);
+              break;
+            }
+            retries--;
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 200));
+            }
+          }
         }
       }
       
