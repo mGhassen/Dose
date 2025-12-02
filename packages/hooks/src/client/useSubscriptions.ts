@@ -116,3 +116,58 @@ export function useDeleteSubscription() {
   });
 }
 
+export function useSubscriptionProjections(subscriptionId: string, startMonth?: string, endMonth?: string) {
+  return useQuery({
+    queryKey: ['subscriptions', subscriptionId, 'projections', startMonth, endMonth],
+    queryFn: () => subscriptionsApi.getProjections(subscriptionId, startMonth, endMonth),
+    enabled: !!subscriptionId,
+  });
+}
+
+export function useGenerateSubscriptionProjections() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ id, startMonth, endMonth }: { id: string; startMonth?: string; endMonth?: string }) => 
+      subscriptionsApi.generateProjections(id, startMonth, endMonth),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.id, 'projections'] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+    },
+  });
+}
+
+export function useUpdateSubscriptionProjectionEntry() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ subscriptionId, entryId, data }: { 
+      subscriptionId: string; 
+      entryId: string; 
+      data: { isPaid?: boolean; paidDate?: string | null; actualAmount?: number | null; notes?: string | null } 
+    }) => 
+      subscriptionsApi.updateProjectionEntry(subscriptionId, entryId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.subscriptionId, 'projections'] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.subscriptionId] });
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+    },
+  });
+}
+
+export function useDeleteSubscriptionProjectionEntry() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ subscriptionId, entryId }: { subscriptionId: string; entryId: string }) => 
+      subscriptionsApi.deleteProjectionEntry(subscriptionId, entryId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.subscriptionId, 'projections'] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.subscriptionId] });
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+    },
+  });
+}
+

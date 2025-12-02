@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month');
+    const year = searchParams.get('year');
     const type = searchParams.get('type');
     const { page, limit, offset } = getPaginationParams(searchParams);
 
@@ -47,6 +48,18 @@ export async function GET(request: NextRequest) {
       .from('sales')
       .select('*')
       .order('date', { ascending: false });
+
+    if (year) {
+      const startDate = `${year}-01-01`;
+      const endDate = `${year}-12-31`;
+      
+      query = query
+        .gte('date', startDate)
+        .lte('date', endDate);
+      countQuery = countQuery
+        .gte('date', startDate)
+        .lte('date', endDate);
+    }
 
     if (month) {
       const startOfMonth = `${month}-01`;

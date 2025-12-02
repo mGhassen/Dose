@@ -1,11 +1,11 @@
-// Generate and Store Expense Projections API Route
+// Generate and Store Subscription Projections API Route
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import { projectExpense } from '@/lib/calculations/expense-projections';
-import type { Expense } from '@kit/types';
+import { projectSubscription } from '@/lib/calculations/subscription-projections';
+import type { Subscription } from '@kit/types';
 
-function transformExpense(row: any): Expense {
+function transformSubscription(row: any): Subscription {
   return {
     id: row.id,
     name: row.name,
@@ -38,34 +38,34 @@ export async function POST(
     
     const supabase = createServerSupabaseClient();
     
-    // Fetch expense
-    const { data: expenseData, error: expenseError } = await supabase
-      .from('expenses')
+    // Fetch subscription
+    const { data: subscriptionData, error: subscriptionError } = await supabase
+      .from('subscriptions')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (expenseError) {
-      if (expenseError.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
+    if (subscriptionError) {
+      if (subscriptionError.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
       }
-      throw expenseError;
+      throw subscriptionError;
     }
 
-    const expense = transformExpense(expenseData);
+    const subscription = transformSubscription(subscriptionData);
 
     // Calculate projections
-    const projections = projectExpense(expense, startMonth, endMonth);
+    const projections = projectSubscription(subscription, startMonth, endMonth);
 
-    // Delete existing projections for this expense
+    // Delete existing projections for this subscription
     await supabase
-      .from('expense_projection_entries')
+      .from('subscription_projection_entries')
       .delete()
-      .eq('expense_id', id);
+      .eq('subscription_id', id);
 
     // Insert new projections
     const projectionData = projections.map(proj => ({
-      expense_id: proj.expenseId,
+      subscription_id: proj.subscriptionId,
       month: proj.month,
       amount: proj.amount,
       is_projected: proj.isProjected,
@@ -76,7 +76,7 @@ export async function POST(
     }));
 
     const { data: insertedProjections, error: insertError } = await supabase
-      .from('expense_projection_entries')
+      .from('subscription_projection_entries')
       .insert(projectionData)
       .select();
 
@@ -86,17 +86,17 @@ export async function POST(
     if (insertedProjections && insertedProjections.length > 0) {
       const entryData = insertedProjections.map((proj: any) => ({
         direction: 'output',
-        entry_type: 'expense_payment',
-        name: `${expense.name} - ${proj.month}`,
+        entry_type: 'subscription_payment',
+        name: `${subscription.name} - ${proj.month}`,
         amount: proj.amount,
-        description: `Expense payment for ${proj.month}`,
-        category: expense.category,
-        vendor: expense.vendor,
+        description: `Subscription payment for ${proj.month}`,
+        category: subscription.category,
+        vendor: subscription.vendor,
         entry_date: `${proj.month}-01`,
         due_date: `${proj.month}-01`,
         reference_id: parseInt(id),
         schedule_entry_id: proj.id,
-        is_active: expense.isActive,
+        is_active: subscription.isActive,
       }));
 
       const { error: entryError } = await supabase
@@ -104,16 +104,16 @@ export async function POST(
         .insert(entryData);
 
       if (entryError) {
-        console.error('Error creating entries for expense projections:', entryError);
+        console.error('Error creating entries for subscription projections:', entryError);
         // Don't fail the projection creation if entry creation fails, but log it
       }
     }
 
     return NextResponse.json(insertedProjections, { status: 201 });
   } catch (error: any) {
-    console.error('Error generating expense projections:', error);
+    console.error('Error generating subscription projections:', error);
     return NextResponse.json(
-      { error: 'Failed to generate expense projections', details: error.message },
+      { error: 'Failed to generate subscription projections', details: error.message },
       { status: 500 }
     );
   }

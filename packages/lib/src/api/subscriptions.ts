@@ -36,5 +36,23 @@ export const subscriptionsApi = {
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     return apiRequest<PaginatedResponse<Subscription>>('GET', `/api/subscriptions?${searchParams.toString()}`);
   },
+  getProjections: (id: string, startMonth?: string, endMonth?: string) => {
+    const searchParams = new URLSearchParams();
+    if (startMonth) searchParams.append('startMonth', startMonth);
+    if (endMonth) searchParams.append('endMonth', endMonth);
+    const query = searchParams.toString();
+    return apiRequest<SubscriptionProjection[]>(`GET`, `/api/subscriptions/${id}/projections${query ? `?${query}` : ''}`);
+  },
+  generateProjections: (id: string, startMonth?: string, endMonth?: string) => {
+    const searchParams = new URLSearchParams();
+    if (startMonth) searchParams.append('startMonth', startMonth);
+    if (endMonth) searchParams.append('endMonth', endMonth);
+    const query = searchParams.toString();
+    return apiRequest<SubscriptionProjection[]>(`POST`, `/api/subscriptions/${id}/generate-projections${query ? `?${query}` : ''}`);
+  },
+  updateProjectionEntry: (id: string, entryId: string, data: { isPaid?: boolean; paidDate?: string | null; actualAmount?: number | null; notes?: string | null }) => 
+    apiRequest<SubscriptionProjection>('PUT', `/api/subscriptions/${id}/projections/${entryId}`, data),
+  deleteProjectionEntry: (id: string, entryId: string) => 
+    apiRequest<void>('DELETE', `/api/subscriptions/${id}/projections/${entryId}`),
 };
 

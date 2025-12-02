@@ -62,6 +62,43 @@ export async function PUT(
       throw error;
     }
 
+    // Update corresponding entry if it exists
+    if (data) {
+      const { data: entryData, error: entryError } = await supabase
+        .from('entries')
+        .select('id')
+        .eq('reference_id', parseInt(id))
+        .eq('schedule_entry_id', parseInt(entryId))
+        .eq('entry_type', 'expense_payment')
+        .maybeSingle();
+
+      if (!entryError && entryData) {
+        // Update the entry's payment status
+        if (body.isPaid !== undefined && body.isPaid && body.paidDate) {
+          // Find or create payment for this entry
+          const { data: payments } = await supabase
+            .from('payments')
+            .select('id')
+            .eq('entry_id', entryData.id)
+            .eq('payment_date', body.paidDate)
+            .maybeSingle();
+
+          if (!payments) {
+            await supabase
+              .from('payments')
+              .insert({
+                entry_id: entryData.id,
+                payment_date: body.paidDate,
+                amount: body.actualAmount || parseFloat(data.amount),
+                is_paid: true,
+                paid_date: body.paidDate,
+                notes: body.notes || null,
+              });
+          }
+        }
+      }
+    }
+
     return NextResponse.json(transformProjectionEntry(data));
   } catch (error: any) {
     console.error('Error updating expense projection entry:', error);

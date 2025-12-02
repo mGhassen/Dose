@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { salesApi } from '@kit/lib';
 import type { Sale, SalesSummary, CreateSaleData, UpdateSaleData } from '@kit/types';
 
-export function useSales(params?: { page?: number; limit?: number; month?: string; type?: string }) {
+export function useSales(params?: { page?: number; limit?: number; month?: string; year?: string; type?: string }) {
   return useQuery({
     queryKey: ['sales', params],
     queryFn: async () => {

@@ -20,21 +20,13 @@ export default function SalesContent() {
   
   const { data: salesResponse, isLoading } = useSales({ 
     page, 
-    limit: 1000 // Fetch all for year filtering, then paginate client-side
+    limit: pageSize,
+    year: selectedYear // Filter by year on server side
   });
   
-  // Filter by year and paginate client-side
-  const filteredSales = useMemo(() => {
-    if (!salesResponse?.data) return [];
-    return salesResponse.data.filter(sale => sale.date.startsWith(selectedYear));
-  }, [salesResponse?.data, selectedYear]);
-  
-  const paginatedSales = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    return filteredSales.slice(startIndex, startIndex + pageSize);
-  }, [filteredSales, page, pageSize]);
-  
-  const totalPages = Math.ceil(filteredSales.length / pageSize);
+  const sales = salesResponse?.data || [];
+  const totalCount = salesResponse?.pagination?.total || 0;
+  const totalPages = salesResponse?.pagination?.totalPages || 0;
   const deleteMutation = useDeleteSale();
 
   const columns: ColumnDef<Sale>[] = useMemo(() => [
@@ -163,7 +155,7 @@ export default function SalesContent() {
           title=""
           description=""
           createHref="/sales/create"
-          data={paginatedSales}
+          data={sales}
           columns={columns}
           loading={isLoading}
           onRowClick={(sale) => router.push(`/sales/${sale.id}`)}
@@ -183,7 +175,7 @@ export default function SalesContent() {
           pagination={{
             page,
             pageSize,
-            totalCount: filteredSales.length,
+            totalCount,
             totalPages,
             onPageChange: setPage,
             onPageSizeChange: (newSize) => {

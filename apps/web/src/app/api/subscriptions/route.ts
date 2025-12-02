@@ -122,6 +122,27 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    // Create an OUTPUT entry for the subscription
+    const { error: entryError } = await supabase
+      .from('entries')
+      .insert({
+        direction: 'output',
+        entry_type: 'subscription',
+        name: body.name,
+        amount: body.amount,
+        description: body.description,
+        category: body.category,
+        vendor: body.vendor,
+        entry_date: body.startDate,
+        reference_id: data.id,
+        is_active: body.isActive ?? true,
+      });
+
+    if (entryError) {
+      console.error('Error creating entry for subscription:', entryError);
+      // Don't fail the subscription creation if entry creation fails, but log it
+    }
+
     return NextResponse.json(transformSubscription(data), { status: 201 });
   } catch (error: any) {
     console.error('Error creating subscription:', error);

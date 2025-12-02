@@ -36,6 +36,25 @@ SELECT
 FROM expenses
 ON CONFLICT DO NOTHING;
 
+-- Step 2b: Create OUTPUT entries from expense projection entries (individual payment dates)
+INSERT INTO entries (direction, entry_type, name, amount, description, entry_date, due_date, reference_id, schedule_entry_id, is_active, created_at, updated_at)
+SELECT 
+  'output' as direction,
+  'expense_payment' as entry_type,
+  CONCAT(e.name, ' - ', epe.month) as name,
+  COALESCE(epe.actual_amount, epe.amount) as amount,
+  epe.notes as description,
+  CONCAT(epe.month, '-01')::DATE as entry_date,
+  CONCAT(epe.month, '-01')::DATE as due_date,
+  epe.expense_id as reference_id,
+  epe.id as schedule_entry_id,
+  true as is_active,
+  epe.created_at,
+  epe.updated_at
+FROM expense_projection_entries epe
+INNER JOIN expenses e ON e.id = epe.expense_id
+ON CONFLICT DO NOTHING;
+
 -- Step 3: Create entries from subscriptions (outputs)
 INSERT INTO entries (direction, entry_type, name, amount, description, category, vendor, entry_date, reference_id, is_active, created_at, updated_at)
 SELECT 
@@ -122,6 +141,25 @@ SELECT
   lte.updated_at
 FROM leasing_timeline_entries lte
 INNER JOIN leasing_payments lp ON lp.id = lte.leasing_id
+ON CONFLICT DO NOTHING;
+
+-- Step 7b: Create OUTPUT entries from subscription projection entries (individual payment dates)
+INSERT INTO entries (direction, entry_type, name, amount, description, entry_date, due_date, reference_id, schedule_entry_id, is_active, created_at, updated_at)
+SELECT 
+  'output' as direction,
+  'subscription_payment' as entry_type,
+  CONCAT(s.name, ' - ', spe.month) as name,
+  COALESCE(spe.actual_amount, spe.amount) as amount,
+  spe.notes as description,
+  CONCAT(spe.month, '-01')::DATE as entry_date,
+  CONCAT(spe.month, '-01')::DATE as due_date,
+  spe.subscription_id as reference_id,
+  spe.id as schedule_entry_id,
+  true as is_active,
+  spe.created_at,
+  spe.updated_at
+FROM subscription_projection_entries spe
+INNER JOIN subscriptions s ON s.id = spe.subscription_id
 ON CONFLICT DO NOTHING;
 
 -- Step 8: Migrate actual_payments to payments
