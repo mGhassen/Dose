@@ -40,6 +40,9 @@ interface EditableSubscriptionTimelineRowProps {
 export function EditableSubscriptionTimelineRow({ projection, subscriptionId, onUpdate }: EditableSubscriptionTimelineRowProps) {
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
   const [isUnpaidDialogOpen, setIsUnpaidDialogOpen] = useState(false);
+  const [isDeletePaymentDialogOpen, setIsDeletePaymentDialogOpen] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [showPayments, setShowPayments] = useState(false);
   const [entryId, setEntryId] = useState<string | null>(null);
   
@@ -169,17 +172,18 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
         notes: notes || null,
       });
       
-      // Update projection entry to reflect payment status
+      // Update projection entry to reflect payment status (without creating duplicate payment)
       const newTotalPaid = totalPaid + amount;
       const isNowFullyPaid = newTotalPaid >= projection.amount;
       
       if (projectionEntry?.id) {
+        // Update projection entry status without paidDate to avoid creating duplicate payment in API
         await updateProjectionEntry.mutateAsync({
           subscriptionId: subscriptionId.toString(),
           entryId: projectionEntry.id.toString(),
           data: {
             isPaid: isNowFullyPaid,
-            paidDate: isNowFullyPaid ? paidDate : projectionEntry.paidDate,
+            // Don't pass paidDate - we're managing payments separately
             actualAmount: newTotalPaid,
             notes: notes || projectionEntry.notes,
           },
@@ -195,18 +199,33 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
     }
   };
   
-  const handleDeletePayment = async (paymentId: number) => {
+  const handleDeletePaymentClick = (paymentId: number) => {
+    setPaymentToDelete(paymentId);
+    setDeleteConfirmText("");
+    setIsDeletePaymentDialogOpen(true);
+  };
+
+  const handleDeletePayment = async () => {
+    if (!paymentToDelete) {
+      return;
+    }
+
+    if (deleteConfirmText !== "DELETE") {
+      toast.error("Please type DELETE to confirm");
+      return;
+    }
+
     try {
-      const paymentToDelete = payments.find(p => p.id === paymentId);
-      if (!paymentToDelete) {
+      const payment = payments.find(p => p.id === paymentToDelete);
+      if (!payment) {
         toast.error("Payment not found");
         return;
       }
       
-      await deletePayment.mutateAsync(paymentId.toString());
+      await deletePayment.mutateAsync(paymentToDelete.toString());
       
       // Recalculate total after deletion
-      const newTotalPaid = totalPaid - paymentToDelete.amount;
+      const newTotalPaid = totalPaid - payment.amount;
       const isNowFullyPaid = newTotalPaid >= projection.amount;
       
       // Update projection entry status
@@ -216,12 +235,15 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
           entryId: projectionEntry.id.toString(),
           data: {
             isPaid: isNowFullyPaid,
-            paidDate: isNowFullyPaid && payments.length > 1 ? payments.find(p => p.id !== paymentId)?.paidDate : null,
+            paidDate: isNowFullyPaid && payments.length > 1 ? payments.find(p => p.id !== paymentToDelete)?.paidDate : null,
             actualAmount: newTotalPaid > 0 ? newTotalPaid : null,
           },
         });
       }
       
+      setIsDeletePaymentDialogOpen(false);
+      setPaymentToDelete(null);
+      setDeleteConfirmText("");
       refetchPayments();
       onUpdate();
       toast.success("Payment deleted successfully");
@@ -379,7 +401,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleDeletePayment(payment.id)}
+                        onClick={() => handleDeletePaymentClick(payment.id)}
                         disabled={deletePayment.isPending}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -482,6 +504,48 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Mark as Unpaid
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <AlertDialog open={isDeletePaymentDialogOpen} onOpenChange={(open) => {
+        setIsDeletePaymentDialogOpen(open);
+        if (!open) {
+          setPaymentToDelete(null);
+          setDeleteConfirmText("");
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Payment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this payment? This action cannot be undone.
+              <br />
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type DELETE to confirm"
+              className="w-full"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIsDeletePaymentDialogOpen(false);
+              setPaymentToDelete(null);
+              setDeleteConfirmText("");
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeletePayment}
+              disabled={deleteConfirmText !== "DELETE" || deletePayment.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletePayment.isPending ? "Deleting..." : "Delete Payment"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

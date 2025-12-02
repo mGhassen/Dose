@@ -83,27 +83,37 @@ export async function PUT(
 
       if (!entryError && entryData) {
         // Update the entry's payment status
+        // Only create payment if paidDate is provided AND no payments exist yet
+        // This prevents duplicate payments when payments are managed separately
         if (body.isPaid !== undefined) {
-          // Find or create payment for this entry
           if (body.isPaid && body.paidDate) {
-            const { data: payments } = await supabase
+            // Check if any payments already exist for this entry
+            const { data: existingPayments } = await supabase
               .from('payments')
               .select('id')
-              .eq('entry_id', entryData.id)
-              .eq('payment_date', body.paidDate)
-              .maybeSingle();
+              .eq('entry_id', entryData.id);
 
-            if (!payments) {
-              await supabase
+            // Only create a payment if none exist (for backward compatibility with old flow)
+            if (!existingPayments || existingPayments.length === 0) {
+              const { data: payments } = await supabase
                 .from('payments')
-                .insert({
-                  entry_id: entryData.id,
-                  payment_date: body.paidDate,
-                  amount: body.actualAmount || parseFloat(existingEntry.amount),
-                  is_paid: true,
-                  paid_date: body.paidDate,
-                  notes: body.notes || null,
-                });
+                .select('id')
+                .eq('entry_id', entryData.id)
+                .eq('payment_date', body.paidDate)
+                .maybeSingle();
+
+              if (!payments) {
+                await supabase
+                  .from('payments')
+                  .insert({
+                    entry_id: entryData.id,
+                    payment_date: body.paidDate,
+                    amount: body.actualAmount || parseFloat(existingEntry.amount),
+                    is_paid: true,
+                    paid_date: body.paidDate,
+                    notes: body.notes || null,
+                  });
+              }
             }
 
             // Create an expense entry when subscription payment is marked as paid
