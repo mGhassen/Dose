@@ -138,6 +138,25 @@ export function useGenerateSubscriptionProjections() {
   });
 }
 
+export function useCreateOrUpdateSubscriptionProjectionEntry() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ subscriptionId, data }: { 
+      subscriptionId: string; 
+      data: { month: string; amount: number; isProjected?: boolean; isPaid?: boolean; paidDate?: string | null; actualAmount?: number | null; notes?: string | null } 
+    }) => 
+      subscriptionsApi.createOrUpdateProjectionEntry(subscriptionId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.subscriptionId, 'projections'] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.subscriptionId] });
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    },
+  });
+}
+
 export function useUpdateSubscriptionProjectionEntry() {
   const queryClient = useQueryClient();
   
@@ -153,6 +172,7 @@ export function useUpdateSubscriptionProjectionEntry() {
       queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.subscriptionId] });
       queryClient.invalidateQueries({ queryKey: ['entries'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
     },
   });
 }

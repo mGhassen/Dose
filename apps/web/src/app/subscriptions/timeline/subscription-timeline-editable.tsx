@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
 import { Plus, Trash2, MoreVertical, X } from "lucide-react";
-import { useUpdateSubscriptionProjectionEntry, useSubscriptionProjections, usePayments } from "@kit/hooks";
+import { useUpdateSubscriptionProjectionEntry, useCreateOrUpdateSubscriptionProjectionEntry, useSubscriptionProjections, usePayments } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
@@ -43,24 +43,37 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
   const remainingToPay = Math.max(0, projection.amount - totalPaid);
   
   const updateProjectionEntry = useUpdateSubscriptionProjectionEntry();
+  const createOrUpdateProjectionEntry = useCreateOrUpdateSubscriptionProjectionEntry();
 
   const handleMarkAsPaid = async (paidDate: string, amount: number, notes?: string) => {
-    if (!projectionEntry?.id) {
-      toast.error("Projection entry not found. Please generate projections first.");
-      return;
-    }
-    
     try {
-      await updateProjectionEntry.mutateAsync({
-        subscriptionId: subscriptionId.toString(),
-        entryId: projectionEntry.id.toString(),
-        data: {
-          isPaid: true,
-          paidDate: paidDate,
-          actualAmount: amount,
-          notes: notes,
-        },
-      });
+      if (projectionEntry?.id) {
+        // Update existing entry
+        await updateProjectionEntry.mutateAsync({
+          subscriptionId: subscriptionId.toString(),
+          entryId: projectionEntry.id.toString(),
+          data: {
+            isPaid: true,
+            paidDate: paidDate,
+            actualAmount: amount,
+            notes: notes,
+          },
+        });
+      } else {
+        // Create new entry if it doesn't exist
+        await createOrUpdateProjectionEntry.mutateAsync({
+          subscriptionId: subscriptionId.toString(),
+          data: {
+            month: projection.month,
+            amount: projection.amount,
+            isProjected: projection.isProjected,
+            isPaid: true,
+            paidDate: paidDate,
+            actualAmount: amount,
+            notes: notes,
+          },
+        });
+      }
       
       setIsPaidDialogOpen(false);
       onUpdate();
@@ -138,12 +151,12 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {!isPaid ? (
-                <DropdownMenuItem onClick={() => setIsPaidDialogOpen(true)} disabled={!projectionEntry?.id}>
+                <DropdownMenuItem onClick={() => setIsPaidDialogOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   Mark as Paid
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem onClick={handleMarkAsUnpaid}>
+                <DropdownMenuItem onClick={handleMarkAsUnpaid} disabled={!projectionEntry?.id}>
                   <X className="mr-2 h-4 w-4" />
                   Mark as Unpaid
                 </DropdownMenuItem>
@@ -241,7 +254,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                   notesInput?.value || undefined
                 );
               }}
-              disabled={updateProjectionEntry.isPending || !projectionEntry?.id}
+              disabled={updateProjectionEntry.isPending || createOrUpdateProjectionEntry.isPending}
             >
               Mark as Paid
             </Button>
