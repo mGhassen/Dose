@@ -19,11 +19,21 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription } from "@kit/hooks";
+import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
-import { formatDate } from "@kit/lib/date-format";
-import type { ExpenseCategory, ExpenseRecurrence } from "@kit/types";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
+import type { ExpenseCategory, ExpenseRecurrence, SubscriptionProjection } from "@kit/types";
+import { EditableSubscriptionTimelineRow } from "../../subscriptions/timeline/subscription-timeline-editable";
+import { projectSubscription } from "@/lib/calculations/subscription-projections";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@kit/ui/table";
 
 interface SubscriptionDetailsContentProps {
   subscriptionId: string;
@@ -35,6 +45,38 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
   const { data: subscription, isLoading } = useSubscriptionById(subscriptionId);
   const updateSubscription = useUpdateSubscription();
   const deleteMutation = useDeleteSubscription();
+  
+  // Fetch stored subscription projection entries (for payment status)
+  const { data: storedProjections, refetch: refetchProjections } = useSubscriptionProjections(subscriptionId);
+  
+  // Calculate projections automatically based on subscription dates and recurrence
+  const calculatedProjections = subscription ? (() => {
+    const startDate = new Date(subscription.startDate);
+    const endDate = subscription.endDate ? new Date(subscription.endDate) : new Date(); // Today if no end date
+    
+    const startMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
+    const endMonth = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}`;
+    
+    return projectSubscription(subscription, startMonth, endMonth);
+  })() : [];
+  
+  // Merge calculated projections with stored entries (to get payment status)
+  const mergedProjections = calculatedProjections.map(calcProj => {
+    const stored = storedProjections?.find((p: any) => p.month === calcProj.month);
+    return {
+      ...calcProj,
+      // Add stored data if it exists
+      id: stored?.id,
+      isPaid: stored?.isPaid || false,
+      paidDate: stored?.paidDate,
+      actualAmount: stored?.actualAmount,
+      notes: stored?.notes,
+    };
+  });
+  
+  const handleTimelineUpdate = () => {
+    refetchProjections();
+  };
   
   const [formData, setFormData] = useState({
     name: "",
@@ -438,6 +480,87 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
             )}
           </CardContent>
         </Card>
+
+        {/* Timeline Card - Only show when not editing */}
+        {!isEditing && subscription && (
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>Subscription Timeline</CardTitle>
+                <CardDescription>
+                  Payment schedule from {formatDate(subscription.startDate)} to {subscription.endDate ? formatDate(subscription.endDate) : 'today'} ({recurrenceLabels[subscription.recurrence]})
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {mergedProjections.length === 0 ? (
+                <div className="text-center py-10">
+                  <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No payment schedule for this subscription</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-4 border rounded-lg">
+                      <div className="text-sm text-muted-foreground">Total Entries</div>
+                      <div className="text-2xl font-bold mt-1">{mergedProjections.length}</div>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="text-sm text-muted-foreground">Total Amount</div>
+                      <div className="text-2xl font-bold mt-1 text-primary">
+                        {formatCurrency(mergedProjections.reduce((sum, p) => sum + ((p as any).actualAmount || p.amount), 0))}
+                      </div>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="text-sm text-muted-foreground">Paid Entries</div>
+                      <div className="text-2xl font-bold mt-1 text-green-600">
+                        {mergedProjections.filter((p: any) => p.isPaid).length}
+                      </div>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="text-sm text-muted-foreground">Unpaid Entries</div>
+                      <div className="text-2xl font-bold mt-1 text-orange-600">
+                        {mergedProjections.filter((p: any) => !p.isPaid).length}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Timeline Table */}
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Month</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {mergedProjections.map((projection: any, index: number) => {
+                          // Use stored entry ID if available, otherwise use month + index for uniqueness
+                          const uniqueKey = projection.id 
+                            ? `stored-${projection.id}` 
+                            : `calc-${projection.month}-${projection.subscriptionId}-${index}`;
+                          
+                          return (
+                            <EditableSubscriptionTimelineRow
+                              key={uniqueKey}
+                              projection={projection}
+                              subscriptionId={subscription.id}
+                              onUpdate={handleTimelineUpdate}
+                            />
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </AppLayout>
   );

@@ -57,55 +57,80 @@ export async function POST(
     // Calculate projections
     const projections = projectSubscription(subscription, startMonth, endMonth);
 
-    // Delete existing projections for this subscription
-    await supabase
+    // Get existing projections to preserve payment data
+    const { data: existingProjections } = await supabase
       .from('subscription_projection_entries')
-      .delete()
-      .eq('subscription_id', id);
+      .select('*')
+      .eq('subscription_id', id)
+      .gte('month', startMonth)
+      .lte('month', endMonth);
 
-    // Insert new projections
-    const projectionData = projections.map(proj => ({
-      subscription_id: proj.subscriptionId,
-      month: proj.month,
-      amount: proj.amount,
-      is_projected: proj.isProjected,
-      is_paid: false,
-      paid_date: null,
-      actual_amount: null,
-      notes: null,
-    }));
+    const existingMap = new Map(
+      (existingProjections || []).map((p: any) => [p.month, p])
+    );
 
+    // Prepare projection data, preserving existing payment info
+    const projectionData = projections.map(proj => {
+      const existing = existingMap.get(proj.month);
+      return {
+        subscription_id: proj.subscriptionId,
+        month: proj.month,
+        amount: proj.amount,
+        is_projected: proj.isProjected,
+        // Preserve existing payment data if it exists
+        is_paid: existing?.is_paid || false,
+        paid_date: existing?.paid_date || null,
+        actual_amount: existing?.actual_amount || null,
+        notes: existing?.notes || null,
+      };
+    });
+
+    // Use upsert to handle conflicts (update amount/projected status, preserve payment data)
     const { data: insertedProjections, error: insertError } = await supabase
       .from('subscription_projection_entries')
-      .insert(projectionData)
+      .upsert(projectionData, {
+        onConflict: 'subscription_id,month',
+        ignoreDuplicates: false,
+      })
       .select();
 
     if (insertError) throw insertError;
 
-    // Create OUTPUT entries for each projection entry
+    // Create OUTPUT entries for each projection entry (only if they don't exist)
     if (insertedProjections && insertedProjections.length > 0) {
-      const entryData = insertedProjections.map((proj: any) => ({
-        direction: 'output',
-        entry_type: 'subscription_payment',
-        name: `${subscription.name} - ${proj.month}`,
-        amount: proj.amount,
-        description: `Subscription payment for ${proj.month}`,
-        category: subscription.category,
-        vendor: subscription.vendor,
-        entry_date: `${proj.month}-01`,
-        due_date: `${proj.month}-01`,
-        reference_id: parseInt(id),
-        schedule_entry_id: proj.id,
-        is_active: subscription.isActive,
-      }));
+      for (const proj of insertedProjections) {
+        // Check if entry already exists
+        const { data: existingEntry } = await supabase
+          .from('entries')
+          .select('id')
+          .eq('reference_id', parseInt(id))
+          .eq('schedule_entry_id', proj.id)
+          .eq('entry_type', 'subscription_payment')
+          .maybeSingle();
 
-      const { error: entryError } = await supabase
-        .from('entries')
-        .insert(entryData);
+        if (!existingEntry) {
+          const { error: entryError } = await supabase
+            .from('entries')
+            .insert({
+              direction: 'output',
+              entry_type: 'subscription_payment',
+              name: `${subscription.name} - ${proj.month}`,
+              amount: proj.amount,
+              description: `Subscription payment for ${proj.month}`,
+              category: subscription.category,
+              vendor: subscription.vendor,
+              entry_date: `${proj.month}-01`,
+              due_date: `${proj.month}-01`,
+              reference_id: parseInt(id),
+              schedule_entry_id: proj.id,
+              is_active: subscription.isActive,
+            });
 
-      if (entryError) {
-        console.error('Error creating entries for subscription projections:', entryError);
-        // Don't fail the projection creation if entry creation fails, but log it
+          if (entryError) {
+            console.error('Error creating entry for subscription projection:', entryError);
+            // Continue with other entries even if one fails
+          }
+        }
       }
     }
 

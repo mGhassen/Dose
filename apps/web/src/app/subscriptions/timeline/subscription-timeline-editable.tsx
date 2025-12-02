@@ -14,8 +14,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
-import { Plus, Trash2, MoreVertical } from "lucide-react";
-import { useCreateActualPayment, useDeleteActualPayment, useActualPayments } from "@kit/hooks";
+import { Plus, Trash2, MoreVertical, X } from "lucide-react";
+import { useUpdateSubscriptionProjectionEntry, useSubscriptionProjections, usePayments } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
@@ -31,49 +31,66 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
   
-  const { data: actualPayments } = useActualPayments({
-    paymentType: 'subscription',
-    direction: 'output', // Only get output payments for subscriptions
-    referenceId: subscriptionId.toString(),
-    month: projection.month,
-  });
+  // Fetch stored projection entries to get the entry ID and payment status
+  const { data: storedProjections } = useSubscriptionProjections(subscriptionId.toString());
+  const projectionEntry = storedProjections?.find((p: any) => p.month === projection.month);
   
-  const totalPaid = actualPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
-  const isFullyPaid = totalPaid >= projection.amount;
+  // Use the stored projection entry's payment status if available, otherwise use calculated projection
+  const isPaid = projectionEntry?.isPaid || false;
+  const paidAmount = projectionEntry?.actualAmount || projectionEntry?.amount || 0;
+  const totalPaid = isPaid ? paidAmount : 0;
+  const isFullyPaid = isPaid && totalPaid >= projection.amount;
   const remainingToPay = Math.max(0, projection.amount - totalPaid);
   
-  const createPayment = useCreateActualPayment();
-  const deletePayment = useDeleteActualPayment();
+  const updateProjectionEntry = useUpdateSubscriptionProjectionEntry();
 
-  const handleAddPayment = async (paidDate: string, amount: number, notes?: string) => {
+  const handleMarkAsPaid = async (paidDate: string, amount: number, notes?: string) => {
+    if (!projectionEntry?.id) {
+      toast.error("Projection entry not found. Please generate projections first.");
+      return;
+    }
+    
     try {
-      await createPayment.mutateAsync({
-        paymentType: 'subscription',
-        direction: 'output', // Subscription payments are output (money going out)
-        referenceId: typeof subscriptionId === 'number' ? subscriptionId : projection.subscriptionId,
-        month: projection.month,
-        paymentDate: paidDate,
-        amount: amount,
-        isPaid: true,
-        paidDate: paidDate,
-        notes: notes,
+      await updateProjectionEntry.mutateAsync({
+        subscriptionId: subscriptionId.toString(),
+        entryId: projectionEntry.id.toString(),
+        data: {
+          isPaid: true,
+          paidDate: paidDate,
+          actualAmount: amount,
+          notes: notes,
+        },
       });
       
       setIsPaidDialogOpen(false);
       onUpdate();
-      toast.success("Output payment recorded");
+      toast.success("Payment recorded and expense created");
     } catch (error: any) {
       toast.error(error?.message || "Failed to record payment");
     }
   };
 
-  const handleDeletePayment = async (paymentId: number) => {
+  const handleMarkAsUnpaid = async () => {
+    if (!projectionEntry?.id) {
+      toast.error("Projection entry not found");
+      return;
+    }
+    
     try {
-      await deletePayment.mutateAsync(String(paymentId));
+      await updateProjectionEntry.mutateAsync({
+        subscriptionId: subscriptionId.toString(),
+        entryId: projectionEntry.id.toString(),
+        data: {
+          isPaid: false,
+          paidDate: null,
+          actualAmount: null,
+        },
+      });
+      
       onUpdate();
-      toast.success("Payment deleted");
+      toast.success("Payment status updated");
     } catch (error: any) {
-      toast.error(error?.message || "Failed to delete payment");
+      toast.error(error?.message || "Failed to update payment status");
     }
   };
 
@@ -120,15 +137,22 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsPaidDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Record Output Payment
-              </DropdownMenuItem>
-              {actualPayments && actualPayments.length > 0 && (
+              {!isPaid ? (
+                <DropdownMenuItem onClick={() => setIsPaidDialogOpen(true)} disabled={!projectionEntry?.id}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Mark as Paid
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={handleMarkAsUnpaid}>
+                  <X className="mr-2 h-4 w-4" />
+                  Mark as Unpaid
+                </DropdownMenuItem>
+              )}
+              {projectionEntry?.paidDate && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setShowPayments(!showPayments)}>
-                    {showPayments ? 'Hide' : 'Show'} Payments ({actualPayments.length})
+                    {showPayments ? 'Hide' : 'Show'} Payment Details
                   </DropdownMenuItem>
                 </>
               )}
@@ -137,30 +161,21 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
         </TableCell>
       </TableRow>
       
-      {/* Show partial payments */}
-      {showPayments && actualPayments && actualPayments.length > 0 && (
+      {/* Show payment details */}
+      {showPayments && projectionEntry && isPaid && (
         <TableRow>
           <TableCell colSpan={4} className="bg-muted/30 p-4">
             <div className="space-y-2 py-2">
-              <div className="text-sm font-medium">Output Payments Recorded:</div>
-              {actualPayments.map((payment) => (
-                <div key={payment.id} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-2">
-                    <span>{formatDate(payment.paymentDate)}</span>
-                    <span className="font-semibold">{formatCurrency(payment.amount)}</span>
-                    {payment.notes && (
-                      <span className="text-muted-foreground">- {payment.notes}</span>
-                    )}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleDeletePayment(payment.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+              <div className="text-sm font-medium">Payment Details:</div>
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center space-x-2">
+                  <span>Paid Date: {projectionEntry.paidDate ? formatDate(projectionEntry.paidDate) : 'N/A'}</span>
+                  <span className="font-semibold">Amount: {formatCurrency(projectionEntry.actualAmount || projectionEntry.amount)}</span>
+                  {projectionEntry.notes && (
+                    <span className="text-muted-foreground">- {projectionEntry.notes}</span>
+                  )}
                 </div>
-              ))}
+              </div>
             </div>
           </TableCell>
         </TableRow>
@@ -220,15 +235,15 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                 const dateInput = document.getElementById('paidDate') as HTMLInputElement;
                 const amountInput = document.getElementById('paymentAmount') as HTMLInputElement;
                 const notesInput = document.getElementById('paymentNotes') as HTMLInputElement;
-                handleAddPayment(
+                handleMarkAsPaid(
                   dateInput?.value || new Date().toISOString().split('T')[0],
                   parseFloat(amountInput?.value || '0'),
                   notesInput?.value || undefined
                 );
               }}
-              disabled={createPayment.isPending}
+              disabled={updateProjectionEntry.isPending || !projectionEntry?.id}
             >
-              Add Payment
+              Mark as Paid
             </Button>
           </DialogFooter>
         </DialogContent>
