@@ -40,7 +40,8 @@ function transformToSnakeCase(data: Partial<MetadataEnum>): any {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    const supabase = createServerSupabaseClient(authHeader);
     
     // Get all metadata enums
     const { data: enums, error: enumsError } = await supabase
@@ -88,7 +89,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    const supabase = createServerSupabaseClient(authHeader);
     const { data, error } = await supabase
       .from('metadata_enums')
       .insert({

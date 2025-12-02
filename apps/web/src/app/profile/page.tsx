@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { useAuth } from "@kit/hooks";
-import { useProfileByUserId } from "@kit/hooks";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Badge } from "@kit/ui/badge";
@@ -38,13 +37,27 @@ export default function ProfilePage() {
   const { formatDate } = useDateFormat();
   const [isEditOpen, setIsEditOpen] = useState(false);
   
-  // Convert user.id (string) to number for the hook
-  const userId = user?.id ? parseInt(user.id, 10) : undefined;
-  
-  // Fetch profile data using React Query hook
-  const { data: profileData, isLoading: profileLoading, error: profileError } = useProfileByUserId(
-    userId || 0
-  );
+  // Profile data is the same as user data for now
+  const profileData = user ? {
+    id: user.id,
+    email: user.email || user.profileEmail,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    phone: user.phone,
+    address: undefined,
+    department: undefined,
+    employeeId: undefined,
+    hireDate: undefined,
+    emergencyContact: undefined,
+    bio: undefined,
+    skills: undefined,
+    languages: undefined,
+    certifications: undefined,
+    position: user.profession,
+    avatar: undefined,
+    createdAt: undefined,
+    updatedAt: undefined,
+  } : null;
   
   // Calculate statistics from profile data
   const statistics = useMemo(() => {
@@ -66,7 +79,7 @@ export default function ProfilePage() {
     };
   }, [profileData]);
 
-  if (authLoading || (userId && profileLoading)) {
+  if (authLoading) {
     return (
       <AppLayout>
         <div className="container py-6">
@@ -196,19 +209,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Profile Data Status */}
-        {profileError && (
-          <Card className="mb-6 border-amber-500">
-            <CardContent className="py-4">
-              <div className="flex items-center space-x-2 text-amber-600">
-                <AlertCircle className="h-4 w-4" />
-                <p className="text-sm">
-                  Extended profile information not available. Showing basic user information.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Statistics Overview */}
         {statistics && (

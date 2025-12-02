@@ -14,7 +14,22 @@ export const supabase = typeof window !== 'undefined'
   : null;
 
 // Server-side Supabase client (for API routes)
-export function createServerSupabaseClient() {
+// Optionally accepts auth header for RLS policies
+export function createServerSupabaseClient(authHeader?: string | null) {
+  if (authHeader) {
+    return createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader
+        }
+      },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      }
+    });
+  }
   return createClient(supabaseUrl, supabaseAnonKey);
 }
 

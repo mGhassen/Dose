@@ -29,11 +29,11 @@ function transformToSnakeCase(data: Partial<MetadataEnumValue>): any {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ enumId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { enumId } = await params;
-    const enumIdNum = parseInt(enumId, 10);
+    const { id } = await params;
+    const enumIdNum = parseInt(id, 10);
 
     if (isNaN(enumIdNum)) {
       return NextResponse.json(
@@ -42,7 +42,8 @@ export async function GET(
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    const supabase = createServerSupabaseClient(authHeader);
     
     const { data, error } = await supabase
       .from('metadata_enum_values')
@@ -67,11 +68,11 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ enumId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { enumId } = await params;
-    const enumIdNum = parseInt(enumId, 10);
+    const { id } = await params;
+    const enumIdNum = parseInt(id, 10);
 
     if (isNaN(enumIdNum)) {
       return NextResponse.json(
@@ -88,7 +89,8 @@ export async function POST(
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    const supabase = createServerSupabaseClient(authHeader);
     const { data, error } = await supabase
       .from('metadata_enum_values')
       .insert({

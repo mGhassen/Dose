@@ -29,7 +29,7 @@ function transformToSnakeCase(data: Partial<MetadataEnumValue>): any {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ enumId: string; valueId: string }> }
+  { params }: { params: Promise<{ id: string; valueId: string }> }
 ) {
   try {
     const { valueId } = await params;
@@ -43,7 +43,8 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    const supabase = createServerSupabaseClient(authHeader);
     
     const { data, error } = await supabase
       .from('metadata_enum_values')
@@ -66,7 +67,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ enumId: string; valueId: string }> }
+  { params }: { params: Promise<{ id: string; valueId: string }> }
 ) {
   try {
     const { valueId } = await params;
@@ -79,7 +80,8 @@ export async function DELETE(
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    const supabase = createServerSupabaseClient(authHeader);
     
     // Soft delete by setting is_active to false
     const { error } = await supabase

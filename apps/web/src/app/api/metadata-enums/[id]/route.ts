@@ -44,8 +44,10 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
-    
+    const authHeader = request.headers.get('authorization');
+    const supabase = createServerSupabaseClient(authHeader);
+
+    // First try to get the enum (including inactive ones)
     const { data, error } = await supabase
       .from('metadata_enums')
       .select('*')
@@ -84,7 +86,8 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    const supabase = createServerSupabaseClient(authHeader);
     const { data, error } = await supabase
       .from('metadata_enums')
       .update(transformToSnakeCase(body))
@@ -122,17 +125,18 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    const supabase = createServerSupabaseClient(authHeader);
     
     // Soft delete by setting is_active to false
     const { error } = await supabase
       .from('metadata_enums')
-      .update({ is_active: false })
+      .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id);
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    return NextResponse.json({}, { status: 204 });
   } catch (error: any) {
     console.error('Error deleting metadata enum:', error);
     return NextResponse.json(
@@ -141,4 +145,3 @@ export async function DELETE(
     );
   }
 }
-
