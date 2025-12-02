@@ -48,7 +48,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
   
   // Fetch stored projection entries to get the entry ID and payment status
   const { data: storedProjections } = useSubscriptionProjections(subscriptionId.toString());
-  const projectionEntry = storedProjections?.find((p: any) => p.month === projection.month);
+  const projectionEntry: any = storedProjections?.find((p: any) => p.month === projection.month);
   
   // Fetch the entry ID for this projection entry
   useEffect(() => {
@@ -127,7 +127,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
       
       if (!projectionEntry?.id) {
         // Create projection entry first
-        const projectionResult = await createOrUpdateProjectionEntry.mutateAsync({
+        const projectionResult: any = await createOrUpdateProjectionEntry.mutateAsync({
           subscriptionId: subscriptionId.toString(),
           data: {
             month: projection.month,
@@ -140,12 +140,21 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
           },
         });
         
-        // Fetch entry ID after creating projection
-        const response = await fetch(`/api/entries?referenceId=${subscriptionId}&scheduleEntryId=${projectionResult.id}&entryType=subscription_payment`);
-        const data = await response.json();
-        if (data?.data && data.data.length > 0) {
-          currentEntryId = data.data[0].id.toString();
-          setEntryId(currentEntryId);
+        // Fetch entry ID after creating projection (with retry in case of timing issues)
+        let retries = 3;
+        while (!currentEntryId && retries > 0) {
+          const response = await fetch(`/api/entries?referenceId=${subscriptionId}&scheduleEntryId=${projectionResult.id}&entryType=subscription_payment`);
+          const data = await response.json();
+          if (data?.data && data.data.length > 0) {
+            currentEntryId = data.data[0].id.toString();
+            setEntryId(currentEntryId);
+            break;
+          }
+          retries--;
+          if (retries > 0) {
+            // Wait a bit before retrying
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
         }
       } else if (!currentEntryId) {
         // Fetch entry ID if we don't have it
@@ -169,7 +178,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
         amount: amount,
         isPaid: true,
         paidDate: paidDate,
-        notes: notes || null,
+        notes: notes || undefined,
       });
       
       // Update projection entry to reflect payment status (without creating duplicate payment)
@@ -177,16 +186,25 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
       const isNowFullyPaid = newTotalPaid >= projection.amount;
       
       if (projectionEntry?.id) {
-        // Update projection entry status without paidDate to avoid creating duplicate payment in API
+        // Update projection entry status
+        // Only set isPaid to true when fully paid, never set to false (that would delete all payments)
+        const updateData: any = {
+          actualAmount: newTotalPaid,
+          notes: notes || projectionEntry.notes,
+        };
+        
+        // Only update isPaid if it changes to fully paid
+        // Never set isPaid to false when adding a partial payment - that would delete all payments
+        const storedEntry: any = storedProjections?.find((p: any) => p.month === projection.month);
+        if (isNowFullyPaid && storedEntry && !storedEntry.isPaid) {
+          updateData.isPaid = true;
+          updateData.paidDate = paidDate;
+        }
+        
         await updateProjectionEntry.mutateAsync({
           subscriptionId: subscriptionId.toString(),
           entryId: projectionEntry.id.toString(),
-          data: {
-            isPaid: isNowFullyPaid,
-            // Don't pass paidDate - we're managing payments separately
-            actualAmount: newTotalPaid,
-            notes: notes || projectionEntry.notes,
-          },
+          data: updateData,
         });
       }
       
@@ -228,16 +246,29 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
       const newTotalPaid = totalPaid - payment.amount;
       const isNowFullyPaid = newTotalPaid >= projection.amount;
       
-      // Update projection entry status
+      // Update projection entry status - only update actualAmount, don't change isPaid
+      // Changing isPaid to false would trigger the API to delete all payments
+      // We only update actualAmount to reflect the new total
       if (projectionEntry?.id) {
+        const updateData: any = {
+          actualAmount: newTotalPaid > 0 ? newTotalPaid : null,
+        };
+        
+        // Only update isPaid if it changes to fully paid
+        // Never set isPaid to false when deleting a payment - that would delete all payments
+        const storedEntry: any = storedProjections?.find((p: any) => p.month === projection.month);
+        if (isNowFullyPaid && storedEntry && !storedEntry.isPaid) {
+          updateData.isPaid = true;
+          const remainingPayments = payments.filter(p => p.id !== paymentToDelete);
+          if (remainingPayments.length > 0) {
+            updateData.paidDate = remainingPayments[0]?.paidDate;
+          }
+        }
+        
         await updateProjectionEntry.mutateAsync({
           subscriptionId: subscriptionId.toString(),
           entryId: projectionEntry.id.toString(),
-          data: {
-            isPaid: isNowFullyPaid,
-            paidDate: isNowFullyPaid && payments.length > 1 ? payments.find(p => p.id !== paymentToDelete)?.paidDate : null,
-            actualAmount: newTotalPaid > 0 ? newTotalPaid : null,
-          },
+          data: updateData,
         });
       }
       

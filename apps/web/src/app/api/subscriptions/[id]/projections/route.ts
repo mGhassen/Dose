@@ -126,17 +126,26 @@ export async function POST(
       if (error) throw error;
       projectionEntry = data;
       
-      // Create corresponding entry if payment is marked as paid
-      if (body.isPaid && body.paidDate) {
-        const { data: subscriptionData } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('id', parseInt(id))
-          .single();
+      // Always create the entry for the projection (needed for payments, even partial ones)
+      const { data: subscriptionData } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('id', parseInt(id))
+        .single();
 
-        if (subscriptionData) {
+      if (subscriptionData) {
+        // Check if entry already exists
+        const { data: existingEntry } = await supabase
+          .from('entries')
+          .select('id')
+          .eq('reference_id', parseInt(id))
+          .eq('schedule_entry_id', projectionEntry.id)
+          .eq('entry_type', 'subscription_payment')
+          .maybeSingle();
+
+        if (!existingEntry) {
           // Create OUTPUT entry
-          const { data: entryData } = await supabase
+          const { data: entryData, error: entryError } = await supabase
             .from('entries')
             .insert({
               direction: 'output',
@@ -155,7 +164,13 @@ export async function POST(
             .select()
             .single();
 
-          if (entryData) {
+          if (entryError) {
+            console.error('Error creating entry for subscription projection:', entryError);
+            // Continue even if entry creation fails
+          }
+
+          // If payment is marked as paid, create payment and expense
+          if (entryData && body.isPaid && body.paidDate) {
             // Create payment
             await supabase
               .from('payments')
