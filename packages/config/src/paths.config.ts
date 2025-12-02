@@ -147,14 +147,14 @@ export const pathsConfig: NavigationConfig = {
       translationKey: "analytics",
       items: [
         {
-          title: "expenses-analytics",
-          url: "/analytics/expenses",
-          translationKey: "expensesAnalytics"
-        },
-        {
           title: "sales-analytics",
           url: "/analytics/sales",
           translationKey: "salesAnalytics"
+        },
+        {
+          title: "expenses-analytics",
+          url: "/analytics/expenses",
+          translationKey: "expensesAnalytics"
         },
         {
           title: "personnel-analytics",
