@@ -11,12 +11,13 @@ import type {
 } from '@kit/types';
 
 export const expensesApi = {
-  getAll: (params?: PaginationParams & { category?: string; month?: string }) => {
+  getAll: (params?: PaginationParams & { category?: string; month?: string; year?: string }) => {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.category) searchParams.append('category', params.category);
     if (params?.month) searchParams.append('month', params.month);
+    if (params?.year) searchParams.append('year', params.year);
     const query = searchParams.toString();
     return apiRequest<PaginatedResponse<Expense>>('GET', `/api/expenses${query ? `?${query}` : ''}`);
   },

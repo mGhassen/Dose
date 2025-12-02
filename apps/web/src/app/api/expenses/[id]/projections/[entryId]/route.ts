@@ -95,6 +95,49 @@ export async function PUT(
                 notes: body.notes || null,
               });
           }
+
+          // Create an expense entry when expense projection payment is marked as paid
+          // (This is for one-time expenses with projections, not subscriptions)
+          const { data: expenseData } = await supabase
+            .from('expenses')
+            .select('*')
+            .eq('id', parseInt(id))
+            .single();
+
+          if (expenseData && !expenseData.subscription_id) {
+            // Only create expense if it doesn't already exist for this projection
+            const { data: existingExpense } = await supabase
+              .from('expenses')
+              .select('id')
+              .eq('subscription_id', null)
+              .eq('expense_date', body.paidDate)
+              .ilike('name', `%${expenseData.name}%`)
+              .maybeSingle();
+
+            if (!existingExpense) {
+              const newExpenseData = {
+                name: `${expenseData.name} - ${data.month}`,
+                category: expenseData.category,
+                amount: body.actualAmount || parseFloat(existingEntry.amount),
+                subscription_id: null, // One-time expense, not linked to subscription
+                expense_date: body.paidDate || data.month + '-01',
+                description: body.notes || `Payment for expense: ${expenseData.name} - ${data.month}`,
+                vendor: expenseData.vendor || null,
+                recurrence: 'one_time',
+                start_date: body.paidDate || data.month + '-01',
+                is_active: true,
+              };
+
+              const { error: expenseError } = await supabase
+                .from('expenses')
+                .insert(newExpenseData);
+
+              if (expenseError) {
+                console.error('Error creating expense for expense projection payment:', expenseError);
+                // Don't fail the update if expense creation fails
+              }
+            }
+          }
         }
       }
     }

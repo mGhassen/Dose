@@ -79,11 +79,10 @@ export async function PUT(
         .eq('reference_id', parseInt(id))
         .eq('schedule_entry_id', parseInt(entryId))
         .eq('entry_type', 'subscription_payment')
-        .single();
+        .maybeSingle();
 
       if (!entryError && entryData) {
         // Update the entry's payment status
-        const entryUpdate: any = {};
         if (body.isPaid !== undefined) {
           // Find or create payment for this entry
           if (body.isPaid && body.paidDate) {
@@ -106,6 +105,40 @@ export async function PUT(
                   notes: body.notes || null,
                 });
             }
+
+            // Create an expense entry when subscription payment is marked as paid
+            const { data: subscriptionData } = await supabase
+              .from('subscriptions')
+              .select('*')
+              .eq('id', parseInt(id))
+              .single();
+
+            if (subscriptionData) {
+              const expenseData = {
+                name: `${subscriptionData.name} - ${data.month}`,
+                category: subscriptionData.category,
+                amount: body.actualAmount || parseFloat(existingEntry.amount),
+                subscription_id: parseInt(id),
+                expense_date: body.paidDate || data.month + '-01',
+                description: body.notes || `Payment for subscription: ${subscriptionData.name} - ${data.month}`,
+                vendor: subscriptionData.vendor || null,
+                recurrence: 'one_time', // Expenses are always one-time
+                start_date: body.paidDate || data.month + '-01',
+                is_active: true,
+              };
+
+              const { error: expenseError } = await supabase
+                .from('expenses')
+                .insert(expenseData);
+
+              if (expenseError) {
+                console.error('Error creating expense for subscription payment:', expenseError);
+                // Don't fail the update if expense creation fails
+              }
+            }
+          } else if (!body.isPaid) {
+            // If payment is marked as unpaid, we could optionally delete the expense
+            // But for now, we'll leave it - the user might want to keep the record
           }
         }
       }

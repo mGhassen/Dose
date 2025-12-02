@@ -11,7 +11,7 @@ import type {
   ExpenseProjectionSummary
 } from '@kit/types';
 
-export function useExpenses(params?: { page?: number; limit?: number; category?: string; month?: string }) {
+export function useExpenses(params?: { page?: number; limit?: number; category?: string; month?: string; year?: string }) {
   return useQuery({
     queryKey: ['expenses', params],
     queryFn: async () => {

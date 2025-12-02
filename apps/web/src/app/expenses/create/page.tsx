@@ -11,21 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateExpense, useSubscriptions } from "@kit/hooks";
+import { useCreateExpense } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseCategory } from "@kit/types";
-import { UnifiedSelector } from "@/components/unified-selector";
 
 export default function CreateExpensePage() {
   const router = useRouter();
   const createExpense = useCreateExpense();
-  const { data: subscriptionsResponse } = useSubscriptions();
-  const subscriptions = subscriptionsResponse?.data || [];
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
     amount: "",
-    subscriptionId: "",
     expenseDate: new Date().toISOString().split('T')[0],
     description: "",
     vendor: "",
@@ -44,7 +40,6 @@ export default function CreateExpensePage() {
         name: formData.name,
         category: formData.category as ExpenseCategory,
         amount: parseFloat(formData.amount),
-        subscriptionId: formData.subscriptionId ? parseInt(formData.subscriptionId) : undefined,
         expenseDate: formData.expenseDate,
         description: formData.description || undefined,
         vendor: formData.vendor || undefined,
@@ -124,33 +119,6 @@ export default function CreateExpensePage() {
                     placeholder="0.00"
                     required
                   />
-                </div>
-
-                {/* Subscription (Optional) */}
-                <div className="space-y-2">
-                  <UnifiedSelector
-                    mode="single"
-                    type="subscription"
-                    items={subscriptions.map(sub => ({
-                      id: sub.id,
-                      name: sub.name,
-                      description: sub.description,
-                    }))}
-                    selectedId={formData.subscriptionId ? parseInt(formData.subscriptionId) : undefined}
-                    onSelect={(item) => {
-                      handleInputChange('subscriptionId', item.id === 0 ? '' : item.id.toString());
-                    }}
-                    placeholder="Select subscription (optional)"
-                    searchPlaceholder="Search subscriptions..."
-                    label="Subscription (Optional)"
-                    manageLink={{
-                      href: '/subscriptions',
-                      text: 'Manage'
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Link this expense to a subscription payment
-                  </p>
                 </div>
 
                 {/* Expense Date */}

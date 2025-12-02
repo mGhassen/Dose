@@ -31,6 +31,9 @@ function transformToSnakeCase(data: CreateExpenseData): any {
     description: data.description,
     vendor: data.vendor,
     expense_date: data.expenseDate,
+    recurrence: 'one_time', // Expenses are always one-time
+    start_date: data.expenseDate, // Required field, use expense_date
+    is_active: true,
   };
 }
 
@@ -39,6 +42,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const month = searchParams.get('month');
+    const year = searchParams.get('year');
     const { page, limit, offset } = getPaginationParams(searchParams);
 
     const supabase = createServerSupabaseClient();
@@ -55,6 +59,18 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     // Apply filters
+    if (year) {
+      const startDate = `${year}-01-01`;
+      const endDate = `${year}-12-31`;
+      
+      query = query
+        .gte('expense_date', startDate)
+        .lte('expense_date', endDate);
+      countQuery = countQuery
+        .gte('expense_date', startDate)
+        .lte('expense_date', endDate);
+    }
+
     if (category) {
       query = query.eq('category', category);
       countQuery = countQuery.eq('category', category);

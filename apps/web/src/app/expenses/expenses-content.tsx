@@ -22,24 +22,16 @@ export default function ExpensesContent() {
   
   const { data: expensesResponse, isLoading } = useExpenses({ 
     page, 
-    limit: 1000 // Fetch all for year filtering, then paginate client-side
+    limit: pageSize,
+    year: selectedYear // Filter by year on server side
   });
   
   const { data: subscriptionsResponse } = useSubscriptions();
   const subscriptions = subscriptionsResponse?.data || [];
   
-  // Filter by year and paginate client-side
-  const filteredExpenses = useMemo(() => {
-    if (!expensesResponse?.data) return [];
-    return expensesResponse.data.filter(exp => exp.expenseDate.startsWith(selectedYear));
-  }, [expensesResponse?.data, selectedYear]);
-  
-  const paginatedExpenses = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    return filteredExpenses.slice(startIndex, startIndex + pageSize);
-  }, [filteredExpenses, page, pageSize]);
-  
-  const totalPages = Math.ceil(filteredExpenses.length / pageSize);
+  const expenses = expensesResponse?.data || [];
+  const totalCount = expensesResponse?.pagination?.total || 0;
+  const totalPages = expensesResponse?.pagination?.totalPages || 0;
   const deleteMutation = useDeleteExpense();
   
   // Create a map of subscription IDs to names for display
@@ -51,11 +43,11 @@ export default function ExpensesContent() {
     return map;
   }, [subscriptions]);
   
-  // Calculate summary stats from filtered expenses
+  // Calculate summary stats from expenses
   const totalExpenses = useMemo(() => {
-    if (!filteredExpenses || !Array.isArray(filteredExpenses)) return 0;
-    return filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-  }, [filteredExpenses]);
+    if (!expenses || !Array.isArray(expenses)) return 0;
+    return expenses.reduce((sum, exp) => sum + exp.amount, 0);
+  }, [expenses]);
 
   const columns: ColumnDef<Expense>[] = useMemo(() => [
     {
@@ -209,7 +201,7 @@ export default function ExpensesContent() {
             <Receipt className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{filteredExpenses.length}</div>
+            <div className="text-2xl font-bold">{totalCount}</div>
             <p className="text-xs text-muted-foreground">
               Total expenses for {selectedYear}
             </p>
@@ -236,8 +228,8 @@ export default function ExpensesContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {filteredExpenses.length > 0 
-                ? formatCurrency(totalExpenses / filteredExpenses.length)
+              {expenses.length > 0 
+                ? formatCurrency(totalExpenses / expenses.length)
                 : formatCurrency(0)}
             </div>
             <p className="text-xs text-muted-foreground">Average amount</p>
@@ -251,7 +243,7 @@ export default function ExpensesContent() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {new Set(filteredExpenses.map(e => e.category)).size}
+              {new Set(expenses.map(e => e.category)).size}
             </div>
             <p className="text-xs text-muted-foreground">Unique categories</p>
           </CardContent>
@@ -264,7 +256,7 @@ export default function ExpensesContent() {
               title=""
               description=""
               createHref="/expenses/create"
-              data={paginatedExpenses}
+              data={expenses}
               columns={columns}
               loading={isLoading}
               onRowClick={(expense) => router.push(`/expenses/${expense.id}`)}
@@ -286,7 +278,7 @@ export default function ExpensesContent() {
               pagination={{
                 page,
                 pageSize,
-                totalCount: filteredExpenses.length,
+                totalCount,
                 totalPages,
                 onPageChange: setPage,
                 onPageSizeChange: (newSize) => {
