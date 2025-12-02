@@ -27,15 +27,33 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServerSupabaseClient();
 
-    // Fetch all sales for the year
-    const { data, error } = await supabase
-      .from('sales')
-      .select('*')
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: true });
+    // Fetch all sales for the year (with pagination to get all records)
+    let allSales: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (error) throw error;
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('sales')
+        .select('*')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        allSales = allSales.concat(data);
+        hasMore = data.length === pageSize;
+        page++;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    const data = allSales;
 
     const sales = (data || []).map(transformSale);
 
