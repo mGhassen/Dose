@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@kit/hooks";
 import AdminLayout from "@/components/admin-layout";
 import ManagerLayout from "@/components/manager-layout";
@@ -10,7 +12,18 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
+  const router = useRouter();
   const { user, isLoading } = useAuth();
+
+  // If no user is authenticated, redirect to login with returnTo parameter
+  useEffect(() => {
+    if (!isLoading && !user) {
+      const returnUrl = typeof window !== 'undefined' 
+        ? window.location.pathname + window.location.search 
+        : '/dashboard';
+      router.push(`/auth/login?returnTo=${encodeURIComponent(returnUrl)}`);
+    }
+  }, [user, isLoading, router]);
 
   // Show loading state while authentication is being checked
   if (isLoading) {
@@ -21,7 +34,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
     );
   }
 
-  // If no user is authenticated, redirect to login (handled by auth system)
   if (!user) {
     return null;
   }

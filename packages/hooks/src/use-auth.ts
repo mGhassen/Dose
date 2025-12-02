@@ -95,6 +95,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [user, isLoading]);
 
+  // Redirect to login when user becomes null (after auth check completes)
+  useEffect(() => {
+    if (!isLoading && !user && authCheckComplete) {
+      const currentPath = window.location.pathname;
+      // Don't redirect if already on login page or auth pages
+      if (!currentPath.startsWith('/auth/')) {
+        const returnUrl = window.location.pathname + window.location.search;
+        router.push(`/auth/login?returnTo=${encodeURIComponent(returnUrl)}`);
+      }
+    }
+  }, [user, isLoading, authCheckComplete, router]);
+
   // Fetch user session - optimized to only refresh when token is actually expired
   const fetchSession = async (token: string) => {
     try {
@@ -147,7 +159,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
             delete window.__authToken;
           }
           setUser(null);
-          router.push('/auth/login');
+          // Preserve current URL for redirect after login
+          const returnUrl = typeof window !== 'undefined' 
+            ? window.location.pathname + window.location.search 
+            : '/dashboard';
+          router.push(`/auth/login?returnTo=${encodeURIComponent(returnUrl)}`);
           setAuthError('Authentication failed. Please log in again.');
           return null;
         }
@@ -205,7 +221,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
                   delete window.__authToken;
                 }
                 setUser(null);
-                router.push('/auth/login');
+                // Preserve current URL for redirect after login
+                const returnUrl = typeof window !== 'undefined' 
+                  ? window.location.pathname + window.location.search 
+                  : '/dashboard';
+                router.push(`/auth/login?returnTo=${encodeURIComponent(returnUrl)}`);
                 setAuthError('Your session has expired. Please log in again.');
                 return null;
               }
@@ -226,7 +246,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
             delete window.__authToken;
           }
           setUser(null);
-          router.push('/auth/login');
+          // Preserve current URL for redirect after login
+          const returnUrl = typeof window !== 'undefined' 
+            ? window.location.pathname + window.location.search 
+            : '/dashboard';
+          router.push(`/auth/login?returnTo=${encodeURIComponent(returnUrl)}`);
           setAuthError('Your session has expired. Please log in again.');
           return null;
         }
@@ -404,7 +428,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       // Only redirect if we're on the root page or login page
       if (currentPath === '/' || currentPath === '/auth/login') {
-        // Check accessible portals to determine where to redirect
+        // Check for returnTo parameter first
+        const urlParams = new URLSearchParams(window.location.search);
+        const returnTo = urlParams.get('returnTo');
+        
+        if (returnTo) {
+          // Redirect to the original page
+          router.push(decodeURIComponent(returnTo));
+          return;
+        }
+        
+        // Otherwise, check accessible portals to determine where to redirect
         if (user.accessiblePortals?.includes('admin')) {
           router.push('/dashboard');
         } else if (user.accessiblePortals?.includes('manager')) {
