@@ -14,12 +14,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
-import { Plus, Trash2, MoreVertical, X, Calendar } from "lucide-react";
+import { Plus, Trash2, MoreVertical, Calendar } from "lucide-react";
 import { useUpdateSubscriptionProjectionEntry, useCreateOrUpdateSubscriptionProjectionEntry, useSubscriptionProjections, usePaymentsByEntry, useCreatePayment, useDeletePayment } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 import type { SubscriptionProjection } from "@kit/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,12 +40,12 @@ interface EditableSubscriptionTimelineRowProps {
 
 export function EditableSubscriptionTimelineRow({ projection, subscriptionId, onUpdate }: EditableSubscriptionTimelineRowProps) {
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
-  const [isUnpaidDialogOpen, setIsUnpaidDialogOpen] = useState(false);
   const [isDeletePaymentDialogOpen, setIsDeletePaymentDialogOpen] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [showPayments, setShowPayments] = useState(false);
   const [entryId, setEntryId] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
   
   // Fetch stored projection entries to get the entry ID and payment status
   const { data: storedProjections } = useSubscriptionProjections(subscriptionId.toString());
@@ -120,7 +121,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
     }
   };
 
-  const handleAddPayment = async (paidDate: string, amount: number, notes?: string) => {
+  const handleAddPayment = async (paidDate: string, amount: number, paymentMethod?: string, notes?: string) => {
     try {
       // First ensure we have a projection entry and entry
       let currentEntryId = entryId;
@@ -178,6 +179,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
         amount: amount,
         isPaid: true,
         paidDate: paidDate,
+        paymentMethod: paymentMethod || undefined,
         notes: notes || undefined,
       });
       
@@ -283,31 +285,6 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
     }
   };
 
-  const handleMarkAsUnpaid = async () => {
-    if (!projectionEntry?.id) {
-      toast.error("Projection entry not found");
-      return;
-    }
-    
-    setIsUnpaidDialogOpen(false);
-    
-    try {
-      await updateProjectionEntry.mutateAsync({
-        subscriptionId: subscriptionId.toString(),
-        entryId: projectionEntry.id.toString(),
-        data: {
-          isPaid: false,
-          paidDate: null,
-          actualAmount: null,
-        },
-      });
-      
-      onUpdate();
-      toast.success("Payment marked as unpaid and expense deleted");
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to update payment status");
-    }
-  };
 
   const [year, month] = projection.month.split('-');
   const date = new Date(parseInt(year), parseInt(month) - 1, 1);
@@ -351,12 +328,6 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                 <DropdownMenuItem onClick={() => setIsPaidDialogOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   {hasPartialPayment ? 'Add Payment' : 'Mark as Paid'}
-                </DropdownMenuItem>
-              )}
-              {isFullyPaid && (
-                <DropdownMenuItem onClick={() => setIsUnpaidDialogOpen(true)} disabled={!projectionEntry?.id}>
-                  <X className="mr-2 h-4 w-4" />
-                  Mark as Unpaid
                 </DropdownMenuItem>
               )}
               {payments.length > 0 && (
@@ -424,6 +395,11 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                           <span className="text-sm text-muted-foreground">
                             on {formatDate(payment.paymentDate)}
                           </span>
+                          {payment.paymentMethod && (
+                            <span className="text-sm text-muted-foreground">
+                              ({payment.paymentMethod.replace('_', ' ')})
+                            </span>
+                          )}
                           {payment.notes && (
                             <span className="text-sm text-muted-foreground">- {payment.notes}</span>
                           )}
@@ -470,6 +446,19 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                   </p>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="paymentMethod">Payment Method</Label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger id="paymentMethod">
+                      <SelectValue placeholder="Select payment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="paymentNotes">Notes (optional)</Label>
                   <Input
                     id="paymentNotes"
@@ -508,6 +497,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                   handleAddPayment(
                     dateInput?.value || new Date().toISOString().split('T')[0],
                     amount,
+                    paymentMethod || undefined,
                     notesInput?.value || undefined
                   );
                 }}
@@ -519,26 +509,6 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      <AlertDialog open={isUnpaidDialogOpen} onOpenChange={setIsUnpaidDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Mark Payment as Unpaid</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to mark this payment as unpaid? This will delete the associated expense and payment records.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleMarkAsUnpaid}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Mark as Unpaid
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       
       <AlertDialog open={isDeletePaymentDialogOpen} onOpenChange={(open) => {
         setIsDeletePaymentDialogOpen(open);
