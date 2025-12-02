@@ -129,6 +129,27 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    // Create an OUTPUT entry for the expense
+    const { error: entryError } = await supabase
+      .from('entries')
+      .insert({
+        direction: 'output',
+        entry_type: 'expense',
+        name: body.name,
+        amount: body.amount,
+        description: body.description,
+        category: body.category,
+        vendor: body.vendor,
+        entry_date: body.expenseDate,
+        reference_id: data.id,
+        is_active: true,
+      });
+
+    if (entryError) {
+      console.error('Error creating entry for expense:', entryError);
+      // Don't fail the expense creation if entry creation fails, but log it
+    }
+
     return NextResponse.json(transformExpense(data), { status: 201 });
   } catch (error: any) {
     console.error('Error creating expense:', error);

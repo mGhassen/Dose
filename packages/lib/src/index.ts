@@ -40,6 +40,8 @@ export * from './api/financial-plan';
 export * from './api/budgets';
 export * from './api/dashboard';
 export * from './api/actual-payments';
+export * from './api/entries';
+export * from './api/payments';
 
 // Export inventory management API modules
 export * from './api/ingredients';

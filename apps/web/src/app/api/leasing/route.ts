@@ -104,6 +104,25 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    // Create an OUTPUT entry for the leasing payment
+    const { error: entryError } = await supabase
+      .from('entries')
+      .insert({
+        direction: 'output',
+        entry_type: 'leasing',
+        name: body.name,
+        amount: body.amount,
+        description: body.description,
+        entry_date: body.startDate,
+        reference_id: data.id,
+        is_active: body.isActive ?? true,
+      });
+
+    if (entryError) {
+      console.error('Error creating entry for leasing payment:', entryError);
+      // Don't fail the leasing creation if entry creation fails, but log it
+    }
+
     return NextResponse.json(transformLeasing(data), { status: 201 });
   } catch (error: any) {
     console.error('Error creating leasing payment:', error);

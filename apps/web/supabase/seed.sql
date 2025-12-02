@@ -18495,3 +18495,279 @@ INSERT INTO variables (name, type, value, unit, effective_date, end_date, descri
 ('EUR to TND Exchange Rate', 'exchange_rate', 3.25, 'rate', '2024-01-01', NULL, 'Euro to Tunisian Dinar exchange rate', true),
 ('Minimum Wage', 'cost', 450.0, 'TND', '2024-01-01', NULL, 'Minimum monthly wage', true),
 ('Social Security Rate', 'tax', 18.75, 'percentage', '2024-01-01', NULL, 'Employer social security contribution rate', true);
+
+-- ============================================================================
+-- ENTRIES (Created from existing data)
+-- ============================================================================
+-- Create entries from sales (inputs)
+INSERT INTO entries (direction, entry_type, name, amount, description, entry_date, reference_id, is_active, created_at, updated_at)
+SELECT 
+  'input' as direction,
+  'sale' as entry_type,
+  COALESCE(description, CONCAT('Sale - ', type)) as name,
+  amount,
+  description,
+  date as entry_date,
+  id as reference_id,
+  true as is_active,
+  created_at,
+  updated_at
+FROM sales;
+
+-- Create entries from expenses (outputs)
+INSERT INTO entries (direction, entry_type, name, amount, description, category, vendor, entry_date, reference_id, is_active, created_at, updated_at)
+SELECT 
+  'output' as direction,
+  'expense' as entry_type,
+  name,
+  amount,
+  description,
+  category,
+  vendor,
+  COALESCE(expense_date, start_date) as entry_date,
+  id as reference_id,
+  is_active,
+  created_at,
+  updated_at
+FROM expenses;
+
+-- Create entries from subscriptions (outputs)
+INSERT INTO entries (direction, entry_type, name, amount, description, category, vendor, entry_date, reference_id, is_active, created_at, updated_at)
+SELECT 
+  'output' as direction,
+  'subscription' as entry_type,
+  name,
+  amount,
+  description,
+  category,
+  vendor,
+  start_date as entry_date,
+  id as reference_id,
+  is_active,
+  created_at,
+  updated_at
+FROM subscriptions;
+
+-- Create INPUT entries from loans (principal amount received)
+INSERT INTO entries (direction, entry_type, name, amount, description, entry_date, reference_id, is_active, created_at, updated_at)
+SELECT 
+  'input' as direction,
+  'loan' as entry_type,
+  name,
+  principal_amount as amount,
+  description,
+  start_date as entry_date,
+  id as reference_id,
+  true as is_active,
+  created_at,
+  updated_at
+FROM loans;
+
+-- Create OUTPUT entries from loan schedules (repayments)
+INSERT INTO entries (direction, entry_type, name, amount, description, entry_date, due_date, reference_id, schedule_entry_id, is_active, created_at, updated_at)
+SELECT 
+  'output' as direction,
+  'loan_payment' as entry_type,
+  CONCAT(l.name, ' - Payment Month ', ls.month) as name,
+  ls.total_payment as amount,
+  CONCAT('Principal: ', ls.principal_payment, ', Interest: ', ls.interest_payment) as description,
+  ls.payment_date as entry_date,
+  ls.payment_date as due_date,
+  ls.loan_id as reference_id,
+  ls.id as schedule_entry_id,
+  true as is_active,
+  ls.created_at,
+  ls.updated_at
+FROM loan_schedules ls
+INNER JOIN loans l ON l.id = ls.loan_id;
+
+-- Create OUTPUT entries from leasing payments
+INSERT INTO entries (direction, entry_type, name, amount, description, entry_date, reference_id, is_active, created_at, updated_at)
+SELECT 
+  'output' as direction,
+  'leasing' as entry_type,
+  name,
+  amount,
+  description,
+  start_date as entry_date,
+  id as reference_id,
+  is_active,
+  created_at,
+  updated_at
+FROM leasing_payments;
+
+-- Create OUTPUT entries from leasing timeline entries (individual payment dates)
+INSERT INTO entries (direction, entry_type, name, amount, description, entry_date, due_date, reference_id, schedule_entry_id, is_active, created_at, updated_at)
+SELECT 
+  'output' as direction,
+  'leasing_payment' as entry_type,
+  CONCAT(lp.name, ' - ', lte.month) as name,
+  COALESCE(lte.actual_amount, lte.amount) as amount,
+  lte.notes as description,
+  lte.payment_date as entry_date,
+  lte.payment_date as due_date,
+  lte.leasing_id as reference_id,
+  lte.id as schedule_entry_id,
+  true as is_active,
+  lte.created_at,
+  lte.updated_at
+FROM leasing_timeline_entries lte
+INNER JOIN leasing_payments lp ON lp.id = lte.leasing_id;
+
+-- Set sequence for entries
+SELECT setval('entries_id_seq', (SELECT MAX(id) FROM entries));
+
+-- ============================================================================
+-- PAYMENTS (Sample payments linked to entries)
+-- ============================================================================
+-- Create sample payments for sales (input payments - money received)
+-- Get first 50 sales entries and create payments for them
+INSERT INTO payments (entry_id, payment_date, amount, is_paid, paid_date, payment_method, notes, created_at, updated_at)
+SELECT 
+  e.id as entry_id,
+  e.entry_date as payment_date,
+  e.amount,
+  true as is_paid,
+  e.entry_date as paid_date,
+  'cash' as payment_method,
+  'Payment received' as notes,
+  e.created_at,
+  e.updated_at
+FROM entries e
+WHERE e.direction = 'input' 
+  AND e.entry_type = 'sale'
+ORDER BY e.id
+LIMIT 50;
+
+-- Create sample payments for expenses (output payments - money paid)
+-- Get first 30 expense entries and create payments for them
+INSERT INTO payments (entry_id, payment_date, amount, is_paid, paid_date, payment_method, notes, created_at, updated_at)
+SELECT 
+  e.id as entry_id,
+  e.entry_date as payment_date,
+  e.amount,
+  true as is_paid,
+  e.entry_date as paid_date,
+  'bank_transfer' as payment_method,
+  'Payment made' as notes,
+  e.created_at,
+  e.updated_at
+FROM entries e
+WHERE e.direction = 'output' 
+  AND e.entry_type = 'expense'
+ORDER BY e.id
+LIMIT 30;
+
+-- Create sample payments for subscriptions (output payments - subscription payments made)
+-- Get first 20 subscription entries and create payments for them
+INSERT INTO payments (entry_id, payment_date, amount, is_paid, paid_date, payment_method, notes, created_at, updated_at)
+SELECT 
+  e.id as entry_id,
+  e.entry_date as payment_date,
+  e.amount,
+  true as is_paid,
+  e.entry_date as paid_date,
+  'card' as payment_method,
+  'Subscription payment' as notes,
+  e.created_at,
+  e.updated_at
+FROM entries e
+WHERE e.direction = 'output' 
+  AND e.entry_type = 'subscription'
+ORDER BY e.id
+LIMIT 20;
+
+-- Create sample payments for loan principal (input payments - loan money received)
+-- Get all loan entries and create payments for them
+INSERT INTO payments (entry_id, payment_date, amount, is_paid, paid_date, payment_method, notes, created_at, updated_at)
+SELECT 
+  e.id as entry_id,
+  e.entry_date as payment_date,
+  e.amount,
+  true as is_paid,
+  e.entry_date as paid_date,
+  'bank_transfer' as payment_method,
+  'Loan principal received' as notes,
+  e.created_at,
+  e.updated_at
+FROM entries e
+WHERE e.direction = 'input' 
+  AND e.entry_type = 'loan';
+
+-- Create sample payments for loan repayments (output payments - loan payments made)
+-- Get first 24 loan payment entries (first 2 years of payments) and create payments for paid ones
+INSERT INTO payments (entry_id, payment_date, amount, is_paid, paid_date, payment_method, notes, created_at, updated_at)
+SELECT 
+  e.id as entry_id,
+  e.entry_date as payment_date,
+  e.amount,
+  CASE 
+    WHEN e.entry_date <= CURRENT_DATE THEN true 
+    ELSE false 
+  END as is_paid,
+  CASE 
+    WHEN e.entry_date <= CURRENT_DATE THEN e.entry_date 
+    ELSE NULL 
+  END as paid_date,
+  'bank_transfer' as payment_method,
+  'Loan repayment' as notes,
+  e.created_at,
+  e.updated_at
+FROM entries e
+WHERE e.direction = 'output' 
+  AND e.entry_type = 'loan_payment'
+ORDER BY e.entry_date
+LIMIT 24;
+
+-- Create sample payments for leasing (output payments - leasing payments made)
+-- Get first 12 leasing payment entries and create payments for paid ones
+INSERT INTO payments (entry_id, payment_date, amount, is_paid, paid_date, payment_method, notes, created_at, updated_at)
+SELECT 
+  e.id as entry_id,
+  e.entry_date as payment_date,
+  e.amount,
+  CASE 
+    WHEN e.entry_date <= CURRENT_DATE THEN true 
+    ELSE false 
+  END as is_paid,
+  CASE 
+    WHEN e.entry_date <= CURRENT_DATE THEN e.entry_date 
+    ELSE NULL 
+  END as paid_date,
+  'bank_transfer' as payment_method,
+  'Leasing payment' as notes,
+  e.created_at,
+  e.updated_at
+FROM entries e
+WHERE e.direction = 'output' 
+  AND e.entry_type = 'leasing_payment'
+ORDER BY e.entry_date
+LIMIT 12;
+
+-- Migrate actual_payments to payments (if any exist)
+INSERT INTO payments (entry_id, payment_date, amount, is_paid, paid_date, notes, created_at, updated_at)
+SELECT 
+  e.id as entry_id,
+  ap.payment_date,
+  ap.amount,
+  ap.is_paid,
+  ap.paid_date,
+  ap.notes,
+  ap.created_at,
+  ap.updated_at
+FROM actual_payments ap
+INNER JOIN entries e ON (
+  e.direction = ap.direction 
+  AND e.entry_type = ap.payment_type 
+  AND e.reference_id = ap.reference_id
+  AND (ap.schedule_entry_id IS NULL OR e.schedule_entry_id = ap.schedule_entry_id)
+)
+WHERE NOT EXISTS (
+  SELECT 1 FROM payments p 
+  WHERE p.entry_id = e.id 
+    AND p.payment_date = ap.payment_date
+    AND p.amount = ap.amount
+);
+
+-- Set sequence for payments
+SELECT setval('payments_id_seq', (SELECT MAX(id) FROM payments));

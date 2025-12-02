@@ -78,6 +78,31 @@ export async function POST(
 
     if (insertError) throw insertError;
 
+    // Create OUTPUT entries for each loan payment schedule entry
+    if (insertedSchedule && insertedSchedule.length > 0) {
+      const entryData = insertedSchedule.map((scheduleEntry: any) => ({
+        direction: 'output',
+        entry_type: 'loan_payment',
+        name: `${loan.name} - Payment Month ${scheduleEntry.month}`,
+        amount: scheduleEntry.total_payment,
+        description: `Principal: ${scheduleEntry.principal_payment}, Interest: ${scheduleEntry.interest_payment}`,
+        entry_date: scheduleEntry.payment_date,
+        due_date: scheduleEntry.payment_date,
+        reference_id: parseInt(id),
+        schedule_entry_id: scheduleEntry.id,
+        is_active: true,
+      }));
+
+      const { error: entryError } = await supabase
+        .from('entries')
+        .insert(entryData);
+
+      if (entryError) {
+        console.error('Error creating entries for loan schedule:', entryError);
+        // Don't fail the schedule generation if entry creation fails, but log it
+      }
+    }
+
     return NextResponse.json(insertedSchedule, { status: 201 });
   } catch (error: any) {
     console.error('Error generating loan schedule:', error);

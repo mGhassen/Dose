@@ -120,6 +120,25 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    // Create an INPUT entry for the sale
+    const { error: entryError } = await supabase
+      .from('entries')
+      .insert({
+        direction: 'input',
+        entry_type: 'sale',
+        name: body.description || `Sale - ${body.type}`,
+        amount: body.amount,
+        description: body.description,
+        entry_date: body.date,
+        reference_id: data.id,
+        is_active: true,
+      });
+
+    if (entryError) {
+      console.error('Error creating entry for sale:', entryError);
+      // Don't fail the sale creation if entry creation fails, but log it
+    }
+
     return NextResponse.json(transformSale(data), { status: 201 });
   } catch (error: any) {
     console.error('Error creating sale:', error);

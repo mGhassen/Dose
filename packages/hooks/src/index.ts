@@ -34,6 +34,8 @@ export * from './client/useBudgetProjections';
 export * from './client/useBudgets';
 export * from './client/useMetadataEnums';
 export * from './client/useActualPayments';
+export * from './client/useEntries';
+export * from './client/usePayments';
 
 // Export inventory management hooks
 export * from './client/useIngredients';

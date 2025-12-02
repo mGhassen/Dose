@@ -31,6 +31,9 @@ export function useInvestmentDepreciation(investmentId: string) {
   });
 }
 
+// Alias for backward compatibility
+export const useDepreciationSchedule = useInvestmentDepreciation;
+
 export function useCreateInvestment() {
   const queryClient = useQueryClient();
   
@@ -77,6 +80,9 @@ export function useGenerateDepreciation() {
     },
   });
 }
+
+// Alias for backward compatibility
+export const useGenerateDepreciationSchedule = useGenerateDepreciation;
 
 export function useUpdateDepreciationEntry() {
   const queryClient = useQueryClient();

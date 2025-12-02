@@ -96,6 +96,8 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createServerSupabaseClient();
+    
+    // Create the loan
     const { data, error } = await supabase
       .from('loans')
       .insert(transformToSnakeCase(body))
@@ -103,6 +105,25 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // Create an INPUT entry for the loan principal (money received)
+    const { error: entryError } = await supabase
+      .from('entries')
+      .insert({
+        direction: 'input',
+        entry_type: 'loan',
+        name: body.name,
+        amount: body.principalAmount,
+        description: body.description || `Loan principal received: ${body.loanNumber}`,
+        entry_date: body.startDate,
+        reference_id: data.id,
+        is_active: true,
+      });
+
+    if (entryError) {
+      console.error('Error creating entry for loan:', entryError);
+      // Don't fail the loan creation if entry creation fails, but log it
+    }
 
     return NextResponse.json(transformLoan(data), { status: 201 });
   } catch (error: any) {
