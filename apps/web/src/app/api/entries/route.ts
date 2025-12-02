@@ -120,6 +120,8 @@ export async function GET(request: NextRequest) {
     const entryType = searchParams.get('entryType');
     const category = searchParams.get('category');
     const month = searchParams.get('month');
+    const referenceId = searchParams.get('referenceId');
+    const scheduleEntryId = searchParams.get('scheduleEntryId');
     const includePayments = searchParams.get('includePayments') === 'true';
     const { page, limit, offset } = getPaginationParams(searchParams);
 
@@ -150,6 +152,16 @@ export async function GET(request: NextRequest) {
     if (category) {
       query = query.eq('category', category);
       countQuery = countQuery.eq('category', category);
+    }
+
+    if (referenceId) {
+      query = query.eq('reference_id', parseInt(referenceId));
+      countQuery = countQuery.eq('reference_id', parseInt(referenceId));
+    }
+
+    if (scheduleEntryId) {
+      query = query.eq('schedule_entry_id', parseInt(scheduleEntryId));
+      countQuery = countQuery.eq('schedule_entry_id', parseInt(scheduleEntryId));
     }
 
     if (month) {

@@ -219,10 +219,6 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => router.push(`/subscriptions/timeline`)}>
-                  <Calendar className="mr-2 h-4 w-4" />
-                  View Timeline
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsEditing(true)}>
                   <Edit2 className="mr-2 h-4 w-4" />
                   Edit

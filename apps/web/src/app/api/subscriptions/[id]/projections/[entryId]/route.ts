@@ -137,8 +137,47 @@ export async function PUT(
               }
             }
           } else if (!body.isPaid) {
-            // If payment is marked as unpaid, we could optionally delete the expense
-            // But for now, we'll leave it - the user might want to keep the record
+            // If payment is marked as unpaid, delete the associated expense and payment
+            // Find the expense that was created for this subscription payment
+            // The expense should match the subscription_id and the paid_date/month
+            const paidDate = existingEntry.paid_date || data.month + '-01';
+            const { data: expenses } = await supabase
+              .from('expenses')
+              .select('id')
+              .eq('subscription_id', parseInt(id))
+              .eq('expense_date', paidDate)
+              .maybeSingle();
+
+            if (expenses) {
+              // Delete the expense
+              const { error: expenseDeleteError } = await supabase
+                .from('expenses')
+                .delete()
+                .eq('id', expenses.id);
+
+              if (expenseDeleteError) {
+                console.error('Error deleting expense:', expenseDeleteError);
+              }
+            }
+
+            // Delete the payment(s) associated with this entry
+            const { data: payments } = await supabase
+              .from('payments')
+              .select('id')
+              .eq('entry_id', entryData.id);
+
+            if (payments && payments.length > 0) {
+              for (const payment of payments) {
+                const { error: paymentDeleteError } = await supabase
+                  .from('payments')
+                  .delete()
+                  .eq('id', payment.id);
+
+                if (paymentDeleteError) {
+                  console.error('Error deleting payment:', paymentDeleteError);
+                }
+              }
+            }
           }
         }
       }
