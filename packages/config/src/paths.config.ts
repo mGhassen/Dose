@@ -87,29 +87,6 @@ export const pathsConfig: NavigationConfig = {
           url: "/leasing",
           translationKey: "leasing"
         },
-        {
-          title: "investments",
-          url: "/investments",
-          translationKey: "investments"
-        },
-      ]
-    },
-    {
-      title: "payments",
-      url: "#",
-      icon: "CreditCard",
-      translationKey: "payments",
-      items: [
-        {
-          title: "input-payments",
-          url: "/payments/input",
-          translationKey: "inputPayments"
-        },
-        {
-          title: "output-payments",
-          url: "/payments/output",
-          translationKey: "outputPayments"
-        },
       ]
     },
     {
@@ -120,59 +97,20 @@ export const pathsConfig: NavigationConfig = {
       items: [
         {
           title: "inputs",
-          url: "#",
+          url: "/inputs",
           icon: "Database",
-          translationKey: "inputs",
-          items: [
-            {
-              title: "sales",
-              url: "/sales",
-              translationKey: "sales"
-            },
-            {
-              title: "loans",
-              url: "/loans/input",
-              translationKey: "loans"
-            },
-          ]
+          translationKey: "inputs"
         },
         {
           title: "outputs",
-          url: "#",
+          url: "/outputs",
           icon: "Database",
-          translationKey: "outputs",
-          items: [
-            {
-              title: "expenses",
-              url: "/expenses",
-              translationKey: "expenses"
-            },
-            {
-              title: "subscriptions",
-              url: "/subscriptions",
-              translationKey: "subscriptions"
-            },
-            {
-              title: "personnel",
-              url: "/personnel",
-              translationKey: "personnel"
-            },
-            {
-              title: "loans",
-              url: "/loans/output",
-              translationKey: "loanPayments"
-            },
-            {
-              title: "leasing",
-              url: "/leasing",
-              translationKey: "leasing"
-            },
-            {
-              title: "investments",
-              url: "/investments",
-              translationKey: "investments"
-            },
-          ]
+          translationKey: "outputs"
+        },
+        {
+          title: "investments",
+          url: "/investments",
+          translationKey: "investments"
         },
         {
           title: "profit-loss",

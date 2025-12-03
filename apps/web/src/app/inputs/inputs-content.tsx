@@ -58,11 +58,26 @@ export default function InputsContent() {
       cell: ({ row }) => formatCurrency(row.original.amount),
     },
     {
+      id: "amountPaid",
+      accessorKey: "payments",
+      header: "Amount Paid",
+      cell: ({ row }) => {
+        const payments = row.original.payments || [];
+        const totalPaid = payments.filter(p => p.isPaid).reduce((sum, p) => sum + p.amount, 0);
+        return (
+          <div className="font-medium">
+            {formatCurrency(totalPaid)}
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: "entryDate",
       header: "Date",
       cell: ({ row }) => formatDate(row.original.entryDate),
     },
     {
+      id: "paymentStatus",
       accessorKey: "payments",
       header: "Payment Status",
       cell: ({ row }) => {
@@ -74,7 +89,7 @@ export default function InputsContent() {
         if (isFullyPaid) {
           return <Badge variant="default">Fully Paid</Badge>;
         } else if (hasPartialPayment) {
-          return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">Partially Paid</Badge>;
+          return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700">Partially Paid</Badge>;
         } else {
           return <Badge variant="secondary">Pending Payment</Badge>;
         }
@@ -120,14 +135,28 @@ export default function InputsContent() {
 
   const handleBulkExport = async (entries: Entry[]) => {
     const csv = [
-      ['Name', 'Type', 'Amount', 'Date', 'Description'].join(','),
-      ...entries.map(entry => [
-        `"${entry.name}"`,
-        `"${entryTypeLabels[entry.entryType] || entry.entryType}"`,
-        entry.amount,
-        entry.entryDate,
-        `"${entry.description || ''}"`
-      ].join(','))
+      ['Name', 'Type', 'Amount', 'Amount Paid', 'Date', 'Payment Status', 'Description'].join(','),
+      ...entries.map(entry => {
+        const payments = entry.payments || [];
+        const totalPaid = payments.filter(p => p.isPaid).reduce((sum, p) => sum + p.amount, 0);
+        const isFullyPaid = totalPaid >= entry.amount;
+        const hasPartialPayment = totalPaid > 0 && !isFullyPaid;
+        let status = "Pending Payment";
+        if (isFullyPaid) {
+          status = "Fully Paid";
+        } else if (hasPartialPayment) {
+          status = "Partially Paid";
+        }
+        return [
+          `"${entry.name}"`,
+          `"${entryTypeLabels[entry.entryType] || entry.entryType}"`,
+          entry.amount,
+          totalPaid,
+          entry.entryDate,
+          `"${status}"`,
+          `"${entry.description || ''}"`
+        ].join(',');
+      })
     ].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -199,6 +228,17 @@ export default function InputsContent() {
           ]}
           localStoragePrefix="inputs"
           searchFields={["name", "description"]}
+          pagination={{
+            page,
+            pageSize,
+            totalCount,
+            totalPages: Math.ceil(totalCount / pageSize),
+            onPageChange: setPage,
+            onPageSizeChange: (newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            },
+          }}
         />
       </div>
     </div>

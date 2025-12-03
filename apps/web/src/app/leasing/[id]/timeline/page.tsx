@@ -192,9 +192,11 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Status</label>
-                <Badge variant={leasing.isActive ? "default" : "secondary"} className="mt-1">
-                  {leasing.isActive ? "Active" : "Inactive"}
-                </Badge>
+                <div className="mt-1">
+                  <Badge variant={leasing.isActive ? "default" : "secondary"}>
+                    {leasing.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
               </div>
             </div>
           </CardContent>
