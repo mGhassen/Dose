@@ -20,7 +20,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime) - keeps data in cache even when unused
             retry: (failureCount, error) => {
               // Don't retry on abort errors (query cancellation)
-              if (error instanceof Error && error.name === 'AbortError') {
+              if (error instanceof Error && (error.name === 'AbortError' || (error as any).isAbortError)) {
                 return false;
               }
               // Retry up to 3 times for network errors
@@ -30,6 +30,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
               return false;
             },
             retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+            // Suppress AbortError from being logged
+            onError: (error) => {
+              // Silently handle AbortErrors - they're expected when queries are cancelled
+              if (error instanceof Error && (error.name === 'AbortError' || (error as any).isAbortError)) {
+                return; // Don't log AbortErrors
+              }
+              // Log other errors for debugging
+              console.error('Query error:', error);
+            },
           },
           mutations: {
             retry: false,

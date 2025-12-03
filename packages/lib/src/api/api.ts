@@ -73,7 +73,9 @@ export async function apiRequest<T>(
     try {
       // If external signal is already aborted, throw immediately
       if (signal?.aborted) {
-        throw new DOMException('The operation was aborted.', 'AbortError');
+        const abortError = new DOMException('The operation was aborted.', 'AbortError');
+        (abortError as any).isAbortError = true;
+        throw abortError;
       }
       
       // Create a controller for timeout
@@ -180,8 +182,12 @@ export async function apiRequest<T>(
       return result;
     } catch (error) {
       // Don't log AbortError as it's expected when queries are cancelled
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw error;
+      // This happens when React Query cancels queries (e.g., component unmount, query invalidation)
+      if (error instanceof Error && (error.name === 'AbortError' || (error as any).isAbortError)) {
+        // Create a proper AbortError that React Query can handle silently
+        const abortError = new DOMException('The operation was aborted.', 'AbortError');
+        (abortError as any).isAbortError = true;
+        throw abortError;
       }
       console.error('API request error:', error);
       throw error;

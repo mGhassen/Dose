@@ -220,19 +220,13 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
   }
 
   const isPastDue = new Date(entry.paymentDate) < new Date() && !isFullyPaid;
-  const isProjected = new Date(entry.paymentDate) > new Date();
 
   return (
     <>
-      <TableRow className={isPastDue ? "bg-destructive/10" : isProjected ? "bg-muted/50" : ""}>
+      <TableRow className={isPastDue ? "bg-destructive/10" : ""}>
         <TableCell className="font-medium">{entry.month}</TableCell>
         <TableCell>
-          <div className="flex items-center space-x-2">
-            {formatDate(entry.paymentDate)}
-            {isProjected && (
-              <span className="text-xs text-muted-foreground">(Projected)</span>
-            )}
-          </div>
+          {formatDate(entry.paymentDate)}
         </TableCell>
         <TableCell className="text-right">{formatCurrency(entry.principalPayment)}</TableCell>
         <TableCell className="text-right">{formatCurrency(entry.interestPayment)}</TableCell>
