@@ -59,6 +59,7 @@ interface DataTablePageProps<T> {
   filterOptions?: FilterOption[];
   defaultHiddenColumns?: string[];
   headerActions?: ReactNode;
+  onInsert?: () => void;
   renderExpandedRow?: (row: T) => ReactNode;
   isRowExpandable?: (row: T) => boolean;
   expandedRows?: Set<number>;
@@ -96,6 +97,7 @@ export default function DataTablePage<T>({
   filterOptions = [],
   defaultHiddenColumns = [],
   headerActions,
+  onInsert,
   renderExpandedRow,
   isRowExpandable,
   expandedRows,
@@ -986,7 +988,16 @@ export default function DataTablePage<T>({
               {enableGridView && (
                 <ViewToggle view={view} onViewChange={setView} />
               )}
-              {createHref && (
+              {onInsert && (
+                <Button
+                  className="bg-primary hover:bg-green-700 text-white"
+                  onClick={onInsert}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  {t('insert')}
+                </Button>
+              )}
+              {createHref && !onInsert && (
                 <Button
                   className="bg-primary hover:bg-green-700 text-white"
                   asChild
