@@ -254,6 +254,8 @@ export interface LeasingPayment {
   description?: string;
   lessor?: string;
   isActive: boolean;
+  offPaymentMonths?: number[]; // Array of month numbers (from start date) where no payment is made
+  firstPaymentAmount?: number; // Optional different amount for the first payment
   createdAt: string;
   updatedAt: string;
 }
@@ -268,6 +270,8 @@ export interface CreateLeasingPaymentData {
   description?: string;
   lessor?: string;
   isActive?: boolean;
+  offPaymentMonths?: number[]; // Array of month numbers (from start date) where no payment is made
+  firstPaymentAmount?: number; // Optional different amount for the first payment
 }
 
 export interface UpdateLeasingPaymentData extends Partial<CreateLeasingPaymentData> {}

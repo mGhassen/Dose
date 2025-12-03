@@ -13,6 +13,7 @@ import AppLayout from "@/components/app-layout";
 import { useCreateLeasingPayment } from "@kit/hooks";
 import { toast } from "sonner";
 import type { LeasingType, ExpenseRecurrence } from "@kit/types";
+import { Checkbox } from "@kit/ui/checkbox";
 
 export default function CreateLeasingPage() {
   const router = useRouter();
@@ -27,6 +28,8 @@ export default function CreateLeasingPage() {
     description: "",
     lessor: "",
     isActive: true,
+    offPaymentMonths: [] as number[],
+    firstPaymentAmount: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,6 +51,8 @@ export default function CreateLeasingPage() {
         description: formData.description || undefined,
         lessor: formData.lessor || undefined,
         isActive: formData.isActive,
+        offPaymentMonths: formData.offPaymentMonths.length > 0 ? formData.offPaymentMonths : undefined,
+        firstPaymentAmount: formData.firstPaymentAmount ? parseFloat(formData.firstPaymentAmount) : undefined,
       });
       toast.success("Leasing payment created successfully");
       router.push('/leasing');
@@ -59,6 +64,34 @@ export default function CreateLeasingPage() {
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const handleOffPaymentMonthToggle = (month: number) => {
+    setFormData(prev => {
+      const currentMonths = prev.offPaymentMonths || [];
+      const isSelected = currentMonths.includes(month);
+      return {
+        ...prev,
+        offPaymentMonths: isSelected
+          ? currentMonths.filter(m => m !== month)
+          : [...currentMonths, month].sort((a, b) => a - b),
+      };
+    });
+  };
+
+  // Calculate how many months to show for off-payment selection
+  // Show up to 60 months (5 years) or until end date if provided
+  const calculateMaxMonths = () => {
+    if (formData.endDate) {
+      const start = new Date(formData.startDate);
+      const end = new Date(formData.endDate);
+      const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+      return Math.min(monthsDiff, 60); // Cap at 60 months
+    }
+    return 60; // Default to 60 months if no end date
+  };
+
+  const maxMonths = calculateMaxMonths();
+  const monthOptions = Array.from({ length: maxMonths }, (_, i) => i + 1);
 
   return (
     <AppLayout>
@@ -200,6 +233,62 @@ export default function CreateLeasingPage() {
                   placeholder="Additional notes about this leasing payment"
                   rows={3}
                 />
+              </div>
+
+              {/* First Payment Amount */}
+              <div className="space-y-2">
+                <Label htmlFor="firstPaymentAmount">First Payment Amount (Optional)</Label>
+                <Input
+                  id="firstPaymentAmount"
+                  type="number"
+                  step="0.01"
+                  value={formData.firstPaymentAmount}
+                  onChange={(e) => handleInputChange('firstPaymentAmount', e.target.value)}
+                  placeholder="Leave empty to use regular amount"
+                />
+                <p className="text-sm text-muted-foreground">
+                  If specified, this amount will be used for the first payment instead of the regular amount
+                </p>
+              </div>
+
+              {/* Off-Payment Months */}
+              <div className="space-y-2">
+                <Label>Off-Payment Months (No Payment)</Label>
+                <p className="text-sm text-muted-foreground">
+                  Select months (from start date) where no payment will be made
+                </p>
+                {formData.startDate ? (
+                  <>
+                    <div className="grid grid-cols-6 md:grid-cols-12 gap-2 p-4 border rounded-md max-h-60 overflow-y-auto">
+                      {monthOptions.map((month) => (
+                        <div key={month} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`off-payment-${month}`}
+                            checked={formData.offPaymentMonths.includes(month)}
+                            onCheckedChange={() => handleOffPaymentMonthToggle(month)}
+                          />
+                          <Label
+                            htmlFor={`off-payment-${month}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {month}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    {formData.offPaymentMonths.length > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Selected: {formData.offPaymentMonths.join(', ')}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="p-4 border rounded-md bg-muted/50">
+                    <p className="text-sm text-muted-foreground">
+                      Please enter the start date above to select off-payment months.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Actions */}

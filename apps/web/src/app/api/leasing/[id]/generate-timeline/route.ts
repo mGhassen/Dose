@@ -17,6 +17,8 @@ function transformLeasing(row: any): LeasingPayment {
     description: row.description,
     lessor: row.lessor,
     isActive: row.is_active,
+    offPaymentMonths: row.off_payment_months || [],
+    firstPaymentAmount: row.first_payment_amount ? parseFloat(row.first_payment_amount) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

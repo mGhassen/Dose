@@ -17,13 +17,15 @@ function transformLeasing(row: any): LeasingPayment {
     description: row.description,
     lessor: row.lessor,
     isActive: row.is_active,
+    offPaymentMonths: row.off_payment_months || [],
+    firstPaymentAmount: row.first_payment_amount ? parseFloat(row.first_payment_amount) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
 function transformToSnakeCase(data: CreateLeasingPaymentData): any {
-  return {
+  const result: any = {
     name: data.name,
     type: data.type,
     amount: data.amount,
@@ -34,6 +36,20 @@ function transformToSnakeCase(data: CreateLeasingPaymentData): any {
     lessor: data.lessor,
     is_active: data.isActive ?? true,
   };
+  
+  // Only include off_payment_months if it's provided and not empty
+  if (data.offPaymentMonths && Array.isArray(data.offPaymentMonths) && data.offPaymentMonths.length > 0) {
+    result.off_payment_months = data.offPaymentMonths;
+  } else {
+    result.off_payment_months = [];
+  }
+  
+  // Only include first_payment_amount if it's provided
+  if (data.firstPaymentAmount !== undefined && data.firstPaymentAmount !== null) {
+    result.first_payment_amount = data.firstPaymentAmount;
+  }
+  
+  return result;
 }
 
 export async function GET(request: NextRequest) {

@@ -61,6 +61,10 @@ export function projectLeasingPayment(
     ? new Date(Math.min(end.getTime(), leasingEnd.getTime())) 
     : end;
 
+  const offPaymentMonths = new Set(leasing.offPaymentMonths || []);
+  let paymentOccurrence = 0; // Track which payment occurrence this is (0 = first, 1 = second, etc.)
+  let paymentMonthNumber = 0; // Track payment month number (1 = first payment month, 2 = second payment month, etc.)
+
   while (currentDate <= finalDate) {
     const month = currentDate.toISOString().slice(0, 7);
 
@@ -88,14 +92,30 @@ export function projectLeasingPayment(
     }
 
     if (shouldInclude) {
-      entries.push({
-        month,
-        leasingId: leasing.id,
-        leasingName: leasing.name,
-        amount: leasing.amount,
-        isProjected: currentDate > new Date(),
-        paymentDate: currentDate.toISOString(),
-      });
+      // Increment payment month number (this is the Nth payment month from start)
+      paymentMonthNumber++;
+      
+      // Check if this payment month is an off-payment month
+      const isOffPaymentMonth = offPaymentMonths.has(paymentMonthNumber);
+      
+      if (!isOffPaymentMonth) {
+        // Determine payment amount: use firstPaymentAmount for first payment if provided, otherwise use regular amount
+        const paymentAmount = paymentOccurrence === 0 && leasing.firstPaymentAmount !== undefined && leasing.firstPaymentAmount !== null
+          ? leasing.firstPaymentAmount
+          : leasing.amount;
+
+        entries.push({
+          month,
+          leasingId: leasing.id,
+          leasingName: leasing.name,
+          amount: paymentAmount,
+          isProjected: currentDate > new Date(),
+          paymentDate: currentDate.toISOString(),
+        });
+        
+        paymentOccurrence++;
+      }
+      // If it's an off-payment month, we skip it (don't add to entries)
     }
 
     // Move to next month
