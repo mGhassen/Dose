@@ -4,9 +4,14 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useEntries, useDeleteEntry } from "@kit/hooks";
+import { useEntries, useDeleteEntry, useLoans } from "@kit/hooks";
 import type { Entry } from "@kit/lib";
+import type { Loan } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { Button } from "@kit/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@kit/ui/dialog";
+import { Label } from "@kit/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
@@ -15,6 +20,8 @@ export default function LoansOutputContent() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [isLoanSelectDialogOpen, setIsLoanSelectDialogOpen] = useState(false);
+  const [selectedLoanId, setSelectedLoanId] = useState<string>("");
   
   const { data: entriesData, isLoading } = useEntries({ 
     direction: 'output', 
@@ -24,6 +31,17 @@ export default function LoansOutputContent() {
     limit: pageSize
   });
   const deleteMutation = useDeleteEntry();
+  const { data: loans } = useLoans();
+
+  const handleInsert = () => {
+    setIsLoanSelectDialogOpen(true);
+  };
+
+  const handleLoanSelect = () => {
+    if (selectedLoanId) {
+      router.push(`/loans/${selectedLoanId}/schedule`);
+    }
+  };
 
   const entries = entriesData?.data || [];
   const totalCount = entriesData?.pagination?.total || 0;
@@ -168,7 +186,7 @@ export default function LoansOutputContent() {
         <DataTablePage
           title=""
           description=""
-          createHref="/loans/payments/create"
+          onInsert={handleInsert}
           data={entries}
           columns={columns}
           loading={isLoading}
@@ -191,6 +209,52 @@ export default function LoansOutputContent() {
           searchFields={["name", "description"]}
         />
       </div>
+
+      {/* Loan Selection Dialog */}
+      <Dialog open={isLoanSelectDialogOpen} onOpenChange={setIsLoanSelectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Loan</DialogTitle>
+            <DialogDescription>
+              Choose a loan to view its schedule and make payments
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="loan-select">Loan *</Label>
+              <Select value={selectedLoanId} onValueChange={setSelectedLoanId}>
+                <SelectTrigger id="loan-select">
+                  <SelectValue placeholder="Choose a loan..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {loans?.map((loan: Loan) => (
+                    <SelectItem key={loan.id} value={loan.id.toString()}>
+                      {loan.name} ({loan.loanNumber}) - {formatCurrency(loan.principalAmount)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsLoanSelectDialogOpen(false);
+                setSelectedLoanId("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleLoanSelect}
+              disabled={!selectedLoanId}
+            >
+              View Schedule
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

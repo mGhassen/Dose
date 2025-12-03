@@ -15,7 +15,9 @@ import {
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
 import { Edit2, Check, X, MoreVertical, Plus, Trash2 } from "lucide-react";
-import { useUpdateLoanScheduleEntry, useActualPayments, useCreateActualPayment, useDeleteActualPayment } from "@kit/hooks";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { useUpdateLoanScheduleEntry, useCreatePayment, useDeletePayment } from "@kit/hooks";
+import type { Entry } from "@kit/lib";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -25,12 +27,14 @@ interface EditableScheduleRowProps {
   entry: LoanScheduleEntry;
   loanId: string;
   onUpdate: () => void;
+  allEntries?: Entry[];
 }
 
-export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableScheduleRowProps) {
+export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [] }: EditableScheduleRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
   const [editData, setEditData] = useState({
     paymentDate: entry.paymentDate.split('T')[0],
     principalPayment: entry.principalPayment.toString(),
@@ -39,15 +43,23 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
     remainingBalance: entry.remainingBalance.toString(),
   });
   const updateMutation = useUpdateLoanScheduleEntry();
-  const { data: actualPayments } = useActualPayments({
-    paymentType: 'loan',
-    referenceId: loanId,
-    scheduleEntryId: String(entry.id),
-  });
   
-  const totalPaid = actualPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
-  const isFullyPaid = totalPaid >= entry.totalPayment;
+  // Use entries passed from parent (already fetched once for all schedule entries)
+  // Find entries for this specific schedule entry
+  const allEntriesForSchedule = allEntries.filter(e => e.scheduleEntryId === entry.id);
+  const scheduleEntryEntry = allEntriesForSchedule[0];
+  
+  // Get all payments for this schedule entry (from all entries if duplicates exist)
+  const allPayments = allEntriesForSchedule.flatMap(e => e.payments || []);
+  const totalPaid = allPayments.filter(p => p.isPaid).reduce((sum, p) => sum + p.amount, 0);
+  
+  // Use the isPaid status from the schedule API (which calculates it correctly)
+  // But also calculate locally for display purposes
+  const isFullyPaid = entry.isPaid || totalPaid >= entry.totalPayment;
   const remainingToPay = Math.max(0, entry.totalPayment - totalPaid);
+  
+  // Get payments for display (only from the first entry to avoid duplicates in UI)
+  const payments = scheduleEntryEntry?.payments || [];
 
   const handleSave = async () => {
     try {
@@ -70,62 +82,84 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
     }
   };
 
-  const createPayment = useCreateActualPayment();
-  const deletePayment = useDeleteActualPayment();
+  const createPayment = useCreatePayment();
+  const deletePayment = useDeletePayment();
 
-  const handleAddPayment = async (paidDate: string, amount: number, notes?: string) => {
+  const handleAddPayment = async (paidDate: string, amount: number, paymentMethod?: string, notes?: string) => {
     try {
+      // Ensure entry exists - check all entries for this schedule entry
+      let entryId = scheduleEntryEntry?.id;
+      
+      // If no entry found, check if one exists in the database (might be a race condition)
+      if (!entryId) {
+        const checkResponse = await fetch(`/api/entries?direction=output&entryType=loan_payment&referenceId=${loanId}&scheduleEntryId=${entry.id}&limit=1`);
+        if (checkResponse.ok) {
+          const checkData = await checkResponse.json();
+          if (checkData.data && checkData.data.length > 0) {
+            entryId = checkData.data[0].id;
+          }
+        }
+      }
+      
+      // Only create if still no entry exists
+      if (!entryId) {
+        // Create the entry first
+        const entryResponse = await fetch('/api/entries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            direction: 'output',
+            entryType: 'loan_payment',
+            name: `Loan Payment - Month ${entry.month}`,
+            amount: entry.totalPayment,
+            description: `Principal: ${entry.principalPayment}, Interest: ${entry.interestPayment}`,
+            entryDate: entry.paymentDate,
+            dueDate: entry.paymentDate,
+            referenceId: parseInt(loanId),
+            scheduleEntryId: entry.id,
+            isActive: true,
+          }),
+        });
+        
+        if (!entryResponse.ok) {
+          throw new Error('Failed to create entry');
+        }
+        
+        const entryData = await entryResponse.json();
+        entryId = entryData.id;
+      }
+
+      // Create the payment (hooks handle invalidation automatically)
       await createPayment.mutateAsync({
-        paymentType: 'loan',
-        direction: 'output', // Loan payments are output (money going out)
-        referenceId: Number(loanId),
-        scheduleEntryId: entry.id,
-        month: entry.paymentDate.slice(0, 7),
+        entryId: entryId!,
         paymentDate: paidDate,
         amount: amount,
         isPaid: true,
         paidDate: paidDate,
-        notes: notes,
+        paymentMethod: paymentMethod || undefined,
+        notes: notes || undefined,
       });
-      
-      // Update schedule entry if fully paid
-      const newTotalPaid = totalPaid + amount;
-      if (newTotalPaid >= entry.totalPayment && !entry.isPaid) {
-        await updateMutation.mutateAsync({
-          loanId,
-          scheduleId: String(entry.id),
-          data: {
-            isPaid: true,
-            paidDate: paidDate,
-          },
-        });
-      }
       
       setIsPaidDialogOpen(false);
       onUpdate();
       toast.success("Payment recorded");
     } catch (error: any) {
+      // Ignore AbortError - it's expected when queries are cancelled
+      if (error instanceof Error && (error.name === 'AbortError' || (error as any).isAbortError)) {
+        // Still show success since the payment was created
+        setIsPaidDialogOpen(false);
+        onUpdate();
+        toast.success("Payment recorded");
+        return;
+      }
       toast.error(error?.message || "Failed to record payment");
     }
   };
 
   const handleDeletePayment = async (paymentId: number) => {
     try {
-      await deletePayment.mutateAsync(String(paymentId));
-      
-      // Recalculate if still fully paid
-      const remainingPayments = actualPayments?.filter(p => p.id !== paymentId) || [];
-      const newTotalPaid = remainingPayments.reduce((sum, p) => sum + p.amount, 0);
-      if (newTotalPaid < entry.totalPayment && entry.isPaid) {
-        await updateMutation.mutateAsync({
-          loanId,
-          scheduleId: String(entry.id),
-          data: {
-            isPaid: false,
-            paidDate: null,
-          },
-        });
-      }
+      // Delete payment (hooks handle invalidation automatically)
+      await deletePayment.mutateAsync(paymentId.toString());
       
       onUpdate();
       toast.success("Payment deleted");
@@ -183,8 +217,8 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
           />
         </TableCell>
         <TableCell>
-          <Badge variant={entry.isPaid ? "default" : "secondary"}>
-            {entry.isPaid ? 'Paid' : 'Pending'}
+          <Badge variant={isFullyPaid ? "default" : "secondary"}>
+            {isFullyPaid ? 'Paid' : 'Pending'}
           </Badge>
         </TableCell>
         <TableCell>
@@ -263,11 +297,11 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
                 <Plus className="mr-2 h-4 w-4" />
                 Add Payment
               </DropdownMenuItem>
-              {actualPayments && actualPayments.length > 0 && (
+              {payments && payments.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setShowPayments(!showPayments)}>
-                    {showPayments ? 'Hide' : 'Show'} Payments ({actualPayments.length})
+                    {showPayments ? 'Hide' : 'Show'} Payments ({payments.length})
                   </DropdownMenuItem>
                 </>
               )}
@@ -277,16 +311,19 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
       </TableRow>
       
       {/* Show partial payments */}
-      {showPayments && actualPayments && actualPayments.length > 0 && (
+      {showPayments && payments && payments.length > 0 && (
         <TableRow>
           <TableCell colSpan={8} className="bg-muted/30 p-4">
             <div className="space-y-2 py-2">
-              <div className="text-sm font-medium">Partial Payments:</div>
-              {actualPayments.map((payment) => (
+              <div className="text-sm font-medium">Payments:</div>
+              {payments.map((payment) => (
                 <div key={payment.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2">
                     <span>{formatDate(payment.paymentDate)}</span>
                     <span className="font-semibold">{formatCurrency(payment.amount)}</span>
+                    {payment.paymentMethod && (
+                      <span className="text-muted-foreground">({payment.paymentMethod.replace('_', ' ')})</span>
+                    )}
                     {payment.notes && (
                       <span className="text-muted-foreground">- {payment.notes}</span>
                     )}
@@ -339,6 +376,19 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
               </p>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="paymentMethod">Payment Method</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger id="paymentMethod">
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="paymentNotes">Notes (optional)</Label>
               <Input
                 id="paymentNotes"
@@ -362,6 +412,7 @@ export function EditableScheduleRow({ entry, loanId, onUpdate }: EditableSchedul
                 handleAddPayment(
                   dateInput?.value || new Date().toISOString().split('T')[0],
                   parseFloat(amountInput?.value || '0'),
+                  paymentMethod || undefined,
                   notesInput?.value || undefined
                 );
               }}

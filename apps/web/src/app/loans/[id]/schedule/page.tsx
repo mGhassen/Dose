@@ -6,7 +6,7 @@ import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { ArrowLeft, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLoanById, useLoanSchedule, useGenerateLoanSchedule } from "@kit/hooks";
+import { useLoanById, useLoanSchedule, useGenerateLoanSchedule, useEntries } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -20,7 +20,6 @@ import {
 } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
 import { EditableScheduleRow } from "./loan-schedule-editable";
-import { useQueryClient } from "@tanstack/react-query";
 
 interface LoanSchedulePageProps {
   params: Promise<{ id: string }>;
@@ -28,16 +27,22 @@ interface LoanSchedulePageProps {
 
 export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: loan, isLoading: loanLoading } = useLoanById(resolvedParams?.id || "");
   const { data: schedule, isLoading: scheduleLoading } = useLoanSchedule(resolvedParams?.id || "");
   const generateSchedule = useGenerateLoanSchedule();
+  
+  // Fetch all entries for this loan at once (instead of per-row)
+  const { data: allEntriesData } = useEntries({
+    direction: 'output',
+    entryType: 'loan_payment',
+    referenceId: resolvedParams?.id ? parseInt(resolvedParams.id) : undefined,
+    includePayments: true,
+    limit: 1000, // Get all entries
+  });
 
   const handleScheduleUpdate = () => {
-    if (resolvedParams?.id) {
-      queryClient.invalidateQueries({ queryKey: ['loans', resolvedParams.id, 'schedule'] });
-    }
+    // Hooks handle invalidation automatically
   };
 
   useEffect(() => {
@@ -235,6 +240,7 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
                         entry={entry}
                         loanId={resolvedParams?.id || ""}
                         onUpdate={handleScheduleUpdate}
+                        allEntries={allEntriesData?.data || []}
                       />
                     ))}
                     <TableRow className="font-semibold bg-muted">

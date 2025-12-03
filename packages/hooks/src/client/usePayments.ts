@@ -74,10 +74,22 @@ export function useCreatePayment() {
   
   return useMutation({
     mutationFn: paymentsApi.create,
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['entries', data.entryId.toString()] });
       queryClient.invalidateQueries({ queryKey: ['entries'] });
+      
+      // Also invalidate loan schedules if this is a loan payment
+      // Fetch the entry to check if it's a loan payment
+      try {
+        const entriesApi = await import('@kit/lib');
+        const entry = await entriesApi.entriesApi.getById(data.entryId.toString());
+        if (entry && entry.entryType === 'loan_payment' && entry.referenceId) {
+          queryClient.invalidateQueries({ queryKey: ['loans', entry.referenceId.toString(), 'schedule'] });
+        }
+      } catch (error) {
+        // Ignore errors when fetching entry for invalidation
+      }
     },
   });
 }
@@ -102,10 +114,28 @@ export function useDeletePayment() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: paymentsApi.delete,
-    onSuccess: () => {
+    mutationFn: async (id: string) => {
+      // Fetch payment before deleting to get entryId for invalidation
+      const payment = await paymentsApi.getById(id);
+      await paymentsApi.delete(id);
+      return payment;
+    },
+    onSuccess: async (payment) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['entries'] });
+      
+      // Also invalidate loan schedules if this is a loan payment
+      if (payment?.entryId) {
+        try {
+          const entriesApi = await import('@kit/lib');
+          const entry = await entriesApi.entriesApi.getById(payment.entryId.toString());
+          if (entry && entry.entryType === 'loan_payment' && entry.referenceId) {
+            queryClient.invalidateQueries({ queryKey: ['loans', entry.referenceId.toString(), 'schedule'] });
+          }
+        } catch (error) {
+          // Ignore errors when fetching entry for invalidation
+        }
+      }
     },
   });
 }

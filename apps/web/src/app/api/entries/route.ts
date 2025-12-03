@@ -19,6 +19,7 @@ export interface Entry {
   isRecurring: boolean;
   recurrenceType?: string;
   referenceId?: number;
+  scheduleEntryId?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -73,6 +74,7 @@ function transformEntry(row: any, payments?: any[]): Entry {
     isRecurring: row.is_recurring || false,
     recurrenceType: row.recurrence_type,
     referenceId: row.reference_id,
+    scheduleEntryId: row.schedule_entry_id,
     isActive: row.is_active !== undefined ? row.is_active : true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -109,6 +111,7 @@ function transformToSnakeCase(data: CreateEntryData | UpdateEntryData): any {
   if ('isRecurring' in data) result.is_recurring = data.isRecurring || false;
   if ('recurrenceType' in data) result.recurrence_type = data.recurrenceType || null;
   if ('referenceId' in data) result.reference_id = data.referenceId || null;
+  if ('scheduleEntryId' in data) result.schedule_entry_id = data.scheduleEntryId || null;
   if ('isActive' in data) result.is_active = data.isActive !== undefined ? data.isActive : true;
   return result;
 }

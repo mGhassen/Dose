@@ -29,6 +29,7 @@ export interface UpdatePaymentData extends Partial<CreatePaymentData> {}
 export const paymentsApi = {
   getAll: (params?: PaginationParams & { 
     entryId?: string; 
+    loanId?: string;
     isPaid?: boolean; 
     month?: string;
   }) => {
@@ -36,6 +37,7 @@ export const paymentsApi = {
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.entryId) searchParams.append('entryId', params.entryId);
+    if (params?.loanId) searchParams.append('loanId', params.loanId);
     if (params?.isPaid !== undefined) searchParams.append('isPaid', params.isPaid.toString());
     if (params?.month) searchParams.append('month', params.month);
     const query = searchParams.toString();

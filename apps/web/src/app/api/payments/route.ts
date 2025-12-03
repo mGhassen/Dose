@@ -61,11 +61,29 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const entryId = searchParams.get('entryId');
+    const loanId = searchParams.get('loanId');
     const isPaid = searchParams.get('isPaid');
     const month = searchParams.get('month');
     const { page, limit, offset } = getPaginationParams(searchParams);
 
     const supabase = createServerSupabaseClient();
+    
+    // If filtering by loanId, first get all entry IDs for that loan
+    let entryIds: number[] | null = null;
+    if (loanId) {
+      const { data: loanEntries } = await supabase
+        .from('entries')
+        .select('id')
+        .eq('reference_id', parseInt(loanId))
+        .in('entry_type', ['loan', 'loan_payment']);
+      
+      if (loanEntries && loanEntries.length > 0) {
+        entryIds = loanEntries.map(e => e.id);
+      } else {
+        // No entries found for this loan, return empty result
+        return NextResponse.json(createPaginatedResponse([], 0, page, limit));
+      }
+    }
     
     // Build base query for counting
     let countQuery = supabase
@@ -82,6 +100,12 @@ export async function GET(request: NextRequest) {
     if (entryId) {
       query = query.eq('entry_id', entryId);
       countQuery = countQuery.eq('entry_id', entryId);
+    } else if (entryIds && entryIds.length > 0) {
+      query = query.in('entry_id', entryIds);
+      countQuery = countQuery.in('entry_id', entryIds);
+    } else if (loanId) {
+      // No entries found, return empty
+      return NextResponse.json(createPaginatedResponse([], 0, page, limit));
     }
 
     if (isPaid !== null && isPaid !== undefined) {

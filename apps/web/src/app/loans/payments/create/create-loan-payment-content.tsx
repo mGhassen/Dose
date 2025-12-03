@@ -241,43 +241,57 @@ export default function CreateLoanPaymentPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {schedule.map((entry: LoanScheduleEntry) => {
-                        const entryPayments = entriesData?.data?.find(
-                          e => e.scheduleEntryId === entry.id
-                        );
-                        const entryTotalPaid = entryPayments?.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0;
-                        const isFullyPaid = entryTotalPaid >= entry.totalPayment;
-                        const hasPartial = entryTotalPaid > 0 && !isFullyPaid;
-                        
-                        return (
-                          <TableRow key={entry.id} className="cursor-pointer hover:bg-muted/50">
-                            <TableCell className="font-medium">{entry.month}</TableCell>
-                            <TableCell>{formatDate(entry.paymentDate)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(entry.principalPayment)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(entry.interestPayment)}</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(entry.totalPayment)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(entry.remainingBalance)}</TableCell>
-                            <TableCell>
-                              <Badge variant={isFullyPaid ? "default" : hasPartial ? "outline" : "secondary"}>
-                                {isFullyPaid ? 'Paid' : hasPartial ? `Partial (${formatCurrency(entryTotalPaid)})` : 'Pending'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedScheduleEntry(entry);
-                                  setStep('make-payment');
-                                }}
-                              >
-                                Select
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      {schedule
+                        .filter((entry: LoanScheduleEntry) => {
+                          // Filter out fully paid entries
+                          const entryPayments = entriesData?.data?.find(
+                            e => e.scheduleEntryId === entry.id
+                          );
+                          const payments = entryPayments?.payments || [];
+                          const totalPaid = payments.filter((p: any) => p.isPaid).reduce((sum: number, p: any) => sum + p.amount, 0);
+                          const isFullyPaid = totalPaid >= entry.totalPayment;
+                          return !isFullyPaid; // Only show entries that are not fully paid
+                        })
+                        .map((entry: LoanScheduleEntry) => {
+                          const entryPayments = entriesData?.data?.find(
+                            e => e.scheduleEntryId === entry.id
+                          );
+                          const payments = entryPayments?.payments || [];
+                          const totalPaid = payments.filter((p: any) => p.isPaid).reduce((sum: number, p: any) => sum + p.amount, 0);
+                          const isFullyPaid = totalPaid >= entry.totalPayment;
+                          const hasPartial = totalPaid > 0 && !isFullyPaid;
+                          const isPastDue = new Date(entry.paymentDate) < new Date() && !isFullyPaid;
+                          
+                          return (
+                            <TableRow key={entry.id} className={isPastDue ? "bg-destructive/10" : "cursor-pointer hover:bg-muted/50"}>
+                              <TableCell className="font-medium">{entry.month}</TableCell>
+                              <TableCell>{formatDate(entry.paymentDate)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(entry.principalPayment)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(entry.interestPayment)}</TableCell>
+                              <TableCell className="text-right font-semibold">{formatCurrency(entry.totalPayment)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(entry.remainingBalance)}</TableCell>
+                              <TableCell>
+                                <Badge variant={isFullyPaid ? "default" : isPastDue ? "destructive" : hasPartial ? "outline" : "secondary"}>
+                                  {isFullyPaid ? 'Paid' : hasPartial ? `Partial (${formatCurrency(totalPaid)})` : isPastDue ? 'Past Due' : 'Pending'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedScheduleEntry(entry);
+                                    setStep('make-payment');
+                                  }}
+                                  disabled={isFullyPaid}
+                                >
+                                  Select
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                     </TableBody>
                   </Table>
                 </div>

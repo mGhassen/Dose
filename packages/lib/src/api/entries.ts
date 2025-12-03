@@ -62,6 +62,8 @@ export const entriesApi = {
     category?: string; 
     month?: string;
     includePayments?: boolean;
+    referenceId?: number;
+    scheduleEntryId?: number;
   }) => {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.append('page', params.page.toString());
@@ -71,6 +73,8 @@ export const entriesApi = {
     if (params?.category) searchParams.append('category', params.category);
     if (params?.month) searchParams.append('month', params.month);
     if (params?.includePayments) searchParams.append('includePayments', 'true');
+    if (params?.referenceId) searchParams.append('referenceId', params.referenceId.toString());
+    if (params?.scheduleEntryId) searchParams.append('scheduleEntryId', params.scheduleEntryId.toString());
     const query = searchParams.toString();
     return apiRequest<PaginatedResponse<Entry>>('GET', `/api/entries${query ? `?${query}` : ''}`);
   },

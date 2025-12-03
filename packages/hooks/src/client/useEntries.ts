@@ -12,6 +12,8 @@ export function useEntries(params?: {
   category?: string; 
   month?: string;
   includePayments?: boolean;
+  referenceId?: number;
+  scheduleEntryId?: number;
 }) {
   return useQuery({
     queryKey: ['entries', params],

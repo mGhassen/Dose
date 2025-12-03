@@ -63,11 +63,36 @@ export async function POST(
     // Calculate schedule
     const schedule = calculateLoanSchedule(loan);
 
+    // Delete existing schedule entries and their associated entries
+    const { data: existingSchedules } = await supabase
+      .from('loan_schedules')
+      .select('id')
+      .eq('loan_id', id);
+
+    if (existingSchedules && existingSchedules.length > 0) {
+      const scheduleIds = existingSchedules.map(s => s.id);
+      // Delete entries associated with these schedule entries
+      await supabase
+        .from('entries')
+        .delete()
+        .eq('entry_type', 'loan_payment')
+        .eq('reference_id', parseInt(id))
+        .in('schedule_entry_id', scheduleIds);
+    }
+
     // Delete existing schedule entries
     await supabase
       .from('loan_schedules')
       .delete()
       .eq('loan_id', id);
+    
+    // Also delete any orphaned entries (entries without a schedule_entry_id or with invalid schedule_entry_id)
+    await supabase
+      .from('entries')
+      .delete()
+      .eq('entry_type', 'loan_payment')
+      .eq('reference_id', parseInt(id))
+      .is('schedule_entry_id', null);
 
     // Insert new schedule entries
     const scheduleData = schedule.map(transformScheduleToSnakeCase);
