@@ -37,6 +37,7 @@ export * from './api/working-capital';
 export * from './api/profit-loss';
 export * from './api/balance-sheet';
 export * from './api/financial-plan';
+export * from './api/financial-statement';
 export * from './api/budgets';
 export * from './api/dashboard';
 export * from './api/actual-payments';

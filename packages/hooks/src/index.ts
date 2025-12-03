@@ -29,6 +29,7 @@ export * from './client/useCashFlow';
 export * from './client/useWorkingCapital';
 export * from './client/useBalanceSheet';
 export * from './client/useFinancialPlan';
+export * from './client/useFinancialStatement';
 export * from './client/useDashboard';
 export * from './client/useBudgetProjections';
 export * from './client/useBudgets';

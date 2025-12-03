@@ -130,7 +130,34 @@
     "email": "Email",
     "phone": "Téléphone",
     "role": "Rôle",
-    "department": "Département"
+    "department": "Département",
+    "date": {
+      "from": "De",
+      "to": "À"
+    },
+    "trends": "Tendances",
+    "performance": "Performance pour",
+    "sales": {
+      "onSite": "Sur place",
+      "delivery": "Livraison",
+      "takeaway": "À emporter",
+      "catering": "Traiteur",
+      "other": "Autre"
+    },
+    "expenses": {
+      "categories": {
+        "rent": "Loyer",
+        "utilities": "Charges",
+        "supplies": "Fournitures",
+        "marketing": "Marketing",
+        "insurance": "Assurance",
+        "maintenance": "Maintenance",
+        "professionalServices": "Services professionnels",
+        "other": "Autres"
+      }
+    },
+    "salary": "Salaire",
+    "charges": "Charges"
   },
   "navigation": {
     "home": "Accueil",
@@ -158,6 +185,7 @@
     "stockMovements": "Mouvements de Stock",
     "expiryDates": "Dates d'Expiration",
     "financialResults": "Résultats Financiers",
+    "financialStatement": "États Financiers",
     "cashFlow": "Trésorerie",
     "profitLoss": "Résultat",
     "balanceSheet": "Bilan",
@@ -342,6 +370,70 @@
       "open": "Ouvert",
       "resolved": "Résolu",
       "closed": "Fermé"
+    }
+  },
+  "financialStatement": {
+    "title": "États Financiers",
+    "subtitle": "Vue d'ensemble financière complète et états des résultats détaillés",
+    "incomeStatement": "États des résultats",
+    "comprehensiveView": "Vue d'ensemble",
+    "detailedView": "Détail",
+    "summaryView": "Résumé",
+    "export": "Exporter CSV",
+    "period": {
+      "year": "Année complète",
+      "quarter": "Trimestre",
+      "month": "Mois",
+      "selectPeriod": "Sélectionner une période"
+    },
+    "sections": {
+      "operatingIncome": "Produits d'exploitation",
+      "sales": "Ventes",
+      "costOfGoodsSold": "Coût des marchandises vendues",
+      "grossProfit": "Profit brut",
+      "operatingExpenses": "Dépenses d'exploitation",
+      "personnelCosts": "Salaires et rémunération des employés",
+      "socialSecurity": "Charge CNSS",
+      "socialSecurityG": "CNSS G",
+      "socialSecurityW": "CNSS W",
+      "leasingCosts": "Loyers et charges locatives",
+      "depreciation": "Amortissements",
+      "interestExpense": "Intérêts",
+      "taxes": "Impôts",
+      "otherExpenses": "Autres charges",
+      "operatingProfit": "Bénéfice d'exploitation",
+      "nonOperatingIncome": "Bénéfices hors exploitation",
+      "nonOperatingExpenses": "Frais hors exploitation",
+      "exchangeGainsLosses": "Échangez un gain ou une perte",
+      "netProfit": "Profit net / Perte nette"
+    },
+    "totals": {
+      "totalFor": "Total pour {section}",
+      "totalOperatingIncome": "Total pour Produits d'exploitation",
+      "totalCostOfGoodsSold": "Total pour Coût des marchandises vendues",
+      "totalOperatingExpenses": "Total pour Dépenses d'exploitation",
+      "totalSocialSecurity": "Total pour Charge CNSS",
+      "totalNonOperatingIncome": "Total pour Bénéfices hors exploitation",
+      "totalNonOperatingExpenses": "Total pour Frais hors exploitation"
+    },
+    "header": {
+      "companyName": "Nom de l'entreprise",
+      "reportTitle": "États des résultats",
+      "accountingBasis": "Base : Comptabilité d'exercice",
+      "account": "COMPTE",
+      "accountCode": "CODE DU COMPTE",
+      "total": "TOTAL",
+      "currencyNote": "**Le montant s'affiche dans votre devise de base EUR"
+    },
+    "summary": {
+      "totalRevenue": "Revenus totaux",
+      "netProfit": "Bénéfice net",
+      "totalAssets": "Actifs totaux",
+      "avgCashBalance": "Solde de trésorerie moyen",
+      "profitMargin": "Marge bénéficiaire",
+      "revenueGrowth": "Croissance des revenus",
+      "assetsGrowth": "Croissance des actifs",
+      "monthlyAverage": "Moyenne mensuelle"
     }
   }
 }

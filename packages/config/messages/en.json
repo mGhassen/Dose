@@ -130,7 +130,32 @@
     "email": "Email",
     "phone": "Phone",
     "role": "Role",
-    "department": "Department"
+    "department": "Department",
+    "date": {
+      "from": "From",
+      "to": "To"
+    },
+    "trends": "Trends",
+    "performance": "Performance for",
+    "sales": {
+      "onSite": "On Site",
+      "delivery": "Delivery",
+      "takeaway": "Takeaway",
+      "catering": "Catering",
+      "other": "Other"
+    },
+    "expenses": {
+      "categories": {
+        "rent": "Rent",
+        "utilities": "Utilities",
+        "supplies": "Supplies",
+        "marketing": "Marketing",
+        "insurance": "Insurance",
+        "maintenance": "Maintenance",
+        "professionalServices": "Professional Services",
+        "other": "Other"
+      }
+    }
   },
   "navigation": {
     "home": "Home",
@@ -158,6 +183,7 @@
     "stockMovements": "Stock Movements",
     "expiryDates": "Expiry Dates",
     "financialResults": "Financial Results",
+    "financialStatement": "Financial Statement",
     "cashFlow": "Cash Flow",
     "profitLoss": "Profit & Loss",
     "balanceSheet": "Balance Sheet",
@@ -342,6 +368,70 @@
       "open": "Open",
       "resolved": "Resolved",
       "closed": "Closed"
+    }
+  },
+  "financialStatement": {
+    "title": "Financial Statement",
+    "subtitle": "Comprehensive financial overview and detailed income statements",
+    "incomeStatement": "Income Statement",
+    "comprehensiveView": "Overview",
+    "detailedView": "Detailed",
+    "summaryView": "Summary",
+    "export": "Export CSV",
+    "period": {
+      "year": "Full Year",
+      "quarter": "Quarter",
+      "month": "Month",
+      "selectPeriod": "Select Period"
+    },
+    "sections": {
+      "operatingIncome": "Operating Income",
+      "sales": "Sales",
+      "costOfGoodsSold": "Cost of Goods Sold",
+      "grossProfit": "Gross Profit",
+      "operatingExpenses": "Operating Expenses",
+      "personnelCosts": "Salaries and Employee Compensation",
+      "socialSecurity": "Social Security Contributions",
+      "socialSecurityG": "CNSS G",
+      "socialSecurityW": "CNSS W",
+      "leasingCosts": "Leasing and Rental Charges",
+      "depreciation": "Depreciation",
+      "interestExpense": "Interest",
+      "taxes": "Taxes",
+      "otherExpenses": "Other Expenses",
+      "operatingProfit": "Operating Profit",
+      "nonOperatingIncome": "Non-Operating Income",
+      "nonOperatingExpenses": "Non-Operating Expenses",
+      "exchangeGainsLosses": "Exchange Gains or Losses",
+      "netProfit": "Net Profit / Net Loss"
+    },
+    "totals": {
+      "totalFor": "Total for {section}",
+      "totalOperatingIncome": "Total for Operating Income",
+      "totalCostOfGoodsSold": "Total for Cost of Goods Sold",
+      "totalOperatingExpenses": "Total for Operating Expenses",
+      "totalSocialSecurity": "Total for Social Security Contributions",
+      "totalNonOperatingIncome": "Total for Non-Operating Income",
+      "totalNonOperatingExpenses": "Total for Non-Operating Expenses"
+    },
+    "header": {
+      "companyName": "Company Name",
+      "reportTitle": "Income Statement",
+      "accountingBasis": "Basis: Accrual Accounting",
+      "account": "ACCOUNT",
+      "accountCode": "ACCOUNT CODE",
+      "total": "TOTAL",
+      "currencyNote": "**Amounts are displayed in your base currency EUR"
+    },
+    "summary": {
+      "totalRevenue": "Total Revenue",
+      "netProfit": "Net Profit",
+      "totalAssets": "Total Assets",
+      "avgCashBalance": "Average Cash Balance",
+      "profitMargin": "Profit Margin",
+      "revenueGrowth": "Revenue Growth",
+      "assetsGrowth": "Assets Growth",
+      "monthlyAverage": "Monthly Average"
     }
   }
 }
