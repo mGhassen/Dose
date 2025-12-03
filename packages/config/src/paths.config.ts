@@ -96,18 +96,6 @@ export const pathsConfig: NavigationConfig = {
       translationKey: "financialResults",
       items: [
         {
-          title: "inputs",
-          url: "/inputs",
-          icon: "Database",
-          translationKey: "inputs"
-        },
-        {
-          title: "outputs",
-          url: "/outputs",
-          icon: "Database",
-          translationKey: "outputs"
-        },
-        {
           title: "investments",
           url: "/investments",
           translationKey: "investments"
@@ -136,6 +124,11 @@ export const pathsConfig: NavigationConfig = {
           title: "financial-plan",
           url: "/financial-plan",
           translationKey: "financialPlan"
+        },
+        {
+          title: "financial-statement",
+          url: "/financial-statement",
+          translationKey: "financialStatement"
         },
       ]
     },
