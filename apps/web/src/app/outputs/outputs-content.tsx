@@ -68,6 +68,19 @@ export default function OutputsContent() {
     },
     {
       accessorKey: "payments",
+      header: "Amount Paid",
+      cell: ({ row }) => {
+        const payments = row.original.payments || [];
+        const totalPaid = payments.filter(p => p.isPaid).reduce((sum, p) => sum + p.amount, 0);
+        return (
+          <div className="font-medium">
+            {formatCurrency(totalPaid)}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "payments",
       header: "Payment Status",
       cell: ({ row }) => {
         const payments = row.original.payments || [];
@@ -124,14 +137,19 @@ export default function OutputsContent() {
 
   const handleBulkExport = async (entries: Entry[]) => {
     const csv = [
-      ['Name', 'Type', 'Amount', 'Date', 'Description'].join(','),
-      ...entries.map(entry => [
-        `"${entry.name}"`,
-        `"${entryTypeLabels[entry.entryType] || entry.entryType}"`,
-        entry.amount,
-        entry.entryDate,
-        `"${entry.description || ''}"`
-      ].join(','))
+      ['Name', 'Type', 'Amount', 'Amount Paid', 'Date', 'Description'].join(','),
+      ...entries.map(entry => {
+        const payments = entry.payments || [];
+        const totalPaid = payments.filter(p => p.isPaid).reduce((sum, p) => sum + p.amount, 0);
+        return [
+          `"${entry.name}"`,
+          `"${entryTypeLabels[entry.entryType] || entry.entryType}"`,
+          entry.amount,
+          totalPaid,
+          entry.entryDate,
+          `"${entry.description || ''}"`
+        ].join(',');
+      })
     ].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv' });

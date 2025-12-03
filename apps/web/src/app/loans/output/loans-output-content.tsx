@@ -51,13 +51,33 @@ export default function LoansOutputContent() {
       accessorKey: "name",
       header: "Payment Description",
       cell: ({ row }) => (
-        <div className="font-medium">{row.original.name}</div>
+        <div>
+          <div className="font-medium">{row.original.name}</div>
+          {row.original.description && (
+            <div className="text-sm text-muted-foreground mt-1">
+              {row.original.description}
+            </div>
+          )}
+        </div>
       ),
     },
     {
       accessorKey: "amount",
       header: "Payment Amount",
       cell: ({ row }) => formatCurrency(row.original.amount),
+    },
+    {
+      accessorKey: "payments",
+      header: "Amount Paid",
+      cell: ({ row }) => {
+        const payments = row.original.payments || [];
+        const totalPaid = payments.filter(p => p.isPaid).reduce((sum, p) => sum + p.amount, 0);
+        return (
+          <div className="font-medium">
+            {formatCurrency(totalPaid)}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "dueDate",
@@ -85,15 +105,6 @@ export default function LoansOutputContent() {
           </Badge>;
         }
       },
-    },
-    {
-      accessorKey: "description",
-      header: "Description",
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground max-w-[200px] truncate">
-          {row.original.description}
-        </div>
-      ),
     },
   ], []);
 
@@ -126,13 +137,18 @@ export default function LoansOutputContent() {
 
   const handleBulkExport = async (entries: Entry[]) => {
     const csv = [
-      ['Payment Description', 'Payment Amount', 'Due Date', 'Description'].join(','),
-      ...entries.map(entry => [
-        `"${entry.name}"`,
-        entry.amount,
-        entry.dueDate || entry.entryDate,
-        `"${entry.description || ''}"`
-      ].join(','))
+      ['Payment Description', 'Payment Amount', 'Amount Paid', 'Due Date', 'Description'].join(','),
+      ...entries.map(entry => {
+        const payments = entry.payments || [];
+        const totalPaid = payments.filter(p => p.isPaid).reduce((sum, p) => sum + p.amount, 0);
+        return [
+          `"${entry.name}"`,
+          entry.amount,
+          totalPaid,
+          entry.dueDate || entry.entryDate,
+          `"${entry.description || ''}"`
+        ].join(',');
+      })
     ].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv' });
