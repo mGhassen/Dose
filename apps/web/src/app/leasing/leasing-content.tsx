@@ -94,8 +94,6 @@ export default function LeasingContent() {
   ], []);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this leasing payment?")) return;
-    
     try {
       await deleteMutation.mutateAsync(id);
       toast.success("Leasing payment deleted successfully");
@@ -106,8 +104,6 @@ export default function LeasingContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} leasing payment(s)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
       toast.success(`${ids.length} leasing payment(s) deleted successfully`);

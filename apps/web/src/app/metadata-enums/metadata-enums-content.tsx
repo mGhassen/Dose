@@ -58,8 +58,6 @@ export default function MetadataEnumsContent() {
   );
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this enum? This will also delete all its values.")) return;
-
     try {
       await deleteMutation.mutateAsync(id);
       toast.success("Enum deleted successfully");
@@ -70,8 +68,6 @@ export default function MetadataEnumsContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} enum(s)?`)) return;
-
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
       toast.success(`${ids.length} enum(s) deleted successfully`);

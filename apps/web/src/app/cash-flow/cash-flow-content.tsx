@@ -126,8 +126,6 @@ export default function CashFlowContent() {
   ], []);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this cash flow entry?")) return;
-    
     try {
       await deleteMutation.mutateAsync(String(id));
       toast.success("Cash flow entry deleted successfully");
@@ -138,8 +136,6 @@ export default function CashFlowContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} cash flow entry(ies)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} cash flow entry(ies) deleted successfully`);

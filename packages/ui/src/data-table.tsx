@@ -262,12 +262,6 @@ export default function DataTable({
   };
 
   const handleSelectRow = (rowId: number, checked: boolean) => {
-    console.log('[DataTable @kit/ui] handleSelectRow:', { 
-      rowId, 
-      checked, 
-      currentSelected: Array.from(selectedRows),
-      rowData: paginatedData.find(r => r.id === rowId)
-    });
     const newSelected = new Set(selectedRows);
     if (checked) {
       newSelected.add(rowId);
@@ -275,7 +269,6 @@ export default function DataTable({
       newSelected.delete(rowId);
     }
     setSelectedRows(newSelected);
-    console.log('[DataTable @kit/ui] Updated selectedRows:', Array.from(newSelected));
     
     // Call external handler if provided
     if (onRowSelect) {
@@ -459,17 +452,8 @@ export default function DataTable({
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={(checked) => {
-                              console.log('[DataTable @kit/ui] Checkbox clicked:', {
-                                rowIndex,
-                                rowId,
-                                checked,
-                                rowData: { id: row.id, ...Object.keys(row).slice(0, 3).reduce((acc, k) => ({ ...acc, [k]: row[k] }), {}) },
-                                allRowIds: allRowIds.slice(0, 5)
-                              });
                               if (rowId !== undefined) {
                                 handleSelectRow(rowId, checked as boolean);
-                              } else {
-                                console.warn('[DataTable @kit/ui] Cannot select row: no valid ID found', row);
                               }
                             }}
                             onClick={(e) => e.stopPropagation()}

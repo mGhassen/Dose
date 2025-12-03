@@ -116,8 +116,6 @@ export default function PersonnelContent() {
   ], []);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this personnel record?")) return;
-    
     try {
       await deleteMutation.mutateAsync(id);
       toast.success("Personnel record deleted successfully");
@@ -128,8 +126,6 @@ export default function PersonnelContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} personnel record(s)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
       toast.success(`${ids.length} personnel record(s) deleted successfully`);

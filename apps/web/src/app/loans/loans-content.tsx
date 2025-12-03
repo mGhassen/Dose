@@ -131,8 +131,6 @@ export default function LoansContent() {
   ], [router]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this loan?")) return;
-    
     try {
       await deleteMutation.mutateAsync(String(id));
       toast.success("Loan deleted successfully");
@@ -143,8 +141,6 @@ export default function LoansContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} loan(s)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} loan(s) deleted successfully`);

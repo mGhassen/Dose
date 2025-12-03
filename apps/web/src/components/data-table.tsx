@@ -336,14 +336,6 @@ export default function DataTable({
 
   // Handle row selection
   const handleRowSelect = (rowId: number, selected: boolean) => {
-    console.log('[DataTable] handleRowSelect called:', { 
-      rowId, 
-      selected, 
-      externalSelectedRows: externalSelectedRows !== undefined,
-      currentSelectedRows: Array.from(selectedRows),
-      dataLength: data.length,
-      firstFewRowIds: data.slice(0, 5).map(r => r.id)
-    });
     // Always notify parent first
     onRowSelect?.(rowId, selected);
     
@@ -355,10 +347,6 @@ export default function DataTable({
       } else {
         newSelected.delete(rowId);
       }
-      console.log('[DataTable] Internal state update:', { 
-        before: Array.from(internalSelectedRows), 
-        after: Array.from(newSelected) 
-      });
       setInternalSelectedRows(newSelected);
     }
   };
@@ -370,41 +358,30 @@ export default function DataTable({
       ? paginatedData 
       : Object.values(paginatedData).flat();
     
-    const allIds = displayedData
-      .map((row, idx) => {
+    const allRowIds = displayedData
+      .map((row) => {
         // Handle both 'id' and numeric IDs (including 0)
         const id = row?.id;
-        const extractedId = typeof id === 'number' ? id : undefined;
-        if (idx < 3) {
-          console.log(`[DataTable] handleSelectAll - row ${idx}:`, { id, extractedId, row: { id: row.id, ...Object.keys(row).slice(0, 2).reduce((acc, k) => ({ ...acc, [k]: row[k] }), {}) } });
-        }
-        return extractedId;
+        return typeof id === 'number' ? id : undefined;
       })
       .filter((id): id is number => id !== undefined);
     
-    console.log('[DataTable] handleSelectAll:', {
-      displayedDataLength: displayedData.length,
-      allIds,
-      currentSelectedRows: Array.from(selectedRows),
-      isAllSelected: allIds.length > 0 && allIds.every(id => selectedRows.has(id))
-    });
-    
-    const isAllSelected = allIds.length > 0 && 
-      allIds.every(id => selectedRows.has(id));
+    const isAllSelected = allRowIds.length > 0 && 
+      allRowIds.every(id => selectedRows.has(id));
     
     if (onSelectAll) {
       // Use batch selection callback if provided
       if (isAllSelected) {
-        onSelectAll(allIds, false);
+        onSelectAll(allRowIds, false);
       } else {
-        onSelectAll(allIds, true);
+        onSelectAll(allRowIds, true);
       }
     } else {
       // Fallback to individual row selection (less efficient)
       if (isAllSelected) {
-        allIds.forEach(id => onRowSelect?.(id, false));
+        allRowIds.forEach(id => onRowSelect?.(id, false));
       } else {
-        allIds.forEach(id => onRowSelect?.(id, true));
+        allRowIds.forEach(id => onRowSelect?.(id, true));
       }
     }
     
@@ -491,18 +468,6 @@ export default function DataTable({
       // Check if this row is selected - always read fresh from selectedRows
       const isSelected = rowId !== undefined && selectedRows.has(rowId);
       
-      // Debug logging for first few rows
-      if (index < 3) {
-        console.log(`[DataTable] Rendering row ${index}:`, {
-          rowId,
-          rowKey,
-          isSelected,
-          rawId,
-          rowData: { id: row.id, ...Object.keys(row).slice(0, 3).reduce((acc, k) => ({ ...acc, [k]: row[k] }), {}) },
-          selectedRowsContents: Array.from(selectedRows).slice(0, 5)
-        });
-      }
-      
       // Capture rowId in a const for the checkbox handler to avoid closure issues
       const capturedRowId = rowId;
       
@@ -520,18 +485,8 @@ export default function DataTable({
               checked={isSelected}
               onCheckedChange={(checked) => {
                 // Use captured rowId to ensure we're selecting the correct row
-                console.log(`[DataTable] Checkbox clicked for row ${index}:`, {
-                  capturedRowId,
-                  checked,
-                  rowIdFromRow: row.id,
-                  rowData: { id: row.id, ...Object.keys(row).slice(0, 3).reduce((acc, k) => ({ ...acc, [k]: row[k] }), {}) },
-                  allRowIds: rows.map((r, i) => ({ index: i, id: r.id })).slice(0, 5),
-                  selectedRowsBefore: Array.from(selectedRows)
-                });
                 if (capturedRowId !== undefined) {
                   handleRowSelect(capturedRowId, checked);
-                } else {
-                  console.warn(`[DataTable] Cannot select row ${index}: no valid ID found`, row);
                 }
               }}
               onClick={(e) => e.stopPropagation()}

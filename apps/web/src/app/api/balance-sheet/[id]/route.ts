@@ -138,7 +138,7 @@ export async function DELETE(
 
     if (error) throw error;
 
-    return NextResponse.json({}, { status: 204 });
+    return new NextResponse(null, { status: 204 });
   } catch (error: any) {
     console.error('Error deleting balance sheet:', error);
     return NextResponse.json(

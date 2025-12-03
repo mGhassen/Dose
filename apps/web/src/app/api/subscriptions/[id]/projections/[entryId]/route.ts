@@ -251,7 +251,7 @@ export async function DELETE(
         .eq('id', entryData.id);
     }
 
-    return NextResponse.json({}, { status: 204 });
+    return new NextResponse(null, { status: 204 });
   } catch (error: any) {
     console.error('Error deleting subscription projection entry:', error);
     return NextResponse.json(

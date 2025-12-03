@@ -406,7 +406,7 @@ export async function DELETE(
 
     if (deleteError) throw deleteError;
 
-    return NextResponse.json({}, { status: 204 });
+    return new NextResponse(null, { status: 204 });
   } catch (error: any) {
     console.error('Error in DELETE /api/users/[id]:', error);
     return NextResponse.json(

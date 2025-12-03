@@ -135,8 +135,6 @@ export default function ProfitLossContent() {
   ], []);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this profit & loss statement?")) return;
-    
     try {
       await deleteMutation.mutateAsync(String(id));
       toast.success("Profit & Loss statement deleted successfully");
@@ -147,8 +145,6 @@ export default function ProfitLossContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} profit & loss statement(s)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} profit & loss statement(s) deleted successfully`);

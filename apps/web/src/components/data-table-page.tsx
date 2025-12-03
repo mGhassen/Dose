@@ -39,6 +39,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import GridView, { GridColumn, GridRow } from "@/components/grid-view";
 import ViewToggle from "@/components/view-toggle";
 import { formatMonthYear } from "@kit/lib/date-format";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface DataTablePageProps<T> {
   title: string;
@@ -163,6 +164,11 @@ export default function DataTablePage<T>({
   });
   const [pendingFilters, setPendingFilters] = useState<any[]>([]);
   const [unifiedFilters, setUnifiedFilters] = useState<FilterState>({});
+  
+  // Confirmation dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteAction, setDeleteAction] = useState<{ type: 'single' | 'bulk'; id?: number; ids?: number[] } | null>(null);
 
   useEffect(() => {
     setPendingFilters([...appliedFilters]);
@@ -180,27 +186,35 @@ export default function DataTablePage<T>({
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (onDelete && confirm(tMessages('confirm.delete', { item: 'item' }))) {
-      try {
-        await onDelete(id);
-      } catch (error) {
-        console.error(tMessages('error.deleteItem'), error);
-      }
-    }
+  const handleDelete = (id: number) => {
+    if (!onDelete) return;
+    setDeleteAction({ type: 'single', id });
+    setDeleteDialogOpen(true);
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedRows.size === 0 || !onBulkDelete) return;
+    setDeleteAction({ type: 'bulk', ids: Array.from(selectedRows) });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteAction) return;
     
-    if (confirm(tMessages('confirm.deleteItems', { count: selectedRows.size }))) {
-      try {
-        const ids = Array.from(selectedRows);
-        await onBulkDelete(ids);
+    setDeletePending(true);
+    try {
+      if (deleteAction.type === 'single' && deleteAction.id && onDelete) {
+        await onDelete(deleteAction.id);
+      } else if (deleteAction.type === 'bulk' && deleteAction.ids && onBulkDelete) {
+        await onBulkDelete(deleteAction.ids);
         setSelectedRows(new Set());
-      } catch (error) {
-        console.error(tMessages('error.deleteItems'), error);
       }
+      setDeleteDialogOpen(false);
+      setDeleteAction(null);
+    } catch (error) {
+      console.error(deleteAction.type === 'single' ? tMessages('error.deleteItem') : tMessages('error.deleteItems'), error);
+    } finally {
+      setDeletePending(false);
     }
   };
 
@@ -614,6 +628,7 @@ export default function DataTablePage<T>({
   const hasHiddenColumns = visibleColumns.size < columns.length;
 
   return (
+    <>
     <div className="space-y-0 flex flex-col h-full">
         <div className="px-4 py-3">
           <h1 className="text-xl font-semibold text-foreground">{title}</h1>
@@ -1180,7 +1195,6 @@ export default function DataTablePage<T>({
             onRowClick={handleRowClick}
             selectedRows={selectedRows}
             onRowSelect={(rowId, selected) => {
-              console.log('[DataTablePage] onRowSelect called:', { rowId, selected });
               setSelectedRows(prev => {
                 const newSelected = new Set(prev);
                 if (selected) {
@@ -1188,7 +1202,6 @@ export default function DataTablePage<T>({
                 } else {
                   newSelected.delete(rowId);
                 }
-                console.log('[DataTablePage] Updated selectedRows:', Array.from(newSelected));
                 return newSelected;
               });
             }}
@@ -1316,5 +1329,28 @@ export default function DataTablePage<T>({
           )}
         </div>
       </div>
+      
+      {/* Confirmation Dialog for Delete */}
+      <ConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open && !deletePending) {
+            setDeleteAction(null);
+          }
+        }}
+        onConfirm={confirmDelete}
+        title={deleteAction?.type === 'bulk' 
+          ? tMessages('confirm.deleteItems', { count: deleteAction.ids?.length || 0 })
+          : tMessages('confirm.delete', { item: 'item' })}
+        description={deleteAction?.type === 'bulk'
+          ? `This will permanently delete ${deleteAction.ids?.length || 0} item${(deleteAction.ids?.length || 0) !== 1 ? 's' : ''}. This action cannot be undone.`
+          : "This action cannot be undone."}
+        confirmText={t('delete')}
+        cancelText={t('cancel')}
+        isPending={deletePending}
+        variant="destructive"
+      />
+    </>
   );
 }
