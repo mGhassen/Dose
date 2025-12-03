@@ -40,7 +40,7 @@ export const pathsConfig: NavigationConfig = {
     },
     {
       title: "inputs",
-      url: "#",
+      url: "/inputs",
       icon: "Database",
       translationKey: "inputs",
       items: [
@@ -49,11 +49,16 @@ export const pathsConfig: NavigationConfig = {
           url: "/sales",
           translationKey: "sales"
         },
+        {
+          title: "loans",
+          url: "/loans/input",
+          translationKey: "loans"
+        },
       ]
     },
     {
       title: "outputs",
-      url: "#",
+      url: "/outputs",
       icon: "Database",
       translationKey: "outputs",
       items: [
@@ -74,8 +79,8 @@ export const pathsConfig: NavigationConfig = {
         },
         {
           title: "loans",
-          url: "/loans",
-          translationKey: "loans"
+          url: "/loans/output",
+          translationKey: "loanPayments"
         },
         {
           title: "leasing",

@@ -4,12 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
-import { ArrowLeft, Download, Calendar, TrendingDown } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useLoanById, useLoanSchedule, useGenerateLoanSchedule } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
-import { formatDate, formatMonthYear } from "@kit/lib/date-format";
+import { formatDate } from "@kit/lib/date-format";
 import {
   Table,
   TableBody,
@@ -113,19 +113,6 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
   const totalPayments = schedule?.reduce((sum, entry) => sum + entry.totalPayment, 0) || 0;
   const paidCount = schedule?.filter(e => e.isPaid).length || 0;
   const pendingCount = schedule?.filter(e => !e.isPaid).length || 0;
-
-  // Monthly totals for visualization
-  const monthlyTotals: Record<string, { principal: number; interest: number; total: number }> = {};
-  schedule?.forEach(entry => {
-    const [year, month] = entry.paymentDate.split('-').slice(0, 2);
-    const monthKey = `${year}-${month}`;
-    if (!monthlyTotals[monthKey]) {
-      monthlyTotals[monthKey] = { principal: 0, interest: 0, total: 0 };
-    }
-    monthlyTotals[monthKey].principal += entry.principalPayment;
-    monthlyTotals[monthKey].interest += entry.interestPayment;
-    monthlyTotals[monthKey].total += entry.totalPayment;
-  });
 
   return (
     <AppLayout>
@@ -270,56 +257,6 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
                 <Button onClick={handleGenerateSchedule} disabled={generateSchedule.isPending}>
                   {generateSchedule.isPending ? "Generating..." : "Generate Amortization Schedule"}
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Monthly Summary */}
-        {Object.keys(monthlyTotals).length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Monthly Payment Summary</CardTitle>
-              <CardDescription>Payment breakdown by month</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(monthlyTotals)
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([month, totals]) => {
-                    const [year, monthNum] = month.split('-');
-                    const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-                    const isFuture = date > new Date();
-                    return (
-                      <div key={month} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <Calendar className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <span className="font-medium text-lg">
-                              {formatMonthYear(date)}
-                            </span>
-                            {isFuture && (
-                              <Badge variant="secondary" className="ml-2">Upcoming</Badge>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-6">
-                          <div className="text-right">
-                            <p className="text-xs text-muted-foreground">Principal</p>
-                            <p className="font-semibold">{formatCurrency(totals.principal)}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xs text-muted-foreground">Interest</p>
-                            <p className="font-semibold text-orange-600">{formatCurrency(totals.interest)}</p>
-                          </div>
-                          <div className="text-right border-l pl-6">
-                            <p className="text-xs text-muted-foreground">Total Payment</p>
-                            <p className="font-bold text-lg text-primary">{formatCurrency(totals.total)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
               </div>
             </CardContent>
           </Card>

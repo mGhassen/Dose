@@ -1,12 +1,12 @@
 "use client";
 
 import AppLayout from '@/components/app-layout';
-import InputsContent from './inputs-content';
+import OutputsContent from './outputs-content';
 
-export default function InputsPage() {
+export default function OutputsPage() {
   return (
     <AppLayout>
-      <InputsContent />
+      <OutputsContent />
     </AppLayout>
   );
 }
