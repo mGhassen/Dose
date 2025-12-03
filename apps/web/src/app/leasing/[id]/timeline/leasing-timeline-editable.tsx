@@ -86,15 +86,7 @@ export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: Edita
     <>
       <TableRow className={isPastDue ? "bg-destructive/10" : isProjected && !isFullyPaid ? "bg-muted/50" : ""}>
         <TableCell className="font-medium">
-          <div className="flex items-center space-x-2">
-            {formatMonthYear(date)}
-            {isProjected && !isFullyPaid && (
-              <Badge variant="secondary" className="text-xs">(Projected)</Badge>
-            )}
-            {totalPaid > 0 && (
-              <Badge variant="default" className="text-xs">(Actual)</Badge>
-            )}
-          </div>
+          {formatMonthYear(date)}
         </TableCell>
         <TableCell>
           <div className="flex items-center space-x-2">
@@ -113,8 +105,11 @@ export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: Edita
           </div>
         </TableCell>
         <TableCell>
-          <Badge variant={isFullyPaid ? "default" : isPastDue ? "destructive" : isProjected ? "secondary" : "outline"}>
-            {isFullyPaid ? "Paid" : totalPaid > 0 ? `Partial (${formatCurrency(totalPaid)})` : isProjected ? "Projected" : "Pending"}
+          <Badge 
+            variant={isFullyPaid ? "default" : isPastDue ? "destructive" : totalPaid > 0 ? "outline" : isProjected ? "secondary" : "outline"}
+            className={totalPaid > 0 && !isFullyPaid ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700" : ""}
+          >
+            {isFullyPaid ? "Paid" : totalPaid > 0 ? "Partially Paid" : isProjected ? "Projected" : "Pending"}
           </Badge>
         </TableCell>
         <TableCell className="text-sm text-muted-foreground">

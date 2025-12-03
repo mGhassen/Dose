@@ -6,7 +6,7 @@ import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
-import { ArrowLeft, Calendar, TrendingUp, Download } from "lucide-react";
+import { ArrowLeft, Calendar, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useLeasingById } from "@kit/hooks";
 import { toast } from "sonner";
@@ -129,12 +129,6 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
   const totalAmount = timeline.reduce((sum, e) => sum + e.amount, 0);
   const actualCount = timeline.filter(e => !e.isProjected).length;
   const projectedCount = timeline.filter(e => e.isProjected).length;
-
-  // Group by month for visualization
-  const monthlyTotals: Record<string, number> = {};
-  timeline.forEach(e => {
-    monthlyTotals[e.month] = (monthlyTotals[e.month] || 0) + e.amount;
-  });
 
   return (
     <AppLayout>
@@ -320,43 +314,6 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
           </Card>
         )}
 
-        {/* Monthly Summary Chart */}
-        {Object.keys(monthlyTotals).length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Monthly Summary</CardTitle>
-              <CardDescription>Total leasing payment amount per month</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(monthlyTotals)
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([month, total]) => {
-                    const [year, monthNum] = month.split('-');
-                    const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-                    const isFuture = date > new Date();
-                    return (
-                      <div key={month} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">
-                            {formatMonthYear(date)}
-                          </span>
-                          {isFuture && (
-                            <Badge variant="secondary" className="text-xs">Projected</Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-semibold text-lg">{formatCurrency(total)}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </AppLayout>
   );
