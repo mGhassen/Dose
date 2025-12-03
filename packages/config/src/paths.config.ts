@@ -40,7 +40,7 @@ export const pathsConfig: NavigationConfig = {
     },
     {
       title: "inputs",
-      url: "/inputs",
+      url: "#",
       icon: "Database",
       translationKey: "inputs",
       items: [
@@ -58,7 +58,7 @@ export const pathsConfig: NavigationConfig = {
     },
     {
       title: "outputs",
-      url: "/outputs",
+      url: "#",
       icon: "Database",
       translationKey: "outputs",
       items: [
@@ -118,6 +118,62 @@ export const pathsConfig: NavigationConfig = {
       icon: "TrendingUp",
       translationKey: "financialResults",
       items: [
+        {
+          title: "inputs",
+          url: "#",
+          icon: "Database",
+          translationKey: "inputs",
+          items: [
+            {
+              title: "sales",
+              url: "/sales",
+              translationKey: "sales"
+            },
+            {
+              title: "loans",
+              url: "/loans/input",
+              translationKey: "loans"
+            },
+          ]
+        },
+        {
+          title: "outputs",
+          url: "#",
+          icon: "Database",
+          translationKey: "outputs",
+          items: [
+            {
+              title: "expenses",
+              url: "/expenses",
+              translationKey: "expenses"
+            },
+            {
+              title: "subscriptions",
+              url: "/subscriptions",
+              translationKey: "subscriptions"
+            },
+            {
+              title: "personnel",
+              url: "/personnel",
+              translationKey: "personnel"
+            },
+            {
+              title: "loans",
+              url: "/loans/output",
+              translationKey: "loanPayments"
+            },
+            {
+              title: "leasing",
+              url: "/leasing",
+              translationKey: "leasing"
+            },
+            {
+              title: "investments",
+              url: "/investments",
+              translationKey: "investments"
+            },
+          ]
+        },
         {
           title: "profit-loss",
           url: "/profit-loss",

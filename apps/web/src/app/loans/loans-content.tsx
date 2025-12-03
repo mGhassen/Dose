@@ -7,6 +7,9 @@ import DataTablePage from "@/components/data-table-page";
 import { useLoans, useDeleteLoan } from "@kit/hooks";
 import type { Loan, LoanStatus } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { Button } from "@kit/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@kit/ui/dropdown-menu";
+import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
@@ -77,7 +80,39 @@ export default function LoansContent() {
       header: "Lender",
       cell: ({ row }) => row.original.lender || <span className="text-muted-foreground">—</span>,
     },
-  ], []);
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const loan = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="ghost">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => router.push(`/loans/${loan.id}/edit`)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(loan.id);
+                }}
+                className="text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ], [router]);
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this loan?")) return;

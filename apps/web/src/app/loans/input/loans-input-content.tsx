@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
@@ -55,16 +55,25 @@ export default function LoansInputContent() {
   });
   const deleteMutation = useDeleteEntry();
   
-  // Fetch payments for selected entry
-  const { data: payments = [], refetch: refetchPayments } = usePaymentsByEntry(selectedEntry?.id?.toString() || '');
+  // Fetch payments for selected entry - only fetch when entry is selected
+  const { data: payments = [], refetch: refetchPayments } = usePaymentsByEntry(
+    selectedEntry?.id?.toString() || ''
+  );
   const createPayment = useCreatePayment();
   const deletePayment = useDeletePayment();
+
+  // Refetch payments when dialog opens
+  useEffect(() => {
+    if (isPaymentDialogOpen && selectedEntry?.id) {
+      refetchPayments();
+    }
+  }, [isPaymentDialogOpen, selectedEntry?.id, refetchPayments]);
 
   const entries = entriesData?.data || [];
   const totalCount = entriesData?.pagination?.total || 0;
   
-  // Calculate payment totals for selected entry
-  const totalPaid = selectedEntry ? (payments.filter(p => p.isPaid).reduce((sum, p) => sum + p.amount, 0)) : 0;
+  // Calculate payment totals for selected entry - include all payments (paid and unpaid)
+  const totalPaid = selectedEntry ? (payments.reduce((sum, p) => sum + p.amount, 0)) : 0;
   const remainingToPay = selectedEntry ? Math.max(0, selectedEntry.amount - totalPaid) : 0;
 
   const columns: ColumnDef<Entry>[] = useMemo(() => [
@@ -279,6 +288,7 @@ export default function LoansInputContent() {
         <DataTablePage
           title=""
           description=""
+          createHref="/loans/create"
           data={entries}
           columns={columns}
           loading={isLoading}
