@@ -232,37 +232,54 @@ export default function DataTable({
   };
 
   const handleSelectAll = (checked: boolean) => {
+    // Extract row IDs from paginated data
+    const allRowIds = paginatedData
+      .map(row => {
+        const id = row?.id;
+        return typeof id === 'number' ? id : undefined;
+      })
+      .filter((id): id is number => id !== undefined);
+    
     if (checked) {
-      const allIds = new Set(paginatedData.map((_, index) => index));
-      setSelectedRows(allIds);
+      const newSelected = new Set(selectedRows);
+      allRowIds.forEach(id => newSelected.add(id));
+      setSelectedRows(newSelected);
       
       // Call external handler for each row
       if (onRowSelect) {
-        paginatedData.forEach(row => onRowSelect(row.id, true));
+        allRowIds.forEach(id => onRowSelect(id, true));
       }
     } else {
-      setSelectedRows(new Set());
+      const newSelected = new Set(selectedRows);
+      allRowIds.forEach(id => newSelected.delete(id));
+      setSelectedRows(newSelected);
       
       // Call external handler for each row
       if (onRowSelect) {
-        paginatedData.forEach(row => onRowSelect(row.id, false));
+        allRowIds.forEach(id => onRowSelect(id, false));
       }
     }
   };
 
-  const handleSelectRow = (index: number, checked: boolean) => {
+  const handleSelectRow = (rowId: number, checked: boolean) => {
+    console.log('[DataTable @kit/ui] handleSelectRow:', { 
+      rowId, 
+      checked, 
+      currentSelected: Array.from(selectedRows),
+      rowData: paginatedData.find(r => r.id === rowId)
+    });
     const newSelected = new Set(selectedRows);
     if (checked) {
-      newSelected.add(index);
+      newSelected.add(rowId);
     } else {
-      newSelected.delete(index);
+      newSelected.delete(rowId);
     }
     setSelectedRows(newSelected);
+    console.log('[DataTable @kit/ui] Updated selectedRows:', Array.from(newSelected));
     
     // Call external handler if provided
     if (onRowSelect) {
-      const rowData = paginatedData[index];
-      onRowSelect(rowData.id, checked);
+      onRowSelect(rowId, checked);
     }
   };
 
@@ -292,8 +309,18 @@ export default function DataTable({
     setExpandedRows(newExpanded);
   };
 
-  const isAllSelected = selectedRows.size === paginatedData.length && paginatedData.length > 0;
-  const isIndeterminate = selectedRows.size > 0 && selectedRows.size < paginatedData.length;
+  // Check if all rows are selected (using row IDs, not indices)
+  const allRowIds = useMemo(() => {
+    return paginatedData
+      .map(row => {
+        const id = row?.id;
+        return typeof id === 'number' ? id : undefined;
+      })
+      .filter((id): id is number => id !== undefined);
+  }, [paginatedData]);
+  
+  const isAllSelected = allRowIds.length > 0 && allRowIds.every(id => selectedRows.has(id));
+  const isIndeterminate = allRowIds.some(id => selectedRows.has(id)) && !isAllSelected;
 
   // Handle column visibility toggle
   const toggleColumnVisibility = (columnKey: string) => {
@@ -395,10 +422,14 @@ export default function DataTable({
               </tr>
             ) : (
               paginatedData.map((row, rowIndex) => {
+                // Extract row ID
+                const rowId = typeof row?.id === 'number' ? row.id : undefined;
                 const isExpanded = expandedRows.has(rowIndex);
                 const canExpand = renderExpandedRow && (isRowExpandable !== undefined ? isRowExpandable(row) : true);
+                const isSelected = rowId !== undefined && selectedRows.has(rowId);
+                
                 return (
-                  <Fragment key={rowIndex}>
+                  <Fragment key={rowId !== undefined ? `row-${rowId}` : `row-index-${rowIndex}`}>
                     <tr 
                       className="hover:bg-muted/50 cursor-pointer transition-colors"
                       onClick={() => handleRowClick(row)}
@@ -426,8 +457,21 @@ export default function DataTable({
                       {selectable && (
                         <td className="px-3 py-4">
                           <Checkbox
-                            checked={selectedRows.has(rowIndex)}
-                            onCheckedChange={(checked) => handleSelectRow(rowIndex, checked as boolean)}
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              console.log('[DataTable @kit/ui] Checkbox clicked:', {
+                                rowIndex,
+                                rowId,
+                                checked,
+                                rowData: { id: row.id, ...Object.keys(row).slice(0, 3).reduce((acc, k) => ({ ...acc, [k]: row[k] }), {}) },
+                                allRowIds: allRowIds.slice(0, 5)
+                              });
+                              if (rowId !== undefined) {
+                                handleSelectRow(rowId, checked as boolean);
+                              } else {
+                                console.warn('[DataTable @kit/ui] Cannot select row: no valid ID found', row);
+                              }
+                            }}
                             onClick={(e) => e.stopPropagation()}
                             className="border-border"
                           />
@@ -446,8 +490,16 @@ export default function DataTable({
                             row: { 
                               original: row, 
                               getValue: (key: string) => getNestedValue(row, key),
-                              getIsSelected: () => selectedRows.has(row.id),
-                              toggleSelected: (value: boolean) => handleSelectRow(rowIndex, value)
+                              getIsSelected: () => {
+                                const id = typeof row?.id === 'number' ? row.id : undefined;
+                                return id !== undefined && selectedRows.has(id);
+                              },
+                              toggleSelected: (value: boolean) => {
+                                const id = typeof row?.id === 'number' ? row.id : undefined;
+                                if (id !== undefined) {
+                                  handleSelectRow(id, value);
+                                }
+                              }
                             } 
                           } as any)
                         ) : (

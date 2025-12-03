@@ -63,6 +63,7 @@ interface DataTableProps {
   initialFilters?: Record<string, string>;
   onRowClick?: (row: any) => void;
   onRowSelect?: (rowId: number, selected: boolean) => void;
+  onSelectAll?: (selectedIds: number[], selected: boolean) => void; // Batch selection callback
   onBulkAction?: (action: string, selectedIds: number[]) => void;
   onExport?: (data: any[]) => void;
   onRefresh?: () => void;
@@ -73,6 +74,7 @@ interface DataTableProps {
   description?: string;
   pagination?: boolean;
   pageSize?: number;
+  selectedRows?: Set<number>; // Controlled selection state from parent
 }
 
 export default function DataTable({
@@ -83,6 +85,7 @@ export default function DataTable({
   initialFilters = {},
   onRowClick,
   onRowSelect,
+  onSelectAll,
   onBulkAction,
   onExport,
   onRefresh,
@@ -92,7 +95,8 @@ export default function DataTable({
   title = "Data Table",
   description = "Manage your data",
   pagination = false,
-  pageSize = 10
+  pageSize = 10,
+  selectedRows: externalSelectedRows
 }: DataTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -100,7 +104,15 @@ export default function DataTable({
   const [groupBy, setGroupBy] = useState<string>("none");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [internalSelectedRows, setInternalSelectedRows] = useState<Set<number>>(new Set());
+  
+  // Use external selectedRows if provided (controlled), otherwise use internal state
+  const selectedRows = externalSelectedRows !== undefined ? externalSelectedRows : internalSelectedRows;
+  
+  // Create a string representation of selected rows for React to detect changes
+  const selectedRowsKey = useMemo(() => {
+    return Array.from(selectedRows).sort().join(',');
+  }, [selectedRows]);
   const [filters, setFilters] = useState<Record<string, string>>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
   const [currentPageSize, setCurrentPageSize] = useState(pageSize);
@@ -324,26 +336,85 @@ export default function DataTable({
 
   // Handle row selection
   const handleRowSelect = (rowId: number, selected: boolean) => {
-    const newSelected = new Set(selectedRows);
-    if (selected) {
-      newSelected.add(rowId);
-    } else {
-      newSelected.delete(rowId);
-    }
-    setSelectedRows(newSelected);
+    console.log('[DataTable] handleRowSelect called:', { 
+      rowId, 
+      selected, 
+      externalSelectedRows: externalSelectedRows !== undefined,
+      currentSelectedRows: Array.from(selectedRows),
+      dataLength: data.length,
+      firstFewRowIds: data.slice(0, 5).map(r => r.id)
+    });
+    // Always notify parent first
     onRowSelect?.(rowId, selected);
+    
+    // Only update internal state if not controlled
+    if (externalSelectedRows === undefined) {
+      const newSelected = new Set(internalSelectedRows);
+      if (selected) {
+        newSelected.add(rowId);
+      } else {
+        newSelected.delete(rowId);
+      }
+      console.log('[DataTable] Internal state update:', { 
+        before: Array.from(internalSelectedRows), 
+        after: Array.from(newSelected) 
+      });
+      setInternalSelectedRows(newSelected);
+    }
   };
 
   // Handle select all
   const handleSelectAll = () => {
-    const allIds = groupBy === "none" 
-      ? sortedData.map(row => row.id)
-      : Object.values(groupedData).flat().map(row => row.id);
+    // Get IDs from the currently displayed data (paginated if pagination is enabled)
+    const displayedData = Array.isArray(paginatedData) 
+      ? paginatedData 
+      : Object.values(paginatedData).flat();
     
-    if (selectedRows.size === allIds.length) {
-      setSelectedRows(new Set());
+    const allIds = displayedData
+      .map((row, idx) => {
+        // Handle both 'id' and numeric IDs (including 0)
+        const id = row?.id;
+        const extractedId = typeof id === 'number' ? id : undefined;
+        if (idx < 3) {
+          console.log(`[DataTable] handleSelectAll - row ${idx}:`, { id, extractedId, row: { id: row.id, ...Object.keys(row).slice(0, 2).reduce((acc, k) => ({ ...acc, [k]: row[k] }), {}) } });
+        }
+        return extractedId;
+      })
+      .filter((id): id is number => id !== undefined);
+    
+    console.log('[DataTable] handleSelectAll:', {
+      displayedDataLength: displayedData.length,
+      allIds,
+      currentSelectedRows: Array.from(selectedRows),
+      isAllSelected: allIds.length > 0 && allIds.every(id => selectedRows.has(id))
+    });
+    
+    const isAllSelected = allIds.length > 0 && 
+      allIds.every(id => selectedRows.has(id));
+    
+    if (onSelectAll) {
+      // Use batch selection callback if provided
+      if (isAllSelected) {
+        onSelectAll(allIds, false);
+      } else {
+        onSelectAll(allIds, true);
+      }
     } else {
-      setSelectedRows(new Set(allIds));
+      // Fallback to individual row selection (less efficient)
+      if (isAllSelected) {
+        allIds.forEach(id => onRowSelect?.(id, false));
+      } else {
+        allIds.forEach(id => onRowSelect?.(id, true));
+      }
+    }
+    
+    // Only update internal state if not controlled
+    if (externalSelectedRows === undefined) {
+      if (isAllSelected) {
+        setInternalSelectedRows(new Set());
+      } else {
+        setInternalSelectedRows(new Set(allIds));
+      }
     }
   };
 
@@ -401,9 +472,43 @@ export default function DataTable({
 
   // Render table rows
   const renderRows = (rows: any[]) => {
-    return rows.map((row, index) => (
+    return rows.map((row, index) => {
+      // Extract row ID - always read directly from row object at render time
+      const rawId = row.id;
+      let rowId: number | undefined;
+      if (rawId !== undefined && rawId !== null) {
+        if (typeof rawId === 'number') {
+          rowId = rawId;
+        } else if (typeof rawId === 'string') {
+          const numId = Number(rawId);
+          rowId = !isNaN(numId) ? numId : undefined;
+        }
+      }
+      
+      // Use a stable key based only on the row ID, not selection state
+      const rowKey = rowId !== undefined ? `row-${rowId}` : `row-index-${index}`;
+      
+      // Check if this row is selected - always read fresh from selectedRows
+      const isSelected = rowId !== undefined && selectedRows.has(rowId);
+      
+      // Debug logging for first few rows
+      if (index < 3) {
+        console.log(`[DataTable] Rendering row ${index}:`, {
+          rowId,
+          rowKey,
+          isSelected,
+          rawId,
+          rowData: { id: row.id, ...Object.keys(row).slice(0, 3).reduce((acc, k) => ({ ...acc, [k]: row[k] }), {}) },
+          selectedRowsContents: Array.from(selectedRows).slice(0, 5)
+        });
+      }
+      
+      // Capture rowId in a const for the checkbox handler to avoid closure issues
+      const capturedRowId = rowId;
+      
+      return (
       <div
-        key={row.id || index}
+        key={rowKey}
         className={`flex items-center border-b border-border hover:bg-muted/50 transition-colors group ${
           onRowClick ? "cursor-pointer" : ""
         }`}
@@ -412,8 +517,23 @@ export default function DataTable({
         {selectable && (
           <div className="p-3">
             <Checkbox
-              checked={selectedRows.has(row.id)}
-              onCheckedChange={(checked) => handleRowSelect(row.id, checked as boolean)}
+              checked={isSelected}
+              onCheckedChange={(checked) => {
+                // Use captured rowId to ensure we're selecting the correct row
+                console.log(`[DataTable] Checkbox clicked for row ${index}:`, {
+                  capturedRowId,
+                  checked,
+                  rowIdFromRow: row.id,
+                  rowData: { id: row.id, ...Object.keys(row).slice(0, 3).reduce((acc, k) => ({ ...acc, [k]: row[k] }), {}) },
+                  allRowIds: rows.map((r, i) => ({ index: i, id: r.id })).slice(0, 5),
+                  selectedRowsBefore: Array.from(selectedRows)
+                });
+                if (capturedRowId !== undefined) {
+                  handleRowSelect(capturedRowId, checked);
+                } else {
+                  console.warn(`[DataTable] Cannot select row ${index}: no valid ID found`, row);
+                }
+              }}
               onClick={(e) => e.stopPropagation()}
             />
           </div>
@@ -644,7 +764,15 @@ export default function DataTable({
             {selectable && (
               <div className="p-3">
                 <Checkbox
-                  checked={selectedRows.size > 0 && selectedRows.size === (groupBy === "none" ? sortedData.length : Object.values(groupedData).flat().length)}
+                  checked={(() => {
+                    const displayedData = Array.isArray(paginatedData) 
+                      ? paginatedData 
+                      : Object.values(paginatedData).flat();
+                    const allIds = displayedData
+                      .map(row => row?.id)
+                      .filter((id): id is number => id !== undefined && id !== null);
+                    return allIds.length > 0 && allIds.every(id => selectedRows.has(id));
+                  })()}
                   onCheckedChange={handleSelectAll}
                 />
               </div>

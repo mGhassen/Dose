@@ -119,7 +119,9 @@ export async function apiRequest<T>(
           throw error;
         }
         
-        console.error(`API Error Response Body: ${errorText.substring(0, 500)}${errorText.length > 500 ? '...' : ''}`);
+        console.error(`[API Error] ${method} ${endpoint} -> ${response.status} ${response.statusText}`);
+        console.error(`[API Error] Response Body: ${errorText.substring(0, 500)}${errorText.length > 500 ? '...' : ''}`);
+        console.error(`[API Error] Full URL: ${url}`);
         
         // Try to parse error details for better error messages
         let errorDetails: any = {};
@@ -127,15 +129,15 @@ export async function apiRequest<T>(
         try {
           const parsedError = JSON.parse(errorText);
           if (parsedError.error) {
-            // If error is a string, use it directly
+            // If error is a string, use it directly but include endpoint
             if (typeof parsedError.error === 'string') {
-              errorMessage = parsedError.error;
+              errorMessage = `${parsedError.error} (${method} ${endpoint})`;
             } else {
               errorDetails = parsedError.error;
               errorMessage = parsedError.error.message || parsedError.error.error || errorMessage;
             }
           } else if (parsedError.message) {
-            errorMessage = parsedError.message;
+            errorMessage = `${parsedError.message} (${method} ${endpoint})`;
           } else {
             errorDetails = parsedError;
           }
@@ -145,11 +147,22 @@ export async function apiRequest<T>(
             errorDetails = { ...errorDetails, ...parsedError.details };
           }
         } catch {
-          // If not JSON, use the raw text as error message
+          // If not JSON, use the raw text as error message but include endpoint
           if (errorText && errorText.length > 0) {
-            errorMessage = errorText.length > 200 ? errorText.substring(0, 200) + '...' : errorText;
+            const rawMessage = errorText.length > 200 ? errorText.substring(0, 200) + '...' : errorText;
+            errorMessage = `${rawMessage} (${method} ${endpoint})`;
             errorDetails = { message: errorText.substring(0, 200) };
           }
+        }
+        
+        // For 404, provide more helpful context
+        if (response.status === 404) {
+          console.error(`[API] 404 Not Found for ${method} ${endpoint}`);
+          console.error(`[API] This usually means:`);
+          console.error(`  - The API route doesn't exist: ${endpoint}`);
+          console.error(`  - The route file is missing or has a typo`);
+          console.error(`  - Next.js dev server needs to be restarted`);
+          console.error(`  - Route file has syntax errors preventing it from being registered`);
         }
         
         // For 403, provide more helpful context

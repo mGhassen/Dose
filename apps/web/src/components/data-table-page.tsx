@@ -208,7 +208,10 @@ export default function DataTablePage<T>({
     if (!onBulkCopy) return;
     
     const dataToCopy = type === 'selected' 
-      ? filteredData.filter((item, index) => selectedRows.has(index))
+      ? filteredData.filter((item) => {
+          const itemId = (item as any).id;
+          return itemId !== undefined && selectedRows.has(itemId);
+        })
       : filteredData;
     
     onBulkCopy(dataToCopy, type);
@@ -218,7 +221,10 @@ export default function DataTablePage<T>({
     if (!onBulkExport) return;
     
     const dataToExport = type === 'selected' 
-      ? filteredData.filter((item, index) => selectedRows.has(index))
+      ? filteredData.filter((item) => {
+          const itemId = (item as any).id;
+          return itemId !== undefined && selectedRows.has(itemId);
+        })
       : filteredData;
     
     onBulkExport(dataToExport, type);
@@ -1172,14 +1178,33 @@ export default function DataTablePage<T>({
             pagination={!pagination}
             pageSize={pagination ? pagination.pageSize : undefined}
             onRowClick={handleRowClick}
+            selectedRows={selectedRows}
             onRowSelect={(rowId, selected) => {
-              const newSelected = new Set(selectedRows);
-              if (selected) {
-                newSelected.add(rowId);
-              } else {
-                newSelected.delete(rowId);
-              }
-              setSelectedRows(newSelected);
+              console.log('[DataTablePage] onRowSelect called:', { rowId, selected });
+              setSelectedRows(prev => {
+                const newSelected = new Set(prev);
+                if (selected) {
+                  newSelected.add(rowId);
+                } else {
+                  newSelected.delete(rowId);
+                }
+                console.log('[DataTablePage] Updated selectedRows:', Array.from(newSelected));
+                return newSelected;
+              });
+            }}
+            onSelectAll={(selectedIds, selected) => {
+              // Batch update for select all
+              setSelectedRows(prev => {
+                const newSelected = new Set(prev);
+                if (selected) {
+                  // Select all: add all IDs
+                  selectedIds.forEach(id => newSelected.add(id));
+                } else {
+                  // Deselect all: remove all selected IDs
+                  selectedIds.forEach(id => newSelected.delete(id));
+                }
+                return newSelected;
+              });
             }}
             renderExpandedRow={renderExpandedRow}
             isRowExpandable={isRowExpandable}
