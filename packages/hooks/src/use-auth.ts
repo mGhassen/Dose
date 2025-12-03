@@ -438,15 +438,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
         
+        // Check account status first - if pending, redirect to account status page
+        if (user.status === 'pending') {
+          router.push('/auth/account-status');
+          return;
+        }
+        
+        // If account is suspended or archived, redirect to account status page
+        if (user.status === 'suspended' || user.status === 'archived') {
+          router.push('/auth/account-status');
+          return;
+        }
+        
         // Otherwise, check accessible portals to determine where to redirect
-        if (user.accessiblePortals?.includes('admin')) {
+        // If accessiblePortals is not set, derive it from isAdmin
+        const portals = user.accessiblePortals || (user.isAdmin ? ['admin', 'manager', 'conductor'] : ['conductor']);
+        
+        if (portals.includes('admin') || portals.includes('manager') || portals.includes('conductor')) {
           router.push('/dashboard');
-        } else if (user.accessiblePortals?.includes('manager')) {
-          router.push('/dashboard'); // Managers go to dashboard with manager layout
-        } else if (user.accessiblePortals?.includes('conductor')) {
-          router.push('/dashboard'); // Conductors go to dashboard with user layout
         } else {
-          router.push('/auth/waiting-approval');
+          // Fallback: if user is active but has no portals, still allow dashboard access
+          if (user.status === 'active') {
+            router.push('/dashboard');
+          } else {
+            router.push('/auth/waiting-approval');
+          }
         }
       }
     }

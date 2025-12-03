@@ -154,6 +154,11 @@ export async function GET(request: NextRequest) {
     }
   }
   
+  // Determine accessible portals based on admin status
+  const accessiblePortals = account.is_admin
+    ? ['admin', 'manager', 'conductor']
+    : ['conductor'];
+  
   // Transform user data to match expected format
   const transformedUser = {
     id: authUser.id,
@@ -168,7 +173,8 @@ export async function GET(request: NextRequest) {
     isAdmin: account.is_admin || false,
     status: account.status,
     role: account.is_admin ? 'admin' as const : 'user' as const,
-    provider: 'email'
+    provider: 'email',
+    accessiblePortals
   };
   
   return NextResponse.json({ 
