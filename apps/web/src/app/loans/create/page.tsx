@@ -13,6 +13,7 @@ import AppLayout from "@/components/app-layout";
 import { useCreateLoan } from "@kit/hooks";
 import { toast } from "sonner";
 import type { LoanStatus } from "@kit/types";
+import { Checkbox } from "@kit/ui/checkbox";
 
 export default function CreateLoanPage() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function CreateLoanPage() {
     status: "active" as LoanStatus,
     lender: "",
     description: "",
+    offPaymentMonths: [] as number[],
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,6 +51,7 @@ export default function CreateLoanPage() {
         status: formData.status,
         lender: formData.lender || undefined,
         description: formData.description || undefined,
+        offPaymentMonths: formData.offPaymentMonths.length > 0 ? formData.offPaymentMonths : undefined,
       });
       toast.success("Loan created successfully");
       router.push('/loans');
@@ -60,6 +63,22 @@ export default function CreateLoanPage() {
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const handleOffPaymentMonthToggle = (month: number) => {
+    setFormData(prev => {
+      const currentMonths = prev.offPaymentMonths || [];
+      const isSelected = currentMonths.includes(month);
+      return {
+        ...prev,
+        offPaymentMonths: isSelected
+          ? currentMonths.filter(m => m !== month)
+          : [...currentMonths, month].sort((a, b) => a - b),
+      };
+    });
+  };
+
+  const durationMonths = formData.durationMonths ? parseInt(formData.durationMonths) : 0;
+  const monthOptions = Array.from({ length: Math.max(0, durationMonths) }, (_, i) => i + 1);
 
   return (
     <AppLayout>
@@ -195,6 +214,51 @@ export default function CreateLoanPage() {
                   placeholder="Additional notes about this loan"
                   rows={3}
                 />
+              </div>
+
+              {/* Off-Payment Months */}
+              <div className="space-y-2">
+                <Label>Off-Payment Months (Interest Only)</Label>
+                <p className="text-sm text-muted-foreground">
+                  Select months where only interest will be paid (no principal payment)
+                </p>
+                {durationMonths > 0 ? (
+                  <>
+                    <div className="grid grid-cols-6 md:grid-cols-12 gap-2 p-4 border rounded-md max-h-60 overflow-y-auto">
+                      {monthOptions.map((month) => (
+                        <div key={month} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`off-payment-${month}`}
+                            checked={formData.offPaymentMonths.includes(month)}
+                            onCheckedChange={() => handleOffPaymentMonthToggle(month)}
+                          />
+                          <Label
+                            htmlFor={`off-payment-${month}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {month}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    {formData.offPaymentMonths.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                          Selected: {formData.offPaymentMonths.join(', ')}
+                        </p>
+                        <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                          Total loan duration: {durationMonths} months (base) + {formData.offPaymentMonths.length} months (extension) = {durationMonths + formData.offPaymentMonths.length} months total
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="p-4 border rounded-md bg-muted/50">
+                    <p className="text-sm text-muted-foreground">
+                      Please enter the loan duration (in months) above to select off-payment months.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Actions */}

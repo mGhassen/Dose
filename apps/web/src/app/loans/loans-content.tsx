@@ -81,6 +81,22 @@ export default function LoansContent() {
       cell: ({ row }) => row.original.lender || <span className="text-muted-foreground">—</span>,
     },
     {
+      id: "offPaymentMonths",
+      accessorKey: "offPaymentMonths",
+      header: "Off-Payment Months",
+      cell: ({ row }) => {
+        const offPaymentMonths = row.original.offPaymentMonths || [];
+        if (offPaymentMonths.length === 0) {
+          return <span className="text-muted-foreground">—</span>;
+        }
+        return (
+          <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+            {offPaymentMonths.length} month{offPaymentMonths.length > 1 ? 's' : ''}
+          </Badge>
+        );
+      },
+    },
+    {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => {

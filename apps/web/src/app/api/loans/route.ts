@@ -17,13 +17,14 @@ function transformLoan(row: any): Loan {
     status: row.status,
     lender: row.lender,
     description: row.description,
+    offPaymentMonths: row.off_payment_months || [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
 function transformToSnakeCase(data: CreateLoanData): any {
-  return {
+  const result: any = {
     name: data.name,
     loan_number: data.loanNumber,
     principal_amount: data.principalAmount,
@@ -34,6 +35,15 @@ function transformToSnakeCase(data: CreateLoanData): any {
     lender: data.lender,
     description: data.description,
   };
+  
+  // Only include off_payment_months if it's provided and not empty
+  if (data.offPaymentMonths && Array.isArray(data.offPaymentMonths) && data.offPaymentMonths.length > 0) {
+    result.off_payment_months = data.offPaymentMonths;
+  } else {
+    result.off_payment_months = [];
+  }
+  
+  return result;
 }
 
 export async function GET(request: NextRequest) {
@@ -97,14 +107,26 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServerSupabaseClient();
     
+    // Transform data for database
+    const loanData = transformToSnakeCase(body);
+    
+    // Log for debugging
+    console.log('Creating loan with off_payment_months:', loanData.off_payment_months);
+    
     // Create the loan
     const { data, error } = await supabase
       .from('loans')
-      .insert(transformToSnakeCase(body))
+      .insert(loanData)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error creating loan:', error);
+      throw error;
+    }
+    
+    // Log the created loan to verify off_payment_months was saved
+    console.log('Created loan with off_payment_months:', data.off_payment_months);
 
     // Create an INPUT entry for the loan principal (money received)
     const { error: entryError } = await supabase

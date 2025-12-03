@@ -177,7 +177,7 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
               </div>
             </div>
             {schedule && schedule.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4 pt-4 border-t">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Total Payments</label>
                   <p className="text-base font-semibold mt-1">{schedule.length}</p>
@@ -190,12 +190,26 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
                   <label className="text-sm font-medium text-muted-foreground">Pending</label>
                   <p className="text-base font-semibold mt-1 text-blue-600">{pendingCount}</p>
                 </div>
+                {loan.offPaymentMonths && loan.offPaymentMonths.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Interest-Only Months</label>
+                    <p className="text-base font-semibold mt-1 text-amber-600">{loan.offPaymentMonths.length}</p>
+                  </div>
+                )}
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Remaining Balance</label>
                   <p className="text-base font-semibold mt-1">
                     {schedule.length > 0 ? formatCurrency(schedule[schedule.length - 1].remainingBalance) : formatCurrency(loan.principalAmount)}
                   </p>
                 </div>
+              </div>
+            )}
+            {loan.offPaymentMonths && loan.offPaymentMonths.length > 0 && (
+              <div className="mt-4 pt-4 border-t">
+                <label className="text-sm font-medium text-muted-foreground">Off-Payment Months (Interest Only)</label>
+                <p className="text-sm mt-1 text-muted-foreground">
+                  Months {loan.offPaymentMonths.join(', ')} - Only interest will be paid (no principal)
+                </p>
               </div>
             )}
           </CardContent>
@@ -216,6 +230,11 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
               <CardTitle>Amortization Schedule</CardTitle>
               <CardDescription>
                 {schedule.length} payment(s) scheduled
+                {loan.offPaymentMonths && loan.offPaymentMonths.length > 0 && (
+                  <span className="ml-2">
+                    • {loan.offPaymentMonths.length} interest-only month{loan.offPaymentMonths.length > 1 ? 's' : ''}
+                  </span>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -241,6 +260,7 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
                         loanId={resolvedParams?.id || ""}
                         onUpdate={handleScheduleUpdate}
                         allEntries={allEntriesData?.data || []}
+                        offPaymentMonths={loan.offPaymentMonths || []}
                       />
                     ))}
                     <TableRow className="font-semibold bg-muted">

@@ -17,6 +17,7 @@ function transformLoan(row: any): Loan {
     status: row.status,
     lender: row.lender,
     description: row.description,
+    offPaymentMonths: row.off_payment_months || [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -59,9 +60,21 @@ export async function POST(
     }
 
     const loan = transformLoan(loanData);
+    
+    // Log for debugging
+    console.log('Generating schedule for loan:', {
+      id: loan.id,
+      name: loan.name,
+      offPaymentMonths: loan.offPaymentMonths,
+      raw_off_payment_months: loanData.off_payment_months
+    });
 
     // Calculate schedule
     const schedule = calculateLoanSchedule(loan);
+    
+    // Log schedule to verify off-payment months are applied
+    const offPaymentEntries = schedule.filter(e => e.principalPayment === 0);
+    console.log(`Schedule generated: ${schedule.length} entries, ${offPaymentEntries.length} interest-only entries`);
 
     // Delete existing schedule entries and their associated entries
     const { data: existingSchedules } = await supabase

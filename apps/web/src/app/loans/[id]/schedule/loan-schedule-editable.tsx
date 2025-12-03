@@ -28,9 +28,11 @@ interface EditableScheduleRowProps {
   loanId: string;
   onUpdate: () => void;
   allEntries?: Entry[];
+  offPaymentMonths?: number[];
 }
 
-export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [] }: EditableScheduleRowProps) {
+export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], offPaymentMonths = [] }: EditableScheduleRowProps) {
+  const isOffPaymentMonth = offPaymentMonths.includes(entry.month);
   const [isEditing, setIsEditing] = useState(false);
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
@@ -257,13 +259,28 @@ export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [] }
 
   return (
     <>
-      <TableRow className={isPastDue ? "bg-destructive/10" : ""}>
-        <TableCell className="font-medium">{entry.month}</TableCell>
+      <TableRow className={`${isPastDue ? "bg-destructive/10" : ""} ${isOffPaymentMonth ? "bg-amber-50 dark:bg-amber-950/20" : ""}`}>
+        <TableCell className="font-medium">
+          <div className="flex items-center gap-2">
+            {entry.month}
+            {isOffPaymentMonth && (
+              <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700 text-xs">
+                Interest Only
+              </Badge>
+            )}
+          </div>
+        </TableCell>
         <TableCell>
           {formatDate(entry.paymentDate)}
         </TableCell>
-        <TableCell className="text-right">{formatCurrency(entry.principalPayment)}</TableCell>
-        <TableCell className="text-right">{formatCurrency(entry.interestPayment)}</TableCell>
+        <TableCell className="text-right">
+          {isOffPaymentMonth ? (
+            <span className="text-muted-foreground italic">—</span>
+          ) : (
+            formatCurrency(entry.principalPayment)
+          )}
+        </TableCell>
+        <TableCell className="text-right font-medium">{formatCurrency(entry.interestPayment)}</TableCell>
         <TableCell className="text-right font-semibold">
           <div className="flex flex-col items-end">
             {formatCurrency(entry.totalPayment)}

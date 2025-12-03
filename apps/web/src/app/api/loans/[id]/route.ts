@@ -16,6 +16,7 @@ function transformLoan(row: any): Loan {
     status: row.status,
     lender: row.lender,
     description: row.description,
+    offPaymentMonths: row.off_payment_months || [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -32,6 +33,7 @@ function transformToSnakeCase(data: UpdateLoanData): any {
   if (data.status !== undefined) result.status = data.status;
   if (data.lender !== undefined) result.lender = data.lender;
   if (data.description !== undefined) result.description = data.description;
+  if (data.offPaymentMonths !== undefined) result.off_payment_months = data.offPaymentMonths || [];
   result.updated_at = new Date().toISOString();
   return result;
 }

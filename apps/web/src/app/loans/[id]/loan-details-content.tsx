@@ -27,6 +27,7 @@ import {
 } from "@kit/ui/alert-dialog";
 import { Badge } from "@kit/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
+import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2, Plus } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useLoanById, useUpdateLoan, useDeleteLoan, useLoanSchedule, useEntries, usePaymentsByEntry, useCreatePayment, useDeletePayment } from "@kit/hooks";
@@ -85,6 +86,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
     status: "active" as LoanStatus,
     lender: "",
     description: "",
+    offPaymentMonths: [] as number[],
   });
 
   useEffect(() => {
@@ -99,6 +101,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
         status: loan.status,
         lender: loan.lender || "",
         description: loan.description || "",
+        offPaymentMonths: loan.offPaymentMonths || [],
       });
     }
   }, [loan]);
@@ -125,6 +128,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
           status: formData.status,
           lender: formData.lender || undefined,
           description: formData.description || undefined,
+          offPaymentMonths: formData.offPaymentMonths.length > 0 ? formData.offPaymentMonths : undefined,
         },
       });
       toast.success("Loan updated successfully");
@@ -152,6 +156,22 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const handleOffPaymentMonthToggle = (month: number) => {
+    setFormData(prev => {
+      const currentMonths = prev.offPaymentMonths || [];
+      const isSelected = currentMonths.includes(month);
+      return {
+        ...prev,
+        offPaymentMonths: isSelected
+          ? currentMonths.filter(m => m !== month)
+          : [...currentMonths, month].sort((a, b) => a - b),
+      };
+    });
+  };
+
+  const durationMonths = formData.durationMonths ? parseInt(formData.durationMonths) : 0;
+  const monthOptions = Array.from({ length: durationMonths }, (_, i) => i + 1);
 
   if (isLoading) {
     return (
@@ -357,6 +377,38 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                   />
                 </div>
 
+                {/* Off-Payment Months */}
+                {durationMonths > 0 && (
+                  <div className="space-y-2">
+                    <Label>Off-Payment Months (Interest Only)</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Select months where only interest will be paid (no principal payment)
+                    </p>
+                    <div className="grid grid-cols-6 md:grid-cols-12 gap-2 p-4 border rounded-md max-h-60 overflow-y-auto">
+                      {monthOptions.map((month) => (
+                        <div key={month} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`off-payment-${month}`}
+                            checked={formData.offPaymentMonths.includes(month)}
+                            onCheckedChange={() => handleOffPaymentMonthToggle(month)}
+                          />
+                          <Label
+                            htmlFor={`off-payment-${month}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {month}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    {formData.offPaymentMonths.length > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Selected: {formData.offPaymentMonths.join(', ')}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex justify-end space-x-4 pt-6">
                   <Button
@@ -429,6 +481,30 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                       {loan.lender || <span className="text-muted-foreground">—</span>}
                     </p>
                   </div>
+
+                  {/* Off-Payment Months */}
+                  {loan.offPaymentMonths && loan.offPaymentMonths.length > 0 && (
+                    <div className="md:col-span-2">
+                      <label className="text-sm font-medium text-muted-foreground">Off-Payment Months (Interest Only)</label>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {loan.offPaymentMonths.map((month) => (
+                          <Badge 
+                            key={month} 
+                            variant="outline" 
+                            className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
+                          >
+                            Month {month}
+                          </Badge>
+                        ))}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        These months will only require interest payments (no principal)
+                      </p>
+                      <p className="text-sm font-medium text-amber-600 dark:text-amber-400 mt-1">
+                        Total loan duration: {loan.durationMonths} months (base) + {loan.offPaymentMonths.length} months (extension) = {loan.durationMonths + loan.offPaymentMonths.length} months total
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Schedule Summary */}

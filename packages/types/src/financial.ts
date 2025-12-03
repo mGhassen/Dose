@@ -287,6 +287,7 @@ export interface Loan {
   status: LoanStatus;
   lender?: string;
   description?: string;
+  offPaymentMonths?: number[]; // Array of month numbers where only interest is paid (no principal)
   createdAt: string;
   updatedAt: string;
 }
@@ -314,6 +315,7 @@ export interface CreateLoanData {
   status?: LoanStatus;
   lender?: string;
   description?: string;
+  offPaymentMonths?: number[]; // Array of month numbers where only interest is paid (no principal)
 }
 
 export interface UpdateLoanData extends Partial<CreateLoanData> {}
