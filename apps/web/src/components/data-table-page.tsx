@@ -102,7 +102,7 @@ export default function DataTablePage<T>({
   onExpandedRowsChange,
   pagination,
   enableGridView = true,
-  defaultView = 'grid'
+  defaultView = 'table'
 }: DataTablePageProps<T>) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1059,7 +1059,7 @@ export default function DataTablePage<T>({
                       label: header,
                       type,
                       width: 150,
-                      editable: type === 'text' || type === 'number' || type === 'currency',
+                      editable: type === 'text' || type === 'currency',
                     };
                   });
 
