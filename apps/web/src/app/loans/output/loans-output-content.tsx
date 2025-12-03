@@ -67,6 +67,7 @@ export default function LoansOutputContent() {
       cell: ({ row }) => formatCurrency(row.original.amount),
     },
     {
+      id: "amountPaid",
       accessorKey: "payments",
       header: "Amount Paid",
       cell: ({ row }) => {
@@ -80,11 +81,7 @@ export default function LoansOutputContent() {
       },
     },
     {
-      accessorKey: "dueDate",
-      header: "Due Date",
-      cell: ({ row }) => row.original.dueDate ? formatDate(row.original.dueDate) : formatDate(row.original.entryDate),
-    },
-    {
+      id: "paymentStatus",
       accessorKey: "payments",
       header: "Payment Status",
       cell: ({ row }) => {
@@ -105,6 +102,11 @@ export default function LoansOutputContent() {
           </Badge>;
         }
       },
+    },
+    {
+      accessorKey: "dueDate",
+      header: "Due Date",
+      cell: ({ row }) => row.original.dueDate ? formatDate(row.original.dueDate) : formatDate(row.original.entryDate),
     },
   ], []);
 
@@ -215,7 +217,9 @@ export default function LoansOutputContent() {
           onBulkDelete={handleBulkDelete}
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
-          filterColumns={[]}
+          filterColumns={[
+            { value: "payments", label: "Payment Status" },
+          ]}
           sortColumns={[
             { value: "name", label: "Payment Description", type: "character varying" },
             { value: "amount", label: "Payment Amount", type: "numeric" },
