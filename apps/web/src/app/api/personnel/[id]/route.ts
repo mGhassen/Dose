@@ -13,6 +13,7 @@ function transformPersonnel(row: any): Personnel {
     position: row.position,
     type: row.type,
     baseSalary: parseFloat(row.base_salary),
+    salaryFrequency: row.salary_frequency || 'monthly',
     employerCharges: parseFloat(row.employer_charges),
     employerChargesType: row.employer_charges_type,
     startDate: row.start_date,
@@ -24,6 +25,20 @@ function transformPersonnel(row: any): Personnel {
   };
 }
 
+// Convert salary to monthly based on frequency
+function convertToMonthlySalary(salary: number, frequency: 'yearly' | 'monthly' | 'weekly'): number {
+  switch (frequency) {
+    case 'yearly':
+      return salary / 12;
+    case 'monthly':
+      return salary;
+    case 'weekly':
+      return salary * 52 / 12; // 52 weeks per year / 12 months
+    default:
+      return salary;
+  }
+}
+
 function transformToSnakeCase(data: UpdatePersonnelData): any {
   const result: any = {};
   if (data.firstName !== undefined) result.first_name = data.firstName;
@@ -31,7 +46,14 @@ function transformToSnakeCase(data: UpdatePersonnelData): any {
   if (data.email !== undefined) result.email = data.email;
   if (data.position !== undefined) result.position = data.position;
   if (data.type !== undefined) result.type = data.type;
-  if (data.baseSalary !== undefined) result.base_salary = data.baseSalary;
+  if (data.baseSalary !== undefined && data.salaryFrequency !== undefined) {
+    // Convert to monthly before storing
+    result.base_salary = convertToMonthlySalary(data.baseSalary, data.salaryFrequency);
+  } else if (data.baseSalary !== undefined) {
+    // If only baseSalary is provided, assume it's already monthly (for backward compatibility)
+    result.base_salary = data.baseSalary;
+  }
+  if (data.salaryFrequency !== undefined) result.salary_frequency = data.salaryFrequency;
   if (data.employerCharges !== undefined) result.employer_charges = data.employerCharges;
   if (data.employerChargesType !== undefined) result.employer_charges_type = data.employerChargesType;
   if (data.startDate !== undefined) result.start_date = data.startDate;

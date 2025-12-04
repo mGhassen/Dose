@@ -366,9 +366,10 @@ export interface Personnel {
   email?: string;
   position: string;
   type: PersonnelType;
-  baseSalary: number;
-  employerCharges: number; // Charges patronales (% or fixed)
-  employerChargesType: 'percentage' | 'fixed';
+  baseSalary: number; // Always stored as monthly salary
+  salaryFrequency: 'yearly' | 'monthly' | 'weekly'; // Frequency of the salary package
+  employerCharges: number; // Charges patronales (calculated, always percentage)
+  employerChargesType: 'percentage' | 'fixed'; // Always 'percentage' now
   startDate: string;
   endDate?: string;
   isActive: boolean;
@@ -436,9 +437,10 @@ export interface CreatePersonnelData {
   email?: string;
   position: string;
   type: PersonnelType;
-  baseSalary: number;
-  employerCharges: number;
-  employerChargesType: 'percentage' | 'fixed';
+  baseSalary: number; // Input salary (will be converted to monthly)
+  salaryFrequency: 'yearly' | 'monthly' | 'weekly'; // Frequency of input salary
+  employerCharges: number; // Calculated from baseSalary and social security rate
+  employerChargesType: 'percentage' | 'fixed'; // Always 'percentage'
   startDate: string;
   endDate?: string;
   isActive?: boolean;

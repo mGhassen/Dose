@@ -14,6 +14,7 @@ function transformPersonnel(row: any): Personnel {
     position: row.position,
     type: row.type,
     baseSalary: parseFloat(row.base_salary),
+    salaryFrequency: row.salary_frequency || 'monthly',
     employerCharges: parseFloat(row.employer_charges),
     employerChargesType: row.employer_charges_type,
     startDate: row.start_date,
@@ -25,14 +26,32 @@ function transformPersonnel(row: any): Personnel {
   };
 }
 
+// Convert salary to monthly based on frequency
+function convertToMonthlySalary(salary: number, frequency: 'yearly' | 'monthly' | 'weekly'): number {
+  switch (frequency) {
+    case 'yearly':
+      return salary / 12;
+    case 'monthly':
+      return salary;
+    case 'weekly':
+      return salary * 52 / 12; // 52 weeks per year / 12 months
+    default:
+      return salary;
+  }
+}
+
 function transformToSnakeCase(data: CreatePersonnelData): any {
+  // Convert salary to monthly before storing
+  const monthlySalary = convertToMonthlySalary(data.baseSalary, data.salaryFrequency);
+  
   return {
     first_name: data.firstName,
     last_name: data.lastName,
     email: data.email,
     position: data.position,
     type: data.type,
-    base_salary: data.baseSalary,
+    base_salary: monthlySalary, // Store as monthly
+    salary_frequency: data.salaryFrequency,
     employer_charges: data.employerCharges,
     employer_charges_type: data.employerChargesType,
     start_date: data.startDate,

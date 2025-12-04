@@ -19,9 +19,17 @@ interface EditablePersonnelTimelineRowProps {
   projection: PersonnelSalaryProjection;
   personnelId: number;
   onUpdate: () => void;
+  employeeSocialTaxRate?: number; // As decimal (e.g., 0.20 for 20%)
+  socialSecurityRate?: number; // As decimal (e.g., 0.1875 for 18.75%)
 }
 
-export function EditablePersonnelTimelineRow({ projection, personnelId, onUpdate }: EditablePersonnelTimelineRowProps) {
+export function EditablePersonnelTimelineRow({ 
+  projection, 
+  personnelId, 
+  onUpdate,
+  employeeSocialTaxRate,
+  socialSecurityRate
+}: EditablePersonnelTimelineRowProps) {
   const [isNetPaidDialogOpen, setIsNetPaidDialogOpen] = useState(false);
   const [isTaxesPaidDialogOpen, setIsTaxesPaidDialogOpen] = useState(false);
   const [netPaidDate, setNetPaidDate] = useState(projection.netPaidDate || projection.netPaymentDate || '');
@@ -206,8 +214,22 @@ export function EditablePersonnelTimelineRow({ projection, personnelId, onUpdate
         </TableCell>
         <TableCell>
           <div className="space-y-1">
-            <div className="text-sm">Social: {formatCurrency(projection.socialTaxes)}</div>
-            <div className="text-sm">Employer: {formatCurrency(projection.employerTaxes)}</div>
+            <div className="text-sm">
+              Social: {formatCurrency(projection.socialTaxes)}
+              {employeeSocialTaxRate !== undefined && (
+                <span className="text-xs text-muted-foreground ml-1">
+                  ({Math.round(employeeSocialTaxRate * 100)}%)
+                </span>
+              )}
+            </div>
+            <div className="text-sm">
+              Employer: {formatCurrency(projection.employerTaxes)}
+              {socialSecurityRate !== undefined && (
+                <span className="text-xs text-muted-foreground ml-1">
+                  ({Math.round(socialSecurityRate * 100)}%)
+                </span>
+              )}
+            </div>
             <div className="font-semibold">Total: {formatCurrency(totalTaxes)}</div>
           </div>
         </TableCell>

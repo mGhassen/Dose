@@ -55,7 +55,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     undefined
   );
   
-  // Fetch variables to get employee social tax rate
+  // Fetch variables to get employee social tax rate and social security rate
   const { data: variables } = useVariables();
   const variablesList = variables || [];
   const employeeSocialTaxVariable = useMemo(() => 
@@ -67,6 +67,16 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
       ? employeeSocialTaxVariable.value / 100 // Convert percentage to decimal
       : 0.20, // Default to 20% if not found
     [employeeSocialTaxVariable]
+  );
+  const socialSecurityVariable = useMemo(() => 
+    variablesList.find((v: any) => v.name === 'Social Security Rate'),
+    [variablesList]
+  );
+  const socialSecurityRate = useMemo(() => 
+    socialSecurityVariable 
+      ? socialSecurityVariable.value / 100 // Convert percentage to decimal
+      : 0.1875, // Default to 18.75% if not found
+    [socialSecurityVariable]
   );
   
   // Calculate projections automatically based on personnel dates
@@ -112,8 +122,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     position: "",
     type: "" as PersonnelType | "",
     baseSalary: "",
-    employerCharges: "",
-    employerChargesType: "percentage" as "percentage" | "fixed",
+    salaryFrequency: "monthly" as "yearly" | "monthly" | "weekly",
     startDate: "",
     endDate: "",
     isActive: true,
@@ -133,8 +142,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
         position: personnel.position,
         type: personnel.type,
         baseSalary: personnel.baseSalary.toString(),
-        employerCharges: personnel.employerCharges.toString(),
-        employerChargesType: personnel.employerChargesType,
+        salaryFrequency: personnel.salaryFrequency || 'monthly',
         startDate: personnel.startDate.split('T')[0],
         endDate: personnel.endDate ? personnel.endDate.split('T')[0] : "",
         isActive: personnel.isActive,
@@ -147,7 +155,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     e.preventDefault();
 
     if (!formData.firstName || !formData.lastName || !formData.position || !formData.type || 
-        !formData.baseSalary || !formData.employerCharges || !formData.startDate) {
+        !formData.baseSalary || !formData.startDate) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -155,6 +163,17 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     if (!resolvedParams?.id) return;
 
     try {
+      // Calculate employer charges from base salary and social security rate
+      const inputSalary = parseFloat(formData.baseSalary);
+      // Convert to monthly for calculation
+      let monthlySalary = inputSalary;
+      if (formData.salaryFrequency === 'yearly') {
+        monthlySalary = inputSalary / 12;
+      } else if (formData.salaryFrequency === 'weekly') {
+        monthlySalary = inputSalary * 52 / 12;
+      }
+      const employerCharges = monthlySalary * socialSecurityRate;
+      
       await updatePersonnel.mutateAsync({
         id: resolvedParams.id,
         data: {
@@ -163,9 +182,10 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
           email: formData.email || undefined,
           position: formData.position,
           type: formData.type as PersonnelType,
-          baseSalary: parseFloat(formData.baseSalary),
-          employerCharges: parseFloat(formData.employerCharges),
-          employerChargesType: formData.employerChargesType,
+          baseSalary: inputSalary, // Send input salary, API will convert to monthly
+          salaryFrequency: formData.salaryFrequency,
+          employerCharges: employerCharges,
+          employerChargesType: 'percentage', // Always percentage, calculated from variable
           startDate: formData.startDate,
           endDate: formData.endDate || undefined,
           isActive: formData.isActive,
@@ -363,35 +383,26 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                     />
                   </div>
 
-                  {/* Employer Charges */}
+                  {/* Salary Frequency */}
                   <div className="space-y-2">
-                    <Label htmlFor="employerCharges">Employer Charges *</Label>
-                    <Input
-                      id="employerCharges"
-                      type="number"
-                      step="0.01"
-                      value={formData.employerCharges}
-                      onChange={(e) => handleInputChange('employerCharges', e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  {/* Charges Type */}
-                  <div className="space-y-2">
-                    <Label htmlFor="employerChargesType">Charges Type *</Label>
+                    <Label htmlFor="salaryFrequency">Salary Package Frequency *</Label>
                     <Select
-                      value={formData.employerChargesType}
-                      onValueChange={(value) => handleInputChange('employerChargesType', value as "percentage" | "fixed")}
+                      value={formData.salaryFrequency}
+                      onValueChange={(value) => handleInputChange('salaryFrequency', value)}
                       required
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select frequency" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="percentage">Percentage (%)</SelectItem>
-                        <SelectItem value="fixed">Fixed Amount</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Select the frequency of the salary package
+                    </p>
                   </div>
 
                   {/* Start Date */}
@@ -492,19 +503,19 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
 
                   {/* Base Salary */}
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Base Salary</label>
+                    <label className="text-sm font-medium text-muted-foreground">Base Salary (Monthly)</label>
                     <p className="text-base font-semibold mt-1">{formatCurrency(personnel.baseSalary)}</p>
                   </div>
 
-                  {/* Employer Charges */}
+                  {/* Salary Frequency */}
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Employer Charges</label>
-                    <p className="text-base mt-1">
-                      {formatCurrency(personnel.employerCharges)}
-                      <span className="text-xs text-muted-foreground ml-2">
-                        (calculated from Social Security Rate)
-                      </span>
-                    </p>
+                    <label className="text-sm font-medium text-muted-foreground">Salary Package Frequency</label>
+                    <div className="text-base mt-1">
+                      <Badge variant="outline">
+                        {personnel.salaryFrequency === 'yearly' ? 'Yearly' : 
+                         personnel.salaryFrequency === 'weekly' ? 'Weekly' : 'Monthly'}
+                      </Badge>
+                    </div>
                   </div>
 
                   {/* Total Cost */}
@@ -629,6 +640,8 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                               projection={projection}
                               personnelId={personnel.id}
                               onUpdate={handleTimelineUpdate}
+                              employeeSocialTaxRate={employeeSocialTaxRate}
+                              socialSecurityRate={socialSecurityRate}
                             />
                           );
                         })}

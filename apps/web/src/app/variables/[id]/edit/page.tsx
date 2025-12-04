@@ -104,10 +104,7 @@ export default function EditVariablePage({ params }: EditVariablePageProps) {
       });
       
       toast.success("Variable updated successfully");
-      // Small delay to ensure the mutation completes before navigation
-      setTimeout(() => {
-        router.push(`/variables/${resolvedParams.id}`);
-      }, 100);
+      router.push(`/variables/${resolvedParams.id}`);
     } catch (error: any) {
       const errorMessage = error?.data?.error || error?.message || error?.response?.data?.error || "Failed to update variable";
       toast.error(errorMessage);

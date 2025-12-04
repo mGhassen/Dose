@@ -13,7 +13,6 @@ import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { usePersonnelById, useUpdatePersonnel, useVariables } from "@kit/hooks";
 import { toast } from "sonner";
-import { formatCurrency } from "@kit/lib/config";
 import type { PersonnelType } from "@kit/types";
 
 interface EditPersonnelPageProps {
@@ -44,18 +43,13 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
     position: "",
     type: "" as PersonnelType | "",
     baseSalary: "",
+    salaryFrequency: "monthly" as "yearly" | "monthly" | "weekly",
     startDate: "",
     endDate: "",
     isActive: true,
     notes: "",
   });
   
-  // Calculate employer charges automatically
-  const calculatedEmployerCharges = useMemo(() => {
-    if (!formData.baseSalary) return 0;
-    const baseSalary = parseFloat(formData.baseSalary) || 0;
-    return baseSalary * socialSecurityRate;
-  }, [formData.baseSalary, socialSecurityRate]);
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -70,6 +64,7 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
         position: personnel.position,
         type: personnel.type,
         baseSalary: personnel.baseSalary.toString(),
+        salaryFrequency: personnel.salaryFrequency || 'monthly',
         startDate: personnel.startDate.split('T')[0],
         endDate: personnel.endDate ? personnel.endDate.split('T')[0] : "",
         isActive: personnel.isActive,
@@ -91,8 +86,15 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
 
     try {
       // Calculate employer charges from base salary and social security rate
-      const baseSalary = parseFloat(formData.baseSalary);
-      const employerCharges = baseSalary * socialSecurityRate;
+      const inputSalary = parseFloat(formData.baseSalary);
+      // Convert to monthly for calculation
+      let monthlySalary = inputSalary;
+      if (formData.salaryFrequency === 'yearly') {
+        monthlySalary = inputSalary / 12;
+      } else if (formData.salaryFrequency === 'weekly') {
+        monthlySalary = inputSalary * 52 / 12;
+      }
+      const employerCharges = monthlySalary * socialSecurityRate;
       
       await updatePersonnel.mutateAsync({
         id: resolvedParams.id,
@@ -102,7 +104,8 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
           email: formData.email || undefined,
           position: formData.position,
           type: formData.type as PersonnelType,
-          baseSalary: baseSalary,
+          baseSalary: inputSalary, // Send input salary, API will convert to monthly
+          salaryFrequency: formData.salaryFrequency,
           employerCharges: employerCharges,
           employerChargesType: 'percentage', // Always percentage, calculated from variable
           startDate: formData.startDate,
@@ -244,23 +247,25 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
                   />
                 </div>
 
-                {/* Employer Charges (Calculated) */}
+                {/* Salary Frequency */}
                 <div className="space-y-2">
-                  <Label htmlFor="employerCharges">Employer Charges (Calculated)</Label>
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      id="employerCharges"
-                      type="text"
-                      value={formatCurrency(calculatedEmployerCharges)}
-                      disabled
-                      className="bg-muted"
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      ({socialSecurityRate * 100}% of base salary)
-                    </span>
-                  </div>
+                  <Label htmlFor="salaryFrequency">Salary Package Frequency *</Label>
+                  <Select
+                    value={formData.salaryFrequency}
+                    onValueChange={(value) => handleInputChange('salaryFrequency', value)}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <p className="text-xs text-muted-foreground">
-                    Calculated from Social Security Rate variable. Can be adjusted when recording actual payments.
+                    Select the frequency of the salary package
                   </p>
                 </div>
 
