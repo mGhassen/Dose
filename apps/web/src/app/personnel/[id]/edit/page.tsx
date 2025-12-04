@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { usePersonnelById, useUpdatePersonnel } from "@kit/hooks";
+import { usePersonnelById, useUpdatePersonnel, useVariables } from "@kit/hooks";
 import { toast } from "sonner";
+import { formatCurrency } from "@kit/lib/config";
 import type { PersonnelType } from "@kit/types";
 
 interface EditPersonnelPageProps {
@@ -25,6 +26,17 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
   const { data: personnel, isLoading } = usePersonnelById(resolvedParams?.id || "");
   const updatePersonnel = useUpdatePersonnel();
   
+  // Fetch variables to get Social Security Rate
+  const { data: variables } = useVariables();
+  const variablesList = variables || [];
+  const socialSecurityVariable = useMemo(() => 
+    variablesList.find((v: any) => v.name === 'Social Security Rate'),
+    [variablesList]
+  );
+  const socialSecurityRate = socialSecurityVariable 
+    ? socialSecurityVariable.value / 100 // Convert percentage to decimal
+    : 0.1875; // Default to 18.75% if not found
+  
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -32,13 +44,18 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
     position: "",
     type: "" as PersonnelType | "",
     baseSalary: "",
-    employerCharges: "",
-    employerChargesType: "percentage" as "percentage" | "fixed",
     startDate: "",
     endDate: "",
     isActive: true,
     notes: "",
   });
+  
+  // Calculate employer charges automatically
+  const calculatedEmployerCharges = useMemo(() => {
+    if (!formData.baseSalary) return 0;
+    const baseSalary = parseFloat(formData.baseSalary) || 0;
+    return baseSalary * socialSecurityRate;
+  }, [formData.baseSalary, socialSecurityRate]);
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -53,8 +70,6 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
         position: personnel.position,
         type: personnel.type,
         baseSalary: personnel.baseSalary.toString(),
-        employerCharges: personnel.employerCharges.toString(),
-        employerChargesType: personnel.employerChargesType,
         startDate: personnel.startDate.split('T')[0],
         endDate: personnel.endDate ? personnel.endDate.split('T')[0] : "",
         isActive: personnel.isActive,
@@ -67,7 +82,7 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
     e.preventDefault();
 
     if (!formData.firstName || !formData.lastName || !formData.position || !formData.type || 
-        !formData.baseSalary || !formData.employerCharges || !formData.startDate) {
+        !formData.baseSalary || !formData.startDate) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -75,6 +90,10 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
     if (!resolvedParams?.id) return;
 
     try {
+      // Calculate employer charges from base salary and social security rate
+      const baseSalary = parseFloat(formData.baseSalary);
+      const employerCharges = baseSalary * socialSecurityRate;
+      
       await updatePersonnel.mutateAsync({
         id: resolvedParams.id,
         data: {
@@ -83,9 +102,9 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
           email: formData.email || undefined,
           position: formData.position,
           type: formData.type as PersonnelType,
-          baseSalary: parseFloat(formData.baseSalary),
-          employerCharges: parseFloat(formData.employerCharges),
-          employerChargesType: formData.employerChargesType,
+          baseSalary: baseSalary,
+          employerCharges: employerCharges,
+          employerChargesType: 'percentage', // Always percentage, calculated from variable
           startDate: formData.startDate,
           endDate: formData.endDate || undefined,
           isActive: formData.isActive,
@@ -225,36 +244,24 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
                   />
                 </div>
 
-                {/* Employer Charges */}
+                {/* Employer Charges (Calculated) */}
                 <div className="space-y-2">
-                  <Label htmlFor="employerCharges">Employer Charges *</Label>
-                  <Input
-                    id="employerCharges"
-                    type="number"
-                    step="0.01"
-                    value={formData.employerCharges}
-                    onChange={(e) => handleInputChange('employerCharges', e.target.value)}
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-
-                {/* Charges Type */}
-                <div className="space-y-2">
-                  <Label htmlFor="employerChargesType">Charges Type *</Label>
-                  <Select
-                    value={formData.employerChargesType}
-                    onValueChange={(value) => handleInputChange('employerChargesType', value as "percentage" | "fixed")}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="percentage">Percentage (%)</SelectItem>
-                      <SelectItem value="fixed">Fixed Amount</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="employerCharges">Employer Charges (Calculated)</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      id="employerCharges"
+                      type="text"
+                      value={formatCurrency(calculatedEmployerCharges)}
+                      disabled
+                      className="bg-muted"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      ({socialSecurityRate * 100}% of base salary)
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Calculated from Social Security Rate variable. Can be adjusted when recording actual payments.
+                  </p>
                 </div>
 
                 {/* Start Date */}

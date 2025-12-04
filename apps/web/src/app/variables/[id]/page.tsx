@@ -145,7 +145,7 @@ export default function VariableDetailPage({ params }: VariableDetailPageProps) 
                   <label className="text-sm font-medium text-muted-foreground">Value</label>
                   <p className="text-base font-semibold mt-1">
                     {variable.unit 
-                      ? `${variable.value} ${variable.unit}`
+                      ? `${variable.value} ${variable.unit === 'percentage' ? '%' : variable.unit}`
                       : variable.value.toString()}
                   </p>
                 </div>

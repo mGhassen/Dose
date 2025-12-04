@@ -47,9 +47,12 @@ export default function VariablesContent() {
       header: "Value",
       cell: ({ row }) => {
         const variable = row.original;
-        return variable.unit 
-          ? `${variable.value} ${variable.unit}`
-          : variable.value.toString();
+        if (!variable.unit) {
+          return variable.value.toString();
+        }
+        // Convert "percentage" to "%" for display
+        const displayUnit = variable.unit === 'percentage' ? '%' : variable.unit;
+        return `${variable.value} ${displayUnit}`;
       },
     },
     {

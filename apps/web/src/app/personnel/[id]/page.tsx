@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
@@ -56,15 +56,23 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   );
   
   // Fetch variables to get employee social tax rate
-  const { data: variablesResponse } = useVariables();
-  const variables = variablesResponse?.data || [];
-  const employeeSocialTaxVariable = variables.find((v: any) => v.name === 'Employee Social Tax Rate');
-  const employeeSocialTaxRate = employeeSocialTaxVariable 
-    ? employeeSocialTaxVariable.value / 100 // Convert percentage to decimal
-    : 0.20; // Default to 20% if not found
+  const { data: variables } = useVariables();
+  const variablesList = variables || [];
+  const employeeSocialTaxVariable = useMemo(() => 
+    variablesList.find((v: any) => v.name === 'Employee Social Tax Rate'),
+    [variablesList]
+  );
+  const employeeSocialTaxRate = useMemo(() => 
+    employeeSocialTaxVariable 
+      ? employeeSocialTaxVariable.value / 100 // Convert percentage to decimal
+      : 0.20, // Default to 20% if not found
+    [employeeSocialTaxVariable]
+  );
   
   // Calculate projections automatically based on personnel dates
-  const calculatedProjections = personnel ? (() => {
+  const calculatedProjections = useMemo(() => {
+    if (!personnel) return [];
+    
     const startDate = new Date(personnel.startDate);
     const endDate = personnel.endDate ? new Date(personnel.endDate) : new Date();
     const now = new Date();
@@ -74,7 +82,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     const endMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     
     return projectPersonnelSalary(personnel, startMonth, endMonth, employeeSocialTaxRate);
-  })() : [];
+  }, [personnel, employeeSocialTaxRate]);
   
   // Merge calculated projections with stored entries (to get payment status)
   const mergedProjections = calculatedProjections.map(calcProj => {
@@ -492,9 +500,10 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Employer Charges</label>
                     <p className="text-base mt-1">
-                      {personnel.employerChargesType === 'percentage' 
-                        ? `${personnel.employerCharges}%` 
-                        : formatCurrency(personnel.employerCharges)}
+                      {formatCurrency(personnel.employerCharges)}
+                      <span className="text-xs text-muted-foreground ml-2">
+                        (calculated from Social Security Rate)
+                      </span>
                     </p>
                   </div>
 
