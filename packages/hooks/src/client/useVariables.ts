@@ -53,6 +53,9 @@ export function useUpdateVariable() {
     mutationFn: ({ id, data }: { id: string; data: UpdateVariableData }) => 
       variablesApi.update(id, data),
     onSuccess: async (updatedVariable, variables) => {
+      // Update the query cache directly with the new data
+      queryClient.setQueryData(['variables', variables.id], updatedVariable);
+      
       // Refetch the specific variable to ensure it's updated
       await queryClient.refetchQueries({ queryKey: ['variables', variables.id] });
       

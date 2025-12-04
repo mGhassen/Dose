@@ -87,27 +87,23 @@ export default function EditVariablePage({ params }: EditVariablePageProps) {
     }
 
     try {
-      const updateData = {
-        name: formData.name.trim(),
-        type: formData.type as VariableType,
-        value: numValue,
-        unit: formData.unit?.trim() || undefined,
-        effectiveDate: formData.effectiveDate,
-        endDate: formData.endDate?.trim() || undefined,
-        description: formData.description?.trim() || undefined,
-        isActive: formData.isActive,
-      };
-      
       await updateVariable.mutateAsync({
         id: resolvedParams.id,
-        data: updateData,
+        data: {
+          name: formData.name.trim(),
+          type: formData.type as VariableType,
+          value: numValue,
+          unit: formData.unit?.trim() || undefined,
+          effectiveDate: formData.effectiveDate,
+          endDate: formData.endDate?.trim() || undefined,
+          description: formData.description?.trim() || undefined,
+          isActive: formData.isActive,
+        },
       });
-      
       toast.success("Variable updated successfully");
       router.push(`/variables/${resolvedParams.id}`);
     } catch (error: any) {
-      const errorMessage = error?.data?.error || error?.message || error?.response?.data?.error || "Failed to update variable";
-      toast.error(errorMessage);
+      toast.error(error?.message || "Failed to update variable");
     }
   };
 
@@ -277,7 +273,7 @@ export default function EditVariablePage({ params }: EditVariablePageProps) {
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={updateVariable.isPending || !resolvedParams?.id}
+                  disabled={updateVariable.isPending || isLoading || !resolvedParams?.id}
                 >
                   <Save className="mr-2 h-4 w-4" />
                   {updateVariable.isPending ? "Updating..." : "Update Variable"}

@@ -15,12 +15,14 @@ const DEFAULT_EMPLOYEE_SOCIAL_TAX_RATE = 0.20;
  * Project a single personnel's salary across a date range
  * Calculates monthly projections with brute, net, social taxes, and employer taxes
  * @param employeeSocialTaxRate - Employee social tax rate as decimal (e.g., 0.20 for 20%). Defaults to 20% if not provided.
+ * @param socialSecurityRate - Social security rate (employer charges) as decimal (e.g., 0.1875 for 18.75%). Defaults to 18.75% if not provided.
  */
 export function projectPersonnelSalary(
   personnel: Personnel,
   startMonth: string, // YYYY-MM
   endMonth: string, // YYYY-MM
-  employeeSocialTaxRate: number = DEFAULT_EMPLOYEE_SOCIAL_TAX_RATE
+  employeeSocialTaxRate: number = DEFAULT_EMPLOYEE_SOCIAL_TAX_RATE,
+  socialSecurityRate?: number // Optional, will use personnel.employerCharges if not provided
 ): PersonnelSalaryProjection[] {
   const projections: PersonnelSalaryProjection[] = [];
   const start = new Date(startMonth + '-01');
@@ -38,11 +40,15 @@ export function projectPersonnelSalary(
 
   // Calculate salary breakdown
   const bruteSalary = personnel.baseSalary;
+  // Social taxes = difference between brute and net (deducted from brute)
   const socialTaxes = bruteSalary * employeeSocialTaxRate;
   const netSalary = bruteSalary - socialTaxes;
   
-  // Employer taxes (already calculated in personnel.employerCharges)
-  const employerTaxes = personnel.employerCharges;
+  // Employer taxes = total charge added to brut (calculated from social security rate)
+  // If socialSecurityRate is provided, use it; otherwise fall back to stored employerCharges
+  const employerTaxes = socialSecurityRate !== undefined 
+    ? bruteSalary * socialSecurityRate 
+    : personnel.employerCharges;
 
   // Generate projections for each month
   let currentDate = new Date(Math.max(start.getTime(), personnelStart.getTime()));
@@ -81,17 +87,19 @@ export function projectPersonnelSalary(
 /**
  * Project all personnel salaries for a given date range
  * @param employeeSocialTaxRate - Employee social tax rate as decimal (e.g., 0.20 for 20%). Defaults to 20% if not provided.
+ * @param socialSecurityRate - Social security rate (employer charges) as decimal (e.g., 0.1875 for 18.75%). Optional.
  */
 export function projectPersonnelSalariesForRange(
   personnelList: Personnel[],
   startMonth: string, // YYYY-MM
   endMonth: string, // YYYY-MM
-  employeeSocialTaxRate: number = DEFAULT_EMPLOYEE_SOCIAL_TAX_RATE
+  employeeSocialTaxRate: number = DEFAULT_EMPLOYEE_SOCIAL_TAX_RATE,
+  socialSecurityRate?: number
 ): PersonnelSalaryProjection[] {
   const allProjections: PersonnelSalaryProjection[] = [];
 
   for (const personnel of personnelList) {
-    const projections = projectPersonnelSalary(personnel, startMonth, endMonth, employeeSocialTaxRate);
+    const projections = projectPersonnelSalary(personnel, startMonth, endMonth, employeeSocialTaxRate, socialSecurityRate);
     allProjections.push(...projections);
   }
 
@@ -107,14 +115,16 @@ export function projectPersonnelSalariesForRange(
 /**
  * Project all personnel salaries for a given year
  * @param employeeSocialTaxRate - Employee social tax rate as decimal (e.g., 0.20 for 20%). Defaults to 20% if not provided.
+ * @param socialSecurityRate - Social security rate (employer charges) as decimal (e.g., 0.1875 for 18.75%). Optional.
  */
 export function projectPersonnelSalariesForYear(
   personnelList: Personnel[],
   year: string, // YYYY
-  employeeSocialTaxRate: number = DEFAULT_EMPLOYEE_SOCIAL_TAX_RATE
+  employeeSocialTaxRate: number = DEFAULT_EMPLOYEE_SOCIAL_TAX_RATE,
+  socialSecurityRate?: number
 ): PersonnelSalaryProjection[] {
   const startMonth = `${year}-01`;
   const endMonth = `${year}-12`;
-  return projectPersonnelSalariesForRange(personnelList, startMonth, endMonth, employeeSocialTaxRate);
+  return projectPersonnelSalariesForRange(personnelList, startMonth, endMonth, employeeSocialTaxRate, socialSecurityRate);
 }
 

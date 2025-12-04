@@ -91,8 +91,8 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     const startMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
     const endMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     
-    return projectPersonnelSalary(personnel, startMonth, endMonth, employeeSocialTaxRate);
-  }, [personnel, employeeSocialTaxRate]);
+    return projectPersonnelSalary(personnel, startMonth, endMonth, employeeSocialTaxRate, socialSecurityRate);
+  }, [personnel, employeeSocialTaxRate, socialSecurityRate]);
   
   // Merge calculated projections with stored entries (to get payment status)
   const mergedProjections = calculatedProjections.map(calcProj => {
@@ -251,9 +251,8 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     intern: "Intern",
   };
 
-  const totalCost = personnel.employerChargesType === 'percentage'
-    ? personnel.baseSalary * (1 + personnel.employerCharges / 100)
-    : personnel.baseSalary + personnel.employerCharges;
+  // Total cost = brut + employer taxes (employer taxes are added on top of brut)
+  const totalCost = personnel.baseSalary + (personnel.employerCharges || personnel.baseSalary * socialSecurityRate);
 
   return (
     <AppLayout>
