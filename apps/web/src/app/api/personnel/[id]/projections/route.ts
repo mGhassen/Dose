@@ -57,7 +57,10 @@ export async function GET(
     if (error) {
       console.error('Supabase error fetching personnel salary projections:', error);
       // If table doesn't exist, return empty array instead of error
-      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+      if (error.code === '42P01' || 
+          error.message?.includes('does not exist') || 
+          error.message?.includes('schema cache') ||
+          error.message?.includes('Could not find the table')) {
         console.warn('personnel_salary_projections table does not exist yet, returning empty array');
         return NextResponse.json([]);
       }
