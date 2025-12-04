@@ -5791,7 +5791,8 @@ INSERT INTO variables (name, type, value, unit, effective_date, end_date, descri
 ('Inflation Rate', 'inflation', 8.5, 'percentage', '2024-01-01', NULL, 'Annual inflation rate', true),
 ('EUR to TND Exchange Rate', 'exchange_rate', 3.25, 'rate', '2024-01-01', NULL, 'Euro to Tunisian Dinar exchange rate', true),
 ('Minimum Wage', 'cost', 450.0, 'TND', '2024-01-01', NULL, 'Minimum monthly wage', true),
-('Social Security Rate', 'tax', 18.75, 'percentage', '2024-01-01', NULL, 'Employer social security contribution rate', true);
+('Social Security Rate', 'tax', 18.75, 'percentage', '2024-01-01', NULL, 'Employer social security contribution rate', true),
+('Employee Social Tax Rate', 'tax', 20.0, 'percentage', '2024-01-01', NULL, 'Employee social tax deduction rate (applied to brute salary to calculate net)', true);
 -- ENTRIES (Created from existing data)
 -- ============================================================================
 -- Create entries from sales (inputs)

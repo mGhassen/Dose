@@ -20,7 +20,7 @@ import { Badge } from "@kit/ui/badge";
 import { Save, X, Trash2, MoreVertical, Edit2, Calendar } from "lucide-react";
 import Link from "next/link";
 import AppLayout from "@/components/app-layout";
-import { usePersonnelById, useUpdatePersonnel, useDeletePersonnel, usePersonnelSalaryProjections } from "@kit/hooks";
+import { usePersonnelById, useUpdatePersonnel, useDeletePersonnel, usePersonnelSalaryProjections, useVariables } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
@@ -55,6 +55,14 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     undefined
   );
   
+  // Fetch variables to get employee social tax rate
+  const { data: variablesResponse } = useVariables();
+  const variables = variablesResponse?.data || [];
+  const employeeSocialTaxVariable = variables.find((v: any) => v.name === 'Employee Social Tax Rate');
+  const employeeSocialTaxRate = employeeSocialTaxVariable 
+    ? employeeSocialTaxVariable.value / 100 // Convert percentage to decimal
+    : 0.20; // Default to 20% if not found
+  
   // Calculate projections automatically based on personnel dates
   const calculatedProjections = personnel ? (() => {
     const startDate = new Date(personnel.startDate);
@@ -65,7 +73,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     const startMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
     const endMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     
-    return projectPersonnelSalary(personnel, startMonth, endMonth);
+    return projectPersonnelSalary(personnel, startMonth, endMonth, employeeSocialTaxRate);
   })() : [];
   
   // Merge calculated projections with stored entries (to get payment status)
