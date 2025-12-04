@@ -54,13 +54,27 @@ export async function GET(
 
     const { data, error } = await query;
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error fetching personnel salary projections:', error);
+      // If table doesn't exist, return empty array instead of error
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.warn('personnel_salary_projections table does not exist yet, returning empty array');
+        return NextResponse.json([]);
+      }
+      throw error;
+    }
 
     const entries = (data || []).map(transformProjectionEntry);
 
     return NextResponse.json(entries);
   } catch (error: any) {
     console.error('Error fetching personnel salary projections:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
     return NextResponse.json(
       { error: 'Failed to fetch personnel salary projections', details: error.message },
       { status: 500 }
