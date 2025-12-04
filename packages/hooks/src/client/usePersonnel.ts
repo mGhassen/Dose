@@ -105,3 +105,48 @@ export function useDeletePersonnel() {
   });
 }
 
+export function usePersonnelSalaryProjections(personnelId: string, startMonth?: string, endMonth?: string) {
+  return useQuery({
+    queryKey: ['personnel', personnelId, 'salary-projections', startMonth, endMonth],
+    queryFn: () => personnelApi.getSalaryProjections(personnelId, startMonth, endMonth),
+    enabled: !!personnelId,
+  });
+}
+
+export function useCreateOrUpdatePersonnelSalaryProjectionEntry() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ personnelId, data }: { 
+      personnelId: string; 
+      data: import('@kit/types').CreatePersonnelSalaryProjectionData 
+    }) => 
+      personnelApi.createOrUpdateSalaryProjectionEntry(personnelId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['personnel', variables.personnelId, 'salary-projections'] });
+      queryClient.invalidateQueries({ queryKey: ['personnel', variables.personnelId] });
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+    },
+  });
+}
+
+export function useUpdatePersonnelSalaryProjectionEntry() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ personnelId, entryId, data }: { 
+      personnelId: string; 
+      entryId: string; 
+      data: import('@kit/types').UpdatePersonnelSalaryProjectionData 
+    }) => 
+      personnelApi.updateSalaryProjectionEntry(personnelId, entryId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['personnel', variables.personnelId, 'salary-projections'] });
+      queryClient.invalidateQueries({ queryKey: ['personnel', variables.personnelId] });
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+    },
+  });
+}
+

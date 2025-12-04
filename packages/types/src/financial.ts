@@ -377,6 +377,7 @@ export interface Personnel {
   updatedAt: string;
 }
 
+// Aggregate projection for reporting (used in profit/loss, etc.)
 export interface PersonnelProjection {
   month: string; // YYYY-MM
   totalSalary: number;
@@ -384,6 +385,50 @@ export interface PersonnelProjection {
   totalCost: number;
   headcount: number;
 }
+
+// Individual personnel salary projection (for timeline)
+export interface PersonnelSalaryProjection {
+  id?: number;
+  personnelId: number;
+  month: string; // YYYY-MM
+  bruteSalary: number; // Gross salary before taxes
+  netSalary: number; // Net salary after employee taxes
+  socialTaxes: number; // Employee social contributions
+  employerTaxes: number; // Employer charges/taxes
+  netPaymentDate?: string; // Date when net salary is paid
+  taxesPaymentDate?: string; // Date when taxes are paid
+  isProjected: boolean;
+  isNetPaid: boolean; // Whether net salary payment is completed
+  isTaxesPaid: boolean; // Whether taxes payment is completed
+  netPaidDate?: string; // Actual date net salary was paid
+  taxesPaidDate?: string; // Actual date taxes were paid
+  actualNetAmount?: number; // Actual net amount paid (if different from projected)
+  actualTaxesAmount?: number; // Actual taxes amount paid (if different from projected)
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreatePersonnelSalaryProjectionData {
+  personnelId: number;
+  month: string;
+  bruteSalary: number;
+  netSalary: number;
+  socialTaxes?: number;
+  employerTaxes?: number;
+  netPaymentDate?: string;
+  taxesPaymentDate?: string;
+  isProjected?: boolean;
+  isNetPaid?: boolean;
+  isTaxesPaid?: boolean;
+  netPaidDate?: string;
+  taxesPaidDate?: string;
+  actualNetAmount?: number;
+  actualTaxesAmount?: number;
+  notes?: string;
+}
+
+export interface UpdatePersonnelSalaryProjectionData extends Partial<CreatePersonnelSalaryProjectionData> {}
 
 export interface CreatePersonnelData {
   firstName: string;

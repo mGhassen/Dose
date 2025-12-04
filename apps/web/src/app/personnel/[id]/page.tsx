@@ -17,13 +17,24 @@ import { Textarea } from "@kit/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
-import { Save, X, Trash2, MoreVertical, Edit2 } from "lucide-react";
+import { Save, X, Trash2, MoreVertical, Edit2, Calendar } from "lucide-react";
+import Link from "next/link";
 import AppLayout from "@/components/app-layout";
-import { usePersonnelById, useUpdatePersonnel, useDeletePersonnel } from "@kit/hooks";
+import { usePersonnelById, useUpdatePersonnel, useDeletePersonnel, usePersonnelSalaryProjections } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
-import { formatDate } from "@kit/lib/date-format";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 import type { PersonnelType } from "@kit/types";
+import { projectPersonnelSalary } from "@/lib/calculations/personnel-projections";
+import { EditablePersonnelTimelineRow } from "../personnel-timeline-editable";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@kit/ui/table";
 
 interface PersonnelDetailPageProps {
   params: Promise<{ id: string }>;
@@ -36,6 +47,47 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   const { data: personnel, isLoading } = usePersonnelById(resolvedParams?.id || "");
   const updatePersonnel = useUpdatePersonnel();
   const deleteMutation = useDeletePersonnel();
+  
+  // Fetch stored salary projection entries (for payment status)
+  const { data: storedProjections, refetch: refetchProjections } = usePersonnelSalaryProjections(
+    resolvedParams?.id || "",
+    undefined,
+    undefined
+  );
+  
+  // Calculate projections automatically based on personnel dates
+  const calculatedProjections = personnel ? (() => {
+    const startDate = new Date(personnel.startDate);
+    const endDate = personnel.endDate ? new Date(personnel.endDate) : new Date();
+    const now = new Date();
+    now.setFullYear(now.getFullYear() + 1); // Project 1 year ahead
+    
+    const startMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
+    const endMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    return projectPersonnelSalary(personnel, startMonth, endMonth);
+  })() : [];
+  
+  // Merge calculated projections with stored entries (to get payment status)
+  const mergedProjections = calculatedProjections.map(calcProj => {
+    const stored = storedProjections?.find((p: any) => p.month === calcProj.month);
+    return {
+      ...calcProj,
+      // Add stored data if it exists
+      id: stored?.id,
+      isNetPaid: stored?.isNetPaid || false,
+      isTaxesPaid: stored?.isTaxesPaid || false,
+      netPaidDate: stored?.netPaidDate,
+      taxesPaidDate: stored?.taxesPaidDate,
+      actualNetAmount: stored?.actualNetAmount,
+      actualTaxesAmount: stored?.actualTaxesAmount,
+      notes: stored?.notes,
+    };
+  });
+  
+  const handleTimelineUpdate = () => {
+    refetchProjections();
+  };
   
   const [formData, setFormData] = useState({
     firstName: "",
@@ -492,6 +544,85 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
             )}
           </CardContent>
         </Card>
+
+        {/* Timeline Card - Only show when not editing */}
+        {!isEditing && personnel && (
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>Salary Timeline</CardTitle>
+                <CardDescription>
+                  Monthly salary projections from {formatDate(personnel.startDate)} to {personnel.endDate ? formatDate(personnel.endDate) : 'ongoing'}
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {mergedProjections.length === 0 ? (
+                <div className="text-center py-10">
+                  <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No salary projections for this personnel</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-4 border rounded-lg">
+                      <div className="text-sm text-muted-foreground">Total Months</div>
+                      <div className="text-2xl font-bold mt-1">{mergedProjections.length}</div>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="text-sm text-muted-foreground">Total Net Salary</div>
+                      <div className="text-2xl font-bold mt-1 text-primary">
+                        {formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualNetAmount || p.netSalary), 0))}
+                      </div>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="text-sm text-muted-foreground">Total Taxes</div>
+                      <div className="text-2xl font-bold mt-1 text-primary">
+                        {formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualTaxesAmount || (p.socialTaxes + p.employerTaxes)), 0))}
+                      </div>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="text-sm text-muted-foreground">Total Cost</div>
+                      <div className="text-2xl font-bold mt-1 text-primary">
+                        {formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualNetAmount || p.netSalary) + (p.actualTaxesAmount || (p.socialTaxes + p.employerTaxes)), 0))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Timeline Table */}
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Month</TableHead>
+                          <TableHead>Net Salary</TableHead>
+                          <TableHead>Taxes</TableHead>
+                          <TableHead>Payment Status</TableHead>
+                          <TableHead>Payment Dates</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {mergedProjections.map((projection: any, index: number) => {
+                          const uniqueKey = `personnel-${personnel.id}-month-${projection.month}-${projection.id || 'calc'}-idx-${index}`;
+                          
+                          return (
+                            <EditablePersonnelTimelineRow
+                              key={uniqueKey}
+                              projection={projection}
+                              personnelId={personnel.id}
+                              onUpdate={handleTimelineUpdate}
+                            />
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </AppLayout>
   );

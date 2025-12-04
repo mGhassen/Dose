@@ -578,6 +578,9 @@ def main():
     print(",\n".join(personnel) + ";")
     print("SELECT setval('personnel_id_seq', (SELECT MAX(id) FROM personnel));")
     print()
+    print("-- NOTE: Personnel salary projections are calculated on-the-fly, not pre-inserted.")
+    print("-- The personnel_salary_projections table stores actual payment records when payments are made.")
+    print()
     
     print("-- ============================================================================")
     print("-- SALES (2 years: 2024-2025)")
