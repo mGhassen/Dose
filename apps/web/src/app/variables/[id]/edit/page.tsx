@@ -58,31 +58,59 @@ export default function EditVariablePage({ params }: EditVariablePageProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.type || formData.value === "" || !formData.effectiveDate) {
-      toast.error("Please fill in all required fields");
+    // Validate required fields
+    if (!formData.name?.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    if (!formData.type) {
+      toast.error("Type is required");
+      return;
+    }
+    if (formData.value === "" || formData.value === null || formData.value === undefined) {
+      toast.error("Value is required");
+      return;
+    }
+    const numValue = parseFloat(formData.value);
+    if (isNaN(numValue)) {
+      toast.error("Value must be a valid number");
+      return;
+    }
+    if (!formData.effectiveDate) {
+      toast.error("Effective date is required");
       return;
     }
 
-    if (!resolvedParams?.id) return;
+    if (!resolvedParams?.id) {
+      toast.error("Variable ID is missing");
+      return;
+    }
 
     try {
+      const updateData = {
+        name: formData.name.trim(),
+        type: formData.type as VariableType,
+        value: numValue,
+        unit: formData.unit?.trim() || undefined,
+        effectiveDate: formData.effectiveDate,
+        endDate: formData.endDate?.trim() || undefined,
+        description: formData.description?.trim() || undefined,
+        isActive: formData.isActive,
+      };
+      
       await updateVariable.mutateAsync({
         id: resolvedParams.id,
-        data: {
-          name: formData.name,
-          type: formData.type as VariableType,
-          value: parseFloat(formData.value),
-          unit: formData.unit || undefined,
-          effectiveDate: formData.effectiveDate,
-          endDate: formData.endDate || undefined,
-          description: formData.description || undefined,
-          isActive: formData.isActive,
-        },
+        data: updateData,
       });
+      
       toast.success("Variable updated successfully");
-      router.push(`/variables/${resolvedParams.id}`);
+      // Small delay to ensure the mutation completes before navigation
+      setTimeout(() => {
+        router.push(`/variables/${resolvedParams.id}`);
+      }, 100);
     } catch (error: any) {
-      toast.error(error?.message || "Failed to update variable");
+      const errorMessage = error?.data?.error || error?.message || error?.response?.data?.error || "Failed to update variable";
+      toast.error(errorMessage);
     }
   };
 
@@ -250,7 +278,10 @@ export default function EditVariablePage({ params }: EditVariablePageProps) {
                   <X className="mr-2 h-4 w-4" />
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updateVariable.isPending}>
+                <Button 
+                  type="submit" 
+                  disabled={updateVariable.isPending || !resolvedParams?.id}
+                >
                   <Save className="mr-2 h-4 w-4" />
                   {updateVariable.isPending ? "Updating..." : "Update Variable"}
                 </Button>

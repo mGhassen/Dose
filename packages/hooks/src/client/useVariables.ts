@@ -53,8 +53,20 @@ export function useUpdateVariable() {
     mutationFn: ({ id, data }: { id: string; data: UpdateVariableData }) => 
       variablesApi.update(id, data),
     onSuccess: (_, variables) => {
+      // Invalidate all variables queries
       queryClient.invalidateQueries({ queryKey: ['variables'] });
       queryClient.invalidateQueries({ queryKey: ['variables', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['variables', 'type'] });
+      
+      // Invalidate calculations that depend on variables
+      // Personnel calculations use Social Security Rate and Employee Social Tax Rate
+      queryClient.invalidateQueries({ queryKey: ['personnel'] });
+      queryClient.invalidateQueries({ queryKey: ['personnel', 'salary-projections'] });
+      
+      // Financial calculations that use variables
+      queryClient.invalidateQueries({ queryKey: ['profit-loss'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-statement'] });
     },
   });
 }

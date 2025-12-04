@@ -27,9 +27,12 @@ export default function CreatePersonnelPage() {
     variablesList.find((v: any) => v.name === 'Social Security Rate'),
     [variablesList]
   );
-  const socialSecurityRate = socialSecurityVariable 
-    ? socialSecurityVariable.value / 100 // Convert percentage to decimal
-    : 0.1875; // Default to 18.75% if not found
+  const socialSecurityRate = useMemo(() => 
+    socialSecurityVariable 
+      ? socialSecurityVariable.value / 100 // Convert percentage to decimal
+      : 0.1875, // Default to 18.75% if not found
+    [socialSecurityVariable]
+  );
   
   const [formData, setFormData] = useState({
     firstName: "",
