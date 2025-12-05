@@ -64,11 +64,15 @@ export function EditablePersonnelTimelineRow({
       const amount = parseFloat(actualNetAmount) || projection.netSalary;
 
       if (projectionEntry?.id) {
-        // Update existing entry
+        // Update existing entry - also update calculated values to ensure they're correct
         await updateProjectionEntry.mutateAsync({
           personnelId: personnelId.toString(),
           entryId: projectionEntry.id.toString(),
           data: {
+            bruteSalary: projection.bruteSalary, // Update with calculated value
+            netSalary: projection.netSalary, // Update with calculated value
+            socialTaxes: projection.socialTaxes, // Update with calculated value
+            employerTaxes: projection.employerTaxes, // Update with calculated value
             isNetPaid: isNetPaidChecked,
             netPaidDate: isNetPaidChecked ? paidDate : null,
             actualNetAmount: amount,
@@ -76,15 +80,15 @@ export function EditablePersonnelTimelineRow({
           },
         });
       } else {
-        // Create new entry
+        // Create new entry - always use calculated values from projection
         await createOrUpdateProjectionEntry.mutateAsync({
           personnelId: personnelId.toString(),
           data: {
             month: projection.month,
-            bruteSalary: projection.bruteSalary,
-            netSalary: projection.netSalary,
-            socialTaxes: projection.socialTaxes,
-            employerTaxes: projection.employerTaxes,
+            bruteSalary: projection.bruteSalary, // Use calculated value
+            netSalary: projection.netSalary, // Use calculated value
+            socialTaxes: projection.socialTaxes, // Use calculated value
+            employerTaxes: projection.employerTaxes, // Use calculated value
             netPaymentDate: projection.netPaymentDate,
             taxesPaymentDate: projection.taxesPaymentDate,
             isProjected: projection.isProjected,
@@ -113,11 +117,15 @@ export function EditablePersonnelTimelineRow({
       const amount = parseFloat(actualTaxesAmount) || (projection.socialTaxes + projection.employerTaxes);
 
       if (projectionEntry?.id) {
-        // Update existing entry
+        // Update existing entry - also update calculated values to ensure they're correct
         await updateProjectionEntry.mutateAsync({
           personnelId: personnelId.toString(),
           entryId: projectionEntry.id.toString(),
           data: {
+            bruteSalary: projection.bruteSalary, // Update with calculated value
+            netSalary: projection.netSalary, // Update with calculated value
+            socialTaxes: projection.socialTaxes, // Update with calculated value
+            employerTaxes: projection.employerTaxes, // Update with calculated value
             isTaxesPaid: isTaxesPaidChecked,
             taxesPaidDate: isTaxesPaidChecked ? paidDate : null,
             actualTaxesAmount: amount,
@@ -125,15 +133,15 @@ export function EditablePersonnelTimelineRow({
           },
         });
       } else {
-        // Create new entry
+        // Create new entry - always use calculated values from projection
         await createOrUpdateProjectionEntry.mutateAsync({
           personnelId: personnelId.toString(),
           data: {
             month: projection.month,
-            bruteSalary: projection.bruteSalary,
-            netSalary: projection.netSalary,
-            socialTaxes: projection.socialTaxes,
-            employerTaxes: projection.employerTaxes,
+            bruteSalary: projection.bruteSalary, // Use calculated value
+            netSalary: projection.netSalary, // Use calculated value
+            socialTaxes: projection.socialTaxes, // Use calculated value
+            employerTaxes: projection.employerTaxes, // Use calculated value
             netPaymentDate: projection.netPaymentDate,
             taxesPaymentDate: projection.taxesPaymentDate,
             isProjected: projection.isProjected,
@@ -216,17 +224,17 @@ export function EditablePersonnelTimelineRow({
           <div className="space-y-1">
             <div className="text-sm">
               Social: {formatCurrency(projection.socialTaxes)}
-              {employeeSocialTaxRate !== undefined && (
+              {socialSecurityRate !== undefined && (
                 <span className="text-xs text-muted-foreground ml-1">
-                  ({Math.round(employeeSocialTaxRate * 100)}%)
+                  ({Math.round(socialSecurityRate * 100)}%)
                 </span>
               )}
             </div>
             <div className="text-sm">
               Employer: {formatCurrency(projection.employerTaxes)}
-              {socialSecurityRate !== undefined && (
+              {employeeSocialTaxRate !== undefined && (
                 <span className="text-xs text-muted-foreground ml-1">
-                  ({Math.round(socialSecurityRate * 100)}%)
+                  ({Math.round(employeeSocialTaxRate * 100)}%)
                 </span>
               )}
             </div>

@@ -48,7 +48,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   const updatePersonnel = useUpdatePersonnel();
   const deleteMutation = useDeletePersonnel();
   
-  // Fetch stored salary projection entries (for payment status)
+  // Fetch stored salary projection entries (for payment status only - NOT for calculations)
   const { data: storedProjections, refetch: refetchProjections } = usePersonnelSalaryProjections(
     resolvedParams?.id || "",
     undefined,
@@ -62,24 +62,35 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     variablesList.find((v: any) => v.name === 'Employee Social Tax Rate'),
     [variablesList]
   );
-  const employeeSocialTaxRate = useMemo(() => 
-    employeeSocialTaxVariable 
+  const employeeSocialTaxRate = useMemo(() => {
+    const rate = employeeSocialTaxVariable 
       ? employeeSocialTaxVariable.value / 100 // Convert percentage to decimal
-      : 0.20, // Default to 20% if not found
-    [employeeSocialTaxVariable]
-  );
+      : 0.20; // Default to 20% if not found
+    console.log('[Personnel] Employee Social Tax Rate:', { 
+      variable: employeeSocialTaxVariable?.name, 
+      value: employeeSocialTaxVariable?.value, 
+      rate 
+    });
+    return rate;
+  }, [employeeSocialTaxVariable]);
   const socialSecurityVariable = useMemo(() => 
     variablesList.find((v: any) => v.name === 'Social Security Rate'),
     [variablesList]
   );
-  const socialSecurityRate = useMemo(() => 
-    socialSecurityVariable 
+  const socialSecurityRate = useMemo(() => {
+    const rate = socialSecurityVariable 
       ? socialSecurityVariable.value / 100 // Convert percentage to decimal
-      : 0.1875, // Default to 18.75% if not found
-    [socialSecurityVariable]
-  );
+      : 0.1875; // Default to 18.75% if not found
+    console.log('[Personnel] Social Security Rate:', { 
+      variable: socialSecurityVariable?.name, 
+      value: socialSecurityVariable?.value, 
+      rate 
+    });
+    return rate;
+  }, [socialSecurityVariable]);
   
   // Calculate projections automatically based on personnel dates
+  // CRITICAL: Always recalculate - never use stored values for calculations
   const calculatedProjections = useMemo(() => {
     if (!personnel) return [];
     
@@ -91,15 +102,34 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     const startMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
     const endMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     
-    return projectPersonnelSalary(personnel, startMonth, endMonth, employeeSocialTaxRate, socialSecurityRate);
+    const projections = projectPersonnelSalary(personnel, startMonth, endMonth, employeeSocialTaxRate, socialSecurityRate);
+    console.log('[Personnel] Calculated projections:', {
+      personnelId: personnel.id,
+      baseSalary: personnel.baseSalary,
+      employeeSocialTaxRate,
+      socialSecurityRate,
+      firstProjection: projections[0],
+    });
+    return projections;
   }, [personnel, employeeSocialTaxRate, socialSecurityRate]);
   
   // Merge calculated projections with stored entries (to get payment status)
+  // CRITICAL: Always use calculated values for brute, net, social taxes, and employer taxes
+  // Only use stored values for payment status and actual amounts
   const mergedProjections = calculatedProjections.map(calcProj => {
     const stored = storedProjections?.find((p: any) => p.month === calcProj.month);
+    // Force use calculated values - don't let stored values override
     return {
-      ...calcProj,
-      // Add stored data if it exists
+      personnelId: calcProj.personnelId,
+      month: calcProj.month,
+      bruteSalary: calcProj.bruteSalary, // FORCE calculated
+      netSalary: calcProj.netSalary, // FORCE calculated
+      socialTaxes: calcProj.socialTaxes, // FORCE calculated
+      employerTaxes: calcProj.employerTaxes, // FORCE calculated
+      netPaymentDate: calcProj.netPaymentDate,
+      taxesPaymentDate: calcProj.taxesPaymentDate,
+      isProjected: calcProj.isProjected,
+      // Only use stored data for payment tracking
       id: stored?.id,
       isNetPaid: stored?.isNetPaid || false,
       isTaxesPaid: stored?.isTaxesPaid || false,
@@ -252,7 +282,8 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   };
 
   // Total cost = brut + employer taxes (employer taxes are added on top of brut)
-  const totalCost = personnel.baseSalary + (personnel.employerCharges || personnel.baseSalary * socialSecurityRate);
+  // Employer taxes = brut * employeeSocialTaxRate
+  const totalCost = personnel.baseSalary + (personnel.baseSalary * employeeSocialTaxRate);
 
   return (
     <AppLayout>

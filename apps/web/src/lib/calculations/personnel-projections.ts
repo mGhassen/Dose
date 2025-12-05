@@ -40,15 +40,30 @@ export function projectPersonnelSalary(
 
   // Calculate salary breakdown
   const bruteSalary = personnel.baseSalary;
+  
   // Social taxes = difference between brute and net (deducted from brute)
-  const socialTaxes = bruteSalary * employeeSocialTaxRate;
+  // Use Social Security Rate for social taxes (what gets deducted from brute)
+  const socialTaxes = socialSecurityRate !== undefined 
+    ? bruteSalary * socialSecurityRate 
+    : bruteSalary * 0.1875; // Default 18.75%
   const netSalary = bruteSalary - socialTaxes;
   
-  // Employer taxes = total charge added to brut (calculated from social security rate)
-  // If socialSecurityRate is provided, use it; otherwise fall back to stored employerCharges
-  const employerTaxes = socialSecurityRate !== undefined 
-    ? bruteSalary * socialSecurityRate 
-    : personnel.employerCharges;
+  // Employer taxes = total charge added to brut
+  // Use Employee Social Tax Rate for employer taxes (what gets added on top)
+  const employerTaxes = bruteSalary * employeeSocialTaxRate;
+  
+  // Debug: Log calculation to verify
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Personnel salary calculation:', {
+      personnelId: personnel.id,
+      bruteSalary,
+      employeeSocialTaxRate,
+      socialTaxes,
+      netSalary,
+      socialSecurityRate,
+      employerTaxes,
+    });
+  }
 
   // Generate projections for each month
   let currentDate = new Date(Math.max(start.getTime(), personnelStart.getTime()));
