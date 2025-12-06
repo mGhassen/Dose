@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useIntegrations, useIntegrationByType, useInitiateOAuth, useCompleteOAuth, useSyncIntegration, useDisconnectIntegration } from '@kit/hooks';
+import { useIntegrations, useIntegrationByType, useInitiateOAuth, useCompleteOAuth, useSyncIntegration, useDisconnectIntegration, useManualConnectIntegration } from '@kit/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { Button } from '@kit/ui/button';
 import { Badge } from '@kit/ui/badge';
@@ -21,12 +21,18 @@ import {
   Package,
   MapPin,
   Clock,
-  ExternalLink
+  ExternalLink,
+  Key,
+  Upload
 } from 'lucide-react';
 import { useToast } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
 import SquareDataView from './square-data-view';
 import { Alert, AlertDescription } from '@kit/ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@kit/ui/dialog';
+import { Input } from '@kit/ui/input';
+import { Label } from '@kit/ui/label';
+import { Textarea } from '@kit/ui/textarea';
 
 export default function IntegrationsContent() {
   const { data: integrations, isLoading } = useIntegrations();
@@ -35,9 +41,14 @@ export default function IntegrationsContent() {
   const completeOAuth = useCompleteOAuth();
   const syncIntegration = useSyncIntegration();
   const disconnectIntegration = useDisconnectIntegration();
+  const manualConnect = useManualConnectIntegration();
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showManualConnect, setShowManualConnect] = useState(false);
+  const [manualToken, setManualToken] = useState('');
+  const [manualMerchantId, setManualMerchantId] = useState('');
+  const [manualLocationId, setManualLocationId] = useState('');
 
   // Check if we're returning from OAuth
   useEffect(() => {
@@ -235,22 +246,120 @@ export default function IntegrationsContent() {
                     </Button>
                   </div>
                 ) : (
-                  <Button
-                    onClick={handleConnectSquare}
-                    disabled={isConnecting || initiateOAuth.isPending}
-                  >
-                    {isConnecting || initiateOAuth.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Connecting...
-                      </>
-                    ) : (
-                      <>
-                        <Link2 className="w-4 h-4 mr-2" />
-                        Connect Square
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleConnectSquare}
+                      disabled={isConnecting || initiateOAuth.isPending}
+                    >
+                      {isConnecting || initiateOAuth.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Connecting...
+                        </>
+                      ) : (
+                        <>
+                          <Link2 className="w-4 h-4 mr-2" />
+                          Connect Square
+                        </>
+                      )}
+                    </Button>
+                    <Dialog open={showManualConnect} onOpenChange={setShowManualConnect}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Key className="w-4 h-4 mr-2" />
+                          Manual Connect
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Manual Connect Square (Sandbox)</DialogTitle>
+                          <DialogDescription>
+                            Paste your Square Sandbox access token to connect without OAuth. 
+                            Get the token from Square Developer Console → OAuth → Sandbox Test Accounts → Authorize test account.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div>
+                            <Label htmlFor="access_token">Access Token *</Label>
+                            <Textarea
+                              id="access_token"
+                              placeholder="EAAAEI..."
+                              value={manualToken}
+                              onChange={(e) => setManualToken(e.target.value)}
+                              rows={3}
+                              className="font-mono text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="merchant_id">Merchant ID (Optional)</Label>
+                            <Input
+                              id="merchant_id"
+                              placeholder="ML..."
+                              value={manualMerchantId}
+                              onChange={(e) => setManualMerchantId(e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="location_id">Location ID (Optional)</Label>
+                            <Input
+                              id="location_id"
+                              placeholder="Location ID"
+                              value={manualLocationId}
+                              onChange={(e) => setManualLocationId(e.target.value)}
+                            />
+                          </div>
+                          <Button
+                            onClick={async () => {
+                              if (!manualToken) {
+                                toast({
+                                  title: 'Missing Token',
+                                  description: 'Please enter an access token',
+                                  variant: 'destructive',
+                                });
+                                return;
+                              }
+                              try {
+                                await manualConnect.mutateAsync({
+                                  integration_type: 'square',
+                                  access_token: manualToken,
+                                  merchant_id: manualMerchantId || undefined,
+                                  location_id: manualLocationId || undefined,
+                                });
+                                setShowManualConnect(false);
+                                setManualToken('');
+                                setManualMerchantId('');
+                                setManualLocationId('');
+                                toast({
+                                  title: 'Connected Successfully',
+                                  description: 'Square integration connected manually.',
+                                });
+                              } catch (error: any) {
+                                toast({
+                                  title: 'Connection Failed',
+                                  description: error.message || 'Failed to connect',
+                                  variant: 'destructive',
+                                });
+                              }
+                            }}
+                            disabled={manualConnect.isPending}
+                            className="w-full"
+                          >
+                            {manualConnect.isPending ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Connecting...
+                              </>
+                            ) : (
+                              <>
+                                <Key className="w-4 h-4 mr-2" />
+                                Connect
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 )}
               </div>
             </CardHeader>
@@ -291,7 +400,7 @@ export default function IntegrationsContent() {
                   </Alert>
                 )}
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button
                     variant="outline"
                     size="sm"

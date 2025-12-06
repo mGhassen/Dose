@@ -4,6 +4,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { IntegrationSyncData } from '@kit/types';
 
+const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
+const SQUARE_API_BASE = SQUARE_USE_SANDBOX 
+  ? 'https://connect.squareupsandbox.com'
+  : 'https://connect.squareup.com';
+
 async function getIntegrationAndVerifyAccess(
   supabase: any,
   integrationId: string
@@ -64,7 +69,7 @@ async function syncSquareIntegration(
     // Placeholder implementation
     if (syncType === 'locations' || syncType === 'full') {
       // Fetch locations
-      const locationsResponse = await fetch('https://connect.squareup.com/v2/locations', {
+      const locationsResponse = await fetch(`${SQUARE_API_BASE}/v2/locations`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Square-Version': '2024-01-18',

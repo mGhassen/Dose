@@ -4,6 +4,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { SquareListOrdersResponse } from '@kit/types';
 
+const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
+const SQUARE_API_BASE = SQUARE_USE_SANDBOX 
+  ? 'https://connect.squareupsandbox.com'
+  : 'https://connect.squareup.com';
+
 async function getIntegrationAndVerifyAccess(
   supabase: any,
   integrationId: string
@@ -89,8 +94,22 @@ export async function GET(
     
     if (queryParam) {
       try {
-        requestBody.query = JSON.parse(queryParam);
-      } catch {
+        const query = JSON.parse(queryParam);
+        // Convert date strings to ISO 8601 timestamps
+        if (query.filter?.date_time_filter?.created_at) {
+          const dateFilter = query.filter.date_time_filter.created_at;
+          if (dateFilter.start_at && !dateFilter.start_at.includes('T')) {
+            dateFilter.start_at = `${dateFilter.start_at}T00:00:00Z`;
+          }
+          if (dateFilter.end_at && !dateFilter.end_at.includes('T')) {
+            // Set end date to end of day
+            dateFilter.end_at = `${dateFilter.end_at}T23:59:59Z`;
+          }
+        }
+        requestBody.query = query;
+        console.log('Orders request body:', JSON.stringify(requestBody, null, 2));
+      } catch (e) {
+        console.error('Invalid query JSON:', e);
         // Invalid JSON, ignore
       }
     }
@@ -103,7 +122,7 @@ export async function GET(
       requestBody.cursor = cursor;
     }
 
-    const response = await fetch('https://connect.squareup.com/v2/orders/search', {
+    const response = await fetch(`${SQUARE_API_BASE}/v2/orders/search`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -115,8 +134,20 @@ export async function GET(
 
     if (!response.ok) {
       const errorText = await response.text();
+      let errorDetails;
+      try {
+        errorDetails = JSON.parse(errorText);
+      } catch {
+        errorDetails = errorText;
+      }
+      console.error('Square Orders API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        details: JSON.stringify(errorDetails, null, 2),
+        requestBody: JSON.stringify(requestBody, null, 2),
+      });
       return NextResponse.json(
-        { error: `Square API error: ${response.statusText}`, details: errorText },
+        { error: `Square API error: ${response.statusText}`, details: errorDetails },
         { status: response.status }
       );
     }

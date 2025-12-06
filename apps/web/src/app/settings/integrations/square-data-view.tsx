@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Calendar,
   DollarSign,
+  Download,
 } from 'lucide-react';
 import { formatDateTime } from '@kit/lib/date-format';
 import { Input } from '@kit/ui/input';
@@ -70,6 +71,112 @@ export default function SquareDataView({ integrationId }: SquareDataViewProps) {
     }).format(amount / 100); // Square amounts are in cents
   };
 
+  const exportToCsv = (data: any[], filename: string, headers: string[], getRow: (item: any) => string[]) => {
+    const csv = [
+      headers.join(','),
+      ...data.map(item => getRow(item).map(cell => {
+        // Escape commas and quotes in CSV
+        const cellStr = String(cell || '');
+        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+          return `"${cellStr.replace(/"/g, '""')}"`;
+        }
+        return cellStr;
+      }).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportLocations = () => {
+    if (!locations || locations.length === 0) return;
+    
+    exportToCsv(
+      locations,
+      `square-locations-${new Date().toISOString().split('T')[0]}.csv`,
+      ['ID', 'Name', 'Address', 'City', 'State', 'Postal Code', 'Country', 'Timezone', 'Status'],
+      (location) => [
+        location.id,
+        location.name || '',
+        location.address?.address_line_1 || '',
+        location.address?.locality || '',
+        location.address?.administrative_district_level_1 || '',
+        location.address?.postal_code || '',
+        location.address?.country || '',
+        location.timezone || '',
+        location.status || '',
+      ]
+    );
+  };
+
+  const handleExportOrders = () => {
+    if (!orders?.orders || orders.orders.length === 0) return;
+    
+    exportToCsv(
+      orders.orders,
+      `square-orders-${new Date().toISOString().split('T')[0]}.csv`,
+      ['ID', 'Reference ID', 'Location ID', 'Created At', 'Updated At', 'State', 'Total Amount', 'Currency', 'Item Count'],
+      (order) => [
+        order.id,
+        order.reference_id || '',
+        order.location_id || '',
+        order.created_at || '',
+        order.updated_at || '',
+        order.state || '',
+        order.net_amounts?.total_money?.amount?.toString() || '0',
+        order.net_amounts?.total_money?.currency || 'USD',
+        order.line_items?.length?.toString() || '0',
+      ]
+    );
+  };
+
+  const handleExportPayments = () => {
+    if (!payments?.payments || payments.payments.length === 0) return;
+    
+    exportToCsv(
+      payments.payments,
+      `square-payments-${new Date().toISOString().split('T')[0]}.csv`,
+      ['ID', 'Location ID', 'Order ID', 'Created At', 'Amount', 'Currency', 'Status', 'Payment Method', 'Card Last 4'],
+      (payment) => [
+        payment.id,
+        payment.location_id || '',
+        payment.order_id || '',
+        payment.created_at || '',
+        payment.amount_money?.amount?.toString() || '0',
+        payment.amount_money?.currency || 'USD',
+        payment.status || '',
+        payment.source_type || '',
+        payment.card_details?.card?.last_4 || '',
+      ]
+    );
+  };
+
+  const handleExportCatalog = () => {
+    if (!catalog?.objects || catalog.objects.length === 0) return;
+    
+    exportToCsv(
+      catalog.objects,
+      `square-catalog-${new Date().toISOString().split('T')[0]}.csv`,
+      ['ID', 'Type', 'Name', 'Description', 'Price', 'Currency', 'SKU', 'Category ID', 'Is Deleted'],
+      (item) => [
+        item.id,
+        item.type || '',
+        item.item_data?.name || item.category_data?.name || item.item_variation_data?.name || '',
+        item.item_data?.description || '',
+        item.item_variation_data?.price_money?.amount?.toString() || '0',
+        item.item_variation_data?.price_money?.currency || 'USD',
+        item.item_variation_data?.sku || '',
+        item.item_data?.category_id || '',
+        item.is_deleted ? 'Yes' : 'No',
+      ]
+    );
+  };
+
   return (
     <div className="space-y-4">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -95,8 +202,18 @@ export default function SquareDataView({ integrationId }: SquareDataViewProps) {
         <TabsContent value="locations">
           <Card>
             <CardHeader>
-              <CardTitle>Square Locations</CardTitle>
-              <CardDescription>Your Square business locations</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Square Locations</CardTitle>
+                  <CardDescription>Your Square business locations</CardDescription>
+                </div>
+                {locations && locations.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={handleExportLocations}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export CSV
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {locationsLoading ? (
@@ -152,10 +269,18 @@ export default function SquareDataView({ integrationId }: SquareDataViewProps) {
                   <CardTitle>Square Orders</CardTitle>
                   <CardDescription>Orders from your Square POS</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => refetchOrders()}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh
-                </Button>
+                <div className="flex gap-2">
+                  {orders?.orders && orders.orders.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={handleExportOrders}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Export CSV
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => refetchOrders()}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -251,10 +376,18 @@ export default function SquareDataView({ integrationId }: SquareDataViewProps) {
                   <CardTitle>Square Payments</CardTitle>
                   <CardDescription>Payment transactions from Square</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => refetchPayments()}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh
-                </Button>
+                <div className="flex gap-2">
+                  {payments?.payments && payments.payments.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={handleExportPayments}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Export CSV
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => refetchPayments()}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -326,8 +459,18 @@ export default function SquareDataView({ integrationId }: SquareDataViewProps) {
         <TabsContent value="catalog">
           <Card>
             <CardHeader>
-              <CardTitle>Square Catalog</CardTitle>
-              <CardDescription>Items, variations, and categories from your Square catalog</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Square Catalog</CardTitle>
+                  <CardDescription>Items, variations, and categories from your Square catalog</CardDescription>
+                </div>
+                {catalog?.objects && catalog.objects.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={handleExportCatalog}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export CSV
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {catalogLoading ? (

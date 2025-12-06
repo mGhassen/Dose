@@ -7,6 +7,7 @@ import type { Integration } from '@kit/types';
 const SQUARE_APP_ID = process.env.SQUARE_APPLICATION_ID;
 const SQUARE_APP_SECRET = process.env.SQUARE_APPLICATION_SECRET;
 const SQUARE_REDIRECT_URI = process.env.SQUARE_REDIRECT_URI || 'http://localhost:3000/api/integrations/oauth/square/callback';
+const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
 
 function transformIntegration(row: any): Integration {
   return {
@@ -36,7 +37,11 @@ async function exchangeCodeForToken(code: string): Promise<{
   merchant_id?: string;
   location_id?: string;
 }> {
-  const response = await fetch('https://connect.squareup.com/oauth2/token', {
+  const tokenUrl = SQUARE_USE_SANDBOX
+    ? 'https://connect.squareupsandbox.com/oauth2/token'
+    : 'https://connect.squareup.com/oauth2/token';
+  
+  const response = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

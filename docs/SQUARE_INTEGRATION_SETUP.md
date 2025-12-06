@@ -96,12 +96,68 @@ Once connected, you can sync data from Square:
 
 ## Using Square Sandbox (Testing)
 
-For testing without a real Square account:
+For testing without a real Square account, you can use Square's Sandbox environment:
 
-1. In Square Developer Dashboard, go to **"Sandbox"**
-2. Create a test location
-3. Use the sandbox credentials (they'll have a different Application ID/Secret)
-4. The OAuth flow will work the same way, but with test data
+### Step 1: Create a Sandbox Test Account
+
+1. Go to [Square Developer Console](https://developer.squareup.com/console)
+2. Navigate to **"Sandbox Test Accounts"** in the left sidebar
+3. Click **"+ New sandbox test account"**
+4. Provide a name (e.g., "SunnyBudget Test") and select your country
+5. Click **"Create"**
+
+### Step 2: Authorize Your Test Account
+
+1. In your Square application dashboard, go to **"OAuth"** section
+2. Scroll down to **"Sandbox Test Accounts"** section
+3. Click **"Authorize test account"**
+4. Select the test account you just created
+5. Choose the necessary permissions (same as production)
+6. Click **"Save"**
+
+This will generate an access token for your test account. **Important:** For sandbox OAuth flow, you'll need to use this pre-authorized token instead of going through the OAuth redirect flow.
+
+### Step 3: Use Sandbox Credentials
+
+1. In Square Developer Dashboard, go to your application
+2. Switch to **"Sandbox"** environment (toggle in the top right)
+3. Go to **"Credentials"** - you'll see different Application ID and Secret for sandbox
+4. Copy the **Sandbox Application ID** and **Sandbox Application Secret**
+5. Update your `.env.local`:
+
+```env
+SQUARE_APPLICATION_ID=your_sandbox_application_id
+SQUARE_APPLICATION_SECRET=your_sandbox_application_secret
+SQUARE_REDIRECT_URI=http://localhost:3000/api/integrations/oauth/square/callback
+SQUARE_USE_SANDBOX=true
+```
+
+### Step 4: Open Sandbox Dashboard Before OAuth
+
+**Important:** Before clicking "Connect Square" in your app:
+
+1. In Square Developer Console, go to **"Sandbox Test Accounts"**
+2. Click **"Open"** next to your test account
+3. This opens the Sandbox Square Dashboard in a new tab - **keep it open**
+4. Now go back to your app and click "Connect Square"
+5. The OAuth flow should work with the sandbox account
+
+### Alternative: Direct Sandbox Token (Easier for Testing)
+
+Instead of OAuth flow, you can directly use the sandbox access token:
+
+1. After authorizing your test account in Step 2, copy the **Access Token** shown
+2. You can manually create an integration in your database with this token
+3. Or modify the OAuth callback to accept a sandbox token directly
+
+### Sandbox vs Production URLs
+
+- **Sandbox OAuth**: `https://connect.squareupsandbox.com/oauth2/authorize`
+- **Sandbox API**: `https://connect.squareupsandbox.com/v2/...`
+- **Production OAuth**: `https://connect.squareup.com/oauth2/authorize`
+- **Production API**: `https://connect.squareup.com/v2/...`
+
+The code will automatically use sandbox URLs if `SQUARE_USE_SANDBOX=true` is set.
 
 ## Troubleshooting
 

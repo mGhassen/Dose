@@ -4,6 +4,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { SquareListPaymentsResponse } from '@kit/types';
 
+const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
+const SQUARE_API_BASE = SQUARE_USE_SANDBOX 
+  ? 'https://connect.squareupsandbox.com'
+  : 'https://connect.squareup.com';
+
 async function getIntegrationAndVerifyAccess(
   supabase: any,
   integrationId: string
@@ -76,8 +81,8 @@ export async function GET(
     }
 
     // Build query parameters
-    const beginTime = searchParams.get('begin_time');
-    const endTime = searchParams.get('end_time');
+    let beginTime = searchParams.get('begin_time');
+    let endTime = searchParams.get('end_time');
     const sortOrder = searchParams.get('sort_order');
     const cursor = searchParams.get('cursor');
     const locationId = searchParams.get('location_id');
@@ -85,6 +90,14 @@ export async function GET(
     const last4 = searchParams.get('last_4');
     const cardBrand = searchParams.get('card_brand');
     const limit = searchParams.get('limit');
+
+    // Convert date strings to ISO 8601 timestamps
+    if (beginTime && !beginTime.includes('T')) {
+      beginTime = `${beginTime}T00:00:00Z`;
+    }
+    if (endTime && !endTime.includes('T')) {
+      endTime = `${endTime}T23:59:59Z`;
+    }
 
     const queryParams = new URLSearchParams();
     if (beginTime) queryParams.append('begin_time', beginTime);
@@ -98,7 +111,7 @@ export async function GET(
     if (limit) queryParams.append('limit', limit);
 
     const response = await fetch(
-      `https://connect.squareup.com/v2/payments?${queryParams.toString()}`,
+      `${SQUARE_API_BASE}/v2/payments?${queryParams.toString()}`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -109,8 +122,20 @@ export async function GET(
 
     if (!response.ok) {
       const errorText = await response.text();
+      let errorDetails;
+      try {
+        errorDetails = JSON.parse(errorText);
+      } catch {
+        errorDetails = errorText;
+      }
+      console.error('Square Payments API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        details: errorDetails,
+        queryParams: queryParams.toString(),
+      });
       return NextResponse.json(
-        { error: `Square API error: ${response.statusText}`, details: errorText },
+        { error: `Square API error: ${response.statusText}`, details: errorDetails },
         { status: response.status }
       );
     }

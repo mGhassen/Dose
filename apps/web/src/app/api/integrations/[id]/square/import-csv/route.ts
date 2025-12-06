@@ -1,13 +1,7 @@
-// Square Catalog Route
+// Square CSV Import Route
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { SquareListCatalogResponse } from '@kit/types';
-
-const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
-const SQUARE_API_BASE = SQUARE_USE_SANDBOX 
-  ? 'https://connect.squareupsandbox.com'
-  : 'https://connect.squareup.com';
 
 async function getIntegrationAndVerifyAccess(
   supabase: any,
@@ -47,13 +41,22 @@ async function getIntegrationAndVerifyAccess(
   return { integration, error: null };
 }
 
-export async function GET(
+export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const { searchParams } = new URL(request.url);
+    const body = await request.json();
+    const { import_type, data } = body;
+
+    if (!import_type || !data || !Array.isArray(data)) {
+      return NextResponse.json(
+        { error: 'Missing required fields: import_type, data' },
+        { status: 400 }
+      );
+    }
+
     const authHeader = request.headers.get('authorization');
     
     if (!authHeader) {
@@ -71,59 +74,50 @@ export async function GET(
       );
     }
 
-    const accessToken = integration.access_token; // Should be decrypted in production
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    // Import data based on type
+    // For now, we'll just validate and return success
+    // In production, you'd want to actually store this data in your database
     
-    if (!accessToken) {
-      return NextResponse.json(
-        { error: 'Access token not found' },
-        { status: 401 }
-      );
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      try {
+        // Validate row based on import type
+        if (import_type === 'orders') {
+          if (!row.id || !row.created_at) {
+            throw new Error(`Row ${i + 1}: Missing required fields (id, created_at)`);
+          }
+        } else if (import_type === 'payments') {
+          if (!row.id || !row.created_at || !row.amount) {
+            throw new Error(`Row ${i + 1}: Missing required fields (id, created_at, amount)`);
+          }
+        } else if (import_type === 'catalog') {
+          if (!row.id || !row.type || !row.name) {
+            throw new Error(`Row ${i + 1}: Missing required fields (id, type, name)`);
+          }
+        }
+        
+        // TODO: Actually import the data into your database
+        // For now, we'll just count it as successful
+        successCount++;
+      } catch (error: any) {
+        errorCount++;
+        errors.push(error.message || `Row ${i + 1}: Invalid data`);
+      }
     }
 
-    // Build request body
-    const types = searchParams.getAll('types');
-    const cursor = searchParams.get('cursor');
-    const catalogVersion = searchParams.get('catalog_version');
-
-    const requestBody: any = {};
-    
-    if (types.length > 0) {
-      requestBody.types = types;
-    }
-    
-    if (cursor) {
-      requestBody.cursor = cursor;
-    }
-    
-    if (catalogVersion) {
-      requestBody.catalog_version = parseInt(catalogVersion, 10);
-    }
-
-    const response = await fetch(`${SQUARE_API_BASE}/v2/catalog/search`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'Square-Version': '2024-01-18',
-      },
-      body: JSON.stringify({ object_types: types.length > 0 ? types : undefined, ...requestBody }),
+    return NextResponse.json({
+      success: successCount,
+      errors: errorCount,
+      error_details: errors.slice(0, 10), // Limit to first 10 errors
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return NextResponse.json(
-        { error: `Square API error: ${response.statusText}`, details: errorText },
-        { status: response.status }
-      );
-    }
-
-    const data: SquareListCatalogResponse = await response.json();
-    
-    return NextResponse.json(data);
   } catch (error: any) {
-    console.error('Error fetching Square catalog:', error);
+    console.error('Error importing CSV:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch catalog', details: error.message },
+      { error: 'Failed to import CSV', details: error.message },
       { status: 500 }
     );
   }

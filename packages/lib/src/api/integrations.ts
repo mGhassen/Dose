@@ -45,6 +45,8 @@ export const integrationsApi = {
     apiRequest<Integration>('POST', `/api/integrations/${id}/refresh-token`),
   disconnect: (id: string) =>
     apiRequest<Integration>('POST', `/api/integrations/${id}/disconnect`),
+  manualConnect: (data: { integration_type: string; access_token: string; merchant_id?: string; location_id?: string }) =>
+    apiRequest<Integration>('POST', '/api/integrations/manual-connect', data),
 
   // Sync operations
   sync: (id: string, syncType?: 'orders' | 'payments' | 'catalog' | 'locations' | 'full') =>

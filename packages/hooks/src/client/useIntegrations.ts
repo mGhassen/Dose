@@ -120,6 +120,18 @@ export function useDisconnectIntegration() {
   });
 }
 
+export function useManualConnectIntegration() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (data: { integration_type: string; access_token: string; merchant_id?: string; location_id?: string }) =>
+      integrationsApi.manualConnect(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['integrations'] });
+    },
+  });
+}
+
 // Sync hooks
 export function useSyncIntegration() {
   const queryClient = useQueryClient();

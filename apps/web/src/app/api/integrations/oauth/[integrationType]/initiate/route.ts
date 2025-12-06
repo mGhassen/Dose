@@ -7,6 +7,7 @@ import crypto from 'crypto';
 const SQUARE_APP_ID = process.env.SQUARE_APPLICATION_ID;
 const SQUARE_APP_SECRET = process.env.SQUARE_APPLICATION_SECRET;
 const SQUARE_REDIRECT_URI = process.env.SQUARE_REDIRECT_URI || 'http://localhost:3000/api/integrations/oauth/square/callback';
+const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
 
 export async function POST(
   request: NextRequest,
@@ -56,8 +57,11 @@ export async function POST(
     // Generate state token for CSRF protection
     const state = crypto.randomBytes(32).toString('hex');
     
-    // Build Square OAuth URL
-    const authUrl = new URL('https://squareup.com/oauth2/authorize');
+    // Build Square OAuth URL (use sandbox if enabled)
+    const oauthBaseUrl = SQUARE_USE_SANDBOX 
+      ? 'https://connect.squareupsandbox.com/oauth2/authorize'
+      : 'https://squareup.com/oauth2/authorize';
+    const authUrl = new URL(oauthBaseUrl);
     authUrl.searchParams.append('client_id', SQUARE_APP_ID);
     authUrl.searchParams.append('scope', 'MERCHANT_PROFILE_READ PAYMENTS_READ ORDERS_READ ITEMS_READ');
     authUrl.searchParams.append('session', 'false');
