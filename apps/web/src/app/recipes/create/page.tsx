@@ -17,7 +17,7 @@ import { toast } from "sonner";
 export default function CreateRecipePage() {
   const router = useRouter();
   const createRecipe = useCreateRecipe();
-  const { data: itemsResponse } = useItems({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000, includeRecipes: true });
   const [formData, setFormData] = useState({
     name: "",
     description: "",

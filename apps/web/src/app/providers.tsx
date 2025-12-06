@@ -16,7 +16,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             queryFn: getQueryFn({ on401: "throw" }),
             refetchInterval: false,
             refetchOnWindowFocus: false,
-            staleTime: 5 * 60 * 1000, // 5 minutes instead of Infinity
+            refetchOnMount: 'always', // Always refetch when component mounts to ensure fresh data after mutations
+            staleTime: 30 * 1000, // 30 seconds - data is considered fresh for 30 seconds
             gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime) - keeps data in cache even when unused
             retry: (failureCount, error) => {
               // Don't retry on abort errors (query cancellation)

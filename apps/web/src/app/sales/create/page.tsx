@@ -17,7 +17,7 @@ import type { SalesType } from "@kit/types";
 export default function CreateSalePage() {
   const router = useRouter();
   const createSale = useCreateSale();
-  const { data: itemsResponse } = useItems({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000, includeRecipes: true });
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     type: "" as SalesType | "",

@@ -93,24 +93,41 @@ export async function POST(
       movements.push({ itemId: item.id, quantity: quantityToDeduct, type: 'OUT' });
     }
 
-    // Step 2: Create a new item for the produced output
-    const { data: producedItem, error: itemError } = await supabase
+    // Step 2: Get or create the produced item for this recipe
+    // Check if an item with this produced_from_recipe_id already exists
+    let { data: producedItem, error: itemCheckError } = await supabase
       .from('items')
-      .insert({
-        name: recipeData.name,
-        description: recipeData.description || `Produced from recipe: ${recipeData.name}`,
-        category: recipeData.category,
-        unit: recipeData.unit || 'serving',
-        produced_from_recipe_id: Number(id),
-        item_type: 'item',
-        is_active: true,
-      })
-      .select()
+      .select('*')
+      .eq('produced_from_recipe_id', Number(id))
       .single();
 
-    if (itemError) throw itemError;
+    // If item doesn't exist, create it
+    if (itemCheckError && itemCheckError.code === 'PGRST116') {
+      const { data: newItem, error: itemCreateError } = await supabase
+        .from('items')
+        .insert({
+          name: recipeData.name,
+          description: recipeData.description || `Produced from recipe: ${recipeData.name}`,
+          category: recipeData.category,
+          unit: recipeData.unit || 'serving',
+          produced_from_recipe_id: Number(id),
+          item_type: 'item',
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (itemCreateError) throw itemCreateError;
+      if (!newItem) {
+        throw new Error('Failed to create produced item');
+      }
+      producedItem = newItem;
+    } else if (itemCheckError) {
+      throw itemCheckError;
+    }
+
     if (!producedItem) {
-      throw new Error('Failed to create produced item');
+      throw new Error('Produced item not found and could not be created');
     }
 
     // Step 3: Add the produced item to stock (IN movement)

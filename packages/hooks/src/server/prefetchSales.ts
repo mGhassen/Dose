@@ -2,11 +2,11 @@ import { QueryClient } from '@tanstack/react-query';
 import { makeQueryClient } from '@kit/lib/queryClient.server';
 import { salesApi } from '@kit/lib/api/sales';
 
-export async function prefetchSales(queryClient?: QueryClient) {
+export async function prefetchSales(queryClient?: QueryClient, params?: { page?: number; limit?: number; month?: string; year?: string; type?: string }) {
   const qc = queryClient || makeQueryClient();
   await qc.prefetchQuery({
-    queryKey: ['sales'],
-    queryFn: () => salesApi.getAll(),
+    queryKey: ['sales', params],
+    queryFn: () => salesApi.getAll(params),
   });
   return qc;
 }

@@ -1,4 +1,6 @@
-// Items API Route (replaces ingredients)
+// Items API Route
+// Items are actual inventory - can be raw ingredients OR produced items (from recipes)
+// Recipes are NOT items - they're separate in recipes table
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
@@ -47,51 +49,55 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const { page, limit, offset } = getPaginationParams(searchParams);
     const itemType = searchParams.get('itemType'); // Filter by item type
+    const includeRecipes = searchParams.get('includeRecipes') === 'true'; // For selection purposes
 
     const supabase = createServerSupabaseClient();
     
-    // Fetch both items and recipes, then combine them
-    // This allows recipes to be used as items without duplication
-    
-    // Fetch items
+    // Fetch items from items table
+    // Items can be: raw ingredients OR produced items (with produced_from_recipe_id)
     let itemsQuery = supabase
       .from('items')
       .select('*');
     
-    if (itemType && itemType !== 'recipe') {
+    if (itemType) {
       itemsQuery = itemsQuery.eq('item_type', itemType);
-    } else if (!itemType) {
-      // If no filter, only get regular items (not recipes from items table)
+    } else {
+      // Default: only get items (not recipes)
       itemsQuery = itemsQuery.eq('item_type', 'item');
     }
 
-    // Fetch recipes (they are items too)
-    let recipesQuery = supabase
-      .from('recipes')
-      .select('*');
-    
-    // Apply itemType filter for recipes
-    if (itemType === 'recipe') {
-      // Only recipes
-    } else if (!itemType) {
-      // Include recipes when no filter
-    } else {
-      // If filtering for specific item type (not recipe), exclude recipes
-      recipesQuery = recipesQuery.eq('id', -1); // Empty result
-    }
-
-    // Execute both queries
-    const [{ data: itemsData, error: itemsError }, { data: recipesData, error: recipesError }] = await Promise.all([
-      itemsQuery,
-      recipesQuery,
-    ]);
-
+    // Execute items query
+    const { data: itemsData, error: itemsError } = await itemsQuery;
     if (itemsError) throw itemsError;
-    if (recipesError) throw recipesError;
 
-    // Transform recipes to items format (for API response only, not stored in items table)
-    const recipesAsItems = (recipesData || []).map((recipe: any) => {
-      const recipeItem: any = {
+    let allData: any[] = [...(itemsData || [])];
+
+    // If includeRecipes=true, also fetch recipes (for selection in sales/recipes)
+    if (includeRecipes) {
+      // Get produced item recipe IDs to exclude those recipes (avoid duplicates)
+      const producedRecipeIds = new Set(
+        (itemsData || [])
+          .filter((item: any) => item.produced_from_recipe_id)
+          .map((item: any) => item.produced_from_recipe_id)
+      );
+
+      // Fetch all active recipes
+      const { data: allRecipesData, error: recipesError } = await supabase
+        .from('recipes')
+        .select('*')
+        .eq('is_active', true);
+      
+      if (recipesError) throw recipesError;
+      
+      // Filter out recipes that have produced items (in JavaScript)
+      const recipesData = (allRecipesData || []).filter(
+        (recipe: any) => !producedRecipeIds.has(recipe.id)
+      );
+
+      if (recipesError) throw recipesError;
+
+      // Transform recipes to items format (for API response only)
+      const recipesAsItems = (recipesData || []).map((recipe: any) => ({
         id: recipe.id,
         name: recipe.name,
         description: recipe.description,
@@ -101,21 +107,18 @@ export async function GET(request: NextRequest) {
         is_active: recipe.is_active,
         created_at: recipe.created_at,
         updated_at: recipe.updated_at,
-        // Recipe-specific fields
         serving_size: recipe.serving_size,
         preparation_time: recipe.preparation_time,
         cooking_time: recipe.cooking_time,
         instructions: recipe.instructions,
         notes: recipe.notes,
-      };
-      return recipeItem;
-    });
+      }));
 
-    // Combine items and recipes
-    const allData = [...(itemsData || []), ...recipesAsItems];
-    
+      allData = [...allData, ...recipesAsItems];
+    }
+
     // Sort by created_at descending
-    allData.sort((a, b) => {
+    allData.sort((a: any, b: any) => {
       const dateA = new Date(a.created_at).getTime();
       const dateB = new Date(b.created_at).getTime();
       return dateB - dateA;
@@ -125,7 +128,7 @@ export async function GET(request: NextRequest) {
     const total = allData.length;
     const paginatedData = allData.slice(offset, offset + limit);
 
-    // Transform items and recipes to Item type
+    // Transform to Item type
     const items: Item[] = paginatedData.map((row: any) => {
       if (row.item_type === 'recipe') {
         // Transform recipe to Item format
@@ -139,7 +142,6 @@ export async function GET(request: NextRequest) {
           isActive: row.is_active,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
-          // Recipe-specific fields
           servingSize: row.serving_size,
           preparationTime: row.preparation_time,
           cookingTime: row.cooking_time,
@@ -175,20 +177,19 @@ export async function POST(request: NextRequest) {
     
     if (!body.name || !body.unit) {
       return NextResponse.json(
-        { error: 'Missing required fields: name and unit' },
+        { error: 'Missing required fields: name, unit' },
         { status: 400 }
       );
     }
 
     const supabase = createServerSupabaseClient();
-    
-    const { data: itemData, error: itemError } = await supabase
+    const { data: itemData, error } = await supabase
       .from('items')
       .insert(transformToSnakeCase(body))
       .select()
       .single();
 
-    if (itemError) throw itemError;
+    if (error) throw error;
 
     return NextResponse.json(transformItem(itemData), { status: 201 });
   } catch (error: any) {

@@ -60,9 +60,9 @@ INSERT INTO items (id, name, description, category, sku, unit, unit_price, vendo
 (14, 'Lids', 'Cup lids', 'Supplies', 'SUPPLY-LID-001', 'box', 12.00, 1, '500 lids per box', 'item', true),
 (15, 'Napkins', 'Paper napkins', 'Supplies', 'SUPPLY-NAP-001', 'pack', 8.00, 1, '1000 napkins per pack', 'item', true),
 (16, 'Sugar Packets', 'Sugar packets', 'Supplies', 'SUPPLY-SUG-001', 'box', 15.00, 1, '1000 packets per box', 'item', true),
-(17, 'Syrup - Vanilla', 'Vanilla syrup', 'Supplies', 'SUPPLY-SYR-VAN-001', 'bottle', 12.00, 1, '750ml bottle', 'item', true),
-(18, 'Syrup - Caramel', 'Caramel syrup', 'Supplies', 'SUPPLY-SYR-CAR-001', 'bottle', 12.00, 1, '750ml bottle', 'item', true),
-(19, 'Syrup - Hazelnut', 'Hazelnut syrup', 'Supplies', 'SUPPLY-SYR-HAZ-001', 'bottle', 12.00, 1, '750ml bottle', 'item', true),
+(17, 'Vanilla Syrup', 'Vanilla syrup', 'Syrups', 'SUPPLY-SYR-VAN-001', 'L', 12.00, 1, '750ml bottle', 'item', true),
+(18, 'Caramel Syrup', 'Caramel syrup', 'Syrups', 'SUPPLY-SYR-CAR-001', 'L', 12.00, 1, '750ml bottle', 'item', true),
+(19, 'Hazelnut Syrup', 'Hazelnut syrup', 'Syrups', 'SUPPLY-SYR-HAZ-001', 'L', 12.00, 1, '750ml bottle', 'item', true),
 (20, 'Cleaning Supplies', 'General cleaning supplies', 'Supplies', 'SUPPLY-CLEAN-001', 'set', 45.00, 5, 'Monthly restock', 'item', true),
 (21, 'Item 21', 'Description for Item 21', 'Equipment', 'ITEM-021', 'piece', 47.00, 22, 'Auto-generated item 21', 'item', true),
 (22, 'Item 22', 'Description for Item 22', 'Supplies', 'ITEM-022', 'kg', 49.00, 23, 'Auto-generated item 22', 'item', true),
@@ -6117,11 +6117,7 @@ SELECT setval('payments_id_seq', (SELECT MAX(id) FROM payments));
 INSERT INTO items (name, description, unit, category, item_type, is_active) VALUES
 -- Coffee & Espresso (only if not already in first items section)
 ('Decaf Coffee Beans', 'Decaffeinated coffee beans', 'kg', 'Coffee', 'item', true),
-
--- Dairy & Alternatives (only if not already in first items section)
 ('Skim Milk', 'Low-fat skim milk', 'L', 'Dairy', 'item', true),
-('Oat Milk', 'Oat milk alternative', 'L', 'Dairy Alternatives', 'item', true),
-('Almond Milk', 'Almond milk alternative', 'L', 'Dairy Alternatives', 'item', true),
 ('Soy Milk', 'Soy milk alternative', 'L', 'Dairy Alternatives', 'item', true),
 ('Heavy Cream', 'Heavy whipping cream', 'L', 'Dairy', 'item', true),
 ('Half and Half', 'Half milk, half cream', 'L', 'Dairy', 'item', true),
@@ -6137,10 +6133,7 @@ INSERT INTO items (name, description, unit, category, item_type, is_active) VALU
 ('Herbal Tea', 'Assorted herbal teas', 'kg', 'Tea', 'item', true),
 ('Chai Tea', 'Spiced chai tea blend', 'kg', 'Tea', 'item', true),
 
--- Pastries & Food
-('Croissants', 'Butter croissants', 'piece', 'Pastries', 'item', true),
-('Muffins', 'Assorted muffins', 'piece', 'Pastries', 'item', true),
-('Bagels', 'Fresh bagels', 'piece', 'Pastries', 'item', true),
+-- Pastries & Food (only if not already in first items section)
 ('Sandwiches', 'Pre-made sandwiches', 'piece', 'Food', 'item', true),
 ('Cookies', 'Assorted cookies', 'piece', 'Pastries', 'item', true),
 
@@ -6346,10 +6339,11 @@ ON CONFLICT (item_id, location) DO NOTHING;
 -- PRODUCED ITEMS - Items created from recipes
 -- ============================================================================
 -- These are items that were produced from recipes (e.g., Espresso, Latte, etc.)
+-- Only create if an item for this recipe doesn't already exist (check by produced_from_recipe_id)
 INSERT INTO items (name, description, category, unit, item_type, produced_from_recipe_id, is_active)
 SELECT 
   r.name,
-  r.description || ' (Produced from recipe)',
+  COALESCE(r.description, '') || ' (Produced from recipe)',
   r.category,
   r.unit,
   'item' as item_type,
@@ -6358,7 +6352,10 @@ SELECT
 FROM recipes r
 WHERE r.is_active = true
   AND r.name IN ('Espresso', 'Double Espresso', 'Americano', 'Cappuccino', 'Latte', 'Mocha', 'Caramel Macchiato', 'Flat White', 'Cortado', 'Cold Brew', 'Iced Coffee', 'Iced Latte', 'Frappuccino', 'Hot Chocolate', 'Chai Latte')
-ON CONFLICT DO NOTHING;
+  AND NOT EXISTS (
+    SELECT 1 FROM items i 
+    WHERE i.produced_from_recipe_id = r.id
+  );
 
 -- STOCK LEVELS FOR PRODUCED ITEMS
 -- Add initial stock for some produced items
