@@ -56,10 +56,13 @@ export async function GET(request: NextRequest) {
       .from('sales')
       .select('*', { count: 'exact', head: true });
 
-    // Build data query with item join
+    // Build data query with item join (items can be from items table or recipes table)
     let query = supabase
       .from('sales')
-      .select('*, item:items(*)')
+      .select(`
+        *,
+        item:items(*)
+      `)
       .order('date', { ascending: false });
 
     if (year) {
@@ -106,7 +109,38 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
     if (countError) throw countError;
 
-    const sales: Sale[] = (data || []).map(transformSale);
+    // Transform sales and fetch recipe items if item is null (recipe not in items table)
+    const sales: Sale[] = await Promise.all((data || []).map(async (row: any) => {
+      let sale = transformSale(row);
+      
+      // If item is null but item_id exists, it might be a recipe
+      if (!sale.item && sale.itemId) {
+        const { data: recipeData } = await supabase
+          .from('recipes')
+          .select('*')
+          .eq('id', sale.itemId)
+          .single();
+        
+        if (recipeData) {
+          sale.item = {
+            id: recipeData.id,
+            name: recipeData.name,
+            description: recipeData.description,
+            category: recipeData.category,
+            sku: undefined,
+            unit: recipeData.unit || 'serving',
+            unitPrice: undefined,
+            itemType: 'recipe',
+            isActive: recipeData.is_active,
+            createdAt: recipeData.created_at,
+            updatedAt: recipeData.updated_at,
+          };
+        }
+      }
+      
+      return sale;
+    }));
+    
     const total = count || 0;
     
     const response: PaginatedResponse<Sale> = createPaginatedResponse(

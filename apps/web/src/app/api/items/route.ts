@@ -55,37 +55,78 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServerSupabaseClient();
     
-    // Count query
-    let countQuery = supabase
-      .from('items')
-      .select('*', { count: 'exact', head: true });
+    // Fetch both items and recipes, then combine them
+    // This allows recipes to be used as items without duplication
     
-    if (itemType) {
-      countQuery = countQuery.eq('item_type', itemType);
+    // Fetch items
+    let itemsQuery = supabase
+      .from('items')
+      .select('*');
+    
+    if (itemType && itemType !== 'recipe') {
+      itemsQuery = itemsQuery.eq('item_type', itemType);
+    } else if (!itemType) {
+      // If no filter, only get regular items (not recipes from items table)
+      itemsQuery = itemsQuery.eq('item_type', 'item');
     }
 
-    // Data query
-    let query = supabase
-      .from('items')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    // Fetch recipes (they are items too)
+    let recipesQuery = supabase
+      .from('recipes')
+      .select('*');
     
-    if (itemType) {
-      query = query.eq('item_type', itemType);
+    // Apply itemType filter for recipes
+    if (itemType === 'recipe') {
+      // Only recipes
+    } else if (!itemType) {
+      // Include recipes when no filter
+    } else {
+      // If filtering for specific item type (not recipe), exclude recipes
+      recipesQuery = recipesQuery.eq('id', -1); // Empty result
     }
 
-    // Execute queries
-    const [{ data, error }, { count, error: countError }] = await Promise.all([
-      query,
-      countQuery,
+    // Execute both queries
+    const [{ data: itemsData, error: itemsError }, { data: recipesData, error: recipesError }] = await Promise.all([
+      itemsQuery,
+      recipesQuery,
     ]);
 
-    if (error) throw error;
-    if (countError) throw countError;
+    if (itemsError) throw itemsError;
+    if (recipesError) throw recipesError;
 
-    const items: Item[] = (data || []).map(transformItem);
-    const total = count || 0;
+    // Transform recipes to items format
+    const recipesAsItems = (recipesData || []).map((recipe: any) => ({
+      id: recipe.id,
+      name: recipe.name,
+      description: recipe.description,
+      unit: recipe.unit || 'serving',
+      category: recipe.category,
+      item_type: 'recipe',
+      serving_size: recipe.serving_size,
+      preparation_time: recipe.preparation_time,
+      cooking_time: recipe.cooking_time,
+      instructions: recipe.instructions,
+      notes: recipe.notes,
+      is_active: recipe.is_active,
+      created_at: recipe.created_at,
+      updated_at: recipe.updated_at,
+    }));
+
+    // Combine items and recipes
+    const allData = [...(itemsData || []), ...recipesAsItems];
+    
+    // Sort by created_at descending
+    allData.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return dateB - dateA;
+    });
+
+    // Apply pagination manually
+    const total = allData.length;
+    const paginatedData = allData.slice(offset, offset + limit);
+
+    const items: Item[] = paginatedData.map(transformItem);
     
     const response: PaginatedResponse<Item> = createPaginatedResponse(
       items,

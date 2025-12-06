@@ -62,7 +62,34 @@ export async function GET(
       throw error;
     }
 
-    return NextResponse.json(transformSale(data));
+    let sale = transformSale(data);
+    
+    // If item is null but item_id exists, it might be a recipe
+    if (!sale.item && sale.itemId) {
+      const { data: recipeData } = await supabase
+        .from('recipes')
+        .select('*')
+        .eq('id', sale.itemId)
+        .single();
+      
+      if (recipeData) {
+        sale.item = {
+          id: recipeData.id,
+          name: recipeData.name,
+          description: recipeData.description,
+          category: recipeData.category,
+          sku: undefined,
+          unit: recipeData.unit || 'serving',
+          unitPrice: undefined,
+          itemType: 'recipe',
+          isActive: recipeData.is_active,
+          createdAt: recipeData.created_at,
+          updatedAt: recipeData.updated_at,
+        };
+      }
+    }
+
+    return NextResponse.json(sale);
   } catch (error: any) {
     console.error('Error fetching sale:', error);
     return NextResponse.json(

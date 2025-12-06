@@ -54,13 +54,52 @@ export async function GET(
     const { id } = await params;
     const supabase = createServerSupabaseClient();
     
-    const { data: itemData, error: itemError } = await supabase
+    // Try to find in items table first
+    let { data: itemData, error: itemError } = await supabase
       .from('items')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (itemError) throw itemError;
+    // If not found in items, check recipes table
+    if (itemError && itemError.code === 'PGRST116') {
+      const { data: recipeData, error: recipeError } = await supabase
+        .from('recipes')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (recipeError) {
+        if (recipeError.code === 'PGRST116') {
+          return NextResponse.json(
+            { error: 'Item not found' },
+            { status: 404 }
+          );
+        }
+        throw recipeError;
+      }
+
+      // Transform recipe to item format
+      itemData = {
+        id: recipeData.id,
+        name: recipeData.name,
+        description: recipeData.description,
+        unit: recipeData.unit || 'serving',
+        category: recipeData.category,
+        item_type: 'recipe',
+        serving_size: recipeData.serving_size,
+        preparation_time: recipeData.preparation_time,
+        cooking_time: recipeData.cooking_time,
+        instructions: recipeData.instructions,
+        notes: recipeData.notes,
+        is_active: recipeData.is_active,
+        created_at: recipeData.created_at,
+        updated_at: recipeData.updated_at,
+      };
+    } else if (itemError) {
+      throw itemError;
+    }
+
     if (!itemData) {
       return NextResponse.json(
         { error: 'Item not found' },

@@ -146,6 +146,7 @@ export async function PUT(
       );
     }
 
+
     // Update items if provided (supports both 'items' and legacy 'ingredients')
     const itemsToUpdate = body.items || body.ingredients;
     if (itemsToUpdate !== undefined) {
