@@ -49,8 +49,13 @@ export async function GET(
   try {
     const { id } = await params;
     const { searchParams } = new URL(request.url);
+    const authHeader = request.headers.get('authorization');
     
-    const supabase = createServerSupabaseClient();
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
+    }
+
+    const supabase = createServerSupabaseClient(authHeader);
     
     const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
     

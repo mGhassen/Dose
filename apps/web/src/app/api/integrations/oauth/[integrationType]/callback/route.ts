@@ -103,7 +103,13 @@ export async function POST(
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
+    }
+
+    const supabase = createServerSupabaseClient(authHeader);
     
     // Get current user's account
     const { data: { user } } = await supabase.auth.getUser();

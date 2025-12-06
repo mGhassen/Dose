@@ -36,7 +36,13 @@ function transformToSnakeCase(data: CreateIntegrationData): any {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
+    }
+
+    const supabase = createServerSupabaseClient(authHeader);
     
     // Get current user's account
     const { data: { user } } = await supabase.auth.getUser();
@@ -86,7 +92,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
+    }
+
+    const supabase = createServerSupabaseClient(authHeader);
     
     // Get current user's account
     const { data: { user } } = await supabase.auth.getUser();

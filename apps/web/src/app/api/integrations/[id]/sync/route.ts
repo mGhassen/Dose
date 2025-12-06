@@ -97,7 +97,13 @@ export async function POST(
     const body = await request.json();
     const syncType = body.sync_type || 'full';
 
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
+    }
+
+    const supabase = createServerSupabaseClient(authHeader);
     
     const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
     
@@ -175,7 +181,13 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
+    }
+
+    const supabase = createServerSupabaseClient(authHeader);
     
     const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
     

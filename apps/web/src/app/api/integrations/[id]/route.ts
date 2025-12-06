@@ -64,7 +64,13 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
+    }
+
+    const supabase = createServerSupabaseClient(authHeader);
     
     const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
     
@@ -93,7 +99,13 @@ export async function PUT(
     const { id } = await params;
     const body: UpdateIntegrationData = await request.json();
     
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
+    }
+
+    const supabase = createServerSupabaseClient(authHeader);
     
     const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
     
@@ -136,7 +148,13 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
+    }
+
+    const supabase = createServerSupabaseClient(authHeader);
     
     const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
     
