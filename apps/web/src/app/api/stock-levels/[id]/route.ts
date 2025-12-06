@@ -7,7 +7,7 @@ import type { StockLevel, UpdateStockLevelData } from '@kit/types';
 function transformStockLevel(row: any): StockLevel {
   return {
     id: row.id,
-    ingredientId: row.ingredient_id,
+    itemId: row.item_id || row.ingredient_id, // Support both for backward compat
     quantity: parseFloat(row.quantity),
     unit: row.unit,
     location: row.location,
@@ -16,12 +16,24 @@ function transformStockLevel(row: any): StockLevel {
     lastUpdated: row.last_updated,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    item: row.item ? {
+      id: row.item.id,
+      name: row.item.name,
+      description: row.item.description,
+      unit: row.item.unit,
+      category: row.item.category,
+      itemType: row.item.item_type || 'item',
+      isActive: row.item.is_active,
+      createdAt: row.item.created_at,
+      updatedAt: row.item.updated_at,
+    } : undefined,
   };
 }
 
 function transformToSnakeCase(data: UpdateStockLevelData): any {
   const result: any = {};
-  if (data.ingredientId !== undefined) result.ingredient_id = data.ingredientId;
+  if (data.itemId !== undefined) result.item_id = data.itemId;
+  if (data.ingredientId !== undefined) result.item_id = data.ingredientId; // Backward compat
   if (data.quantity !== undefined) result.quantity = data.quantity;
   if (data.unit !== undefined) result.unit = data.unit;
   if (data.location !== undefined) result.location = data.location;
@@ -40,7 +52,7 @@ export async function GET(
     
     const { data, error } = await supabase
       .from('stock_levels')
-      .select('*')
+      .select('*, item:items(*)')
       .eq('id', id)
       .single();
 

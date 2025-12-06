@@ -25,7 +25,8 @@ export default function StockLevelsContent() {
   
   const itemMap = useMemo(() => {
     if (!itemsResponse?.data) return new Map<number, string>();
-    return new Map(itemsResponse.data.filter(i => i.itemType === 'item').map(i => [i.id, i.name]));
+    // Include all items (raw + produced), not just items with itemType === 'item'
+    return new Map(itemsResponse.data.map(i => [i.id, i.name]));
   }, [itemsResponse?.data]);
   
   const stockLevels = stockLevelsResponse?.data || [];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@kit/ui/button";
@@ -10,9 +10,9 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
-import { Save, X, Trash2, Plus, ChefHat, MoreVertical, Edit2 } from "lucide-react";
+import { Save, X, Trash2, Plus, ChefHat, MoreVertical, Edit2, AlertTriangle, CheckCircle } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useItems, useProduceRecipe, useRecipeCost } from "@kit/hooks";
+import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useItems, useProduceRecipe, useRecipeCost, useStockLevels } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
 import { formatCurrency } from "@kit/lib/config";
@@ -61,6 +61,29 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const updateRecipe = useUpdateRecipe();
   const deleteMutation = useDeleteRecipe();
   const produceRecipe = useProduceRecipe();
+  
+  // Fetch stock levels for all recipe items when dialog is open
+  const recipeItemIds = recipe?.items?.map(ri => ri.itemId?.toString()).filter(Boolean) || 
+                        recipe?.ingredients?.map((ri: any) => ri.itemId?.toString() || ri.ingredientId?.toString()).filter(Boolean) || [];
+  const { data: allStockLevelsResponse } = useStockLevels({ 
+    limit: 1000 
+  });
+  
+  // Create a map of itemId -> stock level (sum across all locations)
+  const stockLevelMap = useMemo(() => {
+    const map = new Map<number, number>();
+    if (!allStockLevelsResponse?.data) return map;
+    
+    allStockLevelsResponse.data.forEach(level => {
+      const itemId = level.itemId;
+      if (itemId) {
+        const current = map.get(itemId) || 0;
+        map.set(itemId, current + level.quantity);
+      }
+    });
+    
+    return map;
+  }, [allStockLevelsResponse?.data]);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -180,6 +203,42 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     updated[index] = { ...item, [field]: value };
     setItems(updated);
   };
+
+  // Check if we have enough stock for all ingredients
+  const stockAvailability = useMemo(() => {
+    if (!recipe || !produceQuantity || parseFloat(produceQuantity) <= 0) {
+      return { canProduce: false, issues: [] };
+    }
+    
+    const multiplier = parseFloat(produceQuantity) / (recipe.servingSize || 1);
+    const issues: Array<{ itemId: number; itemName: string; required: number; available: number; unit: string }> = [];
+    
+    const recipeItems = recipe.items || recipe.ingredients || [];
+    for (const ri of recipeItems) {
+      const itemId = ri.itemId || (ri as any).ingredientId;
+      if (!itemId) continue;
+      
+      const requiredQuantity = ri.quantity * multiplier;
+      const availableQuantity = stockLevelMap.get(itemId) || 0;
+      const item = ri.item || (ri as any).ingredient;
+      const itemName = item?.name || `Item ${itemId}`;
+      
+      if (availableQuantity < requiredQuantity) {
+        issues.push({
+          itemId,
+          itemName,
+          required: requiredQuantity,
+          available: availableQuantity,
+          unit: ri.unit,
+        });
+      }
+    }
+    
+    return {
+      canProduce: issues.length === 0,
+      issues,
+    };
+  }, [recipe, produceQuantity, stockLevelMap]);
 
   if (isLoading || !resolvedParams) {
     return (
@@ -674,21 +733,62 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
               />
             </div>
             {((recipe?.items || recipe?.ingredients) && (recipe.items?.length || recipe.ingredients?.length || 0) > 0) && (
-              <div className="border rounded-lg p-4 bg-muted">
+              <div className="border rounded-lg p-4 bg-muted space-y-3">
                 <Label className="text-sm font-semibold">Items to be deducted:</Label>
-                <div className="mt-2 space-y-1">
+                <div className="mt-2 space-y-2">
                   {(recipe.items || recipe.ingredients || []).map((ri: any, idx: number) => {
-                    const multiplier = parseFloat(produceQuantity) / (recipe.servingSize || 1);
+                    const multiplier = (parseFloat(produceQuantity) || 0) / (recipe?.servingSize || 1);
                     const quantityToDeduct = ri.quantity * multiplier;
                     const item = ri.item || ri.ingredient;
                     const itemId = ri.itemId || ri.ingredientId;
+                    const availableStock = itemId ? (stockLevelMap.get(itemId) || 0) : 0;
+                    const hasEnough = availableStock >= quantityToDeduct;
+                    const isOutOfStock = availableStock === 0;
+                    
                     return (
-                      <div key={idx} className="text-sm">
-                        • {item?.name || `Item ${itemId}`}: {quantityToDeduct.toFixed(2)} {ri.unit}
+                      <div key={idx} className={`text-sm p-2 rounded border ${hasEnough ? 'bg-background' : 'bg-destructive/10 border-destructive'}`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {hasEnough ? (
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <AlertTriangle className="h-4 w-4 text-destructive" />
+                            )}
+                            <span className="font-medium">{item?.name || `Item ${itemId}`}</span>
+                          </div>
+                        </div>
+                        <div className="mt-1 ml-6 space-y-1">
+                          <div className="text-xs">
+                            Required: <span className="font-medium">{quantityToDeduct.toFixed(2)} {ri.unit}</span>
+                          </div>
+                          <div className={`text-xs ${hasEnough ? 'text-muted-foreground' : 'text-destructive font-medium'}`}>
+                            Available: {availableStock.toFixed(2)} {ri.unit}
+                            {!hasEnough && (
+                              <span className="ml-2">
+                                ({isOutOfStock ? 'Out of stock' : `Need ${(quantityToDeduct - availableStock).toFixed(2)} more`})
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
+                {stockAvailability.issues.length > 0 && (
+                  <div className="mt-3 p-3 bg-destructive/10 border border-destructive rounded-lg">
+                    <div className="flex items-center gap-2 text-destructive font-medium text-sm mb-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      Insufficient Stock
+                    </div>
+                    <div className="text-xs text-destructive space-y-1">
+                      {stockAvailability.issues.map((issue, idx) => (
+                        <div key={idx}>
+                          • {issue.itemName}: Need {issue.required.toFixed(2)} {issue.unit}, but only {issue.available.toFixed(2)} {issue.unit} available
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -704,6 +804,10 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
               onClick={async () => {
                 if (!resolvedParams?.id || !produceQuantity || parseFloat(produceQuantity) <= 0) {
                   toast.error("Please enter a valid quantity");
+                  return;
+                }
+                if (!stockAvailability.canProduce) {
+                  toast.error("Cannot produce recipe: insufficient stock for one or more ingredients");
                   return;
                 }
                 try {
@@ -724,7 +828,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                   toast.error(error?.message || "Failed to produce recipe");
                 }
               }}
-              disabled={produceRecipe.isPending}
+              disabled={produceRecipe.isPending || !stockAvailability.canProduce}
             >
               <ChefHat className="mr-2 h-4 w-4" />
               {produceRecipe.isPending ? "Producing..." : "Produce Recipe"}

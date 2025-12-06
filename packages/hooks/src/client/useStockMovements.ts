@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { stockMovementsApi } from '@kit/lib';
 import type { StockMovement, CreateStockMovementData, UpdateStockMovementData } from '@kit/types';
 
-export function useStockMovements(params?: { page?: number; limit?: number; ingredientId?: string; movementType?: string }) {
+export function useStockMovements(params?: { page?: number; limit?: number; itemId?: string; ingredientId?: string; movementType?: string }) {
   return useQuery({
     queryKey: ['stock-movements', params],
     queryFn: async () => {

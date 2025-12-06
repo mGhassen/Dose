@@ -215,11 +215,6 @@ export const pathsConfig: NavigationConfig = {
           translationKey: "supplierOrders"
         },
         {
-          title: "stock-levels",
-          url: "/stock-levels",
-          translationKey: "stockLevels"
-        },
-        {
           title: "stock-movements",
           url: "/stock-movements",
           translationKey: "stockMovements"
@@ -256,6 +251,11 @@ export const pathsConfig: NavigationConfig = {
           title: "metadata-enums",
           url: "/metadata-enums",
           translationKey: "metadataEnums"
+        },
+        {
+          title: "integrations",
+          url: "/settings/integrations",
+          translationKey: "integrations"
         },
       ]
     },

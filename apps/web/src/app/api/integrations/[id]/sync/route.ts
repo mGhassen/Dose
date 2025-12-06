@@ -1,0 +1,213 @@
+// Integration Sync Route
+
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabaseClient } from '@kit/lib/supabase';
+import type { IntegrationSyncData } from '@kit/types';
+
+async function getIntegrationAndVerifyAccess(
+  supabase: any,
+  integrationId: string
+): Promise<{ integration: any; error: any }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { integration: null, error: { status: 401, message: 'Unauthorized' } };
+  }
+
+  const { data: account } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('auth_user_id', user.id)
+    .single();
+
+  if (!account) {
+    return { integration: null, error: { status: 404, message: 'Account not found' } };
+  }
+
+  const { data: integration, error } = await supabase
+    .from('integrations')
+    .select('*')
+    .eq('id', integrationId)
+    .eq('account_id', account.id)
+    .single();
+
+  if (error) {
+    return { integration: null, error: { status: 404, message: 'Integration not found' } };
+  }
+
+  return { integration, error: null };
+}
+
+async function syncSquareIntegration(
+  integration: any,
+  syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'full'
+): Promise<{ records_synced: number; records_failed: number; error?: string }> {
+  // This is a placeholder - implement actual Square API calls
+  // For now, we'll just update the sync status
+  
+  const accessToken = integration.access_token; // Should be decrypted in production
+  
+  if (!accessToken) {
+    throw new Error('Access token not found');
+  }
+
+  let recordsSynced = 0;
+  let recordsFailed = 0;
+  let error: string | undefined;
+
+  try {
+    // TODO: Implement actual Square API sync
+    // - Fetch orders, payments, catalog items, locations
+    // - Store/update data in your database
+    // - Handle pagination
+    // - Handle rate limiting
+    
+    // Placeholder implementation
+    if (syncType === 'locations' || syncType === 'full') {
+      // Fetch locations
+      const locationsResponse = await fetch('https://connect.squareup.com/v2/locations', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Square-Version': '2024-01-18',
+        },
+      });
+      
+      if (locationsResponse.ok) {
+        const locationsData = await locationsResponse.json();
+        recordsSynced += locationsData.locations?.length || 0;
+      } else {
+        recordsFailed++;
+        error = `Failed to fetch locations: ${locationsResponse.statusText}`;
+      }
+    }
+
+    // Update integration sync status
+    return { records_synced: recordsSynced, records_failed: recordsFailed, error };
+  } catch (err: any) {
+    error = err.message;
+    return { records_synced: recordsSynced, records_failed: recordsFailed, error };
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const syncType = body.sync_type || 'full';
+
+    const supabase = createServerSupabaseClient();
+    
+    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
+    
+    if (accessError) {
+      return NextResponse.json(
+        { error: accessError.message },
+        { status: accessError.status }
+      );
+    }
+
+    if (integration.status !== 'connected') {
+      return NextResponse.json(
+        { error: 'Integration is not connected' },
+        { status: 400 }
+      );
+    }
+
+    // Update sync status to in_progress
+    await supabase
+      .from('integrations')
+      .update({
+        last_sync_status: 'in_progress',
+        last_sync_error: null,
+      })
+      .eq('id', id);
+
+    const startedAt = new Date().toISOString();
+
+    // Perform sync based on integration type
+    let syncResult;
+    if (integration.integration_type === 'square') {
+      syncResult = await syncSquareIntegration(integration, syncType);
+    } else {
+      return NextResponse.json(
+        { error: `Sync not implemented for integration type: ${integration.integration_type}` },
+        { status: 501 }
+      );
+    }
+
+    const completedAt = new Date().toISOString();
+    const syncStatus: IntegrationSyncData = {
+      integration_id: integration.id,
+      sync_type: syncType,
+      status: syncResult.error ? 'error' : 'success',
+      records_synced: syncResult.records_synced,
+      records_failed: syncResult.records_failed,
+      started_at: startedAt,
+      completed_at: completedAt,
+      error: syncResult.error,
+    };
+
+    // Update integration with sync results
+    await supabase
+      .from('integrations')
+      .update({
+        last_sync_at: completedAt,
+        last_sync_status: syncStatus.status,
+        last_sync_error: syncResult.error || null,
+      })
+      .eq('id', id);
+
+    return NextResponse.json(syncStatus);
+  } catch (error: any) {
+    console.error('Error syncing integration:', error);
+    return NextResponse.json(
+      { error: 'Failed to sync integration', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const supabase = createServerSupabaseClient();
+    
+    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
+    
+    if (accessError) {
+      return NextResponse.json(
+        { error: accessError.message },
+        { status: accessError.status }
+      );
+    }
+
+    if (!integration.last_sync_at) {
+      return NextResponse.json(null);
+    }
+
+    const syncStatus: IntegrationSyncData = {
+      integration_id: integration.id,
+      sync_type: 'full', // Default, could be stored separately
+      status: integration.last_sync_status || 'success',
+      records_synced: 0, // Could be stored separately
+      records_failed: 0, // Could be stored separately
+      started_at: integration.last_sync_at,
+      completed_at: integration.last_sync_at,
+      error: integration.last_sync_error || undefined,
+    };
+
+    return NextResponse.json(syncStatus);
+  } catch (error: any) {
+    console.error('Error fetching sync status:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch sync status', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+

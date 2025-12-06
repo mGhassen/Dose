@@ -4,4 +4,5 @@ export * from './auth';
 export * from './object';
 export * from './financial';
 export * from './pagination';
+export * from './integration';
 

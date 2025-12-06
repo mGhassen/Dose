@@ -57,41 +57,54 @@ export async function GET(
       .eq('id', id)
       .single();
 
-    // If not found in items, check recipes table
+    // If not found in items, check if it's a recipe ID and if there's a produced item
     if (itemError && itemError.code === 'PGRST116') {
-      const { data: recipeData, error: recipeError } = await supabase
-        .from('recipes')
+      // First check if there's a produced item for this recipe ID
+      const { data: producedItemData } = await supabase
+        .from('items')
         .select('*')
-        .eq('id', id)
+        .eq('produced_from_recipe_id', id)
         .single();
+      
+      if (producedItemData) {
+        // Return the produced item instead
+        itemData = producedItemData;
+      } else {
+        // Check if it's a recipe (for backward compatibility)
+        const { data: recipeData, error: recipeError } = await supabase
+          .from('recipes')
+          .select('*')
+          .eq('id', id)
+          .single();
 
-      if (recipeError) {
-        if (recipeError.code === 'PGRST116') {
-          return NextResponse.json(
-            { error: 'Item not found' },
-            { status: 404 }
-          );
+        if (recipeError) {
+          if (recipeError.code === 'PGRST116') {
+            return NextResponse.json(
+              { error: 'Item not found' },
+              { status: 404 }
+            );
+          }
+          throw recipeError;
         }
-        throw recipeError;
-      }
 
-      // Transform recipe to item format (for API response, not stored)
-      itemData = {
-        id: recipeData.id,
-        name: recipeData.name,
-        description: recipeData.description,
-        unit: recipeData.unit || 'serving',
-        category: recipeData.category,
-        item_type: 'recipe',
-        serving_size: recipeData.serving_size,
-        preparation_time: recipeData.preparation_time,
-        cooking_time: recipeData.cooking_time,
-        instructions: recipeData.instructions,
-        notes: recipeData.notes,
-        is_active: recipeData.is_active,
-        created_at: recipeData.created_at,
-        updated_at: recipeData.updated_at,
-      };
+        // Transform recipe to item format (for API response, not stored)
+        itemData = {
+          id: recipeData.id,
+          name: recipeData.name,
+          description: recipeData.description,
+          unit: recipeData.unit || 'serving',
+          category: recipeData.category,
+          item_type: 'recipe',
+          serving_size: recipeData.serving_size,
+          preparation_time: recipeData.preparation_time,
+          cooking_time: recipeData.cooking_time,
+          instructions: recipeData.instructions,
+          notes: recipeData.notes,
+          is_active: recipeData.is_active,
+          created_at: recipeData.created_at,
+          updated_at: recipeData.updated_at,
+        };
+      }
     } else if (itemError) {
       throw itemError;
     }

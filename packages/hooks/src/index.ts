@@ -46,6 +46,7 @@ export * from './client/useSupplierOrders';
 export * from './client/useStockLevels';
 export * from './client/useStockMovements';
 export * from './client/useExpiryDates';
+export * from './client/useIntegrations';
 
 // Server-side hooks (Next.js specific) - exported for convenience
 // Can also be imported directly: import { prefetchUsers } from '@kit/hooks/src/server/prefetchUsers';

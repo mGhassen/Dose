@@ -57,5 +57,8 @@ export * from './api/expiry-dates';
 // Export metadata enums API
 export * from './api/metadata-enums';
 
+// Export integrations API
+export * from './api/integrations';
+
 // Export Supabase client
 export * from './supabase';
