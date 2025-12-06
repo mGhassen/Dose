@@ -7,8 +7,12 @@ import DataTablePage from "@/components/data-table-page";
 import { useIngredients, useDeleteIngredient } from "@kit/hooks";
 import type { Ingredient } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
+import { Package, AlertTriangle, CheckCircle, Plus } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@kit/ui/button";
 
 export default function IngredientsContent() {
   const router = useRouter();
@@ -20,18 +24,19 @@ export default function IngredientsContent() {
     limit: 1000
   });
   
-  const filteredIngredients = useMemo(() => {
-    if (!ingredientsResponse?.data) return [];
-    return ingredientsResponse.data;
-  }, [ingredientsResponse?.data]);
-  
-  const paginatedIngredients = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    return filteredIngredients.slice(startIndex, startIndex + pageSize);
-  }, [filteredIngredients, page, pageSize]);
-  
-  const totalPages = Math.ceil(filteredIngredients.length / pageSize);
+  const ingredients = ingredientsResponse?.data || [];
+  const totalCount = ingredientsResponse?.pagination?.total || ingredients.length;
+  const totalPages = ingredientsResponse?.pagination?.totalPages || Math.ceil(ingredients.length / pageSize);
   const deleteMutation = useDeleteIngredient();
+  
+  // Calculate summary stats
+  const activeCount = useMemo(() => {
+    return ingredients.filter(i => i.isActive).length;
+  }, [ingredients]);
+  
+  const categoryCount = useMemo(() => {
+    return new Set(ingredients.map(i => i.category).filter(Boolean)).size;
+  }, [ingredients]);
 
   const columns: ColumnDef<Ingredient>[] = useMemo(() => [
     {
@@ -141,17 +146,79 @@ export default function IngredientsContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Ingredients</h1>
           <p className="text-muted-foreground mt-2">
-            Manage your inventory ingredients
+            Manage your inventory ingredients for your coffee shop
           </p>
         </div>
+        <Link href="/ingredients/create">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Ingredient
+          </Button>
+        </Link>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Ingredients</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalCount}</div>
+            <p className="text-xs text-muted-foreground">
+              All ingredients in system
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Ingredients</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{activeCount}</div>
+            <p className="text-xs text-muted-foreground">
+              Currently active
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Categories</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{categoryCount}</div>
+            <p className="text-xs text-muted-foreground">
+              Unique categories
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Inactive</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalCount - activeCount}</div>
+            <p className="text-xs text-muted-foreground">
+              Inactive ingredients
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Table View */}
       <div className="-mx-4">
         <DataTablePage
           title=""
           description=""
           createHref="/ingredients/create"
-          data={paginatedIngredients}
+          data={ingredients}
           columns={columns}
           loading={isLoading}
           onRowClick={(ingredient) => router.push(`/ingredients/${ingredient.id}`)}
@@ -173,7 +240,7 @@ export default function IngredientsContent() {
           pagination={{
             page,
             pageSize,
-            totalCount: filteredIngredients.length,
+            totalCount,
             totalPages,
             onPageChange: setPage,
             onPageSizeChange: (newSize) => {

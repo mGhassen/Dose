@@ -7,8 +7,12 @@ import DataTablePage from "@/components/data-table-page";
 import { useRecipes, useDeleteRecipe } from "@kit/hooks";
 import type { Recipe } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
+import { ChefHat, Clock, CheckCircle, AlertCircle, Plus } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@kit/ui/button";
 
 export default function RecipesContent() {
   const router = useRouter();
@@ -20,18 +24,27 @@ export default function RecipesContent() {
     limit: 1000
   });
   
-  const filteredRecipes = useMemo(() => {
-    if (!recipesResponse?.data) return [];
-    return recipesResponse.data;
-  }, [recipesResponse?.data]);
-  
-  const paginatedRecipes = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    return filteredRecipes.slice(startIndex, startIndex + pageSize);
-  }, [filteredRecipes, page, pageSize]);
-  
-  const totalPages = Math.ceil(filteredRecipes.length / pageSize);
+  const recipes = recipesResponse?.data || [];
+  const totalCount = recipesResponse?.pagination?.total || recipes.length;
+  const totalPages = recipesResponse?.pagination?.totalPages || Math.ceil(recipes.length / pageSize);
   const deleteMutation = useDeleteRecipe();
+  
+  // Calculate summary stats
+  const activeCount = useMemo(() => {
+    return recipes.filter(r => r.isActive).length;
+  }, [recipes]);
+  
+  const avgPrepTime = useMemo(() => {
+    const times = recipes.filter(r => r.preparationTime).map(r => r.preparationTime!);
+    if (times.length === 0) return 0;
+    return Math.round(times.reduce((sum, t) => sum + t, 0) / times.length);
+  }, [recipes]);
+  
+  const avgCookTime = useMemo(() => {
+    const times = recipes.filter(r => r.cookingTime).map(r => r.cookingTime!);
+    if (times.length === 0) return 0;
+    return Math.round(times.reduce((sum, t) => sum + t, 0) / times.length);
+  }, [recipes]);
 
   const columns: ColumnDef<Recipe>[] = useMemo(() => [
     {
@@ -146,17 +159,79 @@ export default function RecipesContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Recipes</h1>
           <p className="text-muted-foreground mt-2">
-            Manage your recipes and their ingredients
+            Manage your coffee shop recipes and drink formulas
           </p>
         </div>
+        <Link href="/recipes/create">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Recipe
+          </Button>
+        </Link>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Recipes</CardTitle>
+            <ChefHat className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalCount}</div>
+            <p className="text-xs text-muted-foreground">
+              All recipes in system
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Recipes</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{activeCount}</div>
+            <p className="text-xs text-muted-foreground">
+              Currently active
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg Prep Time</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{avgPrepTime} min</div>
+            <p className="text-xs text-muted-foreground">
+              Average preparation
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg Cook Time</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{avgCookTime} min</div>
+            <p className="text-xs text-muted-foreground">
+              Average cooking
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Table View */}
       <div className="-mx-4">
         <DataTablePage
           title=""
           description=""
           createHref="/recipes/create"
-          data={paginatedRecipes}
+          data={recipes}
           columns={columns}
           loading={isLoading}
           onRowClick={(recipe) => router.push(`/recipes/${recipe.id}`)}
@@ -177,7 +252,7 @@ export default function RecipesContent() {
           pagination={{
             page,
             pageSize,
-            totalCount: filteredRecipes.length,
+            totalCount,
             totalPages,
             onPageChange: setPage,
             onPageSizeChange: (newSize) => {

@@ -87,3 +87,18 @@ export function useDeleteRecipe() {
   });
 }
 
+export function useProduceRecipe() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { quantity: number; location?: string; notes?: string } }) => 
+      recipesApi.produce(id, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['recipes', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['stock-levels'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+    },
+  });
+}
+

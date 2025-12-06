@@ -7,8 +7,11 @@ import DataTablePage from "@/components/data-table-page";
 import { useStockLevels, useDeleteStockLevel, useIngredients } from "@kit/hooks";
 import type { StockLevel } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
+import { Package, AlertTriangle, CheckCircle, TrendingDown, Plus } from "lucide-react";
+import Link from "next/link";
 
 export default function StockLevelsContent() {
   const router = useRouter();
@@ -27,18 +30,28 @@ export default function StockLevelsContent() {
     return new Map(ingredientsResponse.data.map(i => [i.id, i.name]));
   }, [ingredientsResponse?.data]);
   
-  const filteredStockLevels = useMemo(() => {
-    if (!stockLevelsResponse?.data) return [];
-    return stockLevelsResponse.data;
-  }, [stockLevelsResponse?.data]);
-  
-  const paginatedStockLevels = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    return filteredStockLevels.slice(startIndex, startIndex + pageSize);
-  }, [filteredStockLevels, page, pageSize]);
-  
-  const totalPages = Math.ceil(filteredStockLevels.length / pageSize);
+  const stockLevels = stockLevelsResponse?.data || [];
+  const totalCount = stockLevelsResponse?.pagination?.total || stockLevels.length;
+  const totalPages = stockLevelsResponse?.pagination?.totalPages || Math.ceil(stockLevels.length / pageSize);
   const deleteMutation = useDeleteStockLevel();
+  
+  // Calculate low stock items
+  const lowStockItems = useMemo(() => {
+    return stockLevels.filter(level => {
+      if (!level.minimumStockLevel) return false;
+      return level.quantity <= level.minimumStockLevel;
+    });
+  }, [stockLevels]);
+  
+  // Calculate out of stock items
+  const outOfStockItems = useMemo(() => {
+    return stockLevels.filter(level => level.quantity <= 0);
+  }, [stockLevels]);
+  
+  // Calculate total inventory value (would need price data, simplified for now)
+  const totalItems = useMemo(() => {
+    return stockLevels.length;
+  }, [stockLevels]);
 
   const columns: ColumnDef<StockLevel>[] = useMemo(() => [
     {
@@ -46,8 +59,22 @@ export default function StockLevelsContent() {
       header: "Ingredient",
       cell: ({ row }) => {
         const ingredientId = row.original.ingredientId;
+        const level = row.original;
+        const isLowStock = level.minimumStockLevel && level.quantity <= level.minimumStockLevel;
+        const isOutOfStock = level.quantity <= 0;
+        
         if (ingredientId && ingredientMap.has(ingredientId)) {
-          return ingredientMap.get(ingredientId);
+          return (
+            <div className="flex items-center gap-2">
+              <div className="font-medium">{ingredientMap.get(ingredientId)}</div>
+              {isOutOfStock && (
+                <Badge variant="destructive" className="text-xs">Out of Stock</Badge>
+              )}
+              {!isOutOfStock && isLowStock && (
+                <Badge variant="outline" className="text-xs border-orange-500 text-orange-600">Low Stock</Badge>
+              )}
+            </div>
+          );
         }
         return <span className="text-muted-foreground">—</span>;
       },
@@ -55,7 +82,17 @@ export default function StockLevelsContent() {
     {
       accessorKey: "quantity",
       header: "Quantity",
-      cell: ({ row }) => `${row.original.quantity} ${row.original.unit}`,
+      cell: ({ row }) => {
+        const level = row.original;
+        const isLowStock = level.minimumStockLevel && level.quantity <= level.minimumStockLevel;
+        const isOutOfStock = level.quantity <= 0;
+        
+        return (
+          <div className={isOutOfStock ? "text-destructive font-medium" : isLowStock ? "text-orange-600 font-medium" : ""}>
+            {`${level.quantity} ${level.unit}`}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "location",
@@ -65,7 +102,15 @@ export default function StockLevelsContent() {
     {
       accessorKey: "minimumStockLevel",
       header: "Min Stock",
-      cell: ({ row }) => row.original.minimumStockLevel ? `${row.original.minimumStockLevel} ${row.original.unit}` : <span className="text-muted-foreground">—</span>,
+      cell: ({ row }) => {
+        const level = row.original;
+        const isLowStock = level.minimumStockLevel && level.quantity <= level.minimumStockLevel;
+        return level.minimumStockLevel ? (
+          <div className={isLowStock ? "text-orange-600 font-medium" : ""}>
+            {`${level.minimumStockLevel} ${level.unit}`}
+          </div>
+        ) : <span className="text-muted-foreground">—</span>;
+      },
     },
     {
       accessorKey: "maximumStockLevel",
@@ -153,17 +198,108 @@ export default function StockLevelsContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Stock Levels</h1>
           <p className="text-muted-foreground mt-2">
-            Manage current stock levels for ingredients
+            Monitor inventory levels and receive low stock alerts
           </p>
         </div>
+        <Link href="/stock-levels/create">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Stock Level
+          </Button>
+        </Link>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalItems}</div>
+            <p className="text-xs text-muted-foreground">
+              Items tracked
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Low Stock</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{lowStockItems.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Need reordering
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Out of Stock</CardTitle>
+            <TrendingDown className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">{outOfStockItems.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Urgent restock needed
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">In Stock</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {totalItems - lowStockItems.length - outOfStockItems.length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Adequate levels
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Low Stock Alert Banner */}
+      {lowStockItems.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
+              Low Stock Alert
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''} {lowStockItems.length === 1 ? 'is' : 'are'} below minimum stock level. 
+                Consider placing a supplier order.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/supplier-orders/create')}
+              >
+                Create Order
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Table View */}
       <div className="-mx-4">
         <DataTablePage
           title=""
           description=""
           createHref="/stock-levels/create"
-          data={paginatedStockLevels}
+          data={stockLevels}
           columns={columns}
           loading={isLoading}
           onRowClick={(level) => router.push(`/stock-levels/${level.id}`)}
@@ -171,6 +307,9 @@ export default function StockLevelsContent() {
           onBulkDelete={handleBulkDelete}
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
+          filterColumns={[
+            { value: "location", label: "Location" },
+          ]}
           sortColumns={[
             { value: "quantity", label: "Quantity", type: "numeric" },
             { value: "lastUpdated", label: "Last Updated", type: "timestamp" },
@@ -181,7 +320,7 @@ export default function StockLevelsContent() {
           pagination={{
             page,
             pageSize,
-            totalCount: filteredStockLevels.length,
+            totalCount,
             totalPages,
             onPageChange: setPage,
             onPageSizeChange: (newSize) => {

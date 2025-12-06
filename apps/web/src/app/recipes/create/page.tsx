@@ -71,7 +71,17 @@ export default function CreateRecipePage() {
 
   const updateIngredient = (index: number, field: string, value: any) => {
     const updated = [...ingredients];
-    updated[index] = { ...updated[index], [field]: value };
+    const item = updated[index];
+    
+    // Auto-fill unit when ingredient is selected
+    if (field === 'ingredientId' && value) {
+      const ingredient = ingredientsResponse?.data?.find(i => i.id === parseInt(value));
+      if (ingredient) {
+        item.unit = ingredient.unit;
+      }
+    }
+    
+    updated[index] = { ...item, [field]: value };
     setIngredients(updated);
   };
 

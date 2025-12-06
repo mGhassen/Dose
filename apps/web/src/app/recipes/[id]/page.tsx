@@ -9,11 +9,19 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
-import { Save, X, Trash2, Plus } from "lucide-react";
+import { Save, X, Trash2, Plus, ChefHat } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useIngredients } from "@kit/hooks";
+import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useIngredients, useProduceRecipe } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@kit/ui/dialog";
 
 interface RecipeDetailPageProps {
   params: Promise<{ id: string }>;
@@ -23,10 +31,15 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [produceDialogOpen, setProduceDialogOpen] = useState(false);
+  const [produceQuantity, setProduceQuantity] = useState("1");
+  const [produceLocation, setProduceLocation] = useState("");
+  const [produceNotes, setProduceNotes] = useState("");
   const { data: recipe, isLoading } = useRecipeById(resolvedParams?.id || "");
   const { data: ingredientsResponse } = useIngredients({ limit: 1000 });
   const updateRecipe = useUpdateRecipe();
   const deleteMutation = useDeleteRecipe();
+  const produceRecipe = useProduceRecipe();
   
   const [formData, setFormData] = useState({
     name: "",
@@ -172,6 +185,13 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           </div>
           {!isEditing && (
             <div className="flex space-x-2">
+              <Button
+                onClick={() => setProduceDialogOpen(true)}
+                disabled={!recipe?.isActive || !recipe?.ingredients || recipe.ingredients.length === 0}
+              >
+                <ChefHat className="mr-2 h-4 w-4" />
+                Produce Recipe
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => setIsEditing(true)}
@@ -428,6 +448,109 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Produce Recipe Dialog */}
+      <Dialog open={produceDialogOpen} onOpenChange={setProduceDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Produce Recipe</DialogTitle>
+            <DialogDescription>
+              Record production of {recipe?.name}. This will automatically deduct ingredients from stock.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Quantity (servings) *</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="1"
+                step="1"
+                value={produceQuantity}
+                onChange={(e) => setProduceQuantity(e.target.value)}
+                placeholder="1"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Recipe serving size: {recipe?.servingSize || 1}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                value={produceLocation}
+                onChange={(e) => setProduceLocation(e.target.value)}
+                placeholder="Storage location (optional)"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={produceNotes}
+                onChange={(e) => setProduceNotes(e.target.value)}
+                placeholder="Additional notes (optional)"
+                rows={3}
+              />
+            </div>
+            {recipe?.ingredients && recipe.ingredients.length > 0 && (
+              <div className="border rounded-lg p-4 bg-muted">
+                <Label className="text-sm font-semibold">Ingredients to be deducted:</Label>
+                <div className="mt-2 space-y-1">
+                  {recipe.ingredients.map((ri, idx) => {
+                    const multiplier = parseFloat(produceQuantity) / (recipe.servingSize || 1);
+                    const quantityToDeduct = ri.quantity * multiplier;
+                    return (
+                      <div key={idx} className="text-sm">
+                        • {ri.ingredient?.name || `Ingredient ${ri.ingredientId}`}: {quantityToDeduct.toFixed(2)} {ri.unit}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setProduceDialogOpen(false)}
+              disabled={produceRecipe.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!resolvedParams?.id || !produceQuantity || parseFloat(produceQuantity) <= 0) {
+                  toast.error("Please enter a valid quantity");
+                  return;
+                }
+                try {
+                  await produceRecipe.mutateAsync({
+                    id: resolvedParams.id,
+                    data: {
+                      quantity: parseFloat(produceQuantity),
+                      location: produceLocation || undefined,
+                      notes: produceNotes || undefined,
+                    },
+                  });
+                  toast.success("Recipe produced successfully! Ingredients deducted from stock.");
+                  setProduceDialogOpen(false);
+                  setProduceQuantity("1");
+                  setProduceLocation("");
+                  setProduceNotes("");
+                } catch (error: any) {
+                  toast.error(error?.message || "Failed to produce recipe");
+                }
+              }}
+              disabled={produceRecipe.isPending}
+            >
+              <ChefHat className="mr-2 h-4 w-4" />
+              {produceRecipe.isPending ? "Producing..." : "Produce Recipe"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

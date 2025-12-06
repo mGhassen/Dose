@@ -13,5 +13,7 @@ export const recipesApi = {
   create: (data: CreateRecipeData) => apiRequest<Recipe>('POST', '/api/recipes', data),
   update: (id: string, data: UpdateRecipeData) => apiRequest<Recipe>('PUT', `/api/recipes/${id}`, data),
   delete: (id: string) => apiRequest<void>('DELETE', `/api/recipes/${id}`),
+  produce: (id: string, data: { quantity: number; location?: string; notes?: string }) => 
+    apiRequest<{ success: boolean; message: string; movements: Array<{ ingredientId: number; quantity: number }>; recipe: { id: number; name: string; quantityProduced: number } }>('POST', `/api/recipes/${id}/produce`, data),
 };
 

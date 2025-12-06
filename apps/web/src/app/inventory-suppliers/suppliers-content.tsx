@@ -7,8 +7,12 @@ import DataTablePage from "@/components/data-table-page";
 import { useInventorySuppliers, useDeleteInventorySupplier } from "@kit/hooks";
 import type { Supplier } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
+import { Building2, CheckCircle, AlertCircle, Phone, Plus } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@kit/ui/button";
 
 export default function SuppliersContent() {
   const router = useRouter();
@@ -20,18 +24,19 @@ export default function SuppliersContent() {
     limit: 1000
   });
   
-  const filteredSuppliers = useMemo(() => {
-    if (!suppliersResponse?.data) return [];
-    return suppliersResponse.data;
-  }, [suppliersResponse?.data]);
-  
-  const paginatedSuppliers = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    return filteredSuppliers.slice(startIndex, startIndex + pageSize);
-  }, [filteredSuppliers, page, pageSize]);
-  
-  const totalPages = Math.ceil(filteredSuppliers.length / pageSize);
+  const suppliers = suppliersResponse?.data || [];
+  const totalCount = suppliersResponse?.pagination?.total || suppliers.length;
+  const totalPages = suppliersResponse?.pagination?.totalPages || Math.ceil(suppliers.length / pageSize);
   const deleteMutation = useDeleteInventorySupplier();
+  
+  // Calculate summary stats
+  const activeCount = useMemo(() => {
+    return suppliers.filter(s => s.isActive).length;
+  }, [suppliers]);
+  
+  const withContact = useMemo(() => {
+    return suppliers.filter(s => s.email || s.phone).length;
+  }, [suppliers]);
 
   const columns: ColumnDef<Supplier>[] = useMemo(() => [
     {
@@ -153,17 +158,79 @@ export default function SuppliersContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Suppliers</h1>
           <p className="text-muted-foreground mt-2">
-            Manage your inventory suppliers
+            Manage your coffee shop suppliers and vendors
           </p>
         </div>
+        <Link href="/inventory-suppliers/create">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Supplier
+          </Button>
+        </Link>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Suppliers</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalCount}</div>
+            <p className="text-xs text-muted-foreground">
+              All suppliers
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Suppliers</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{activeCount}</div>
+            <p className="text-xs text-muted-foreground">
+              Currently active
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">With Contact</CardTitle>
+            <Phone className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{withContact}</div>
+            <p className="text-xs text-muted-foreground">
+              Have contact info
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Inactive</CardTitle>
+            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalCount - activeCount}</div>
+            <p className="text-xs text-muted-foreground">
+              Inactive suppliers
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Table View */}
       <div className="-mx-4">
         <DataTablePage
           title=""
           description=""
           createHref="/inventory-suppliers/create"
-          data={paginatedSuppliers}
+          data={suppliers}
           columns={columns}
           loading={isLoading}
           onRowClick={(supplier) => router.push(`/inventory-suppliers/${supplier.id}`)}
@@ -183,7 +250,7 @@ export default function SuppliersContent() {
           pagination={{
             page,
             pageSize,
-            totalCount: filteredSuppliers.length,
+            totalCount,
             totalPages,
             onPageChange: setPage,
             onPageSizeChange: (newSize) => {

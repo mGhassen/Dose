@@ -6103,3 +6103,138 @@ WHERE NOT EXISTS (
 
 -- Set sequence for payments
 SELECT setval('payments_id_seq', (SELECT MAX(id) FROM payments));
+
+-- ============================================================================
+-- COFFEE SHOP INVENTORY SEED DATA
+-- ============================================================================
+-- Seed data for ingredients, suppliers, recipes, and initial stock levels
+-- Note: This assumes the inventory management tables exist (from migration)
+
+-- INGREDIENTS - Coffee Shop Essentials
+INSERT INTO ingredients (name, description, unit, category, is_active) VALUES
+-- Coffee & Espresso
+('Arabica Coffee Beans', 'Premium arabica coffee beans', 'kg', 'Coffee', true),
+('Robusta Coffee Beans', 'Robusta coffee beans for espresso', 'kg', 'Coffee', true),
+('Espresso Beans', 'Dark roast espresso beans', 'kg', 'Coffee', true),
+('Decaf Coffee Beans', 'Decaffeinated coffee beans', 'kg', 'Coffee', true),
+
+-- Dairy & Alternatives
+('Whole Milk', 'Fresh whole milk', 'L', 'Dairy', true),
+('Skim Milk', 'Low-fat skim milk', 'L', 'Dairy', true),
+('Oat Milk', 'Oat milk alternative', 'L', 'Dairy Alternatives', true),
+('Almond Milk', 'Almond milk alternative', 'L', 'Dairy Alternatives', true),
+('Soy Milk', 'Soy milk alternative', 'L', 'Dairy Alternatives', true),
+('Heavy Cream', 'Heavy whipping cream', 'L', 'Dairy', true),
+('Half and Half', 'Half milk, half cream', 'L', 'Dairy', true),
+
+-- Syrups & Flavors
+('Vanilla Syrup', 'Vanilla flavored syrup', 'L', 'Syrups', true),
+('Caramel Syrup', 'Caramel flavored syrup', 'L', 'Syrups', true),
+('Hazelnut Syrup', 'Hazelnut flavored syrup', 'L', 'Syrups', true),
+('Chocolate Syrup', 'Chocolate flavored syrup', 'L', 'Syrups', true),
+('Simple Syrup', 'Basic sugar syrup', 'L', 'Syrups', true),
+
+-- Tea
+('Black Tea', 'English breakfast tea', 'kg', 'Tea', true),
+('Green Tea', 'Green tea leaves', 'kg', 'Tea', true),
+('Earl Grey Tea', 'Earl grey tea blend', 'kg', 'Tea', true),
+('Herbal Tea', 'Assorted herbal teas', 'kg', 'Tea', true),
+
+-- Pastries & Food
+('Croissants', 'Butter croissants', 'piece', 'Pastries', true),
+('Muffins', 'Assorted muffins', 'piece', 'Pastries', true),
+('Bagels', 'Fresh bagels', 'piece', 'Pastries', true),
+('Sandwiches', 'Pre-made sandwiches', 'piece', 'Food', true),
+('Cookies', 'Assorted cookies', 'piece', 'Pastries', true),
+
+-- Cups & Packaging
+('Paper Cups 12oz', '12oz disposable cups', 'box', 'Packaging', true),
+('Paper Cups 16oz', '16oz disposable cups', 'box', 'Packaging', true),
+('Lids 12oz', 'Lids for 12oz cups', 'box', 'Packaging', true),
+('Lids 16oz', 'Lids for 16oz cups', 'box', 'Packaging', true),
+('Sleeves', 'Cup sleeves', 'box', 'Packaging', true),
+('Straws', 'Disposable straws', 'box', 'Packaging', true),
+('Napkins', 'Paper napkins', 'box', 'Packaging', true),
+
+-- Toppings & Extras
+('Whipped Cream', 'Canned whipped cream', 'can', 'Toppings', true),
+('Chocolate Chips', 'Semi-sweet chocolate chips', 'kg', 'Toppings', true),
+('Cinnamon', 'Ground cinnamon', 'kg', 'Spices', true),
+('Cocoa Powder', 'Unsweetened cocoa powder', 'kg', 'Toppings', true),
+('Sugar', 'White granulated sugar', 'kg', 'Sweeteners', true),
+('Brown Sugar', 'Brown sugar', 'kg', 'Sweeteners', true),
+('Honey', 'Natural honey', 'kg', 'Sweeteners', true),
+
+-- Water & Ice
+('Filtered Water', 'Filtered water for coffee', 'L', 'Beverages', true),
+('Ice', 'Ice cubes', 'kg', 'Beverages', true),
+
+-- Cleaning & Maintenance
+('Espresso Machine Cleaner', 'Machine cleaning solution', 'L', 'Cleaning', true),
+('Milk Frother Cleaner', 'Frother cleaning solution', 'L', 'Cleaning', true),
+('Sanitizer', 'Food-safe sanitizer', 'L', 'Cleaning', true)
+ON CONFLICT DO NOTHING;
+
+-- SUPPLIERS - Coffee Shop Suppliers
+INSERT INTO suppliers (name, email, phone, address, contact_person, payment_terms, is_active) VALUES
+('Premium Coffee Roasters', 'orders@premiumcoffee.com', '+1-555-0101', '123 Coffee St, Seattle, WA', 'John Smith', 'Net 30', true),
+('Dairy Direct', 'sales@dairydirect.com', '+1-555-0102', '456 Milk Ave, Portland, OR', 'Jane Doe', 'Net 15', true),
+('Syrup Suppliers Inc', 'info@syrupsuppliers.com', '+1-555-0103', '789 Flavor Blvd, San Francisco, CA', 'Bob Johnson', 'Net 30', true),
+('Packaging Plus', 'orders@packagingplus.com', '+1-555-0104', '321 Box St, Los Angeles, CA', 'Alice Williams', 'Net 30', true),
+('Local Bakery', 'orders@localbakery.com', '+1-555-0105', '654 Bread Ln, Seattle, WA', 'Charlie Brown', 'COD', true),
+('Tea Importers', 'sales@teaimporters.com', '+1-555-0106', '987 Tea Garden, Portland, OR', 'Diana Prince', 'Net 30', true)
+ON CONFLICT DO NOTHING;
+
+-- RECIPES - Common Coffee Shop Drinks
+INSERT INTO recipes (name, description, serving_size, preparation_time, cooking_time, instructions, is_active) VALUES
+('Espresso', 'Single shot of espresso', 1, 1, 0, 'Grind 18g coffee beans. Tamp and extract 30ml espresso shot.', true),
+('Double Espresso', 'Double shot of espresso', 1, 1, 0, 'Grind 36g coffee beans. Tamp and extract 60ml espresso shot.', true),
+('Americano', 'Espresso with hot water', 1, 2, 0, 'Extract double espresso. Add 180ml hot water.', true),
+('Cappuccino', 'Espresso with steamed milk and foam', 1, 3, 0, 'Extract double espresso. Steam 120ml milk. Pour milk and top with foam.', true),
+('Latte', 'Espresso with steamed milk', 1, 3, 0, 'Extract double espresso. Steam 180ml milk. Pour milk over espresso.', true),
+('Mocha', 'Espresso with chocolate and steamed milk', 1, 4, 0, 'Extract double espresso. Add 30ml chocolate syrup. Steam 150ml milk. Pour milk over espresso.', true),
+('Caramel Macchiato', 'Espresso with vanilla, caramel, and steamed milk', 1, 4, 0, 'Add 15ml vanilla syrup to cup. Extract double espresso. Steam 150ml milk. Pour milk and drizzle caramel.', true),
+('Flat White', 'Espresso with microfoam milk', 1, 3, 0, 'Extract double espresso. Steam 150ml milk with microfoam. Pour milk over espresso.', true),
+('Cortado', 'Espresso with equal parts steamed milk', 1, 2, 0, 'Extract double espresso. Steam 60ml milk. Pour milk over espresso.', true),
+('Cold Brew', 'Cold brewed coffee', 1, 5, 0, 'Steep 100g coarse ground coffee in 1L cold water for 12-24 hours. Filter and serve over ice.', true),
+('Iced Coffee', 'Chilled coffee over ice', 1, 2, 0, 'Brew coffee. Cool and pour over ice. Add milk and sweetener if desired.', true),
+('Iced Latte', 'Espresso with cold milk over ice', 1, 3, 0, 'Extract double espresso. Pour over ice. Add 180ml cold milk.', true),
+('Frappuccino', 'Blended coffee drink', 1, 5, 0, 'Blend double espresso, 200ml milk, 30ml syrup, ice, and whipped cream.', true),
+('Hot Chocolate', 'Steamed milk with chocolate', 1, 3, 0, 'Heat 200ml milk. Add 30ml chocolate syrup. Top with whipped cream.', true),
+('Chai Latte', 'Spiced tea with steamed milk', 1, 4, 0, 'Steep chai tea. Steam 150ml milk. Combine tea and milk. Add sweetener.', true)
+ON CONFLICT DO NOTHING;
+
+-- STOCK LEVELS - Initial stock levels with min/max
+-- Set up initial stock levels for key ingredients
+INSERT INTO stock_levels (ingredient_id, quantity, unit, location, minimum_stock_level, maximum_stock_level)
+SELECT 
+  id,
+  CASE 
+    WHEN category = 'Coffee' THEN 10.0
+    WHEN category = 'Dairy' OR category = 'Dairy Alternatives' THEN 20.0
+    WHEN category = 'Syrups' THEN 5.0
+    WHEN category = 'Packaging' THEN 50.0
+    WHEN category = 'Pastries' THEN 20.0
+    ELSE 5.0
+  END,
+  unit,
+  'Main Storage',
+  CASE 
+    WHEN category = 'Coffee' THEN 5.0
+    WHEN category = 'Dairy' OR category = 'Dairy Alternatives' THEN 10.0
+    WHEN category = 'Syrups' THEN 2.0
+    WHEN category = 'Packaging' THEN 20.0
+    WHEN category = 'Pastries' THEN 10.0
+    ELSE 2.0
+  END,
+  CASE 
+    WHEN category = 'Coffee' THEN 20.0
+    WHEN category = 'Dairy' OR category = 'Dairy Alternatives' THEN 40.0
+    WHEN category = 'Syrups' THEN 10.0
+    WHEN category = 'Packaging' THEN 100.0
+    WHEN category = 'Pastries' THEN 50.0
+    ELSE 15.0
+  END
+FROM ingredients
+WHERE is_active = true
+ON CONFLICT (ingredient_id, location) DO NOTHING;

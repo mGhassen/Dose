@@ -8,10 +8,46 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
-import { Save, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { Save, X, Info } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateIngredient } from "@kit/hooks";
 import { toast } from "sonner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@kit/ui/tooltip";
+
+const COMMON_UNITS = [
+  { value: 'kg', label: 'Kilogram (kg)' },
+  { value: 'g', label: 'Gram (g)' },
+  { value: 'L', label: 'Liter (L)' },
+  { value: 'mL', label: 'Milliliter (mL)' },
+  { value: 'piece', label: 'Piece' },
+  { value: 'box', label: 'Box' },
+  { value: 'can', label: 'Can' },
+  { value: 'bottle', label: 'Bottle' },
+  { value: 'pack', label: 'Pack' },
+  { value: 'bag', label: 'Bag' },
+];
+
+const COMMON_CATEGORIES = [
+  'Coffee',
+  'Tea',
+  'Dairy',
+  'Dairy Alternatives',
+  'Syrups',
+  'Sweeteners',
+  'Toppings',
+  'Spices',
+  'Pastries',
+  'Food',
+  'Packaging',
+  'Beverages',
+  'Cleaning',
+];
 
 export default function CreateIngredientPage() {
   const router = useRouter();
@@ -79,23 +115,77 @@ export default function CreateIngredientPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="unit">Unit *</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="unit">Unit *</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Select a unit or type a custom one</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <Select
+                    value={formData.unit}
+                    onValueChange={(value) => handleInputChange('unit', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMMON_UNITS.map((unit) => (
+                        <SelectItem key={unit.value} value={unit.value}>
+                          {unit.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
-                    id="unit"
                     value={formData.unit}
                     onChange={(e) => handleInputChange('unit', e.target.value)}
-                    placeholder="kg, L, piece, etc."
+                    placeholder="Or type custom unit (kg, L, piece, etc.)"
+                    className="mt-2"
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="category">Category</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Helps organize and filter ingredients</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => handleInputChange('category', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMMON_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
-                    id="category"
                     value={formData.category}
                     onChange={(e) => handleInputChange('category', e.target.value)}
-                    placeholder="vegetables, meat, dairy, etc."
+                    placeholder="Or type custom category"
+                    className="mt-2"
                   />
                 </div>
 

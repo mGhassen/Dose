@@ -87,3 +87,18 @@ export function useDeleteSupplierOrder() {
   });
 }
 
+export function useReceiveSupplierOrder() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { actualDeliveryDate?: string; items: Array<{ itemId: number; receivedQuantity: number; location?: string }> } }) => 
+      supplierOrdersApi.receive(id, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['supplier-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier-orders', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['stock-levels'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+    },
+  });
+}
+

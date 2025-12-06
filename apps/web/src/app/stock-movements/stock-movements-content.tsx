@@ -7,9 +7,13 @@ import DataTablePage from "@/components/data-table-page";
 import { useStockMovements, useDeleteStockMovement, useIngredients } from "@kit/hooks";
 import type { StockMovement } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 import { StockMovementType } from "@kit/types";
+import { ArrowUpDown, TrendingUp, TrendingDown, Package, Plus } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@kit/ui/button";
 
 export default function StockMovementsContent() {
   const router = useRouter();
@@ -28,18 +32,35 @@ export default function StockMovementsContent() {
     return new Map(ingredientsResponse.data.map(i => [i.id, i.name]));
   }, [ingredientsResponse?.data]);
   
-  const filteredMovements = useMemo(() => {
-    if (!movementsResponse?.data) return [];
-    return movementsResponse.data;
-  }, [movementsResponse?.data]);
-  
-  const paginatedMovements = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    return filteredMovements.slice(startIndex, startIndex + pageSize);
-  }, [filteredMovements, page, pageSize]);
-  
-  const totalPages = Math.ceil(filteredMovements.length / pageSize);
+  const movements = movementsResponse?.data || [];
+  const totalCount = movementsResponse?.pagination?.total || movements.length;
+  const totalPages = movementsResponse?.pagination?.totalPages || Math.ceil(movements.length / pageSize);
   const deleteMutation = useDeleteStockMovement();
+  
+  // Calculate summary stats
+  const inMovements = useMemo(() => {
+    return movements.filter(m => m.movementType === StockMovementType.IN).length;
+  }, [movements]);
+  
+  const outMovements = useMemo(() => {
+    return movements.filter(m => m.movementType === StockMovementType.OUT).length;
+  }, [movements]);
+  
+  const wasteMovements = useMemo(() => {
+    return movements.filter(m => m.movementType === StockMovementType.WASTE || m.movementType === StockMovementType.EXPIRED).length;
+  }, [movements]);
+  
+  const totalInQuantity = useMemo(() => {
+    return movements
+      .filter(m => m.movementType === StockMovementType.IN)
+      .reduce((sum, m) => sum + m.quantity, 0);
+  }, [movements]);
+  
+  const totalOutQuantity = useMemo(() => {
+    return movements
+      .filter(m => m.movementType === StockMovementType.OUT)
+      .reduce((sum, m) => sum + m.quantity, 0);
+  }, [movements]);
 
   const getMovementTypeBadge = (type: StockMovementType) => {
     const variants: Record<StockMovementType, "default" | "secondary" | "destructive" | "outline"> = {
@@ -172,17 +193,79 @@ export default function StockMovementsContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Stock Movements</h1>
           <p className="text-muted-foreground mt-2">
-            Track stock movements and inventory changes
+            Track all inventory movements, receipts, usage, and waste
           </p>
         </div>
+        <Link href="/stock-movements/create">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Record Movement
+          </Button>
+        </Link>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Movements</CardTitle>
+            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalCount}</div>
+            <p className="text-xs text-muted-foreground">
+              All movements tracked
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Stock In</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{inMovements}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalInQuantity.toFixed(2)} units received
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Stock Out</CardTitle>
+            <TrendingDown className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{outMovements}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalOutQuantity.toFixed(2)} units used
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Waste/Expired</CardTitle>
+            <Package className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{wasteMovements}</div>
+            <p className="text-xs text-muted-foreground">
+              Items lost
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Table View */}
       <div className="-mx-4">
         <DataTablePage
           title=""
           description=""
           createHref="/stock-movements/create"
-          data={paginatedMovements}
+          data={movements}
           columns={columns}
           loading={isLoading}
           onRowClick={(movement) => router.push(`/stock-movements/${movement.id}`)}
@@ -203,7 +286,7 @@ export default function StockMovementsContent() {
           pagination={{
             page,
             pageSize,
-            totalCount: filteredMovements.length,
+            totalCount,
             totalPages,
             onPageChange: setPage,
             onPageSizeChange: (newSize) => {

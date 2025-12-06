@@ -15,5 +15,7 @@ export const supplierOrdersApi = {
   create: (data: CreateSupplierOrderData) => apiRequest<SupplierOrder>('POST', '/api/supplier-orders', data),
   update: (id: string, data: UpdateSupplierOrderData) => apiRequest<SupplierOrder>('PUT', `/api/supplier-orders/${id}`, data),
   delete: (id: string) => apiRequest<void>('DELETE', `/api/supplier-orders/${id}`),
+  receive: (id: string, data: { actualDeliveryDate?: string; items: Array<{ itemId: number; receivedQuantity: number; location?: string }> }) => 
+    apiRequest<{ success: boolean; message: string; order: SupplierOrder }>('POST', `/api/supplier-orders/${id}/receive`, data),
 };
 

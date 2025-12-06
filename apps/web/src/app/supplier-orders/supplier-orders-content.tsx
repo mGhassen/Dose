@@ -7,10 +7,14 @@ import DataTablePage from "@/components/data-table-page";
 import { useSupplierOrders, useDeleteSupplierOrder, useInventorySuppliers } from "@kit/hooks";
 import type { SupplierOrder } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 import { SupplierOrderStatus } from "@kit/types";
+import { ShoppingCart, Package, CheckCircle, Clock, Truck, Plus } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@kit/ui/button";
 
 export default function SupplierOrdersContent() {
   const router = useRouter();
@@ -29,18 +33,27 @@ export default function SupplierOrdersContent() {
     return new Map(suppliersResponse.data.map(s => [s.id, s.name]));
   }, [suppliersResponse?.data]);
   
-  const filteredOrders = useMemo(() => {
-    if (!ordersResponse?.data) return [];
-    return ordersResponse.data;
-  }, [ordersResponse?.data]);
-  
-  const paginatedOrders = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    return filteredOrders.slice(startIndex, startIndex + pageSize);
-  }, [filteredOrders, page, pageSize]);
-  
-  const totalPages = Math.ceil(filteredOrders.length / pageSize);
+  const orders = ordersResponse?.data || [];
+  const totalCount = ordersResponse?.pagination?.total || orders.length;
+  const totalPages = ordersResponse?.pagination?.totalPages || Math.ceil(orders.length / pageSize);
   const deleteMutation = useDeleteSupplierOrder();
+  
+  // Calculate summary stats
+  const pendingOrders = useMemo(() => {
+    return orders.filter(o => o.status === SupplierOrderStatus.PENDING).length;
+  }, [orders]);
+  
+  const inTransitOrders = useMemo(() => {
+    return orders.filter(o => o.status === SupplierOrderStatus.IN_TRANSIT).length;
+  }, [orders]);
+  
+  const deliveredOrders = useMemo(() => {
+    return orders.filter(o => o.status === SupplierOrderStatus.DELIVERED).length;
+  }, [orders]);
+  
+  const totalOrderValue = useMemo(() => {
+    return orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+  }, [orders]);
 
   const getStatusBadge = (status: SupplierOrderStatus) => {
     const variants: Record<SupplierOrderStatus, "default" | "secondary" | "destructive" | "outline"> = {
@@ -170,17 +183,79 @@ export default function SupplierOrdersContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Supplier Orders</h1>
           <p className="text-muted-foreground mt-2">
-            Manage supplier orders and deliveries
+            Manage purchase orders and track deliveries
           </p>
         </div>
+        <Link href="/supplier-orders/create">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            New Order
+          </Button>
+        </Link>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalCount}</div>
+            <p className="text-xs text-muted-foreground">
+              All orders
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <Clock className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{pendingOrders}</div>
+            <p className="text-xs text-muted-foreground">
+              Awaiting confirmation
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">In Transit</CardTitle>
+            <Truck className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{inTransitOrders}</div>
+            <p className="text-xs text-muted-foreground">
+              On the way
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(totalOrderValue)}</div>
+            <p className="text-xs text-muted-foreground">
+              All orders value
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Table View */}
       <div className="-mx-4">
         <DataTablePage
           title=""
           description=""
           createHref="/supplier-orders/create"
-          data={paginatedOrders}
+          data={orders}
           columns={columns}
           loading={isLoading}
           onRowClick={(order) => router.push(`/supplier-orders/${order.id}`)}
@@ -201,7 +276,7 @@ export default function SupplierOrdersContent() {
           pagination={{
             page,
             pageSize,
-            totalCount: filteredOrders.length,
+            totalCount,
             totalPages,
             onPageChange: setPage,
             onPageSizeChange: (newSize) => {
