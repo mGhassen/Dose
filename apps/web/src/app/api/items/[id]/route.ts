@@ -5,43 +5,38 @@ import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Item, UpdateItemData } from '@kit/types';
 
 function transformItem(row: any): Item {
+  // Transform regular item from items table (not recipes)
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    unit: row.unit,
+    unit: row.unit || '',
     category: row.category,
-    itemType: row.item_type || 'item',
-    isActive: row.is_active,
+    itemType: 'item' as const, // Items from items table are always 'item'
+    isActive: row.is_active ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    // Recipe-specific fields
-    servingSize: row.serving_size,
-    preparationTime: row.preparation_time,
-    cookingTime: row.cooking_time,
-    instructions: row.instructions,
+    // Item-specific fields
+    sku: row.sku,
+    unitPrice: row.unit_price ? parseFloat(row.unit_price) : undefined,
+    vendorId: row.vendor_id,
     notes: row.notes,
   };
 }
 
 function transformToSnakeCase(data: UpdateItemData): any {
+  // Items should only have item fields, recipes are updated via recipes API
   const result: any = {};
   
   if (data.name !== undefined) result.name = data.name;
   if (data.description !== undefined) result.description = data.description;
   if (data.unit !== undefined) result.unit = data.unit;
   if (data.category !== undefined) result.category = data.category;
-  if (data.itemType !== undefined) result.item_type = data.itemType;
+  if (data.sku !== undefined) result.sku = data.sku;
+  if (data.unitPrice !== undefined) result.unit_price = data.unitPrice;
+  if (data.vendorId !== undefined) result.vendor_id = data.vendorId;
+  if (data.notes !== undefined) result.notes = data.notes;
   if (data.isActive !== undefined) result.is_active = data.isActive;
-  
-  // Recipe-specific fields
-  if (data.itemType === 'recipe' || data.servingSize !== undefined) {
-    if (data.servingSize !== undefined) result.serving_size = data.servingSize;
-    if (data.preparationTime !== undefined) result.preparation_time = data.preparationTime;
-    if (data.cookingTime !== undefined) result.cooking_time = data.cookingTime;
-    if (data.instructions !== undefined) result.instructions = data.instructions;
-    if (data.notes !== undefined) result.notes = data.notes;
-  }
   
   return result;
 }
@@ -79,7 +74,7 @@ export async function GET(
         throw recipeError;
       }
 
-      // Transform recipe to item format
+      // Transform recipe to item format (for API response, not stored)
       itemData = {
         id: recipeData.id,
         name: recipeData.name,
@@ -107,7 +102,27 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(transformItem(itemData));
+    // Transform based on type
+    if (itemData.item_type === 'recipe') {
+      return NextResponse.json({
+        id: itemData.id,
+        name: itemData.name,
+        description: itemData.description,
+        unit: itemData.unit || 'serving',
+        category: itemData.category,
+        itemType: 'recipe' as const,
+        isActive: itemData.is_active,
+        createdAt: itemData.created_at,
+        updatedAt: itemData.updated_at,
+        servingSize: itemData.serving_size,
+        preparationTime: itemData.preparation_time,
+        cookingTime: itemData.cooking_time,
+        instructions: itemData.instructions,
+        notes: itemData.notes,
+      });
+    } else {
+      return NextResponse.json(transformItem(itemData));
+    }
   } catch (error: any) {
     console.error('Error fetching item:', error);
     return NextResponse.json(

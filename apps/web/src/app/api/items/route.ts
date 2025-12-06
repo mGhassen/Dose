@@ -6,45 +6,39 @@ import type { Item, CreateItemData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
 function transformItem(row: any): Item {
+  // Transform regular item from items table (not recipes)
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    unit: row.unit,
+    unit: row.unit || '',
     category: row.category,
-    itemType: row.item_type || 'item',
-    isActive: row.is_active,
+    itemType: 'item' as const, // Items from items table are always 'item'
+    isActive: row.is_active ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    // Recipe-specific fields
-    servingSize: row.serving_size,
-    preparationTime: row.preparation_time,
-    cookingTime: row.cooking_time,
-    instructions: row.instructions,
+    // Item-specific fields
+    sku: row.sku,
+    unitPrice: row.unit_price ? parseFloat(row.unit_price) : undefined,
+    vendorId: row.vendor_id,
     notes: row.notes,
   };
 }
 
 function transformToSnakeCase(data: CreateItemData): any {
-  const result: any = {
+  // Items should only have item fields, recipes are created via recipes API
+  return {
     name: data.name,
     description: data.description,
     unit: data.unit,
     category: data.category,
-    item_type: data.itemType || 'item',
+    item_type: 'item', // Always 'item' for items table
+    sku: data.sku,
+    unit_price: data.unitPrice,
+    vendor_id: data.vendorId,
+    notes: data.notes,
     is_active: data.isActive ?? true,
   };
-  
-  // Recipe-specific fields
-  if (data.itemType === 'recipe') {
-    result.serving_size = data.servingSize;
-    result.preparation_time = data.preparationTime;
-    result.cooking_time = data.cookingTime;
-    result.instructions = data.instructions;
-    result.notes = data.notes;
-  }
-  
-  return result;
 }
 
 export async function GET(request: NextRequest) {
@@ -94,23 +88,27 @@ export async function GET(request: NextRequest) {
     if (itemsError) throw itemsError;
     if (recipesError) throw recipesError;
 
-    // Transform recipes to items format
-    const recipesAsItems = (recipesData || []).map((recipe: any) => ({
-      id: recipe.id,
-      name: recipe.name,
-      description: recipe.description,
-      unit: recipe.unit || 'serving',
-      category: recipe.category,
-      item_type: 'recipe',
-      serving_size: recipe.serving_size,
-      preparation_time: recipe.preparation_time,
-      cooking_time: recipe.cooking_time,
-      instructions: recipe.instructions,
-      notes: recipe.notes,
-      is_active: recipe.is_active,
-      created_at: recipe.created_at,
-      updated_at: recipe.updated_at,
-    }));
+    // Transform recipes to items format (for API response only, not stored in items table)
+    const recipesAsItems = (recipesData || []).map((recipe: any) => {
+      const recipeItem: any = {
+        id: recipe.id,
+        name: recipe.name,
+        description: recipe.description,
+        unit: recipe.unit || 'serving',
+        category: recipe.category,
+        item_type: 'recipe',
+        is_active: recipe.is_active,
+        created_at: recipe.created_at,
+        updated_at: recipe.updated_at,
+        // Recipe-specific fields
+        serving_size: recipe.serving_size,
+        preparation_time: recipe.preparation_time,
+        cooking_time: recipe.cooking_time,
+        instructions: recipe.instructions,
+        notes: recipe.notes,
+      };
+      return recipeItem;
+    });
 
     // Combine items and recipes
     const allData = [...(itemsData || []), ...recipesAsItems];
@@ -126,7 +124,32 @@ export async function GET(request: NextRequest) {
     const total = allData.length;
     const paginatedData = allData.slice(offset, offset + limit);
 
-    const items: Item[] = paginatedData.map(transformItem);
+    // Transform items and recipes to Item type
+    const items: Item[] = paginatedData.map((row: any) => {
+      if (row.item_type === 'recipe') {
+        // Transform recipe to Item format
+        return {
+          id: row.id,
+          name: row.name,
+          description: row.description,
+          unit: row.unit || 'serving',
+          category: row.category,
+          itemType: 'recipe' as const,
+          isActive: row.is_active,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          // Recipe-specific fields
+          servingSize: row.serving_size,
+          preparationTime: row.preparation_time,
+          cookingTime: row.cooking_time,
+          instructions: row.instructions,
+          notes: row.notes,
+        };
+      } else {
+        // Transform regular item
+        return transformItem(row);
+      }
+    });
     
     const response: PaginatedResponse<Item> = createPaginatedResponse(
       items,

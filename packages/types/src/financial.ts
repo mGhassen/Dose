@@ -134,39 +134,10 @@ export interface CreateVendorData {
 export interface UpdateVendorData extends Partial<CreateVendorData> {}
 
 // ============================================================================
-// ITEMS (Articles/Produits)
+// ITEMS (Articles/Produits) - See unified Item interface below
 // ============================================================================
-
-export interface Item {
-  id: number;
-  name: string;
-  description?: string;
-  category?: string;
-  sku?: string;
-  unit?: string;
-  unitPrice?: number;
-  vendorId?: number;
-  recipeId?: number;
-  notes?: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateItemData {
-  name: string;
-  description?: string;
-  category?: string;
-  sku?: string;
-  unit?: string;
-  unitPrice?: number;
-  vendorId?: number;
-  recipeId?: number;
-  notes?: string;
-  isActive?: boolean;
-}
-
-export interface UpdateItemData extends Partial<CreateItemData> {}
+// Note: Item interface is defined later in the file with itemType support
+// This section is kept for reference but the actual types are below
 
 // ============================================================================
 // EXPENSES (Charges d'exploitation - one-time or linked to subscription)
@@ -827,12 +798,16 @@ export interface Item {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  // Item-specific fields (only when itemType === 'item')
+  sku?: string;
+  unitPrice?: number;
+  vendorId?: number;
+  notes?: string;
   // Recipe-specific fields (only when itemType === 'recipe')
   servingSize?: number;
   preparationTime?: number;
   cookingTime?: number;
   instructions?: string;
-  notes?: string;
 }
 
 export interface CreateItemData {
@@ -840,14 +815,13 @@ export interface CreateItemData {
   description?: string;
   unit: string;
   category?: string;
-  itemType?: ItemType;
-  isActive?: boolean;
-  // Recipe-specific fields
-  servingSize?: number;
-  preparationTime?: number;
-  cookingTime?: number;
-  instructions?: string;
+  sku?: string;
+  unitPrice?: number;
+  vendorId?: number;
   notes?: string;
+  isActive?: boolean;
+  // Note: Recipes are created via CreateRecipeData, not CreateItemData
+  // Items table only stores regular inventory items
 }
 
 export interface UpdateItemData extends Partial<CreateItemData> {}
