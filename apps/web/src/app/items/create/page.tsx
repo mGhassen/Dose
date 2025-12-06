@@ -139,14 +139,14 @@ export default function CreateItemPage() {
                 <div className="space-y-2">
                   <Label htmlFor="vendorId">Vendor</Label>
                   <Select
-                    value={formData.vendorId}
-                    onValueChange={(value) => handleInputChange('vendorId', value)}
+                    value={formData.vendorId || undefined}
+                    onValueChange={(value) => handleInputChange('vendorId', value === "none" ? "" : value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select vendor" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {vendorsResponse?.data?.map((vendor) => (
                         <SelectItem key={vendor.id} value={vendor.id.toString()}>
                           {vendor.name}

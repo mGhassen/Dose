@@ -13,11 +13,8 @@ import { toast } from "sonner";
 
 export default function ItemsContent() {
   const router = useRouter();
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   
   const { data: itemsResponse, isLoading } = useItems({ 
-    page, 
     limit: 1000 // Fetch all for filtering, then paginate client-side
   });
   
@@ -31,13 +28,6 @@ export default function ItemsContent() {
     if (!itemsResponse?.data) return [];
     return itemsResponse.data;
   }, [itemsResponse?.data]);
-  
-  const paginatedItems = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    return filteredItems.slice(startIndex, startIndex + pageSize);
-  }, [filteredItems, page, pageSize]);
-  
-  const totalPages = Math.ceil(filteredItems.length / pageSize);
   const deleteMutation = useDeleteItem();
 
   const columns: ColumnDef<Item>[] = useMemo(() => [
@@ -186,7 +176,7 @@ export default function ItemsContent() {
           title=""
           description=""
           createHref="/items/create"
-          data={paginatedItems}
+          data={filteredItems}
           columns={columns}
           loading={isLoading}
           onRowClick={(item) => router.push(`/items/${item.id}`)}
@@ -205,17 +195,6 @@ export default function ItemsContent() {
           ]}
           localStoragePrefix="items"
           searchFields={["name", "sku", "category", "description"]}
-          pagination={{
-            page,
-            pageSize,
-            totalCount: filteredItems.length,
-            totalPages,
-            onPageChange: setPage,
-            onPageSizeChange: (newSize) => {
-              setPageSize(newSize);
-              setPage(1);
-            },
-          }}
         />
       </div>
     </div>

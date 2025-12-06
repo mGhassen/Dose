@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { stockLevelsApi } from '@kit/lib';
 import type { StockLevel, CreateStockLevelData, UpdateStockLevelData } from '@kit/types';
 
-export function useStockLevels(params?: { page?: number; limit?: number; ingredientId?: string; location?: string }) {
+export function useStockLevels(params?: { page?: number; limit?: number; itemId?: string; ingredientId?: string; location?: string }) {
   return useQuery({
     queryKey: ['stock-levels', params],
     queryFn: async () => {

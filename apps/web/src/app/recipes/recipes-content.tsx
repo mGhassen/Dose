@@ -16,17 +16,17 @@ import { Button } from "@kit/ui/button";
 
 export default function RecipesContent() {
   const router = useRouter();
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   
   const { data: recipesResponse, isLoading } = useRecipes({ 
-    page, 
     limit: 1000
   });
   
   const recipes = recipesResponse?.data || [];
   const totalCount = recipesResponse?.pagination?.total || recipes.length;
-  const totalPages = recipesResponse?.pagination?.totalPages || Math.ceil(recipes.length / pageSize);
+  
+  const filteredRecipes = useMemo(() => {
+    return recipes;
+  }, [recipes]);
   const deleteMutation = useDeleteRecipe();
   
   // Calculate summary stats
@@ -231,7 +231,7 @@ export default function RecipesContent() {
           title=""
           description=""
           createHref="/recipes/create"
-          data={recipes}
+          data={filteredRecipes}
           columns={columns}
           loading={isLoading}
           onRowClick={(recipe) => router.push(`/recipes/${recipe.id}`)}
@@ -249,17 +249,6 @@ export default function RecipesContent() {
           ]}
           localStoragePrefix="recipes"
           searchFields={["name", "description"]}
-          pagination={{
-            page,
-            pageSize,
-            totalCount,
-            totalPages,
-            onPageChange: setPage,
-            onPageSizeChange: (newSize) => {
-              setPageSize(newSize);
-              setPage(1);
-            },
-          }}
         />
       </div>
     </div>

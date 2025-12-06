@@ -74,7 +74,7 @@ export async function POST(
       const { error: movementError } = await supabase
         .from('stock_movements')
         .insert({
-          ingredient_id: orderItem.ingredient_id,
+          item_id: orderItem.item_id,
           movement_type: StockMovementType.IN,
           quantity: receiveItem.receivedQuantity,
           unit: orderItem.unit,

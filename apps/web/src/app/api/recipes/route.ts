@@ -10,6 +10,9 @@ function transformRecipe(row: any): Recipe {
     id: row.id,
     name: row.name,
     description: row.description,
+    unit: row.unit,
+    category: row.category,
+    itemType: 'recipe' as const,
     servingSize: row.serving_size,
     preparationTime: row.preparation_time,
     cookingTime: row.cooking_time,
@@ -25,6 +28,9 @@ function transformToSnakeCase(data: CreateRecipeData): any {
   return {
     name: data.name,
     description: data.description,
+    unit: data.unit || 'serving',
+    category: data.category,
+    item_type: 'recipe',
     serving_size: data.servingSize,
     preparation_time: data.preparationTime,
     cooking_time: data.cookingTime,
@@ -41,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServerSupabaseClient();
     
-    // Count query
+    // Count query - recipes are stored in the recipes table
     const countQuery = supabase
       .from('recipes')
       .select('*', { count: 'exact', head: true });
@@ -95,8 +101,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServerSupabaseClient();
     
-    // Start a transaction-like operation
-    // Insert recipe
+    // Insert recipe into recipes table
     const { data: recipeData, error: recipeError } = await supabase
       .from('recipes')
       .insert(transformToSnakeCase(body))
@@ -105,24 +110,45 @@ export async function POST(request: NextRequest) {
 
     if (recipeError) throw recipeError;
 
-    // Insert recipe ingredients if provided
-    if (body.ingredients && body.ingredients.length > 0) {
-      const recipeIngredients = body.ingredients.map(ing => ({
+    // Insert recipe items if provided (can be items or other recipes)
+    if (body.items && body.items.length > 0) {
+      const recipeItems = body.items.map(item => ({
         recipe_id: recipeData.id,
-        ingredient_id: ing.ingredientId,
+        item_id: item.itemId,
+        quantity: item.quantity,
+        unit: item.unit,
+        notes: item.notes,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('recipe_items')
+        .insert(recipeItems);
+
+      if (itemsError) {
+        // Rollback: delete the recipe
+        await supabase.from('recipes').delete().eq('id', recipeData.id);
+        throw itemsError;
+      }
+    }
+    
+    // Also support legacy 'ingredients' field for backward compatibility
+    if (body.ingredients && body.ingredients.length > 0) {
+      const recipeItems = body.ingredients.map(ing => ({
+        recipe_id: recipeData.id,
+        item_id: ing.ingredientId,
         quantity: ing.quantity,
         unit: ing.unit,
         notes: ing.notes,
       }));
 
-      const { error: ingredientsError } = await supabase
-        .from('recipe_ingredients')
-        .insert(recipeIngredients);
+      const { error: itemsError } = await supabase
+        .from('recipe_items')
+        .insert(recipeItems);
 
-      if (ingredientsError) {
+      if (itemsError) {
         // Rollback: delete the recipe
         await supabase.from('recipes').delete().eq('id', recipeData.id);
-        throw ingredientsError;
+        throw itemsError;
       }
     }
 

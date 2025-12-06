@@ -9,11 +9,12 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
-import { Save, X, Trash2, Plus, ChefHat } from "lucide-react";
+import { Save, X, Trash2, Plus, ChefHat, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useIngredients, useProduceRecipe } from "@kit/hooks";
+import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useItems, useProduceRecipe, useRecipeCost } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
+import { formatCurrency } from "@kit/lib/config";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@kit/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@kit/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@kit/ui/alert-dialog";
 
 interface RecipeDetailPageProps {
   params: Promise<{ id: string }>;
@@ -32,11 +50,13 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [produceDialogOpen, setProduceDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [produceQuantity, setProduceQuantity] = useState("1");
   const [produceLocation, setProduceLocation] = useState("");
   const [produceNotes, setProduceNotes] = useState("");
   const { data: recipe, isLoading } = useRecipeById(resolvedParams?.id || "");
-  const { data: ingredientsResponse } = useIngredients({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000 });
+  const { data: costData } = useRecipeCost(resolvedParams?.id || "");
   const updateRecipe = useUpdateRecipe();
   const deleteMutation = useDeleteRecipe();
   const produceRecipe = useProduceRecipe();
@@ -51,7 +71,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     notes: "",
     isActive: true,
   });
-  const [ingredients, setIngredients] = useState<Array<{ ingredientId: number; quantity: number; unit: string; notes?: string }>>([]);
+  const [items, setItems] = useState<Array<{ itemId: number; quantity: number; unit: string; notes?: string }>>([]);
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -69,9 +89,10 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
         notes: recipe.notes || "",
         isActive: recipe.isActive,
       });
-      if (recipe.ingredients) {
-        setIngredients(recipe.ingredients.map(ri => ({
-          ingredientId: ri.ingredientId,
+      if (recipe.items || recipe.ingredients) {
+        const recipeItems = recipe.items || recipe.ingredients || [];
+        setItems(recipeItems.map((ri: any) => ({
+          itemId: ri.itemId || ri.ingredientId,
           quantity: ri.quantity,
           unit: ri.unit,
           notes: ri.notes,
@@ -102,7 +123,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           instructions: formData.instructions || undefined,
           notes: formData.notes || undefined,
           isActive: formData.isActive,
-          ingredients: ingredients.length > 0 ? ingredients : undefined,
+          items: items.length > 0 ? items.map(i => ({ itemId: i.itemId, quantity: i.quantity, unit: i.unit, notes: i.notes })) : undefined,
         },
       });
       toast.success("Recipe updated successfully");
@@ -114,10 +135,6 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
 
   const handleDelete = async () => {
     if (!resolvedParams?.id) return;
-    
-    if (!confirm("Are you sure you want to delete this recipe? This action cannot be undone.")) {
-      return;
-    }
 
     try {
       await deleteMutation.mutateAsync(resolvedParams.id);
@@ -133,18 +150,28 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const addIngredient = () => {
-    setIngredients([...ingredients, { ingredientId: 0, quantity: 0, unit: "" }]);
+  const addItem = () => {
+    setItems([...items, { itemId: 0, quantity: 0, unit: "" }]);
   };
 
-  const removeIngredient = (index: number) => {
-    setIngredients(ingredients.filter((_, i) => i !== index));
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
   };
 
-  const updateIngredient = (index: number, field: string, value: any) => {
-    const updated = [...ingredients];
-    updated[index] = { ...updated[index], [field]: value };
-    setIngredients(updated);
+  const updateItem = (index: number, field: string, value: any) => {
+    const updated = [...items];
+    const item = updated[index];
+    
+    // Auto-fill unit when item is selected
+    if (field === 'itemId' && value) {
+      const selectedItem = itemsResponse?.data?.find(i => i.id === parseInt(value));
+      if (selectedItem) {
+        item.unit = selectedItem.unit || '';
+      }
+    }
+    
+    updated[index] = { ...item, [field]: value };
+    setItems(updated);
   };
 
   if (isLoading || !resolvedParams) {
@@ -187,25 +214,33 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
             <div className="flex space-x-2">
               <Button
                 onClick={() => setProduceDialogOpen(true)}
-                disabled={!recipe?.isActive || !recipe?.ingredients || recipe.ingredients.length === 0}
+                disabled={!recipe?.isActive || (!recipe?.items && !recipe?.ingredients) || ((recipe.items?.length || recipe.ingredients?.length || 0) === 0)}
               >
                 <ChefHat className="mr-2 h-4 w-4" />
                 Produce Recipe
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setIsEditing(true)}
-              >
-                Edit
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {deleteMutation.isPending ? "Deleting..." : "Delete"}
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                    <Edit2 className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    disabled={deleteMutation.isPending}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </div>
@@ -303,31 +338,31 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                   </div>
                 </div>
 
-                {/* Ingredients Section */}
+                {/* Items Section */}
                 <div className="space-y-4 border-t pt-6">
                   <div className="flex items-center justify-between">
-                    <Label className="text-base font-semibold">Ingredients</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addIngredient}>
+                    <Label className="text-base font-semibold">Items</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addItem}>
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Ingredient
+                      Add Item
                     </Button>
                   </div>
 
-                  {ingredients.map((ing, index) => (
+                  {items.map((item, index) => (
                     <div key={index} className="grid grid-cols-12 gap-4 items-end p-4 border rounded-lg">
                       <div className="col-span-4">
-                        <Label>Ingredient</Label>
+                        <Label>Item</Label>
                         <Select
-                          value={ing.ingredientId.toString()}
-                          onValueChange={(value) => updateIngredient(index, 'ingredientId', parseInt(value))}
+                          value={item.itemId.toString()}
+                          onValueChange={(value) => updateItem(index, 'itemId', parseInt(value))}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select ingredient" />
+                            <SelectValue placeholder="Select item" />
                           </SelectTrigger>
                           <SelectContent>
-                            {ingredientsResponse?.data?.map((ingredient) => (
-                              <SelectItem key={ingredient.id} value={ingredient.id.toString()}>
-                                {ingredient.name}
+                            {itemsResponse?.data?.filter(i => i.itemType === 'item').map((it) => (
+                              <SelectItem key={it.id} value={it.id.toString()}>
+                                {it.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -338,15 +373,15 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                         <Input
                           type="number"
                           step="0.01"
-                          value={ing.quantity || ""}
-                          onChange={(e) => updateIngredient(index, 'quantity', parseFloat(e.target.value) || 0)}
+                          value={item.quantity || ""}
+                          onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                         />
                       </div>
                       <div className="col-span-3">
                         <Label>Unit</Label>
                         <Input
-                          value={ing.unit}
-                          onChange={(e) => updateIngredient(index, 'unit', e.target.value)}
+                          value={item.unit}
+                          onChange={(e) => updateItem(index, 'unit', e.target.value)}
                         />
                       </div>
                       <div className="col-span-2">
@@ -354,7 +389,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => removeIngredient(index)}
+                          onClick={() => removeItem(index)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -415,20 +450,59 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                   )}
                 </div>
 
-                {recipe.ingredients && recipe.ingredients.length > 0 && (
+                {((recipe.items || recipe.ingredients) && (recipe.items?.length || recipe.ingredients?.length || 0) > 0) && (
                   <div className="border-t pt-6">
-                    <h3 className="text-lg font-semibold mb-4">Ingredients</h3>
-                    <div className="space-y-2">
-                      {recipe.ingredients.map((ri, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <span className="font-medium">{ri.ingredient?.name || `Ingredient ${ri.ingredientId}`}</span>
-                            <span className="text-muted-foreground ml-2">
-                              {ri.quantity} {ri.unit}
-                            </span>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold">Items</h3>
+                      {costData && (
+                        <div className="text-right">
+                          <div className="text-sm text-muted-foreground">Estimated Cost</div>
+                          <div className="text-lg font-bold">
+                            {costData.hasAllPrices ? (
+                              <>
+                                {formatCurrency(costData.totalCost)} total
+                                {costData.servingSize > 1 && (
+                                  <span className="text-sm text-muted-foreground ml-2">
+                                    ({formatCurrency(costData.costPerServing)} per serving)
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">Price data incomplete</span>
+                            )}
                           </div>
                         </div>
-                      ))}
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {(recipe.items || recipe.ingredients || []).map((ri: any, index: number) => {
+                        const itemId = ri.itemId || ri.ingredientId;
+                        const item = ri.item || ri.ingredient;
+                        const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingredientId) === itemId) || 
+                                        costData?.items?.find((ci: any) => ci.itemId === itemId);
+                        return (
+                          <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{item?.name || `Item ${itemId}`}</span>
+                                <span className="text-muted-foreground">
+                                  {ri.quantity} {ri.unit}
+                                </span>
+                              </div>
+                              {costItem && costItem.hasPrice && (
+                                <div className="text-sm text-muted-foreground mt-1">
+                                  {formatCurrency(costItem.unitPrice)}/{ri.unit} • {formatCurrency(costItem.totalCost)} total
+                                </div>
+                              )}
+                              {costItem && !costItem.hasPrice && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  No price data available
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -455,7 +529,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           <DialogHeader>
             <DialogTitle>Produce Recipe</DialogTitle>
             <DialogDescription>
-              Record production of {recipe?.name}. This will automatically deduct ingredients from stock.
+              Record production of {recipe?.name}. This will automatically deduct items from stock.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -494,16 +568,18 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                 rows={3}
               />
             </div>
-            {recipe?.ingredients && recipe.ingredients.length > 0 && (
+            {((recipe?.items || recipe?.ingredients) && (recipe.items?.length || recipe.ingredients?.length || 0) > 0) && (
               <div className="border rounded-lg p-4 bg-muted">
-                <Label className="text-sm font-semibold">Ingredients to be deducted:</Label>
+                <Label className="text-sm font-semibold">Items to be deducted:</Label>
                 <div className="mt-2 space-y-1">
-                  {recipe.ingredients.map((ri, idx) => {
+                  {(recipe.items || recipe.ingredients || []).map((ri: any, idx: number) => {
                     const multiplier = parseFloat(produceQuantity) / (recipe.servingSize || 1);
                     const quantityToDeduct = ri.quantity * multiplier;
+                    const item = ri.item || ri.ingredient;
+                    const itemId = ri.itemId || ri.ingredientId;
                     return (
                       <div key={idx} className="text-sm">
-                        • {ri.ingredient?.name || `Ingredient ${ri.ingredientId}`}: {quantityToDeduct.toFixed(2)} {ri.unit}
+                        • {item?.name || `Item ${itemId}`}: {quantityToDeduct.toFixed(2)} {ri.unit}
                       </div>
                     );
                   })}
@@ -534,7 +610,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                       notes: produceNotes || undefined,
                     },
                   });
-                  toast.success("Recipe produced successfully! Ingredients deducted from stock.");
+                  toast.success("Recipe produced successfully! Items deducted from stock.");
                   setProduceDialogOpen(false);
                   setProduceQuantity("1");
                   setProduceLocation("");
@@ -551,6 +627,29 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this recipe
+              and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

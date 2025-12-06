@@ -38,18 +38,18 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const { page, limit, offset } = getPaginationParams(searchParams);
-    const ingredientId = searchParams.get('ingredientId');
+    const itemId = searchParams.get('itemId') || searchParams.get('ingredientId'); // Support both for backward compat
     const isExpired = searchParams.get('isExpired');
 
     const supabase = createServerSupabaseClient();
     
     let query = supabase
       .from('expiry_dates')
-      .select('*')
+      .select('*, item:items(*)')
       .order('expiry_date', { ascending: true });
 
-    if (ingredientId) {
-      query = query.eq('ingredient_id', ingredientId);
+    if (itemId) {
+      query = query.eq('item_id', itemId);
     }
     if (isExpired !== null) {
       query = query.eq('is_expired', isExpired === 'true');
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
   try {
     const body: CreateExpiryDateData = await request.json();
     
-    if (!body.ingredientId || body.quantity === undefined || !body.unit || !body.expiryDate) {
+    if (!body.itemId || body.quantity === undefined || !body.unit || !body.expiryDate) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

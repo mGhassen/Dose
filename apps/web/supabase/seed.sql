@@ -6110,69 +6110,86 @@ SELECT setval('payments_id_seq', (SELECT MAX(id) FROM payments));
 -- Seed data for ingredients, suppliers, recipes, and initial stock levels
 -- Note: This assumes the inventory management tables exist (from migration)
 
--- INGREDIENTS - Coffee Shop Essentials
-INSERT INTO ingredients (name, description, unit, category, is_active) VALUES
+-- ITEMS - Coffee Shop Essentials (ingredients and non-food items)
+-- Note: After migration, ingredients will be merged into items table
+-- These will be inserted as items with item_type='item'
+INSERT INTO items (name, description, unit, category, item_type, is_active) VALUES
 -- Coffee & Espresso
-('Arabica Coffee Beans', 'Premium arabica coffee beans', 'kg', 'Coffee', true),
-('Robusta Coffee Beans', 'Robusta coffee beans for espresso', 'kg', 'Coffee', true),
-('Espresso Beans', 'Dark roast espresso beans', 'kg', 'Coffee', true),
-('Decaf Coffee Beans', 'Decaffeinated coffee beans', 'kg', 'Coffee', true),
+('Arabica Coffee Beans', 'Premium arabica coffee beans', 'kg', 'Coffee', 'item', true),
+('Robusta Coffee Beans', 'Robusta coffee beans for espresso', 'kg', 'Coffee', 'item', true),
+('Espresso Beans', 'Dark roast espresso beans', 'kg', 'Coffee', 'item', true),
+('Decaf Coffee Beans', 'Decaffeinated coffee beans', 'kg', 'Coffee', 'item', true),
 
 -- Dairy & Alternatives
-('Whole Milk', 'Fresh whole milk', 'L', 'Dairy', true),
-('Skim Milk', 'Low-fat skim milk', 'L', 'Dairy', true),
-('Oat Milk', 'Oat milk alternative', 'L', 'Dairy Alternatives', true),
-('Almond Milk', 'Almond milk alternative', 'L', 'Dairy Alternatives', true),
-('Soy Milk', 'Soy milk alternative', 'L', 'Dairy Alternatives', true),
-('Heavy Cream', 'Heavy whipping cream', 'L', 'Dairy', true),
-('Half and Half', 'Half milk, half cream', 'L', 'Dairy', true),
+('Whole Milk', 'Fresh whole milk', 'L', 'Dairy', 'item', true),
+('Skim Milk', 'Low-fat skim milk', 'L', 'Dairy', 'item', true),
+('Oat Milk', 'Oat milk alternative', 'L', 'Dairy Alternatives', 'item', true),
+('Almond Milk', 'Almond milk alternative', 'L', 'Dairy Alternatives', 'item', true),
+('Soy Milk', 'Soy milk alternative', 'L', 'Dairy Alternatives', 'item', true),
+('Heavy Cream', 'Heavy whipping cream', 'L', 'Dairy', 'item', true),
+('Half and Half', 'Half milk, half cream', 'L', 'Dairy', 'item', true),
 
 -- Syrups & Flavors
-('Vanilla Syrup', 'Vanilla flavored syrup', 'L', 'Syrups', true),
-('Caramel Syrup', 'Caramel flavored syrup', 'L', 'Syrups', true),
-('Hazelnut Syrup', 'Hazelnut flavored syrup', 'L', 'Syrups', true),
-('Chocolate Syrup', 'Chocolate flavored syrup', 'L', 'Syrups', true),
-('Simple Syrup', 'Basic sugar syrup', 'L', 'Syrups', true),
+('Vanilla Syrup', 'Vanilla flavored syrup', 'L', 'Syrups', 'item', true),
+('Caramel Syrup', 'Caramel flavored syrup', 'L', 'Syrups', 'item', true),
+('Hazelnut Syrup', 'Hazelnut flavored syrup', 'L', 'Syrups', 'item', true),
+('Chocolate Syrup', 'Chocolate flavored syrup', 'L', 'Syrups', 'item', true),
+('Simple Syrup', 'Basic sugar syrup', 'L', 'Syrups', 'item', true),
 
 -- Tea
-('Black Tea', 'English breakfast tea', 'kg', 'Tea', true),
-('Green Tea', 'Green tea leaves', 'kg', 'Tea', true),
-('Earl Grey Tea', 'Earl grey tea blend', 'kg', 'Tea', true),
-('Herbal Tea', 'Assorted herbal teas', 'kg', 'Tea', true),
+('Black Tea', 'English breakfast tea', 'kg', 'Tea', 'item', true),
+('Green Tea', 'Green tea leaves', 'kg', 'Tea', 'item', true),
+('Earl Grey Tea', 'Earl grey tea blend', 'kg', 'Tea', 'item', true),
+('Herbal Tea', 'Assorted herbal teas', 'kg', 'Tea', 'item', true),
+('Chai Tea', 'Spiced chai tea blend', 'kg', 'Tea', 'item', true),
 
 -- Pastries & Food
-('Croissants', 'Butter croissants', 'piece', 'Pastries', true),
-('Muffins', 'Assorted muffins', 'piece', 'Pastries', true),
-('Bagels', 'Fresh bagels', 'piece', 'Pastries', true),
-('Sandwiches', 'Pre-made sandwiches', 'piece', 'Food', true),
-('Cookies', 'Assorted cookies', 'piece', 'Pastries', true),
+('Croissants', 'Butter croissants', 'piece', 'Pastries', 'item', true),
+('Muffins', 'Assorted muffins', 'piece', 'Pastries', 'item', true),
+('Bagels', 'Fresh bagels', 'piece', 'Pastries', 'item', true),
+('Sandwiches', 'Pre-made sandwiches', 'piece', 'Food', 'item', true),
+('Cookies', 'Assorted cookies', 'piece', 'Pastries', 'item', true),
 
--- Cups & Packaging
-('Paper Cups 12oz', '12oz disposable cups', 'box', 'Packaging', true),
-('Paper Cups 16oz', '16oz disposable cups', 'box', 'Packaging', true),
-('Lids 12oz', 'Lids for 12oz cups', 'box', 'Packaging', true),
-('Lids 16oz', 'Lids for 16oz cups', 'box', 'Packaging', true),
-('Sleeves', 'Cup sleeves', 'box', 'Packaging', true),
-('Straws', 'Disposable straws', 'box', 'Packaging', true),
-('Napkins', 'Paper napkins', 'box', 'Packaging', true),
+-- Cups & Packaging (Non-food items)
+('Paper Cups 12oz', '12oz disposable cups', 'box', 'Packaging', 'item', true),
+('Paper Cups 16oz', '16oz disposable cups', 'box', 'Packaging', 'item', true),
+('Lids 12oz', 'Lids for 12oz cups', 'box', 'Packaging', 'item', true),
+('Lids 16oz', 'Lids for 16oz cups', 'box', 'Packaging', 'item', true),
+('Sleeves', 'Cup sleeves', 'box', 'Packaging', 'item', true),
+('Straws', 'Disposable straws', 'box', 'Packaging', 'item', true),
+('Napkins', 'Paper napkins', 'box', 'Packaging', 'item', true),
+('Paper Bags', 'Carry-out paper bags', 'box', 'Packaging', 'item', true),
+('Receipt Paper', 'Thermal receipt paper rolls', 'roll', 'Packaging', 'item', true),
+('To-Go Containers', 'Food containers for takeout', 'box', 'Packaging', 'item', true),
+('Utensils Set', 'Forks, knives, spoons', 'box', 'Packaging', 'item', true),
+('Stirrers', 'Wooden coffee stirrers', 'box', 'Packaging', 'item', true),
+('Cup Carriers', 'Cardboard cup carriers', 'box', 'Packaging', 'item', true),
 
 -- Toppings & Extras
-('Whipped Cream', 'Canned whipped cream', 'can', 'Toppings', true),
-('Chocolate Chips', 'Semi-sweet chocolate chips', 'kg', 'Toppings', true),
-('Cinnamon', 'Ground cinnamon', 'kg', 'Spices', true),
-('Cocoa Powder', 'Unsweetened cocoa powder', 'kg', 'Toppings', true),
-('Sugar', 'White granulated sugar', 'kg', 'Sweeteners', true),
-('Brown Sugar', 'Brown sugar', 'kg', 'Sweeteners', true),
-('Honey', 'Natural honey', 'kg', 'Sweeteners', true),
+('Whipped Cream', 'Canned whipped cream', 'can', 'Toppings', 'item', true),
+('Chocolate Chips', 'Semi-sweet chocolate chips', 'kg', 'Toppings', 'item', true),
+('Cinnamon', 'Ground cinnamon', 'kg', 'Spices', 'item', true),
+('Cocoa Powder', 'Unsweetened cocoa powder', 'kg', 'Toppings', 'item', true),
+('Sugar', 'White granulated sugar', 'kg', 'Sweeteners', 'item', true),
+('Brown Sugar', 'Brown sugar', 'kg', 'Sweeteners', 'item', true),
+('Honey', 'Natural honey', 'kg', 'Sweeteners', 'item', true),
 
 -- Water & Ice
-('Filtered Water', 'Filtered water for coffee', 'L', 'Beverages', true),
-('Ice', 'Ice cubes', 'kg', 'Beverages', true),
+('Filtered Water', 'Filtered water for coffee', 'L', 'Beverages', 'item', true),
+('Ice', 'Ice cubes', 'kg', 'Beverages', 'item', true),
 
--- Cleaning & Maintenance
-('Espresso Machine Cleaner', 'Machine cleaning solution', 'L', 'Cleaning', true),
-('Milk Frother Cleaner', 'Frother cleaning solution', 'L', 'Cleaning', true),
-('Sanitizer', 'Food-safe sanitizer', 'L', 'Cleaning', true)
+-- Cleaning & Maintenance (Non-food items)
+('Espresso Machine Cleaner', 'Machine cleaning solution', 'L', 'Cleaning', 'item', true),
+('Milk Frother Cleaner', 'Frother cleaning solution', 'L', 'Cleaning', 'item', true),
+('Sanitizer', 'Food-safe sanitizer', 'L', 'Cleaning', 'item', true),
+('Dish Soap', 'Commercial dishwashing soap', 'L', 'Cleaning', 'item', true),
+('Paper Towels', 'Commercial paper towels', 'roll', 'Cleaning', 'item', true),
+('Trash Bags', 'Commercial trash bags', 'box', 'Cleaning', 'item', true),
+('Hand Soap', 'Hand sanitizing soap', 'L', 'Cleaning', 'item', true),
+('Gloves', 'Disposable gloves', 'box', 'Cleaning', 'item', true),
+('Cleaning Cloths', 'Reusable cleaning cloths', 'piece', 'Cleaning', 'item', true),
+('Broom', 'Floor broom', 'unit', 'Cleaning', 'item', true),
+('Mop', 'Floor mop', 'unit', 'Cleaning', 'item', true)
 ON CONFLICT DO NOTHING;
 
 -- SUPPLIERS - Coffee Shop Suppliers
@@ -6186,27 +6203,114 @@ INSERT INTO suppliers (name, email, phone, address, contact_person, payment_term
 ON CONFLICT DO NOTHING;
 
 -- RECIPES - Common Coffee Shop Drinks
-INSERT INTO recipes (name, description, serving_size, preparation_time, cooking_time, instructions, is_active) VALUES
-('Espresso', 'Single shot of espresso', 1, 1, 0, 'Grind 18g coffee beans. Tamp and extract 30ml espresso shot.', true),
-('Double Espresso', 'Double shot of espresso', 1, 1, 0, 'Grind 36g coffee beans. Tamp and extract 60ml espresso shot.', true),
-('Americano', 'Espresso with hot water', 1, 2, 0, 'Extract double espresso. Add 180ml hot water.', true),
-('Cappuccino', 'Espresso with steamed milk and foam', 1, 3, 0, 'Extract double espresso. Steam 120ml milk. Pour milk and top with foam.', true),
-('Latte', 'Espresso with steamed milk', 1, 3, 0, 'Extract double espresso. Steam 180ml milk. Pour milk over espresso.', true),
-('Mocha', 'Espresso with chocolate and steamed milk', 1, 4, 0, 'Extract double espresso. Add 30ml chocolate syrup. Steam 150ml milk. Pour milk over espresso.', true),
-('Caramel Macchiato', 'Espresso with vanilla, caramel, and steamed milk', 1, 4, 0, 'Add 15ml vanilla syrup to cup. Extract double espresso. Steam 150ml milk. Pour milk and drizzle caramel.', true),
-('Flat White', 'Espresso with microfoam milk', 1, 3, 0, 'Extract double espresso. Steam 150ml milk with microfoam. Pour milk over espresso.', true),
-('Cortado', 'Espresso with equal parts steamed milk', 1, 2, 0, 'Extract double espresso. Steam 60ml milk. Pour milk over espresso.', true),
-('Cold Brew', 'Cold brewed coffee', 1, 5, 0, 'Steep 100g coarse ground coffee in 1L cold water for 12-24 hours. Filter and serve over ice.', true),
-('Iced Coffee', 'Chilled coffee over ice', 1, 2, 0, 'Brew coffee. Cool and pour over ice. Add milk and sweetener if desired.', true),
-('Iced Latte', 'Espresso with cold milk over ice', 1, 3, 0, 'Extract double espresso. Pour over ice. Add 180ml cold milk.', true),
-('Frappuccino', 'Blended coffee drink', 1, 5, 0, 'Blend double espresso, 200ml milk, 30ml syrup, ice, and whipped cream.', true),
-('Hot Chocolate', 'Steamed milk with chocolate', 1, 3, 0, 'Heat 200ml milk. Add 30ml chocolate syrup. Top with whipped cream.', true),
-('Chai Latte', 'Spiced tea with steamed milk', 1, 4, 0, 'Steep chai tea. Steam 150ml milk. Combine tea and milk. Add sweetener.', true)
+-- Recipes are stored in the recipes table
+INSERT INTO recipes (name, description, serving_size, preparation_time, cooking_time, instructions, item_type, unit, category, is_active) VALUES
+('Espresso', 'Single shot of espresso', 1, 1, 0, 'Grind 18g coffee beans. Tamp and extract 30ml espresso shot.', 'recipe', 'serving', 'Coffee', true),
+('Double Espresso', 'Double shot of espresso', 1, 1, 0, 'Grind 36g coffee beans. Tamp and extract 60ml espresso shot.', 'recipe', 'serving', 'Coffee', true),
+('Americano', 'Espresso with hot water', 1, 2, 0, 'Extract double espresso. Add 180ml hot water.', 'recipe', 'serving', 'Coffee', true),
+('Cappuccino', 'Espresso with steamed milk and foam', 1, 3, 0, 'Extract double espresso. Steam 120ml milk. Pour milk and top with foam.', 'recipe', 'serving', 'Coffee', true),
+('Latte', 'Espresso with steamed milk', 1, 3, 0, 'Extract double espresso. Steam 180ml milk. Pour milk over espresso.', 'recipe', 'serving', 'Coffee', true),
+('Mocha', 'Espresso with chocolate and steamed milk', 1, 4, 0, 'Extract double espresso. Add 30ml chocolate syrup. Steam 150ml milk. Pour milk over espresso.', 'recipe', 'serving', 'Coffee', true),
+('Caramel Macchiato', 'Espresso with vanilla, caramel, and steamed milk', 1, 4, 0, 'Add 15ml vanilla syrup to cup. Extract double espresso. Steam 150ml milk. Pour milk and drizzle caramel.', 'recipe', 'serving', 'Coffee', true),
+('Flat White', 'Espresso with microfoam milk', 1, 3, 0, 'Extract double espresso. Steam 150ml milk with microfoam. Pour milk over espresso.', 'recipe', 'serving', 'Coffee', true),
+('Cortado', 'Espresso with equal parts steamed milk', 1, 2, 0, 'Extract double espresso. Steam 60ml milk. Pour milk over espresso.', 'recipe', 'serving', 'Coffee', true),
+('Cold Brew', 'Cold brewed coffee', 1, 5, 0, 'Steep 100g coarse ground coffee in 1L cold water for 12-24 hours. Filter and serve over ice.', 'recipe', 'serving', 'Coffee', true),
+('Iced Coffee', 'Chilled coffee over ice', 1, 2, 0, 'Brew coffee. Cool and pour over ice. Add milk and sweetener if desired.', 'recipe', 'serving', 'Coffee', true),
+('Iced Latte', 'Espresso with cold milk over ice', 1, 3, 0, 'Extract double espresso. Pour over ice. Add 180ml cold milk.', 'recipe', 'serving', 'Coffee', true),
+('Frappuccino', 'Blended coffee drink', 1, 5, 0, 'Blend double espresso, 200ml milk, 30ml syrup, ice, and whipped cream.', 'recipe', 'serving', 'Coffee', true),
+('Hot Chocolate', 'Steamed milk with chocolate', 1, 3, 0, 'Heat 200ml milk. Add 30ml chocolate syrup. Top with whipped cream.', 'recipe', 'serving', 'Beverages', true),
+('Chai Latte', 'Spiced tea with steamed milk', 1, 4, 0, 'Steep chai tea. Steam 150ml milk. Combine tea and milk. Add sweetener.', 'recipe', 'serving', 'Tea', true)
 ON CONFLICT DO NOTHING;
 
+-- RECIPE ITEMS - Link recipes to their items
+-- This creates the recipe_items table entries
+INSERT INTO recipe_items (recipe_id, item_id, quantity, unit)
+SELECT 
+  r.id as recipe_id,
+  i.id as item_id,
+  CASE 
+    -- Espresso recipes
+    WHEN r.name = 'Espresso' AND i.name = 'Espresso Beans' THEN 0.018
+    WHEN r.name = 'Double Espresso' AND i.name = 'Espresso Beans' THEN 0.036
+    WHEN r.name = 'Americano' AND i.name = 'Espresso Beans' THEN 0.036
+    WHEN r.name = 'Americano' AND i.name = 'Filtered Water' THEN 0.180
+    -- Cappuccino
+    WHEN r.name = 'Cappuccino' AND i.name = 'Espresso Beans' THEN 0.036
+    WHEN r.name = 'Cappuccino' AND i.name = 'Whole Milk' THEN 0.120
+    -- Latte
+    WHEN r.name = 'Latte' AND i.name = 'Espresso Beans' THEN 0.036
+    WHEN r.name = 'Latte' AND i.name = 'Whole Milk' THEN 0.180
+    -- Mocha
+    WHEN r.name = 'Mocha' AND i.name = 'Espresso Beans' THEN 0.036
+    WHEN r.name = 'Mocha' AND i.name = 'Chocolate Syrup' THEN 0.030
+    WHEN r.name = 'Mocha' AND i.name = 'Whole Milk' THEN 0.150
+    -- Caramel Macchiato
+    WHEN r.name = 'Caramel Macchiato' AND i.name = 'Vanilla Syrup' THEN 0.015
+    WHEN r.name = 'Caramel Macchiato' AND i.name = 'Caramel Syrup' THEN 0.010
+    WHEN r.name = 'Caramel Macchiato' AND i.name = 'Espresso Beans' THEN 0.036
+    WHEN r.name = 'Caramel Macchiato' AND i.name = 'Whole Milk' THEN 0.150
+    -- Flat White
+    WHEN r.name = 'Flat White' AND i.name = 'Espresso Beans' THEN 0.036
+    WHEN r.name = 'Flat White' AND i.name = 'Whole Milk' THEN 0.150
+    -- Cortado
+    WHEN r.name = 'Cortado' AND i.name = 'Espresso Beans' THEN 0.036
+    WHEN r.name = 'Cortado' AND i.name = 'Whole Milk' THEN 0.060
+    -- Cold Brew
+    WHEN r.name = 'Cold Brew' AND i.name = 'Arabica Coffee Beans' THEN 0.100
+    WHEN r.name = 'Cold Brew' AND i.name = 'Filtered Water' THEN 1.000
+    WHEN r.name = 'Cold Brew' AND i.name = 'Ice' THEN 0.200
+    -- Iced Coffee
+    WHEN r.name = 'Iced Coffee' AND i.name = 'Arabica Coffee Beans' THEN 0.020
+    WHEN r.name = 'Iced Coffee' AND i.name = 'Filtered Water' THEN 0.250
+    WHEN r.name = 'Iced Coffee' AND i.name = 'Ice' THEN 0.150
+    -- Iced Latte
+    WHEN r.name = 'Iced Latte' AND i.name = 'Espresso Beans' THEN 0.036
+    WHEN r.name = 'Iced Latte' AND i.name = 'Whole Milk' THEN 0.180
+    WHEN r.name = 'Iced Latte' AND i.name = 'Ice' THEN 0.150
+    -- Frappuccino
+    WHEN r.name = 'Frappuccino' AND i.name = 'Espresso Beans' THEN 0.036
+    WHEN r.name = 'Frappuccino' AND i.name = 'Whole Milk' THEN 0.200
+    WHEN r.name = 'Frappuccino' AND i.name = 'Vanilla Syrup' THEN 0.030
+    WHEN r.name = 'Frappuccino' AND i.name = 'Ice' THEN 0.200
+    WHEN r.name = 'Frappuccino' AND i.name = 'Whipped Cream' THEN 0.050
+    -- Hot Chocolate
+    WHEN r.name = 'Hot Chocolate' AND i.name = 'Whole Milk' THEN 0.200
+    WHEN r.name = 'Hot Chocolate' AND i.name = 'Chocolate Syrup' THEN 0.030
+    WHEN r.name = 'Hot Chocolate' AND i.name = 'Whipped Cream' THEN 0.030
+    -- Chai Latte
+    WHEN r.name = 'Chai Latte' AND i.name = 'Chai Tea' THEN 0.010
+    WHEN r.name = 'Chai Latte' AND i.name = 'Filtered Water' THEN 0.100
+    WHEN r.name = 'Chai Latte' AND i.name = 'Whole Milk' THEN 0.150
+    WHEN r.name = 'Chai Latte' AND i.name = 'Honey' THEN 0.010
+    ELSE NULL
+  END as quantity,
+  i.unit
+FROM recipes r
+CROSS JOIN items i
+WHERE i.item_type = 'item'
+  AND CASE 
+    WHEN r.name = 'Espresso' AND i.name = 'Espresso Beans' THEN true
+    WHEN r.name = 'Double Espresso' AND i.name = 'Espresso Beans' THEN true
+    WHEN r.name = 'Americano' AND i.name IN ('Espresso Beans', 'Filtered Water') THEN true
+    WHEN r.name = 'Cappuccino' AND i.name IN ('Espresso Beans', 'Whole Milk') THEN true
+    WHEN r.name = 'Latte' AND i.name IN ('Espresso Beans', 'Whole Milk') THEN true
+    WHEN r.name = 'Mocha' AND i.name IN ('Espresso Beans', 'Chocolate Syrup', 'Whole Milk') THEN true
+    WHEN r.name = 'Caramel Macchiato' AND i.name IN ('Vanilla Syrup', 'Caramel Syrup', 'Espresso Beans', 'Whole Milk') THEN true
+    WHEN r.name = 'Flat White' AND i.name IN ('Espresso Beans', 'Whole Milk') THEN true
+    WHEN r.name = 'Cortado' AND i.name IN ('Espresso Beans', 'Whole Milk') THEN true
+    WHEN r.name = 'Cold Brew' AND i.name IN ('Arabica Coffee Beans', 'Filtered Water', 'Ice') THEN true
+    WHEN r.name = 'Iced Coffee' AND i.name IN ('Arabica Coffee Beans', 'Filtered Water', 'Ice') THEN true
+    WHEN r.name = 'Iced Latte' AND i.name IN ('Espresso Beans', 'Whole Milk', 'Ice') THEN true
+    WHEN r.name = 'Frappuccino' AND i.name IN ('Espresso Beans', 'Whole Milk', 'Vanilla Syrup', 'Ice', 'Whipped Cream') THEN true
+    WHEN r.name = 'Hot Chocolate' AND i.name IN ('Whole Milk', 'Chocolate Syrup', 'Whipped Cream') THEN true
+    WHEN r.name = 'Chai Latte' AND i.name IN ('Chai Tea', 'Filtered Water', 'Whole Milk', 'Honey') THEN true
+    ELSE false
+  END
+ON CONFLICT (recipe_id, item_id) DO NOTHING;
+
 -- STOCK LEVELS - Initial stock levels with min/max
--- Set up initial stock levels for key ingredients
-INSERT INTO stock_levels (ingredient_id, quantity, unit, location, minimum_stock_level, maximum_stock_level)
+-- Set up initial stock levels for key items (not recipes)
+INSERT INTO stock_levels (item_id, quantity, unit, location, minimum_stock_level, maximum_stock_level)
 SELECT 
   id,
   CASE 
@@ -6215,6 +6319,7 @@ SELECT
     WHEN category = 'Syrups' THEN 5.0
     WHEN category = 'Packaging' THEN 50.0
     WHEN category = 'Pastries' THEN 20.0
+    WHEN category = 'Cleaning' THEN 10.0
     ELSE 5.0
   END,
   unit,
@@ -6225,6 +6330,7 @@ SELECT
     WHEN category = 'Syrups' THEN 2.0
     WHEN category = 'Packaging' THEN 20.0
     WHEN category = 'Pastries' THEN 10.0
+    WHEN category = 'Cleaning' THEN 3.0
     ELSE 2.0
   END,
   CASE 
@@ -6233,8 +6339,276 @@ SELECT
     WHEN category = 'Syrups' THEN 10.0
     WHEN category = 'Packaging' THEN 100.0
     WHEN category = 'Pastries' THEN 50.0
+    WHEN category = 'Cleaning' THEN 25.0
     ELSE 15.0
   END
-FROM ingredients
-WHERE is_active = true
-ON CONFLICT (ingredient_id, location) DO NOTHING;
+FROM items
+WHERE is_active = true 
+  AND item_type = 'item'  -- Only items, not recipes
+ON CONFLICT (item_id, location) DO NOTHING;
+
+-- ============================================================================
+-- SUPPLIER ORDERS - Recent orders for cost calculation
+-- ============================================================================
+-- Add supplier orders from the last 3 months so recipe cost calculation works
+INSERT INTO supplier_orders (supplier_id, order_number, order_date, expected_delivery_date, actual_delivery_date, status, total_amount, notes)
+SELECT 
+  s.id as supplier_id,
+  'ORD-' || TO_CHAR(CURRENT_DATE - INTERVAL '1 month', 'YYYYMMDD') || '-' || LPAD(ROW_NUMBER() OVER()::text, 3, '0') as order_number,
+  CURRENT_DATE - INTERVAL '1 month' as order_date,
+  CURRENT_DATE - INTERVAL '25 days' as expected_delivery_date,
+  CURRENT_DATE - INTERVAL '25 days' as actual_delivery_date,
+  'delivered' as status,
+  0 as total_amount, -- Will be calculated
+  'Monthly restock order' as notes
+FROM suppliers s
+WHERE s.name IN ('Premium Coffee Roasters', 'Dairy Direct', 'Syrup Suppliers Inc', 'Packaging Plus')
+LIMIT 4
+ON CONFLICT DO NOTHING;
+
+-- Add more recent orders (last 2 weeks)
+INSERT INTO supplier_orders (supplier_id, order_number, order_date, expected_delivery_date, actual_delivery_date, status, total_amount, notes)
+SELECT 
+  s.id as supplier_id,
+  'ORD-' || TO_CHAR(CURRENT_DATE - INTERVAL '10 days', 'YYYYMMDD') || '-' || LPAD(ROW_NUMBER() OVER()::text, 3, '0') as order_number,
+  CURRENT_DATE - INTERVAL '10 days' as order_date,
+  CURRENT_DATE - INTERVAL '5 days' as expected_delivery_date,
+  CURRENT_DATE - INTERVAL '5 days' as actual_delivery_date,
+  'delivered' as status,
+  0 as total_amount,
+  'Weekly restock order' as notes
+FROM suppliers s
+WHERE s.name IN ('Premium Coffee Roasters', 'Dairy Direct')
+LIMIT 2
+ON CONFLICT DO NOTHING;
+
+-- ============================================================================
+-- SUPPLIER ORDER ITEMS - Items in supplier orders with realistic prices
+-- ============================================================================
+-- Coffee beans from Premium Coffee Roasters (1 month ago)
+INSERT INTO supplier_order_items (order_id, item_id, quantity, unit, unit_price, total_price, received_quantity)
+SELECT 
+  so.id as order_id,
+  i.id as item_id,
+  CASE 
+    WHEN i.name LIKE '%Espresso Beans%' THEN 50.0
+    WHEN i.name LIKE '%Arabica%' THEN 25.0
+    WHEN i.name LIKE '%Robusta%' THEN 20.0
+    ELSE 10.0
+  END as quantity,
+  i.unit,
+  CASE 
+    WHEN i.name LIKE '%Espresso Beans%' THEN 32.00
+    WHEN i.name LIKE '%Arabica%' THEN 28.50
+    WHEN i.name LIKE '%Robusta%' THEN 22.00
+    ELSE 15.00
+  END as unit_price,
+  CASE 
+    WHEN i.name LIKE '%Espresso Beans%' THEN 32.00 * 50.0
+    WHEN i.name LIKE '%Arabica%' THEN 28.50 * 25.0
+    WHEN i.name LIKE '%Robusta%' THEN 22.00 * 20.0
+    ELSE 15.00 * 10.0
+  END as total_price,
+  CASE 
+    WHEN i.name LIKE '%Espresso Beans%' THEN 50.0
+    WHEN i.name LIKE '%Arabica%' THEN 25.0
+    WHEN i.name LIKE '%Robusta%' THEN 20.0
+    ELSE 10.0
+  END as received_quantity
+FROM supplier_orders so
+CROSS JOIN items i
+INNER JOIN suppliers s ON so.supplier_id = s.id
+WHERE s.name = 'Premium Coffee Roasters'
+  AND so.order_date = CURRENT_DATE - INTERVAL '1 month'
+  AND i.name IN ('Espresso Beans', 'Arabica Coffee Beans', 'Robusta Coffee Beans')
+  AND i.item_type = 'item'
+ON CONFLICT DO NOTHING;
+
+-- Milk from Dairy Direct (1 month ago)
+INSERT INTO supplier_order_items (order_id, item_id, quantity, unit, unit_price, total_price, received_quantity)
+SELECT 
+  so.id as order_id,
+  i.id as item_id,
+  CASE 
+    WHEN i.name LIKE '%Whole Milk%' THEN 100.0
+    WHEN i.name LIKE '%Skim Milk%' THEN 50.0
+    WHEN i.name LIKE '%Oat Milk%' THEN 30.0
+    WHEN i.name LIKE '%Almond Milk%' THEN 30.0
+    WHEN i.name LIKE '%Soy Milk%' THEN 30.0
+    ELSE 20.0
+  END as quantity,
+  i.unit,
+  CASE 
+    WHEN i.name LIKE '%Whole Milk%' THEN 3.50
+    WHEN i.name LIKE '%Skim Milk%' THEN 3.20
+    WHEN i.name LIKE '%Oat Milk%' THEN 4.50
+    WHEN i.name LIKE '%Almond Milk%' THEN 5.00
+    WHEN i.name LIKE '%Soy Milk%' THEN 4.00
+    ELSE 3.00
+  END as unit_price,
+  CASE 
+    WHEN i.name LIKE '%Whole Milk%' THEN 3.50 * 100.0
+    WHEN i.name LIKE '%Skim Milk%' THEN 3.20 * 50.0
+    WHEN i.name LIKE '%Oat Milk%' THEN 4.50 * 30.0
+    WHEN i.name LIKE '%Almond Milk%' THEN 5.00 * 30.0
+    WHEN i.name LIKE '%Soy Milk%' THEN 4.00 * 30.0
+    ELSE 3.00 * 20.0
+  END as total_price,
+  CASE 
+    WHEN i.name LIKE '%Whole Milk%' THEN 100.0
+    WHEN i.name LIKE '%Skim Milk%' THEN 50.0
+    WHEN i.name LIKE '%Oat Milk%' THEN 30.0
+    WHEN i.name LIKE '%Almond Milk%' THEN 30.0
+    WHEN i.name LIKE '%Soy Milk%' THEN 30.0
+    ELSE 20.0
+  END as received_quantity
+FROM supplier_orders so
+CROSS JOIN items i
+INNER JOIN suppliers s ON so.supplier_id = s.id
+WHERE s.name = 'Dairy Direct'
+  AND so.order_date = CURRENT_DATE - INTERVAL '1 month'
+  AND i.name IN ('Whole Milk', 'Skim Milk', 'Oat Milk', 'Almond Milk', 'Soy Milk')
+  AND i.item_type = 'item'
+ON CONFLICT DO NOTHING;
+
+-- Syrups from Syrup Suppliers Inc (1 month ago)
+INSERT INTO supplier_order_items (order_id, item_id, quantity, unit, unit_price, total_price, received_quantity)
+SELECT 
+  so.id as order_id,
+  i.id as item_id,
+  CASE 
+    WHEN i.name LIKE '%Vanilla Syrup%' THEN 20.0
+    WHEN i.name LIKE '%Caramel Syrup%' THEN 15.0
+    WHEN i.name LIKE '%Chocolate Syrup%' THEN 15.0
+    WHEN i.name LIKE '%Hazelnut Syrup%' THEN 12.0
+    ELSE 10.0
+  END as quantity,
+  i.unit,
+  CASE 
+    WHEN i.name LIKE '%Vanilla Syrup%' THEN 8.50
+    WHEN i.name LIKE '%Caramel Syrup%' THEN 9.00
+    WHEN i.name LIKE '%Chocolate Syrup%' THEN 8.75
+    WHEN i.name LIKE '%Hazelnut Syrup%' THEN 9.50
+    ELSE 8.00
+  END as unit_price,
+  CASE 
+    WHEN i.name LIKE '%Vanilla Syrup%' THEN 8.50 * 20.0
+    WHEN i.name LIKE '%Caramel Syrup%' THEN 9.00 * 15.0
+    WHEN i.name LIKE '%Chocolate Syrup%' THEN 8.75 * 15.0
+    WHEN i.name LIKE '%Hazelnut Syrup%' THEN 9.50 * 12.0
+    ELSE 8.00 * 10.0
+  END as total_price,
+  CASE 
+    WHEN i.name LIKE '%Vanilla Syrup%' THEN 20.0
+    WHEN i.name LIKE '%Caramel Syrup%' THEN 15.0
+    WHEN i.name LIKE '%Chocolate Syrup%' THEN 15.0
+    WHEN i.name LIKE '%Hazelnut Syrup%' THEN 12.0
+    ELSE 10.0
+  END as received_quantity
+FROM supplier_orders so
+CROSS JOIN items i
+INNER JOIN suppliers s ON so.supplier_id = s.id
+WHERE s.name = 'Syrup Suppliers Inc'
+  AND so.order_date = CURRENT_DATE - INTERVAL '1 month'
+  AND i.name IN ('Vanilla Syrup', 'Caramel Syrup', 'Chocolate Syrup', 'Hazelnut Syrup')
+  AND i.item_type = 'item'
+ON CONFLICT DO NOTHING;
+
+-- Packaging from Packaging Plus (1 month ago)
+INSERT INTO supplier_order_items (order_id, item_id, quantity, unit, unit_price, total_price, received_quantity)
+SELECT 
+  so.id as order_id,
+  i.id as item_id,
+  CASE 
+    WHEN i.name LIKE '%Paper Cup%' THEN 1000.0
+    WHEN i.name LIKE '%Lid%' THEN 1000.0
+    WHEN i.name LIKE '%Sleeve%' THEN 500.0
+    WHEN i.name LIKE '%Napkin%' THEN 2000.0
+    ELSE 100.0
+  END as quantity,
+  i.unit,
+  CASE 
+    WHEN i.name LIKE '%Paper Cup%' THEN 0.15
+    WHEN i.name LIKE '%Lid%' THEN 0.08
+    WHEN i.name LIKE '%Sleeve%' THEN 0.05
+    WHEN i.name LIKE '%Napkin%' THEN 0.02
+    ELSE 0.10
+  END as unit_price,
+  CASE 
+    WHEN i.name LIKE '%Paper Cup%' THEN 0.15 * 1000.0
+    WHEN i.name LIKE '%Lid%' THEN 0.08 * 1000.0
+    WHEN i.name LIKE '%Sleeve%' THEN 0.05 * 500.0
+    WHEN i.name LIKE '%Napkin%' THEN 0.02 * 2000.0
+    ELSE 0.10 * 100.0
+  END as total_price,
+  CASE 
+    WHEN i.name LIKE '%Paper Cup%' THEN 1000.0
+    WHEN i.name LIKE '%Lid%' THEN 1000.0
+    WHEN i.name LIKE '%Sleeve%' THEN 500.0
+    WHEN i.name LIKE '%Napkin%' THEN 2000.0
+    ELSE 100.0
+  END as received_quantity
+FROM supplier_orders so
+CROSS JOIN items i
+INNER JOIN suppliers s ON so.supplier_id = s.id
+WHERE s.name = 'Packaging Plus'
+  AND so.order_date = CURRENT_DATE - INTERVAL '1 month'
+  AND i.category = 'Packaging'
+  AND i.item_type = 'item'
+ON CONFLICT DO NOTHING;
+
+-- Recent orders (10 days ago) - Coffee beans
+INSERT INTO supplier_order_items (order_id, item_id, quantity, unit, unit_price, total_price, received_quantity)
+SELECT 
+  so.id as order_id,
+  i.id as item_id,
+  30.0 as quantity,
+  i.unit,
+  CASE 
+    WHEN i.name LIKE '%Espresso Beans%' THEN 33.00
+    WHEN i.name LIKE '%Arabica%' THEN 29.00
+    ELSE 23.00
+  END as unit_price,
+  CASE 
+    WHEN i.name LIKE '%Espresso Beans%' THEN 33.00 * 30.0
+    WHEN i.name LIKE '%Arabica%' THEN 29.00 * 30.0
+    ELSE 23.00 * 30.0
+  END as total_price,
+  30.0 as received_quantity
+FROM supplier_orders so
+CROSS JOIN items i
+INNER JOIN suppliers s ON so.supplier_id = s.id
+WHERE s.name = 'Premium Coffee Roasters'
+  AND so.order_date = CURRENT_DATE - INTERVAL '10 days'
+  AND i.name IN ('Espresso Beans', 'Arabica Coffee Beans')
+  AND i.item_type = 'item'
+LIMIT 2
+ON CONFLICT DO NOTHING;
+
+-- Recent orders (10 days ago) - Milk
+INSERT INTO supplier_order_items (order_id, item_id, quantity, unit, unit_price, total_price, received_quantity)
+SELECT 
+  so.id as order_id,
+  i.id as item_id,
+  80.0 as quantity,
+  i.unit,
+  3.60 as unit_price,
+  3.60 * 80.0 as total_price,
+  80.0 as received_quantity
+FROM supplier_orders so
+CROSS JOIN items i
+INNER JOIN suppliers s ON so.supplier_id = s.id
+WHERE s.name = 'Dairy Direct'
+  AND so.order_date = CURRENT_DATE - INTERVAL '10 days'
+  AND i.name = 'Whole Milk'
+  AND i.item_type = 'item'
+LIMIT 1
+ON CONFLICT DO NOTHING;
+
+-- Update total_amount for all supplier orders
+UPDATE supplier_orders
+SET total_amount = (
+  SELECT COALESCE(SUM(total_price), 0)
+  FROM supplier_order_items
+  WHERE supplier_order_items.order_id = supplier_orders.id
+);

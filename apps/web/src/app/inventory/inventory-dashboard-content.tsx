@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useIngredients, useRecipes, useStockLevels, useStockMovements, useSupplierOrders, useInventorySuppliers } from "@kit/hooks";
+import { useItems, useRecipes, useStockLevels, useStockMovements, useSupplierOrders, useInventorySuppliers } from "@kit/hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { Badge } from "@kit/ui/badge";
 import { Button } from "@kit/ui/button";
@@ -19,7 +19,8 @@ import {
   ArrowRight,
   Building2,
   Clock,
-  Truck
+  Truck,
+  DollarSign
 } from "lucide-react";
 import Link from "next/link";
 import { SupplierOrderStatus } from "@kit/types";
@@ -27,14 +28,14 @@ import { SupplierOrderStatus } from "@kit/types";
 export default function InventoryDashboardContent() {
   const router = useRouter();
   
-  const { data: ingredientsResponse } = useIngredients({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000 });
   const { data: recipesResponse } = useRecipes({ limit: 1000 });
   const { data: stockLevelsResponse } = useStockLevels({ limit: 1000 });
   const { data: movementsResponse } = useStockMovements({ limit: 20 });
   const { data: ordersResponse } = useSupplierOrders({ limit: 10 });
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
 
-  const ingredients = ingredientsResponse?.data || [];
+  const items = itemsResponse?.data || [];
   const recipes = recipesResponse?.data || [];
   const stockLevels = stockLevelsResponse?.data || [];
   const movements = movementsResponse?.data || [];
@@ -69,7 +70,7 @@ export default function InventoryDashboardContent() {
   }, [orders]);
 
   // Calculate summary stats
-  const totalIngredients = ingredients.length;
+  const totalItems = items.filter(i => i.itemType === 'item').length;
   const activeRecipes = recipes.filter(r => r.isActive).length;
   const totalSuppliers = suppliers.length;
   const activeSuppliers = suppliers.filter(s => s.isActive).length;
@@ -77,12 +78,12 @@ export default function InventoryDashboardContent() {
   const lowStockCount = lowStockItems.length;
   const outOfStockCount = outOfStockItems.length;
 
-  // Get ingredient names for display
-  const ingredientMap = useMemo(() => {
+  // Get item names for display
+  const itemMap = useMemo(() => {
     const map = new Map<number, string>();
-    ingredients.forEach(ing => map.set(ing.id, ing.name));
+    items.filter(i => i.itemType === 'item').forEach(item => map.set(item.id, item.name));
     return map;
-  }, [ingredients]);
+  }, [items]);
 
   return (
     <div className="space-y-6">
@@ -99,13 +100,13 @@ export default function InventoryDashboardContent() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Ingredients</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalIngredients}</div>
+            <div className="text-2xl font-bold">{totalItems}</div>
             <p className="text-xs text-muted-foreground">
-              Ingredients in system
+              Items in system
             </p>
           </CardContent>
         </Card>
@@ -173,11 +174,11 @@ export default function InventoryDashboardContent() {
             ) : (
               <div className="space-y-2">
                 {lowStockItems.map((level) => {
-                  const ingredientName = ingredientMap.get(level.ingredientId) || 'Unknown';
+                  const itemName = itemMap.get(level.itemId || level.ingredientId) || 'Unknown';
                   return (
                     <div key={level.id} className="flex items-center justify-between p-2 rounded-md bg-orange-50 border border-orange-200">
                       <div className="flex-1">
-                        <div className="font-medium text-sm">{ingredientName}</div>
+                        <div className="font-medium text-sm">{itemName}</div>
                         <div className="text-xs text-muted-foreground">
                           {level.quantity} {level.unit} / Min: {level.minimumStockLevel} {level.unit}
                         </div>
@@ -226,11 +227,11 @@ export default function InventoryDashboardContent() {
             ) : (
               <div className="space-y-2">
                 {outOfStockItems.map((level) => {
-                  const ingredientName = ingredientMap.get(level.ingredientId) || 'Unknown';
+                  const itemName = itemMap.get(level.itemId || level.ingredientId) || 'Unknown';
                   return (
                     <div key={level.id} className="flex items-center justify-between p-2 rounded-md bg-red-50 border border-red-200">
                       <div className="flex-1">
-                        <div className="font-medium text-sm">{ingredientName}</div>
+                        <div className="font-medium text-sm">{itemName}</div>
                         <div className="text-xs text-muted-foreground">
                           {level.location || 'No location'}
                         </div>
@@ -338,7 +339,7 @@ export default function InventoryDashboardContent() {
           ) : (
             <div className="space-y-2">
               {recentMovements.map((movement) => {
-                const ingredientName = ingredientMap.get(movement.ingredientId) || 'Unknown';
+                const itemName = itemMap.get(movement.itemId || movement.ingredientId) || 'Unknown';
                 const isIn = movement.movementType === 'in';
                 return (
                   <div key={movement.id} className="flex items-center justify-between p-3 rounded-md border">
@@ -349,7 +350,7 @@ export default function InventoryDashboardContent() {
                         <TrendingDown className="h-5 w-5 text-blue-500" />
                       )}
                       <div className="flex-1">
-                        <div className="font-medium text-sm">{ingredientName}</div>
+                        <div className="font-medium text-sm">{itemName}</div>
                         <div className="text-xs text-muted-foreground">
                           {formatDate(movement.movementDate)} • {movement.location || 'No location'}
                         </div>
@@ -385,7 +386,7 @@ export default function InventoryDashboardContent() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <Link href="/ingredients/create">
+            <Link href="/items/create">
               <Button variant="outline" className="w-full justify-start">
                 <Package className="h-4 w-4 mr-2" />
                 Add Ingredient
@@ -412,6 +413,49 @@ export default function InventoryDashboardContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Additional Tools */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Link href="/inventory/reorder-suggestions">
+          <Card className="hover:bg-accent cursor-pointer transition-colors">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                Reorder Suggestions
+              </CardTitle>
+              <CardDescription>
+                View items that need to be reordered
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+        <Link href="/inventory/valuation">
+          <Card className="hover:bg-accent cursor-pointer transition-colors">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Inventory Valuation
+              </CardTitle>
+              <CardDescription>
+                Calculate total inventory value
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+        <Link href="/expiry-dates">
+          <Card className="hover:bg-accent cursor-pointer transition-colors">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Expiry Dates
+              </CardTitle>
+              <CardDescription>
+                Track ingredient expiration dates
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+      </div>
     </div>
   );
 }

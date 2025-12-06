@@ -102,3 +102,11 @@ export function useProduceRecipe() {
   });
 }
 
+export function useRecipeCost(id: string) {
+  return useQuery({
+    queryKey: ['recipes', id, 'cost'],
+    queryFn: () => recipesApi.getCost(id),
+    enabled: !!id,
+  });
+}
+

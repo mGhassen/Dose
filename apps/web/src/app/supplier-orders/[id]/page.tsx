@@ -230,7 +230,7 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
                       <div key={item.id} className="p-3 border rounded-lg">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <div className="font-medium">{item.ingredient?.name || `Ingredient #${item.ingredientId}`}</div>
+                            <div className="font-medium">{item.item?.name || item.ingredient?.name || `Item #${item.itemId || item.ingredientId}`}</div>
                             <div className="text-sm text-muted-foreground mt-1">
                               Ordered: {item.quantity} {item.unit}
                             </div>
@@ -293,7 +293,7 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
                   
                   return (
                     <div key={receiveItem.itemId} className="p-4 border rounded-lg space-y-3">
-                      <div className="font-medium">{orderItem.ingredient?.name || `Ingredient #${orderItem.ingredientId}`}</div>
+                      <div className="font-medium">{orderItem.item?.name || orderItem.ingredient?.name || `Item #${orderItem.itemId || orderItem.ingredientId}`}</div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label>Received Quantity *</Label>

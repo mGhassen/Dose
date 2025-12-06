@@ -10,13 +10,13 @@ import { Textarea } from "@kit/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { Save, X, Plus, Trash2, Calculator } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateSupplierOrder, useInventorySuppliers, useIngredients } from "@kit/hooks";
+import { useCreateSupplierOrder, useInventorySuppliers, useItems } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { SupplierOrderStatus } from "@kit/types";
 
 interface OrderItem {
-  ingredientId: number;
+  itemId: number;
   quantity: number;
   unit: string;
   unitPrice: number;
@@ -27,10 +27,10 @@ export default function CreateSupplierOrderPage() {
   const router = useRouter();
   const createOrder = useCreateSupplierOrder();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
-  const { data: ingredientsResponse } = useIngredients({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000 });
   
   const suppliers = suppliersResponse?.data || [];
-  const ingredients = ingredientsResponse?.data || [];
+  const allItems = itemsResponse?.data || [];
   
   const [formData, setFormData] = useState({
     supplierId: "",
@@ -61,7 +61,7 @@ export default function CreateSupplierOrderPage() {
 
     // Validate items
     for (const item of items) {
-      if (!item.ingredientId || item.quantity <= 0 || item.unitPrice <= 0) {
+      if (!item.itemId || item.quantity <= 0 || item.unitPrice <= 0) {
         toast.error("Please fill in all item details correctly");
         return;
       }
@@ -76,7 +76,7 @@ export default function CreateSupplierOrderPage() {
         status: SupplierOrderStatus.PENDING,
         notes: formData.notes || undefined,
         items: items.map(item => ({
-          ingredientId: item.ingredientId,
+          itemId: item.itemId,
           quantity: item.quantity,
           unit: item.unit,
           unitPrice: item.unitPrice,
@@ -95,7 +95,7 @@ export default function CreateSupplierOrderPage() {
   };
 
   const addItem = () => {
-    setItems([...items, { ingredientId: 0, quantity: 0, unit: "", unitPrice: 0 }]);
+    setItems([...items, { itemId: 0, quantity: 0, unit: "", unitPrice: 0 }]);
   };
 
   const removeItem = (index: number) => {
@@ -106,11 +106,11 @@ export default function CreateSupplierOrderPage() {
     const updated = [...items];
     const item = updated[index];
     
-    if (field === 'ingredientId') {
-      // Auto-fill unit from ingredient
-      const ingredient = ingredients.find(i => i.id === value);
-      if (ingredient) {
-        item.unit = ingredient.unit;
+    if (field === 'itemId') {
+      // Auto-fill unit from item
+      const selectedItem = allItems.find(i => i.id === value);
+      if (selectedItem) {
+        item.unit = selectedItem.unit || '';
       }
     }
     
@@ -208,24 +208,24 @@ export default function CreateSupplierOrderPage() {
                 </div>
 
                 {items.map((item, index) => {
-                  const ingredient = ingredients.find(i => i.id === item.ingredientId);
+                  const selectedItem = allItems.find(i => i.id === item.itemId);
                   const itemTotal = item.quantity * item.unitPrice;
                   
                   return (
                     <div key={index} className="grid grid-cols-12 gap-4 items-end p-4 border rounded-lg">
                       <div className="col-span-12 md:col-span-4">
-                        <Label>Ingredient *</Label>
+                        <Label>Item *</Label>
                         <Select
-                          value={item.ingredientId.toString()}
-                          onValueChange={(value) => updateItem(index, 'ingredientId', parseInt(value))}
+                          value={item.itemId.toString()}
+                          onValueChange={(value) => updateItem(index, 'itemId', parseInt(value))}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select ingredient" />
+                            <SelectValue placeholder="Select item" />
                           </SelectTrigger>
                           <SelectContent>
-                            {ingredients.filter(i => i.isActive).map((ing) => (
-                              <SelectItem key={ing.id} value={ing.id.toString()}>
-                                {ing.name} ({ing.unit})
+                            {allItems.filter(i => i.isActive && i.itemType === 'item').map((it) => (
+                              <SelectItem key={it.id} value={it.id.toString()}>
+                                {it.name} ({it.unit})
                               </SelectItem>
                             ))}
                           </SelectContent>

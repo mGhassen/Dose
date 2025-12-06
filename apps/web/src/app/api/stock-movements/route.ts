@@ -8,7 +8,7 @@ import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 function transformStockMovement(row: any): StockMovement {
   return {
     id: row.id,
-    ingredientId: row.ingredient_id,
+    itemId: row.item_id,
     movementType: row.movement_type,
     quantity: parseFloat(row.quantity),
     unit: row.unit,
@@ -24,7 +24,7 @@ function transformStockMovement(row: any): StockMovement {
 
 function transformToSnakeCase(data: CreateStockMovementData): any {
   return {
-    ingredient_id: data.ingredientId,
+    item_id: data.itemId,
     movement_type: data.movementType,
     quantity: data.quantity,
     unit: data.unit,
@@ -40,18 +40,18 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const { page, limit, offset } = getPaginationParams(searchParams);
-    const ingredientId = searchParams.get('ingredientId');
+    const itemId = searchParams.get('itemId') || searchParams.get('ingredientId'); // Support both for backward compat
     const movementType = searchParams.get('movementType');
 
     const supabase = createServerSupabaseClient();
     
     let query = supabase
       .from('stock_movements')
-      .select('*')
+      .select('*, item:items(*)')
       .order('movement_date', { ascending: false });
 
-    if (ingredientId) {
-      query = query.eq('ingredient_id', ingredientId);
+    if (itemId) {
+      query = query.eq('item_id', itemId);
     }
     if (movementType) {
       query = query.eq('movement_type', movementType);
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
   try {
     const body: CreateStockMovementData = await request.json();
     
-    if (!body.ingredientId || !body.movementType || body.quantity === undefined || !body.unit) {
+    if (!body.itemId || !body.movementType || body.quantity === undefined || !body.unit) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

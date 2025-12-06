@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useStockMovements, useDeleteStockMovement, useIngredients } from "@kit/hooks";
+import { useStockMovements, useDeleteStockMovement, useItems } from "@kit/hooks";
 import type { StockMovement } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
@@ -17,24 +17,24 @@ import { Button } from "@kit/ui/button";
 
 export default function StockMovementsContent() {
   const router = useRouter();
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   
   const { data: movementsResponse, isLoading } = useStockMovements({ 
-    page, 
     limit: 1000
   });
   
-  const { data: ingredientsResponse } = useIngredients({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000 });
   
-  const ingredientMap = useMemo(() => {
-    if (!ingredientsResponse?.data) return new Map<number, string>();
-    return new Map(ingredientsResponse.data.map(i => [i.id, i.name]));
-  }, [ingredientsResponse?.data]);
+  const itemMap = useMemo(() => {
+    if (!itemsResponse?.data) return new Map<number, string>();
+    return new Map(itemsResponse.data.map(i => [i.id, i.name]));
+  }, [itemsResponse?.data]);
   
   const movements = movementsResponse?.data || [];
   const totalCount = movementsResponse?.pagination?.total || movements.length;
-  const totalPages = movementsResponse?.pagination?.totalPages || Math.ceil(movements.length / pageSize);
+  
+  const filteredMovements = useMemo(() => {
+    return movements;
+  }, [movements]);
   const deleteMutation = useDeleteStockMovement();
   
   // Calculate summary stats
@@ -76,12 +76,12 @@ export default function StockMovementsContent() {
 
   const columns: ColumnDef<StockMovement>[] = useMemo(() => [
     {
-      accessorKey: "ingredientId",
-      header: "Ingredient",
+      accessorKey: "itemId",
+      header: "Item",
       cell: ({ row }) => {
-        const ingredientId = row.original.ingredientId;
-        if (ingredientId && ingredientMap.has(ingredientId)) {
-          return ingredientMap.get(ingredientId);
+        const itemId = row.original.itemId || row.original.ingredientId;
+        if (itemId && itemMap.has(itemId)) {
+          return itemMap.get(itemId);
         }
         return <span className="text-muted-foreground">—</span>;
       },
@@ -115,7 +115,7 @@ export default function StockMovementsContent() {
       header: "Reference",
       cell: ({ row }) => row.original.referenceType ? `${row.original.referenceType} #${row.original.referenceId || ''}` : <span className="text-muted-foreground">—</span>,
     },
-  ], [ingredientMap]);
+  ], [itemMap]);
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this stock movement?")) return;
@@ -145,9 +145,9 @@ export default function StockMovementsContent() {
     const movementsToCopy = type === 'selected' ? data : data;
     
     const csv = [
-      ['Ingredient', 'Type', 'Quantity', 'Unit', 'Location', 'Date', 'Reference'].join(','),
+      ['Item', 'Type', 'Quantity', 'Unit', 'Location', 'Date', 'Reference'].join(','),
       ...movementsToCopy.map(movement => [
-        ingredientMap.get(movement.ingredientId) || '',
+        itemMap.get(movement.itemId || movement.ingredientId) || '',
         movement.movementType,
         movement.quantity,
         movement.unit,
@@ -165,9 +165,9 @@ export default function StockMovementsContent() {
     const movementsToExport = type === 'selected' ? data : data;
     
     const csv = [
-      ['Ingredient', 'Type', 'Quantity', 'Unit', 'Location', 'Date', 'Reference'].join(','),
+      ['Item', 'Type', 'Quantity', 'Unit', 'Location', 'Date', 'Reference'].join(','),
       ...movementsToExport.map(movement => [
-        ingredientMap.get(movement.ingredientId) || '',
+        itemMap.get(movement.itemId || movement.ingredientId) || '',
         movement.movementType,
         movement.quantity,
         movement.unit,
@@ -265,7 +265,7 @@ export default function StockMovementsContent() {
           title=""
           description=""
           createHref="/stock-movements/create"
-          data={movements}
+          data={filteredMovements}
           columns={columns}
           loading={isLoading}
           onRowClick={(movement) => router.push(`/stock-movements/${movement.id}`)}
@@ -283,17 +283,6 @@ export default function StockMovementsContent() {
           ]}
           localStoragePrefix="stock-movements"
           searchFields={["location", "notes"]}
-          pagination={{
-            page,
-            pageSize,
-            totalCount,
-            totalPages,
-            onPageChange: setPage,
-            onPageSizeChange: (newSize) => {
-              setPageSize(newSize);
-              setPage(1);
-            },
-          }}
         />
       </div>
     </div>

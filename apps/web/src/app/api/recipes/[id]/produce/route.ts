@@ -27,10 +27,10 @@ export async function POST(
       );
     }
 
-    // Get recipe with ingredients
+    // Get recipe with items from recipes table
     const { data: recipeData, error: recipeError } = await supabase
       .from('recipes')
-      .select('*, ingredients:recipe_ingredients(*, ingredient:ingredients(*))')
+      .select('*, items:recipe_items(*, item:items(*))')
       .eq('id', id)
       .single();
 
@@ -42,9 +42,9 @@ export async function POST(
       );
     }
 
-    if (!recipeData.ingredients || recipeData.ingredients.length === 0) {
+    if (!recipeData.items || recipeData.items.length === 0) {
       return NextResponse.json(
-        { error: 'Recipe has no ingredients' },
+        { error: 'Recipe has no items' },
         { status: 400 }
       );
     }
@@ -53,35 +53,35 @@ export async function POST(
     const servingSize = recipeData.serving_size || 1;
     const multiplier = body.quantity / servingSize;
 
-    // Create stock movements for each ingredient
+    // Create stock movements for each item (can be items or other recipes)
     const movements = [];
-    for (const recipeIngredient of recipeData.ingredients) {
-      const ingredient = recipeIngredient.ingredient;
-      if (!ingredient) continue;
+    for (const recipeItem of recipeData.items) {
+      const item = recipeItem.item;
+      if (!item) continue;
 
-      const quantityToDeduct = recipeIngredient.quantity * multiplier;
+      const quantityToDeduct = recipeItem.quantity * multiplier;
 
       // Check if we have enough stock (optional - could be a warning instead of error)
       const { data: stockLevel } = await supabase
         .from('stock_levels')
         .select('quantity')
-        .eq('ingredient_id', ingredient.id)
+        .eq('item_id', item.id)
         .eq('location', body.location || null)
         .single();
 
       if (stockLevel && stockLevel.quantity < quantityToDeduct) {
         // Log warning but continue - could be adjusted later
-        console.warn(`Low stock for ingredient ${ingredient.name}: ${stockLevel.quantity} available, ${quantityToDeduct} needed`);
+        console.warn(`Low stock for item ${item.name}: ${stockLevel.quantity} available, ${quantityToDeduct} needed`);
       }
 
       // Create stock movement
       const { error: movementError } = await supabase
         .from('stock_movements')
         .insert({
-          ingredient_id: ingredient.id,
+          item_id: item.id,
           movement_type: StockMovementType.OUT,
           quantity: quantityToDeduct,
-          unit: recipeIngredient.unit,
+          unit: recipeItem.unit,
           reference_type: StockMovementReferenceType.RECIPE,
           reference_id: Number(id),
           location: body.location || null,
@@ -90,7 +90,7 @@ export async function POST(
         });
 
       if (movementError) throw movementError;
-      movements.push({ ingredientId: ingredient.id, quantity: quantityToDeduct });
+      movements.push({ itemId: item.id, quantity: quantityToDeduct });
     }
 
     return NextResponse.json({ 

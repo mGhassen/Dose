@@ -45,10 +45,10 @@ export * from './api/entries';
 export * from './api/payments';
 
 // Export inventory management API modules
-export * from './api/ingredients';
+export * from './api/items';
+export * from './api/ingredients'; // Legacy alias
 export * from './api/recipes';
 export * from './api/inventory-suppliers';
-export * from './api/supplier-catalogs';
 export * from './api/supplier-orders';
 export * from './api/stock-levels';
 export * from './api/stock-movements';

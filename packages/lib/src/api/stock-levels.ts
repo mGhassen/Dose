@@ -2,11 +2,12 @@ import { apiRequest } from './api';
 import type { StockLevel, CreateStockLevelData, UpdateStockLevelData, PaginatedResponse, PaginationParams } from '@kit/types';
 
 export const stockLevelsApi = {
-  getAll: (params?: PaginationParams & { ingredientId?: string; location?: string }) => {
+  getAll: (params?: PaginationParams & { itemId?: string; ingredientId?: string; location?: string }) => {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
-    if (params?.ingredientId) searchParams.append('ingredientId', params.ingredientId);
+    if (params?.itemId) searchParams.append('itemId', params.itemId);
+    if (params?.ingredientId) searchParams.append('itemId', params.ingredientId); // Backward compat
     if (params?.location) searchParams.append('location', params.location);
     const query = searchParams.toString();
     return apiRequest<PaginatedResponse<StockLevel>>('GET', `/api/stock-levels${query ? `?${query}` : ''}`);

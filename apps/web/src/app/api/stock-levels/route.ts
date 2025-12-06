@@ -8,7 +8,7 @@ import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 function transformStockLevel(row: any): StockLevel {
   return {
     id: row.id,
-    ingredientId: row.ingredient_id,
+    itemId: row.item_id,
     quantity: parseFloat(row.quantity),
     unit: row.unit,
     location: row.location,
@@ -22,7 +22,7 @@ function transformStockLevel(row: any): StockLevel {
 
 function transformToSnakeCase(data: CreateStockLevelData): any {
   return {
-    ingredient_id: data.ingredientId,
+    item_id: data.itemId,
     quantity: data.quantity,
     unit: data.unit,
     location: data.location,
@@ -35,18 +35,18 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const { page, limit, offset } = getPaginationParams(searchParams);
-    const ingredientId = searchParams.get('ingredientId');
+    const itemId = searchParams.get('itemId') || searchParams.get('ingredientId'); // Support both for backward compat
     const location = searchParams.get('location');
 
     const supabase = createServerSupabaseClient();
     
     let query = supabase
       .from('stock_levels')
-      .select('*')
+      .select('*, item:items(*)')
       .order('last_updated', { ascending: false });
 
-    if (ingredientId) {
-      query = query.eq('ingredient_id', ingredientId);
+    if (itemId) {
+      query = query.eq('item_id', itemId);
     }
     if (location) {
       query = query.eq('location', location);
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   try {
     const body: CreateStockLevelData = await request.json();
     
-    if (!body.ingredientId || body.quantity === undefined || !body.unit) {
+    if (!body.itemId || body.quantity === undefined || !body.unit) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

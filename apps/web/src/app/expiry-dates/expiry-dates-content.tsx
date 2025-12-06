@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useExpiryDates, useDeleteExpiryDate, useIngredients } from "@kit/hooks";
+import { useExpiryDates, useDeleteExpiryDate, useItems } from "@kit/hooks";
 import type { ExpiryDate } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatDate } from "@kit/lib/date-format";
@@ -12,42 +12,32 @@ import { toast } from "sonner";
 
 export default function ExpiryDatesContent() {
   const router = useRouter();
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   
   const { data: expiryDatesResponse, isLoading } = useExpiryDates({ 
-    page, 
     limit: 1000
   });
   
-  const { data: ingredientsResponse } = useIngredients({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000 });
   
-  const ingredientMap = useMemo(() => {
-    if (!ingredientsResponse?.data) return new Map<number, string>();
-    return new Map(ingredientsResponse.data.map(i => [i.id, i.name]));
-  }, [ingredientsResponse?.data]);
+  const itemMap = useMemo(() => {
+    if (!itemsResponse?.data) return new Map<number, string>();
+    return new Map(itemsResponse.data.filter(i => i.itemType === 'item').map(i => [i.id, i.name]));
+  }, [itemsResponse?.data]);
   
   const filteredExpiryDates = useMemo(() => {
     if (!expiryDatesResponse?.data) return [];
     return expiryDatesResponse.data;
   }, [expiryDatesResponse?.data]);
-  
-  const paginatedExpiryDates = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    return filteredExpiryDates.slice(startIndex, startIndex + pageSize);
-  }, [filteredExpiryDates, page, pageSize]);
-  
-  const totalPages = Math.ceil(filteredExpiryDates.length / pageSize);
   const deleteMutation = useDeleteExpiryDate();
 
   const columns: ColumnDef<ExpiryDate>[] = useMemo(() => [
     {
-      accessorKey: "ingredientId",
-      header: "Ingredient",
+      accessorKey: "itemId",
+      header: "Item",
       cell: ({ row }) => {
-        const ingredientId = row.original.ingredientId;
-        if (ingredientId && ingredientMap.has(ingredientId)) {
-          return ingredientMap.get(ingredientId);
+        const itemId = row.original.itemId || row.original.ingredientId;
+        if (itemId && itemMap.has(itemId)) {
+          return itemMap.get(itemId);
         }
         return <span className="text-muted-foreground">—</span>;
       },
@@ -96,7 +86,7 @@ export default function ExpiryDatesContent() {
       header: "Disposed Date",
       cell: ({ row }) => row.original.disposedDate ? formatDate(row.original.disposedDate) : <span className="text-muted-foreground">—</span>,
     },
-  ], [ingredientMap]);
+  ], [itemMap]);
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this expiry date record?")) return;
@@ -128,7 +118,7 @@ export default function ExpiryDatesContent() {
     const csv = [
       ['Ingredient', 'Quantity', 'Unit', 'Expiry Date', 'Location', 'Status', 'Disposed Date'].join(','),
       ...expiryDatesToCopy.map(expiry => [
-        ingredientMap.get(expiry.ingredientId) || '',
+        itemMap.get(expiry.itemId || expiry.ingredientId) || '',
         expiry.quantity,
         expiry.unit,
         expiry.expiryDate,
@@ -148,7 +138,7 @@ export default function ExpiryDatesContent() {
     const csv = [
       ['Ingredient', 'Quantity', 'Unit', 'Expiry Date', 'Location', 'Status', 'Disposed Date'].join(','),
       ...expiryDatesToExport.map(expiry => [
-        ingredientMap.get(expiry.ingredientId) || '',
+        itemMap.get(expiry.itemId || expiry.ingredientId) || '',
         expiry.quantity,
         expiry.unit,
         expiry.expiryDate,
@@ -184,7 +174,7 @@ export default function ExpiryDatesContent() {
           title=""
           description=""
           createHref="/expiry-dates/create"
-          data={paginatedExpiryDates}
+          data={filteredExpiryDates}
           columns={columns}
           loading={isLoading}
           onRowClick={(expiry) => router.push(`/expiry-dates/${expiry.id}`)}
@@ -201,17 +191,6 @@ export default function ExpiryDatesContent() {
           ]}
           localStoragePrefix="expiry-dates"
           searchFields={["location", "notes"]}
-          pagination={{
-            page,
-            pageSize,
-            totalCount: filteredExpiryDates.length,
-            totalPages,
-            onPageChange: setPage,
-            onPageSizeChange: (newSize) => {
-              setPageSize(newSize);
-              setPage(1);
-            },
-          }}
         />
       </div>
     </div>

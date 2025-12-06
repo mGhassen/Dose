@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     // Insert order items
     const orderItems = body.items.map(item => ({
       order_id: orderData.id,
-      ingredient_id: item.ingredientId,
+      item_id: item.itemId,
       quantity: item.quantity,
       unit: item.unit,
       unit_price: item.unitPrice,

@@ -42,7 +42,6 @@ export * from './client/usePayments';
 export * from './client/useIngredients';
 export * from './client/useRecipes';
 export * from './client/useInventorySuppliers';
-export * from './client/useSupplierCatalogs';
 export * from './client/useSupplierOrders';
 export * from './client/useStockLevels';
 export * from './client/useStockMovements';

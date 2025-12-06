@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useStockLevels, useDeleteStockLevel, useIngredients } from "@kit/hooks";
+import { useStockLevels, useDeleteStockLevel, useItems } from "@kit/hooks";
 import type { StockLevel } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
@@ -12,27 +12,28 @@ import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 import { Package, AlertTriangle, CheckCircle, TrendingDown, Plus } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@kit/ui/button";
 
 export default function StockLevelsContent() {
   const router = useRouter();
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   
   const { data: stockLevelsResponse, isLoading } = useStockLevels({ 
-    page, 
     limit: 1000
   });
   
-  const { data: ingredientsResponse } = useIngredients({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000 });
   
-  const ingredientMap = useMemo(() => {
-    if (!ingredientsResponse?.data) return new Map<number, string>();
-    return new Map(ingredientsResponse.data.map(i => [i.id, i.name]));
-  }, [ingredientsResponse?.data]);
+  const itemMap = useMemo(() => {
+    if (!itemsResponse?.data) return new Map<number, string>();
+    return new Map(itemsResponse.data.filter(i => i.itemType === 'item').map(i => [i.id, i.name]));
+  }, [itemsResponse?.data]);
   
   const stockLevels = stockLevelsResponse?.data || [];
   const totalCount = stockLevelsResponse?.pagination?.total || stockLevels.length;
-  const totalPages = stockLevelsResponse?.pagination?.totalPages || Math.ceil(stockLevels.length / pageSize);
+  
+  const filteredStockLevels = useMemo(() => {
+    return stockLevels;
+  }, [stockLevels]);
   const deleteMutation = useDeleteStockLevel();
   
   // Calculate low stock items
@@ -55,18 +56,18 @@ export default function StockLevelsContent() {
 
   const columns: ColumnDef<StockLevel>[] = useMemo(() => [
     {
-      accessorKey: "ingredientId",
-      header: "Ingredient",
+      accessorKey: "itemId",
+      header: "Item",
       cell: ({ row }) => {
-        const ingredientId = row.original.ingredientId;
+        const itemId = row.original.itemId;
         const level = row.original;
         const isLowStock = level.minimumStockLevel && level.quantity <= level.minimumStockLevel;
         const isOutOfStock = level.quantity <= 0;
         
-        if (ingredientId && ingredientMap.has(ingredientId)) {
+        if (itemId && itemMap.has(itemId)) {
           return (
             <div className="flex items-center gap-2">
-              <div className="font-medium">{ingredientMap.get(ingredientId)}</div>
+              <div className="font-medium">{itemMap.get(itemId)}</div>
               {isOutOfStock && (
                 <Badge variant="destructive" className="text-xs">Out of Stock</Badge>
               )}
@@ -122,7 +123,7 @@ export default function StockLevelsContent() {
       header: "Last Updated",
       cell: ({ row }) => formatDate(row.original.lastUpdated),
     },
-  ], [ingredientMap]);
+  ], [itemMap]);
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this stock level?")) return;
@@ -152,9 +153,9 @@ export default function StockLevelsContent() {
     const stockLevelsToCopy = type === 'selected' ? data : data;
     
     const csv = [
-      ['Ingredient', 'Quantity', 'Unit', 'Location', 'Min Stock', 'Max Stock'].join(','),
+      ['Item', 'Quantity', 'Unit', 'Location', 'Min Stock', 'Max Stock'].join(','),
       ...stockLevelsToCopy.map(level => [
-        ingredientMap.get(level.ingredientId) || '',
+        itemMap.get(level.itemId) || '',
         level.quantity,
         level.unit,
         level.location || '',
@@ -171,9 +172,9 @@ export default function StockLevelsContent() {
     const stockLevelsToExport = type === 'selected' ? data : data;
     
     const csv = [
-      ['Ingredient', 'Quantity', 'Unit', 'Location', 'Min Stock', 'Max Stock'].join(','),
+      ['Item', 'Quantity', 'Unit', 'Location', 'Min Stock', 'Max Stock'].join(','),
       ...stockLevelsToExport.map(level => [
-        ingredientMap.get(level.ingredientId) || '',
+        itemMap.get(level.itemId) || '',
         level.quantity,
         level.unit,
         level.location || '',
@@ -299,7 +300,7 @@ export default function StockLevelsContent() {
           title=""
           description=""
           createHref="/stock-levels/create"
-          data={stockLevels}
+          data={filteredStockLevels}
           columns={columns}
           loading={isLoading}
           onRowClick={(level) => router.push(`/stock-levels/${level.id}`)}
@@ -317,17 +318,6 @@ export default function StockLevelsContent() {
           ]}
           localStoragePrefix="stock-levels"
           searchFields={["location"]}
-          pagination={{
-            page,
-            pageSize,
-            totalCount,
-            totalPages,
-            onPageChange: setPage,
-            onPageSizeChange: (newSize) => {
-              setPageSize(newSize);
-              setPage(1);
-            },
-          }}
         />
       </div>
     </div>

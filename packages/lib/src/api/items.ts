@@ -15,3 +15,5 @@ export const itemsApi = {
   delete: (id: string) => apiRequest<void>('DELETE', `/api/items/${id}`),
 };
 
+// Legacy alias for backward compatibility
+export const ingredientsApi = itemsApi;

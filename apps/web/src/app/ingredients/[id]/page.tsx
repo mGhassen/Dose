@@ -8,11 +8,29 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
-import { Save, X, Trash2 } from "lucide-react";
+import { Save, X, Trash2, Package, ChefHat, MoreVertical, Edit2 } from "lucide-react";
+import Link from "next/link";
 import AppLayout from "@/components/app-layout";
-import { useIngredientById, useUpdateIngredient, useDeleteIngredient } from "@kit/hooks";
+import { useIngredientById, useUpdateIngredient, useDeleteIngredient, useStockLevels } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@kit/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@kit/ui/alert-dialog";
 
 interface IngredientDetailPageProps {
   params: Promise<{ id: string }>;
@@ -23,6 +41,10 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const { data: ingredient, isLoading } = useIngredientById(resolvedParams?.id || "");
+  const { data: stockLevelsResponse } = useStockLevels({ itemId: resolvedParams?.id, limit: 10 });
+  const [recipes, setRecipes] = useState<Array<{ recipeId: number; recipe: { id: number; name: string; isActive: boolean }; quantity: number; unit: string }>>([]);
+  const [loadingRecipes, setLoadingRecipes] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const updateIngredient = useUpdateIngredient();
   const deleteMutation = useDeleteIngredient();
   
@@ -49,6 +71,22 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
       });
     }
   }, [ingredient]);
+
+  useEffect(() => {
+    if (resolvedParams?.id) {
+      setLoadingRecipes(true);
+      fetch(`/api/items/${resolvedParams.id}/recipes`)
+        .then(res => res.json())
+        .then(data => {
+          setRecipes(data.recipes || []);
+          setLoadingRecipes(false);
+        })
+        .catch(err => {
+          console.error('Error fetching recipes:', err);
+          setLoadingRecipes(false);
+        });
+    }
+  }, [resolvedParams?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,10 +118,6 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
 
   const handleDelete = async () => {
     if (!resolvedParams?.id) return;
-    
-    if (!confirm("Are you sure you want to delete this ingredient? This action cannot be undone.")) {
-      return;
-    }
 
     try {
       await deleteMutation.mutateAsync(resolvedParams.id);
@@ -136,22 +170,28 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
             </p>
           </div>
           {!isEditing && (
-            <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsEditing(true)}
-              >
-                Edit
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {deleteMutation.isPending ? "Deleting..." : "Delete"}
-              </Button>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                  <Edit2 className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  disabled={deleteMutation.isPending}
+                  className="text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
 
@@ -273,7 +313,113 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
             )}
           </CardContent>
         </Card>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Stock Levels */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Stock Levels
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stockLevelsResponse?.data && stockLevelsResponse.data.length > 0 ? (
+                <div className="space-y-2">
+                  {stockLevelsResponse.data.map((stock) => (
+                    <Link key={stock.id} href={`/stock-levels/${stock.id}`}>
+                      <div className="p-3 border rounded-lg hover:bg-accent cursor-pointer">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{stock.location || "Default Location"}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {stock.quantity} {stock.unit}
+                            </div>
+                          </div>
+                          {stock.minimumStockLevel && stock.quantity <= stock.minimumStockLevel && (
+                            <span className="text-xs text-orange-600 font-medium">Low Stock</span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                  <Link href={`/stock-levels?ingredientId=${ingredient.id}`}>
+                    <Button variant="outline" className="w-full mt-2">
+                      View All Stock Levels
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground text-center py-4">
+                  No stock levels recorded
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recipes Using This Ingredient */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ChefHat className="h-5 w-5" />
+                Used in Recipes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingRecipes ? (
+                <div className="text-sm text-muted-foreground text-center py-4">Loading...</div>
+              ) : recipes.length > 0 ? (
+                <div className="space-y-2">
+                  {recipes.map((item) => (
+                    <Link key={item.recipeId} href={`/recipes/${item.recipeId}`}>
+                      <div className="p-3 border rounded-lg hover:bg-accent cursor-pointer">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{item.recipe.name}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {item.quantity} {item.unit}
+                            </div>
+                          </div>
+                          {!item.recipe.isActive && (
+                            <span className="text-xs text-muted-foreground">Inactive</span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground text-center py-4">
+                  Not used in any recipes
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this ingredient
+              and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

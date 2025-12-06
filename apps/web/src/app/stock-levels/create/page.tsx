@@ -9,18 +9,18 @@ import { Label } from "@kit/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateStockLevel, useIngredients } from "@kit/hooks";
+import { useCreateStockLevel, useItems } from "@kit/hooks";
 import { toast } from "sonner";
 
 export default function CreateStockLevelPage() {
   const router = useRouter();
   const createStockLevel = useCreateStockLevel();
-  const { data: ingredientsResponse } = useIngredients({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000 });
   
-  const ingredients = ingredientsResponse?.data || [];
+  const items = itemsResponse?.data || [];
   
   const [formData, setFormData] = useState({
-    ingredientId: "",
+    itemId: "",
     quantity: "",
     unit: "",
     location: "",
@@ -31,7 +31,7 @@ export default function CreateStockLevelPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.ingredientId || !formData.quantity || !formData.unit) {
+    if (!formData.itemId || !formData.quantity || !formData.unit) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -43,7 +43,7 @@ export default function CreateStockLevelPage() {
 
     try {
       await createStockLevel.mutateAsync({
-        ingredientId: parseInt(formData.ingredientId),
+        itemId: parseInt(formData.itemId),
         quantity: parseFloat(formData.quantity),
         unit: formData.unit,
         location: formData.location || undefined,
@@ -60,11 +60,11 @@ export default function CreateStockLevelPage() {
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
-    // Auto-fill unit when ingredient is selected
-    if (field === 'ingredientId' && value) {
-      const ingredient = ingredients.find(i => i.id === parseInt(value));
-      if (ingredient) {
-        setFormData(prev => ({ ...prev, unit: ingredient.unit }));
+    // Auto-fill unit when item is selected
+    if (field === 'itemId' && value) {
+      const selectedItem = items.find(i => i.id === parseInt(value));
+      if (selectedItem) {
+        setFormData(prev => ({ ...prev, unit: selectedItem.unit || '' }));
       }
     }
   };
@@ -74,7 +74,7 @@ export default function CreateStockLevelPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Create Stock Level</h1>
-          <p className="text-muted-foreground">Set up stock tracking for an ingredient</p>
+          <p className="text-muted-foreground">Set up stock tracking for an item</p>
         </div>
 
         <Card>
@@ -86,19 +86,19 @@ export default function CreateStockLevelPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="ingredientId">Ingredient *</Label>
+                  <Label htmlFor="itemId">Item *</Label>
                   <Select
-                    value={formData.ingredientId}
-                    onValueChange={(value) => handleInputChange('ingredientId', value)}
+                    value={formData.itemId}
+                    onValueChange={(value) => handleInputChange('itemId', value)}
                     required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select ingredient" />
+                      <SelectValue placeholder="Select item" />
                     </SelectTrigger>
                     <SelectContent>
-                      {ingredients.filter(i => i.isActive).map((ingredient) => (
-                        <SelectItem key={ingredient.id} value={ingredient.id.toString()}>
-                          {ingredient.name} ({ingredient.unit})
+                      {items.filter(i => i.isActive && i.itemType === 'item').map((item) => (
+                        <SelectItem key={item.id} value={item.id.toString()}>
+                          {item.name} ({item.unit})
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -10,19 +10,19 @@ import { Textarea } from "@kit/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateStockMovement, useIngredients } from "@kit/hooks";
+import { useCreateStockMovement, useItems } from "@kit/hooks";
 import { toast } from "sonner";
 import { StockMovementType } from "@kit/types";
 
 export default function CreateStockMovementPage() {
   const router = useRouter();
   const createMovement = useCreateStockMovement();
-  const { data: ingredientsResponse } = useIngredients({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000 });
   
-  const ingredients = ingredientsResponse?.data || [];
+  const items = itemsResponse?.data || [];
   
   const [formData, setFormData] = useState({
-    ingredientId: "",
+    itemId: "",
     movementType: StockMovementType.IN,
     quantity: "",
     unit: "",
@@ -34,7 +34,7 @@ export default function CreateStockMovementPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.ingredientId || !formData.quantity || !formData.unit) {
+    if (!formData.itemId || !formData.quantity || !formData.unit) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -46,7 +46,7 @@ export default function CreateStockMovementPage() {
 
     try {
       await createMovement.mutateAsync({
-        ingredientId: parseInt(formData.ingredientId),
+        itemId: parseInt(formData.itemId),
         movementType: formData.movementType,
         quantity: parseFloat(formData.quantity),
         unit: formData.unit,
@@ -64,11 +64,11 @@ export default function CreateStockMovementPage() {
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
-    // Auto-fill unit when ingredient is selected
-    if (field === 'ingredientId' && value) {
-      const ingredient = ingredients.find(i => i.id === parseInt(value));
-      if (ingredient) {
-        setFormData(prev => ({ ...prev, unit: ingredient.unit }));
+    // Auto-fill unit when item is selected
+    if (field === 'itemId' && value) {
+      const selectedItem = items.find(i => i.id === parseInt(value));
+      if (selectedItem) {
+        setFormData(prev => ({ ...prev, unit: selectedItem.unit || '' }));
       }
     }
   };
@@ -99,19 +99,19 @@ export default function CreateStockMovementPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="ingredientId">Ingredient *</Label>
+                  <Label htmlFor="itemId">Item *</Label>
                   <Select
-                    value={formData.ingredientId}
-                    onValueChange={(value) => handleInputChange('ingredientId', value)}
+                    value={formData.itemId}
+                    onValueChange={(value) => handleInputChange('itemId', value)}
                     required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select ingredient" />
+                      <SelectValue placeholder="Select item" />
                     </SelectTrigger>
                     <SelectContent>
-                      {ingredients.filter(i => i.isActive).map((ingredient) => (
-                        <SelectItem key={ingredient.id} value={ingredient.id.toString()}>
-                          {ingredient.name} ({ingredient.unit})
+                      {items.filter(i => i.isActive && i.itemType === 'item').map((item) => (
+                        <SelectItem key={item.id} value={item.id.toString()}>
+                          {item.name} ({item.unit})
                         </SelectItem>
                       ))}
                     </SelectContent>

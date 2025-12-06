@@ -1,15 +1,22 @@
-// React Query hooks for Ingredients
+// React Query hooks for Ingredients (legacy - use useItems instead)
+// Kept for backward compatibility
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ingredientsApi } from '@kit/lib';
-import type { Ingredient, CreateIngredientData, UpdateIngredientData } from '@kit/types';
+import { itemsApi } from '@kit/lib';
+import type { Item, CreateItemData, UpdateItemData } from '@kit/types';
+
+// Legacy type aliases
+type Ingredient = Item;
+type CreateIngredientData = CreateItemData;
+type UpdateIngredientData = UpdateItemData;
 
 export function useIngredients(params?: { page?: number; limit?: number }) {
   return useQuery({
     queryKey: ['ingredients', params],
     queryFn: async () => {
       try {
-        const result = await ingredientsApi.getAll(params);
+        // Filter to only items (not recipes) for backward compatibility
+        const result = await itemsApi.getAll({ ...params, itemType: 'item' });
         if (result && result !== null && typeof result === 'object' && 'data' in result && 'pagination' in result) {
           return result;
         }
@@ -47,7 +54,7 @@ export function useIngredients(params?: { page?: number; limit?: number }) {
 export function useIngredientById(id: string) {
   return useQuery({
     queryKey: ['ingredients', id],
-    queryFn: () => ingredientsApi.getById(id),
+    queryFn: () => itemsApi.getById(id),
     enabled: !!id,
   });
 }
@@ -56,9 +63,10 @@ export function useCreateIngredient() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ingredientsApi.create,
+    mutationFn: (data: CreateIngredientData) => itemsApi.create({ ...data, itemType: 'item' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ingredients'] });
+      queryClient.invalidateQueries({ queryKey: ['items'] });
     },
   });
 }
@@ -68,10 +76,12 @@ export function useUpdateIngredient() {
   
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateIngredientData }) => 
-      ingredientsApi.update(id, data),
+      itemsApi.update(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['ingredients'] });
       queryClient.invalidateQueries({ queryKey: ['ingredients', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+      queryClient.invalidateQueries({ queryKey: ['items', variables.id] });
     },
   });
 }
@@ -80,9 +90,10 @@ export function useDeleteIngredient() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ingredientsApi.delete,
+    mutationFn: itemsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ingredients'] });
+      queryClient.invalidateQueries({ queryKey: ['items'] });
     },
   });
 }

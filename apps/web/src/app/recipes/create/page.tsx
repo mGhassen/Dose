@@ -11,13 +11,13 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { Save, X, Plus, Trash2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateRecipe, useIngredients } from "@kit/hooks";
+import { useCreateRecipe, useItems } from "@kit/hooks";
 import { toast } from "sonner";
 
 export default function CreateRecipePage() {
   const router = useRouter();
   const createRecipe = useCreateRecipe();
-  const { data: ingredientsResponse } = useIngredients({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000 });
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -28,7 +28,7 @@ export default function CreateRecipePage() {
     notes: "",
     isActive: true,
   });
-  const [ingredients, setIngredients] = useState<Array<{ ingredientId: number; quantity: number; unit: string; notes?: string }>>([]);
+  const [items, setItems] = useState<Array<{ itemId: number; quantity: number; unit: string; notes?: string }>>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +48,7 @@ export default function CreateRecipePage() {
         instructions: formData.instructions || undefined,
         notes: formData.notes || undefined,
         isActive: formData.isActive,
-        ingredients: ingredients.length > 0 ? ingredients : undefined,
+        items: items.length > 0 ? items.map(i => ({ itemId: i.itemId, quantity: i.quantity, unit: i.unit, notes: i.notes })) : undefined,
       });
       toast.success("Recipe created successfully");
       router.push('/recipes');
@@ -61,28 +61,28 @@ export default function CreateRecipePage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const addIngredient = () => {
-    setIngredients([...ingredients, { ingredientId: 0, quantity: 0, unit: "" }]);
+  const addItem = () => {
+    setItems([...items, { itemId: 0, quantity: 0, unit: "" }]);
   };
 
-  const removeIngredient = (index: number) => {
-    setIngredients(ingredients.filter((_, i) => i !== index));
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
   };
 
-  const updateIngredient = (index: number, field: string, value: any) => {
-    const updated = [...ingredients];
+  const updateItem = (index: number, field: string, value: any) => {
+    const updated = [...items];
     const item = updated[index];
     
-    // Auto-fill unit when ingredient is selected
-    if (field === 'ingredientId' && value) {
-      const ingredient = ingredientsResponse?.data?.find(i => i.id === parseInt(value));
-      if (ingredient) {
-        item.unit = ingredient.unit;
+    // Auto-fill unit when item is selected
+    if (field === 'itemId' && value) {
+      const selectedItem = itemsResponse?.data?.find(i => i.id === parseInt(value));
+      if (selectedItem) {
+        item.unit = selectedItem.unit || '';
       }
     }
     
     updated[index] = { ...item, [field]: value };
-    setIngredients(updated);
+    setItems(updated);
   };
 
   return (
@@ -190,31 +190,31 @@ export default function CreateRecipePage() {
                 </div>
               </div>
 
-              {/* Ingredients Section */}
+              {/* Items Section */}
               <div className="space-y-4 border-t pt-6">
                 <div className="flex items-center justify-between">
-                  <Label className="text-base font-semibold">Ingredients</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addIngredient}>
+                  <Label className="text-base font-semibold">Items</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addItem}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Ingredient
+                    Add Item
                   </Button>
                 </div>
 
-                {ingredients.map((ing, index) => (
+                {items.map((item, index) => (
                   <div key={index} className="grid grid-cols-12 gap-4 items-end p-4 border rounded-lg">
                     <div className="col-span-4">
-                      <Label>Ingredient</Label>
+                      <Label>Item</Label>
                       <Select
-                        value={ing.ingredientId.toString()}
-                        onValueChange={(value) => updateIngredient(index, 'ingredientId', parseInt(value))}
+                        value={item.itemId.toString()}
+                        onValueChange={(value) => updateItem(index, 'itemId', parseInt(value))}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select ingredient" />
+                          <SelectValue placeholder="Select item" />
                         </SelectTrigger>
                         <SelectContent>
-                          {ingredientsResponse?.data?.map((ingredient) => (
-                            <SelectItem key={ingredient.id} value={ingredient.id.toString()}>
-                              {ingredient.name}
+                          {itemsResponse?.data?.filter(i => i.itemType === 'item').map((it) => (
+                            <SelectItem key={it.id} value={it.id.toString()}>
+                              {it.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -226,7 +226,7 @@ export default function CreateRecipePage() {
                         type="number"
                         step="0.01"
                         value={ing.quantity || ""}
-                        onChange={(e) => updateIngredient(index, 'quantity', parseFloat(e.target.value) || 0)}
+                        onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                         placeholder="0"
                       />
                     </div>
@@ -234,7 +234,7 @@ export default function CreateRecipePage() {
                       <Label>Unit</Label>
                       <Input
                         value={ing.unit}
-                        onChange={(e) => updateIngredient(index, 'unit', e.target.value)}
+                        onChange={(e) => updateItem(index, 'unit', e.target.value)}
                         placeholder="kg, L, etc."
                       />
                     </div>
@@ -243,7 +243,7 @@ export default function CreateRecipePage() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeIngredient(index)}
+                        onClick={() => removeItem(index)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

@@ -15,5 +15,7 @@ export const recipesApi = {
   delete: (id: string) => apiRequest<void>('DELETE', `/api/recipes/${id}`),
   produce: (id: string, data: { quantity: number; location?: string; notes?: string }) => 
     apiRequest<{ success: boolean; message: string; movements: Array<{ ingredientId: number; quantity: number }>; recipe: { id: number; name: string; quantityProduced: number } }>('POST', `/api/recipes/${id}/produce`, data),
+  getCost: (id: string) => 
+    apiRequest<{ recipeId: number; recipeName: string; totalCost: number; costPerServing: number; servingSize: number; ingredients: Array<{ ingredientId: number; ingredientName: string; quantity: number; unit: string; unitPrice: number; totalCost: number; hasPrice: boolean }>; hasAllPrices: boolean }>('GET', `/api/recipes/${id}/cost`),
 };
 

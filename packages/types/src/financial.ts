@@ -808,76 +808,88 @@ export interface FinancialKPIs {
 // ============================================================================
 
 // ============================================================================
-// INGREDIENTS
+// ITEMS (replaces ingredients - can be regular items or recipes)
 // ============================================================================
 
-export interface Ingredient {
+export type ItemType = 'item' | 'recipe';
+
+export interface Item {
   id: number;
   name: string;
   description?: string;
   unit: string;
   category?: string;
+  itemType: ItemType;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface CreateIngredientData {
-  name: string;
-  description?: string;
-  unit: string;
-  category?: string;
-  isActive?: boolean;
-}
-
-export interface UpdateIngredientData extends Partial<CreateIngredientData> {}
-
-// ============================================================================
-// RECIPES
-// ============================================================================
-
-export interface Recipe {
-  id: number;
-  name: string;
-  description?: string;
+  // Recipe-specific fields (only when itemType === 'recipe')
   servingSize?: number;
   preparationTime?: number;
   cookingTime?: number;
   instructions?: string;
   notes?: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
 
-export interface RecipeIngredient {
+export interface CreateItemData {
+  name: string;
+  description?: string;
+  unit: string;
+  category?: string;
+  itemType?: ItemType;
+  isActive?: boolean;
+  // Recipe-specific fields
+  servingSize?: number;
+  preparationTime?: number;
+  cookingTime?: number;
+  instructions?: string;
+  notes?: string;
+}
+
+export interface UpdateItemData extends Partial<CreateItemData> {}
+
+// Legacy aliases for backward compatibility during migration
+export type Ingredient = Item;
+export type CreateIngredientData = CreateItemData;
+export type UpdateIngredientData = UpdateItemData;
+
+// ============================================================================
+// RECIPES (now a type of Item)
+// ============================================================================
+
+// Recipe is now just an Item with itemType='recipe'
+export type Recipe = Item & { itemType: 'recipe' };
+
+export interface RecipeItem {
   id: number;
   recipeId: number;
-  ingredientId: number;
+  itemId: number; // Can reference either items or recipes (nested recipes)
   quantity: number;
   unit: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
   // Populated fields
-  ingredient?: Ingredient;
+  item?: Item; // Can be either a regular item or another recipe
 }
 
-export interface RecipeWithIngredients extends Recipe {
-  ingredients: RecipeIngredient[];
+export interface RecipeWithItems extends Recipe {
+  items: RecipeItem[];
 }
 
 export interface CreateRecipeData {
   name: string;
   description?: string;
+  unit?: string;
+  category?: string;
   servingSize?: number;
   preparationTime?: number;
   cookingTime?: number;
   instructions?: string;
   notes?: string;
   isActive?: boolean;
-  ingredients?: Array<{
-    ingredientId: number;
+  items?: Array<{
+    itemId: number; // Can be item or recipe ID
     quantity: number;
     unit: string;
     notes?: string;
@@ -886,15 +898,21 @@ export interface CreateRecipeData {
 
 export interface UpdateRecipeData extends Partial<CreateRecipeData> {}
 
-export interface CreateRecipeIngredientData {
+export interface CreateRecipeItemData {
   recipeId: number;
-  ingredientId: number;
+  itemId: number;
   quantity: number;
   unit: string;
   notes?: string;
 }
 
-export interface UpdateRecipeIngredientData extends Partial<CreateRecipeIngredientData> {}
+export interface UpdateRecipeItemData extends Partial<CreateRecipeItemData> {}
+
+// Legacy aliases for backward compatibility
+export type RecipeIngredient = RecipeItem;
+export type RecipeWithIngredients = RecipeWithItems;
+export type CreateRecipeIngredientData = CreateRecipeItemData;
+export type UpdateRecipeIngredientData = UpdateRecipeItemData;
 
 // ============================================================================
 // SUPPLIERS
@@ -928,44 +946,8 @@ export interface CreateSupplierData {
 export interface UpdateSupplierData extends Partial<CreateSupplierData> {}
 
 // ============================================================================
-// SUPPLIER CATALOGS
+// SUPPLIER CATALOGS - REMOVED
 // ============================================================================
-
-export interface SupplierCatalog {
-  id: number;
-  supplierId: number;
-  ingredientId: number;
-  supplierSku?: string;
-  unitPrice: number;
-  unit: string;
-  minimumOrderQuantity?: number;
-  leadTimeDays?: number;
-  isActive: boolean;
-  effectiveDate: string;
-  expiryDate?: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-  // Populated fields
-  supplier?: Supplier;
-  ingredient?: Ingredient;
-}
-
-export interface CreateSupplierCatalogData {
-  supplierId: number;
-  ingredientId: number;
-  supplierSku?: string;
-  unitPrice: number;
-  unit: string;
-  minimumOrderQuantity?: number;
-  leadTimeDays?: number;
-  isActive?: boolean;
-  effectiveDate?: string;
-  expiryDate?: string;
-  notes?: string;
-}
-
-export interface UpdateSupplierCatalogData extends Partial<CreateSupplierCatalogData> {}
 
 // ============================================================================
 // SUPPLIER ORDERS
@@ -982,7 +964,7 @@ export enum SupplierOrderStatus {
 export interface SupplierOrderItem {
   id: number;
   orderId: number;
-  ingredientId: number;
+  itemId: number;
   quantity: number;
   unit: string;
   unitPrice: number;
@@ -992,7 +974,7 @@ export interface SupplierOrderItem {
   createdAt: string;
   updatedAt: string;
   // Populated fields
-  ingredient?: Ingredient;
+  item?: Item;
 }
 
 export interface SupplierOrder {
@@ -1020,7 +1002,7 @@ export interface CreateSupplierOrderData {
   status?: SupplierOrderStatus;
   notes?: string;
   items: Array<{
-    ingredientId: number;
+    itemId: number;
     quantity: number;
     unit: string;
     unitPrice: number;
@@ -1031,7 +1013,7 @@ export interface CreateSupplierOrderData {
 export interface UpdateSupplierOrderData extends Partial<Omit<CreateSupplierOrderData, 'items'>> {
   items?: Array<{
     id?: number;
-    ingredientId: number;
+    itemId: number;
     quantity: number;
     unit: string;
     unitPrice: number;
@@ -1041,7 +1023,7 @@ export interface UpdateSupplierOrderData extends Partial<Omit<CreateSupplierOrde
 
 export interface CreateSupplierOrderItemData {
   orderId: number;
-  ingredientId: number;
+  itemId: number;
   quantity: number;
   unit: string;
   unitPrice: number;
@@ -1056,7 +1038,7 @@ export interface UpdateSupplierOrderItemData extends Partial<CreateSupplierOrder
 
 export interface StockLevel {
   id: number;
-  ingredientId: number;
+  itemId: number;
   quantity: number;
   unit: string;
   location?: string;
@@ -1066,11 +1048,11 @@ export interface StockLevel {
   createdAt: string;
   updatedAt: string;
   // Populated fields
-  ingredient?: Ingredient;
+  item?: Item;
 }
 
 export interface CreateStockLevelData {
-  ingredientId: number;
+  itemId: number;
   quantity: number;
   unit: string;
   location?: string;
@@ -1103,7 +1085,7 @@ export enum StockMovementReferenceType {
 
 export interface StockMovement {
   id: number;
-  ingredientId: number;
+  itemId: number;
   movementType: StockMovementType;
   quantity: number;
   unit: string;
@@ -1115,11 +1097,11 @@ export interface StockMovement {
   createdBy?: number;
   createdAt: string;
   // Populated fields
-  ingredient?: Ingredient;
+  item?: Item;
 }
 
 export interface CreateStockMovementData {
-  ingredientId: number;
+  itemId: number;
   movementType: StockMovementType;
   quantity: number;
   unit: string;
@@ -1138,7 +1120,7 @@ export interface UpdateStockMovementData extends Partial<CreateStockMovementData
 
 export interface ExpiryDate {
   id: number;
-  ingredientId: number;
+  itemId: number;
   stockMovementId?: number;
   quantity: number;
   unit: string;
@@ -1150,11 +1132,11 @@ export interface ExpiryDate {
   createdAt: string;
   updatedAt: string;
   // Populated fields
-  ingredient?: Ingredient;
+  item?: Item;
 }
 
 export interface CreateExpiryDateData {
-  ingredientId: number;
+  itemId: number;
   stockMovementId?: number;
   quantity: number;
   unit: string;

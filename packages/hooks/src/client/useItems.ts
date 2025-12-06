@@ -4,17 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { itemsApi } from '@kit/lib';
 import type { Item, CreateItemData, UpdateItemData } from '@kit/types';
 
-export function useItems(params?: { page?: number; limit?: number }) {
+export function useItems(params?: { page?: number; limit?: number; itemType?: string }) {
   return useQuery({
     queryKey: ['items', params],
     queryFn: async () => {
       try {
         const result = await itemsApi.getAll(params);
-        // Return full paginated response
         if (result && result !== null && typeof result === 'object' && 'data' in result && 'pagination' in result) {
           return result;
         }
-        // If result is already an array (fallback for backward compatibility)
         if (Array.isArray(result)) {
           return {
             data: result,
@@ -88,4 +86,3 @@ export function useDeleteItem() {
     },
   });
 }
-

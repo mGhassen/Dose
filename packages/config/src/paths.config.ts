@@ -195,9 +195,9 @@ export const pathsConfig: NavigationConfig = {
       translationKey: "inventory",
       items: [
         {
-          title: "ingredients",
-          url: "/ingredients",
-          translationKey: "ingredients"
+          title: "items",
+          url: "/items",
+          translationKey: "items"
         },
         {
           title: "recipes",
@@ -208,11 +208,6 @@ export const pathsConfig: NavigationConfig = {
           title: "suppliers",
           url: "/inventory-suppliers",
           translationKey: "suppliers"
-        },
-        {
-          title: "supplier-catalogs",
-          url: "/supplier-catalogs",
-          translationKey: "supplierCatalogs"
         },
         {
           title: "supplier-orders",

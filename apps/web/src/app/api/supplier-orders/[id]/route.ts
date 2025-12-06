@@ -24,7 +24,7 @@ function transformSupplierOrderItem(row: any): SupplierOrderItem {
   return {
     id: row.id,
     orderId: row.order_id,
-    ingredientId: row.ingredient_id,
+    itemId: row.item_id,
     quantity: parseFloat(row.quantity),
     unit: row.unit,
     unitPrice: parseFloat(row.unit_price),
@@ -71,12 +71,12 @@ export async function GET(
       );
     }
 
-    // Get order items with ingredient details
+    // Get order items with item details
     const { data: itemsData, error: itemsError } = await supabase
       .from('supplier_order_items')
       .select(`
         *,
-        ingredient:ingredients(*)
+        item:items(*)
       `)
       .eq('order_id', id);
 
@@ -86,15 +86,16 @@ export async function GET(
       ...transformSupplierOrder(orderData),
       items: (itemsData || []).map(item => ({
         ...transformSupplierOrderItem(item),
-        ingredient: item.ingredient ? {
-          id: item.ingredient.id,
-          name: item.ingredient.name,
-          description: item.ingredient.description,
-          unit: item.ingredient.unit,
-          category: item.ingredient.category,
-          isActive: item.ingredient.is_active,
-          createdAt: item.ingredient.created_at,
-          updatedAt: item.ingredient.updated_at,
+        item: item.item ? {
+          id: item.item.id,
+          name: item.item.name,
+          description: item.item.description,
+          unit: item.item.unit,
+          category: item.item.category,
+          itemType: item.item.item_type || 'item',
+          isActive: item.item.is_active,
+          createdAt: item.item.created_at,
+          updatedAt: item.item.updated_at,
         } : undefined,
       })),
     };
@@ -156,7 +157,7 @@ export async function PUT(
       if (body.items.length > 0) {
         const orderItems = body.items.map(item => ({
           order_id: Number(id),
-          ingredient_id: item.ingredientId,
+          item_id: item.itemId,
           quantity: item.quantity,
           unit: item.unit,
           unit_price: item.unitPrice,
