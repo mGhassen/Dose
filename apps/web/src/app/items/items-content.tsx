@@ -35,8 +35,13 @@ export default function ItemsContent() {
       accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <div className="font-medium">
-          {row.original.name}
+        <div className="flex items-center gap-2">
+          <div className="font-medium">
+            {row.original.name}
+          </div>
+          {row.original.itemType === 'recipe' && (
+            <Badge variant="secondary" className="text-xs">Recipe</Badge>
+          )}
         </div>
       ),
     },
@@ -57,8 +62,14 @@ export default function ItemsContent() {
     },
     {
       accessorKey: "unitPrice",
-      header: "Unit Price",
-      cell: ({ row }) => row.original.unitPrice ? formatCurrency(row.original.unitPrice) : <span className="text-muted-foreground">—</span>,
+      header: "Unit Price / Serving",
+      cell: ({ row }) => {
+        // Recipes don't have unitPrice, show serving size instead
+        if (row.original.itemType === 'recipe') {
+          return row.original.servingSize ? `${row.original.servingSize} servings` : <span className="text-muted-foreground">—</span>;
+        }
+        return row.original.unitPrice ? formatCurrency(row.original.unitPrice) : <span className="text-muted-foreground">—</span>;
+      },
     },
     {
       accessorKey: "vendorId",

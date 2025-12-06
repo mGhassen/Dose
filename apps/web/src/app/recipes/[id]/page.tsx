@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Input } from "@kit/ui/input";
@@ -64,6 +65,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
+    category: "",
+    unit: "",
     servingSize: "",
     preparationTime: "",
     cookingTime: "",
@@ -82,6 +85,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
       setFormData({
         name: recipe.name,
         description: recipe.description || "",
+        category: recipe.category || "",
+        unit: recipe.unit || "",
         servingSize: recipe.servingSize?.toString() || "",
         preparationTime: recipe.preparationTime?.toString() || "",
         cookingTime: recipe.cookingTime?.toString() || "",
@@ -117,6 +122,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
         data: {
           name: formData.name,
           description: formData.description || undefined,
+          category: formData.category || undefined,
+          unit: formData.unit || undefined,
           servingSize: formData.servingSize ? parseInt(formData.servingSize) : undefined,
           preparationTime: formData.preparationTime ? parseInt(formData.preparationTime) : undefined,
           cookingTime: formData.cookingTime ? parseInt(formData.cookingTime) : undefined,
@@ -266,6 +273,27 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                         onChange={(e) => handleInputChange('name', e.target.value)}
                         required
                       />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="category">Category</Label>
+                        <Input
+                          id="category"
+                          value={formData.category}
+                          onChange={(e) => handleInputChange('category', e.target.value)}
+                          placeholder="e.g., Beverages, Food"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="unit">Unit</Label>
+                        <Input
+                          id="unit"
+                          value={formData.unit}
+                          onChange={(e) => handleInputChange('unit', e.target.value)}
+                          placeholder="e.g., serving, piece"
+                        />
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -474,6 +502,40 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                       <p className="text-base mt-1 whitespace-pre-wrap">{recipe.instructions}</p>
                     </div>
                   )}
+
+                  {/* Item Information (shared with items) */}
+                  <div className="pt-4 border-t">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium">Item Information</label>
+                        <Link href={`/items/${recipe.id}`}>
+                          <Button variant="outline" size="sm">
+                            View as Item
+                          </Button>
+                        </Link>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Category</label>
+                          <p className="text-base mt-1">{recipe.category || "—"}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Unit</label>
+                          <p className="text-base mt-1">{recipe.unit || "—"}</p>
+                        </div>
+                      </div>
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-2">
+                          This recipe is available as an item and can be:
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                          <li>Sold in sales transactions</li>
+                          <li>Used as an ingredient in other recipes</li>
+                          <li>Tracked in inventory and stock levels</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
 
                   <div className="pt-4 border-t">
                     <div className="grid grid-cols-1 gap-3 text-sm text-muted-foreground">

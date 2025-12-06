@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import {
@@ -334,10 +335,17 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   {/* Status */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Status</label>
-                    <div className="mt-1">
+                    <div className="mt-1 flex items-center gap-2">
                       <Badge variant={item.isActive ? "default" : "secondary"}>
                         {item.isActive ? "Active" : "Inactive"}
                       </Badge>
+                      {item.itemType === 'recipe' && (
+                        <Link href={`/recipes/${item.id}`}>
+                          <Button variant="outline" size="sm">
+                            View Recipe
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   </div>
 

@@ -108,6 +108,26 @@ export async function PUT(
     const body: UpdateSaleData = await request.json();
 
     const supabase = createServerSupabaseClient();
+    
+    // Validate itemId if provided - check if it exists in items or recipes
+    if (body.itemId !== undefined) {
+      if (body.itemId === null) {
+        // null is allowed (no item linked)
+      } else {
+        const [itemCheck, recipeCheck] = await Promise.all([
+          supabase.from('items').select('id').eq('id', body.itemId).single(),
+          supabase.from('recipes').select('id').eq('id', body.itemId).single(),
+        ]);
+        
+        if (itemCheck.error && recipeCheck.error) {
+          return NextResponse.json(
+            { error: `Item or recipe with id ${body.itemId} not found` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+    
     const { data, error } = await supabase
       .from('sales')
       .update(transformToSnakeCase(body))
