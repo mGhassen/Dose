@@ -18,7 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@kit/ui/badge";
 import { Save, X, Trash2, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useSaleById, useUpdateSale, useDeleteSale } from "@kit/hooks";
+import { useSaleById, useUpdateSale, useDeleteSale, useItems } from "@kit/hooks";
+import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -33,6 +34,7 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const { data: sale, isLoading } = useSaleById(resolvedParams?.id || "");
+  const { data: itemsResponse } = useItems({ limit: 1000 });
   const updateSale = useUpdateSale();
   const deleteMutation = useDeleteSale();
   
@@ -42,6 +44,7 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
     amount: "",
     quantity: "",
     description: "",
+    itemId: "",
   });
 
   useEffect(() => {
@@ -56,6 +59,7 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
         amount: sale.amount.toString(),
         quantity: sale.quantity?.toString() || "",
         description: sale.description || "",
+        itemId: sale.itemId?.toString() || "",
       });
     }
   }, [sale]);
@@ -79,6 +83,7 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
           amount: parseFloat(formData.amount),
           quantity: formData.quantity ? parseInt(formData.quantity) : undefined,
           description: formData.description || undefined,
+          itemId: formData.itemId ? parseInt(formData.itemId) : undefined,
         },
       });
       toast.success("Sale updated successfully");
@@ -250,6 +255,35 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
                       placeholder="Optional"
                     />
                   </div>
+
+                  {/* Item/Recipe */}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="itemId">Item/Recipe</Label>
+                    <Select
+                      value={formData.itemId || "none"}
+                      onValueChange={(value) => handleInputChange('itemId', value === "none" ? "" : value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select item or recipe (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {itemsResponse?.data?.filter(i => i.itemType === 'item').map((item) => (
+                          <SelectItem key={item.id} value={item.id.toString()}>
+                            {item.name} {item.category ? `(${item.category})` : ''}
+                          </SelectItem>
+                        ))}
+                        {itemsResponse?.data?.filter(i => i.itemType === 'recipe').map((recipe) => (
+                          <SelectItem key={recipe.id} value={recipe.id.toString()}>
+                            {recipe.name} (Recipe)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Link this sale to a specific item or recipe
+                    </p>
+                  </div>
                 </div>
 
                 {/* Description */}
@@ -311,6 +345,30 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
                     <p className="text-base mt-1">
                       {sale.quantity || <span className="text-muted-foreground">—</span>}
                     </p>
+                  </div>
+
+                  {/* Item/Recipe */}
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground">Item/Recipe</label>
+                    <div className="mt-1">
+                      {sale.item ? (
+                        <div className="flex items-center gap-2">
+                          <Link href={sale.item.itemType === 'recipe' ? `/recipes/${sale.item.id}` : `/items/${sale.item.id}`}>
+                            <Button variant="link" className="p-0 h-auto font-semibold">
+                              {sale.item.name}
+                            </Button>
+                          </Link>
+                          {sale.item.itemType === 'recipe' && (
+                            <Badge variant="secondary" className="text-xs">Recipe</Badge>
+                          )}
+                          {sale.item.category && (
+                            <Badge variant="outline" className="text-xs">{sale.item.category}</Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

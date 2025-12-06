@@ -462,8 +462,11 @@ export interface Sale {
   amount: number;
   quantity?: number;
   description?: string;
+  itemId?: number;
   createdAt: string;
   updatedAt: string;
+  // Populated fields
+  item?: Item;
 }
 
 export interface SalesSummary {
@@ -482,6 +485,7 @@ export interface CreateSaleData {
   amount: number;
   quantity?: number;
   description?: string;
+  itemId?: number;
 }
 
 export interface UpdateSaleData extends Partial<CreateSaleData> {}

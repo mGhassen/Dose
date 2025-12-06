@@ -65,6 +65,24 @@ export default function SalesContent() {
       cell: ({ row }) => row.original.quantity || <span className="text-muted-foreground">—</span>,
     },
     {
+      accessorKey: "item",
+      header: "Item/Recipe",
+      cell: ({ row }) => {
+        const item = row.original.item;
+        if (item) {
+          return (
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{item.name}</span>
+              {item.itemType === 'recipe' && (
+                <Badge variant="secondary" className="text-xs">Recipe</Badge>
+              )}
+            </div>
+          );
+        }
+        return <span className="text-muted-foreground">—</span>;
+      },
+    },
+    {
       accessorKey: "description",
       header: "Description",
       cell: ({ row }) => row.original.description || <span className="text-muted-foreground">—</span>,
@@ -95,12 +113,13 @@ export default function SalesContent() {
     const salesToCopy = type === 'selected' ? data : data;
     
     const csv = [
-      ['Date', 'Type', 'Amount', 'Quantity', 'Description'].join(','),
+      ['Date', 'Type', 'Amount', 'Quantity', 'Item/Recipe', 'Description'].join(','),
       ...salesToCopy.map(sale => [
         sale.date,
         sale.type,
         sale.amount,
         sale.quantity || '',
+        sale.item?.name || '',
         sale.description || '',
       ].join(','))
     ].join('\n');
@@ -113,12 +132,13 @@ export default function SalesContent() {
     const salesToExport = type === 'selected' ? data : data;
     
     const csv = [
-      ['Date', 'Type', 'Amount', 'Quantity', 'Description'].join(','),
+      ['Date', 'Type', 'Amount', 'Quantity', 'Item/Recipe', 'Description'].join(','),
       ...salesToExport.map(sale => [
         sale.date,
         sale.type,
         sale.amount,
         sale.quantity || '',
+        sale.item?.name || '',
         sale.description || '',
       ].join(','))
     ].join('\n');

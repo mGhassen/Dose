@@ -10,19 +10,21 @@ import { Textarea } from "@kit/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateSale } from "@kit/hooks";
+import { useCreateSale, useItems } from "@kit/hooks";
 import { toast } from "sonner";
 import type { SalesType } from "@kit/types";
 
 export default function CreateSalePage() {
   const router = useRouter();
   const createSale = useCreateSale();
+  const { data: itemsResponse } = useItems({ limit: 1000 });
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     type: "" as SalesType | "",
     amount: "",
     quantity: "",
     description: "",
+    itemId: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,6 +42,7 @@ export default function CreateSalePage() {
         amount: parseFloat(formData.amount),
         quantity: formData.quantity ? parseInt(formData.quantity) : undefined,
         description: formData.description || undefined,
+        itemId: formData.itemId ? parseInt(formData.itemId) : undefined,
       });
       toast.success("Sale created successfully");
       router.push('/sales');
@@ -125,6 +128,35 @@ export default function CreateSalePage() {
                     onChange={(e) => handleInputChange('quantity', e.target.value)}
                     placeholder="Optional"
                   />
+                </div>
+
+                {/* Item/Recipe */}
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="itemId">Item/Recipe</Label>
+                  <Select
+                    value={formData.itemId || "none"}
+                    onValueChange={(value) => handleInputChange('itemId', value === "none" ? "" : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select item or recipe (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {itemsResponse?.data?.filter(i => i.itemType === 'item').map((item) => (
+                        <SelectItem key={item.id} value={item.id.toString()}>
+                          {item.name} {item.category ? `(${item.category})` : ''}
+                        </SelectItem>
+                      ))}
+                      {itemsResponse?.data?.filter(i => i.itemType === 'recipe').map((recipe) => (
+                        <SelectItem key={recipe.id} value={recipe.id.toString()}>
+                          {recipe.name} (Recipe)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Link this sale to a specific item or recipe
+                  </p>
                 </div>
               </div>
 

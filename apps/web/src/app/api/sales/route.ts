@@ -13,8 +13,20 @@ function transformSale(row: any): Sale {
     amount: parseFloat(row.amount),
     quantity: row.quantity,
     description: row.description,
+    itemId: row.item_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    item: row.item ? {
+      id: row.item.id,
+      name: row.item.name,
+      description: row.item.description,
+      category: row.item.category,
+      sku: row.item.sku,
+      unit: row.item.unit,
+      unitPrice: row.item.unit_price ? parseFloat(row.item.unit_price) : undefined,
+      itemType: row.item.item_type,
+      isActive: row.item.is_active,
+    } : undefined,
   };
 }
 
@@ -25,6 +37,7 @@ function transformToSnakeCase(data: CreateSaleData): any {
     amount: data.amount,
     quantity: data.quantity,
     description: data.description,
+    item_id: data.itemId,
   };
 }
 
@@ -43,10 +56,10 @@ export async function GET(request: NextRequest) {
       .from('sales')
       .select('*', { count: 'exact', head: true });
 
-    // Build data query
+    // Build data query with item join
     let query = supabase
       .from('sales')
-      .select('*')
+      .select('*, item:items(*)')
       .order('date', { ascending: false });
 
     if (year) {

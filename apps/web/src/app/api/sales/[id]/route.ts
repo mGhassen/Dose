@@ -12,8 +12,20 @@ function transformSale(row: any): Sale {
     amount: parseFloat(row.amount),
     quantity: row.quantity,
     description: row.description,
+    itemId: row.item_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    item: row.item ? {
+      id: row.item.id,
+      name: row.item.name,
+      description: row.item.description,
+      category: row.item.category,
+      sku: row.item.sku,
+      unit: row.item.unit,
+      unitPrice: row.item.unit_price ? parseFloat(row.item.unit_price) : undefined,
+      itemType: row.item.item_type,
+      isActive: row.item.is_active,
+    } : undefined,
   };
 }
 
@@ -24,6 +36,7 @@ function transformToSnakeCase(data: UpdateSaleData): any {
   if (data.amount !== undefined) result.amount = data.amount;
   if (data.quantity !== undefined) result.quantity = data.quantity;
   if (data.description !== undefined) result.description = data.description;
+  if (data.itemId !== undefined) result.item_id = data.itemId;
   result.updated_at = new Date().toISOString();
   return result;
 }
@@ -38,7 +51,7 @@ export async function GET(
     
     const { data, error } = await supabase
       .from('sales')
-      .select('*')
+      .select('*, item:items(*)')
       .eq('id', id)
       .single();
 
