@@ -100,156 +100,173 @@ export default function CreateRecipePage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="name">Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    placeholder="Recipe name"
-                    required
-                  />
-                </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column: Recipe Information */}
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      placeholder="Recipe name"
+                      required
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="servingSize">Serving Size</Label>
-                  <Input
-                    id="servingSize"
-                    type="number"
-                    value={formData.servingSize}
-                    onChange={(e) => handleInputChange('servingSize', e.target.value)}
-                    placeholder="4"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="preparationTime">Preparation Time (minutes)</Label>
-                  <Input
-                    id="preparationTime"
-                    type="number"
-                    value={formData.preparationTime}
-                    onChange={(e) => handleInputChange('preparationTime', e.target.value)}
-                    placeholder="30"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="cookingTime">Cooking Time (minutes)</Label>
-                  <Input
-                    id="cookingTime"
-                    type="number"
-                    value={formData.cookingTime}
-                    onChange={(e) => handleInputChange('cookingTime', e.target.value)}
-                    placeholder="45"
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    placeholder="Recipe description"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="instructions">Instructions</Label>
-                  <Textarea
-                    id="instructions"
-                    value={formData.instructions}
-                    onChange={(e) => handleInputChange('instructions', e.target.value)}
-                    placeholder="Cooking instructions"
-                    rows={5}
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes}
-                    onChange={(e) => handleInputChange('notes', e.target.value)}
-                    placeholder="Additional notes"
-                    rows={2}
-                  />
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="isActive"
-                    checked={formData.isActive}
-                    onCheckedChange={(checked) => handleInputChange('isActive', checked)}
-                  />
-                  <Label htmlFor="isActive" className="font-normal cursor-pointer">
-                    Active
-                  </Label>
-                </div>
-              </div>
-
-              {/* Items Section */}
-              <div className="space-y-4 border-t pt-6">
-                <div className="flex items-center justify-between">
-                  <Label className="text-base font-semibold">Items</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Item
-                  </Button>
-                </div>
-
-                {items.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-4 items-end p-4 border rounded-lg">
-                    <div className="col-span-4">
-                      <Label>Item</Label>
-                      <Select
-                        value={item.itemId.toString()}
-                        onValueChange={(value) => updateItem(index, 'itemId', parseInt(value))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select item" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {itemsResponse?.data?.filter(i => i.itemType === 'item').map((it) => (
-                            <SelectItem key={it.id} value={it.id.toString()}>
-                              {it.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-3">
-                      <Label>Quantity</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="servingSize">Serving Size</Label>
                       <Input
+                        id="servingSize"
                         type="number"
-                        step="0.01"
-                        value={ing.quantity || ""}
-                        onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                        placeholder="0"
+                        value={formData.servingSize}
+                        onChange={(e) => handleInputChange('servingSize', e.target.value)}
+                        placeholder="4"
                       />
                     </div>
-                    <div className="col-span-3">
-                      <Label>Unit</Label>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="preparationTime">Preparation Time (minutes)</Label>
                       <Input
-                        value={ing.unit}
-                        onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                        placeholder="kg, L, etc."
+                        id="preparationTime"
+                        type="number"
+                        value={formData.preparationTime}
+                        onChange={(e) => handleInputChange('preparationTime', e.target.value)}
+                        placeholder="30"
                       />
-                    </div>
-                    <div className="col-span-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeItem(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
-                ))}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cookingTime">Cooking Time (minutes)</Label>
+                    <Input
+                      id="cookingTime"
+                      type="number"
+                      value={formData.cookingTime}
+                      onChange={(e) => handleInputChange('cookingTime', e.target.value)}
+                      placeholder="45"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => handleInputChange('description', e.target.value)}
+                      placeholder="Recipe description"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="instructions">Instructions</Label>
+                    <Textarea
+                      id="instructions"
+                      value={formData.instructions}
+                      onChange={(e) => handleInputChange('instructions', e.target.value)}
+                      placeholder="Cooking instructions"
+                      rows={8}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="notes">Notes</Label>
+                    <Textarea
+                      id="notes"
+                      value={formData.notes}
+                      onChange={(e) => handleInputChange('notes', e.target.value)}
+                      placeholder="Additional notes"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="isActive"
+                      checked={formData.isActive}
+                      onCheckedChange={(checked) => handleInputChange('isActive', checked)}
+                    />
+                    <Label htmlFor="isActive" className="font-normal cursor-pointer">
+                      Active
+                    </Label>
+                  </div>
+                </div>
+
+                {/* Right Column: Items Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">Items</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Item
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                    {items.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                        <p>No items added yet</p>
+                        <p className="text-sm mt-1">Click "Add Item" to get started</p>
+                      </div>
+                    ) : (
+                      items.map((item, index) => (
+                        <div key={index} className="space-y-3 p-4 border rounded-lg bg-card">
+                          <div className="space-y-2">
+                            <Label>Item</Label>
+                            <Select
+                              value={item.itemId ? item.itemId.toString() : undefined}
+                              onValueChange={(value) => updateItem(index, 'itemId', parseInt(value))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select item" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {itemsResponse?.data?.filter(i => i.itemType === 'item').map((it) => (
+                                  <SelectItem key={it.id} value={it.id.toString()}>
+                                    {it.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label>Quantity</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.quantity || ""}
+                                onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Unit</Label>
+                              <Input
+                                value={item.unit}
+                                onChange={(e) => updateItem(index, 'unit', e.target.value)}
+                                placeholder="kg, L, etc."
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeItem(index)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-4">

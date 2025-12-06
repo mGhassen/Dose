@@ -255,150 +255,167 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           <CardContent>
             {isEditing ? (
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="name">Name *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                      required
-                    />
-                  </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left Column: Recipe Information */}
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Name *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => handleInputChange('name', e.target.value)}
+                        required
+                      />
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="servingSize">Serving Size</Label>
-                    <Input
-                      id="servingSize"
-                      type="number"
-                      value={formData.servingSize}
-                      onChange={(e) => handleInputChange('servingSize', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="preparationTime">Preparation Time (minutes)</Label>
-                    <Input
-                      id="preparationTime"
-                      type="number"
-                      value={formData.preparationTime}
-                      onChange={(e) => handleInputChange('preparationTime', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="cookingTime">Cooking Time (minutes)</Label>
-                    <Input
-                      id="cookingTime"
-                      type="number"
-                      value={formData.cookingTime}
-                      onChange={(e) => handleInputChange('cookingTime', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => handleInputChange('description', e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="instructions">Instructions</Label>
-                    <Textarea
-                      id="instructions"
-                      value={formData.instructions}
-                      onChange={(e) => handleInputChange('instructions', e.target.value)}
-                      rows={5}
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="notes">Notes</Label>
-                    <Textarea
-                      id="notes"
-                      value={formData.notes}
-                      onChange={(e) => handleInputChange('notes', e.target.value)}
-                      rows={2}
-                    />
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="isActive"
-                      checked={formData.isActive}
-                      onCheckedChange={(checked) => handleInputChange('isActive', checked)}
-                    />
-                    <Label htmlFor="isActive" className="font-normal cursor-pointer">
-                      Active
-                    </Label>
-                  </div>
-                </div>
-
-                {/* Items Section */}
-                <div className="space-y-4 border-t pt-6">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-base font-semibold">Items</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Item
-                    </Button>
-                  </div>
-
-                  {items.map((item, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-4 items-end p-4 border rounded-lg">
-                      <div className="col-span-4">
-                        <Label>Item</Label>
-                        <Select
-                          value={item.itemId.toString()}
-                          onValueChange={(value) => updateItem(index, 'itemId', parseInt(value))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select item" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {itemsResponse?.data?.filter(i => i.itemType === 'item').map((it) => (
-                              <SelectItem key={it.id} value={it.id.toString()}>
-                                {it.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="col-span-3">
-                        <Label>Quantity</Label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="servingSize">Serving Size</Label>
                         <Input
+                          id="servingSize"
                           type="number"
-                          step="0.01"
-                          value={item.quantity || ""}
-                          onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                          value={formData.servingSize}
+                          onChange={(e) => handleInputChange('servingSize', e.target.value)}
                         />
                       </div>
-                      <div className="col-span-3">
-                        <Label>Unit</Label>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="preparationTime">Preparation Time (minutes)</Label>
                         <Input
-                          value={item.unit}
-                          onChange={(e) => updateItem(index, 'unit', e.target.value)}
+                          id="preparationTime"
+                          type="number"
+                          value={formData.preparationTime}
+                          onChange={(e) => handleInputChange('preparationTime', e.target.value)}
                         />
-                      </div>
-                      <div className="col-span-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeItem(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     </div>
-                  ))}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="cookingTime">Cooking Time (minutes)</Label>
+                      <Input
+                        id="cookingTime"
+                        type="number"
+                        value={formData.cookingTime}
+                        onChange={(e) => handleInputChange('cookingTime', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => handleInputChange('description', e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="instructions">Instructions</Label>
+                      <Textarea
+                        id="instructions"
+                        value={formData.instructions}
+                        onChange={(e) => handleInputChange('instructions', e.target.value)}
+                        rows={8}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="notes">Notes</Label>
+                      <Textarea
+                        id="notes"
+                        value={formData.notes}
+                        onChange={(e) => handleInputChange('notes', e.target.value)}
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="isActive"
+                        checked={formData.isActive}
+                        onCheckedChange={(checked) => handleInputChange('isActive', checked)}
+                      />
+                      <Label htmlFor="isActive" className="font-normal cursor-pointer">
+                        Active
+                      </Label>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Items Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold">Items</Label>
+                      <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Item
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                      {items.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                          <p>No items added yet</p>
+                          <p className="text-sm mt-1">Click "Add Item" to get started</p>
+                        </div>
+                      ) : (
+                        items.map((item, index) => (
+                          <div key={index} className="space-y-3 p-4 border rounded-lg bg-card">
+                            <div className="space-y-2">
+                              <Label>Item</Label>
+                              <Select
+                                value={item.itemId ? item.itemId.toString() : undefined}
+                                onValueChange={(value) => updateItem(index, 'itemId', parseInt(value))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select item" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {itemsResponse?.data?.filter(i => i.itemType === 'item').map((it) => (
+                                    <SelectItem key={it.id} value={it.id.toString()}>
+                                      {it.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-2">
+                                <Label>Quantity</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={item.quantity || ""}
+                                  onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Unit</Label>
+                                <Input
+                                  value={item.unit}
+                                  onChange={(e) => updateItem(index, 'unit', e.target.value)}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-end">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeItem(index)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex justify-end space-x-4">
+                <div className="flex justify-end space-x-4 pt-6 border-t">
                   <Button
                     type="button"
                     variant="outline"
@@ -414,45 +431,66 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                 </div>
               </form>
             ) : (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column: Recipe Information */}
+                <div className="space-y-6">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Name</label>
                     <p className="text-base font-semibold mt-1">{recipe.name}</p>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Serving Size</label>
-                    <p className="text-base mt-1">{recipe.servingSize ? `${recipe.servingSize} servings` : "—"}</p>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Serving Size</label>
+                      <p className="text-base mt-1">{recipe.servingSize ? `${recipe.servingSize} servings` : "—"}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Status</label>
+                      <p className="text-base mt-1">{recipe.isActive ? "Active" : "Inactive"}</p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Preparation Time</label>
-                    <p className="text-base mt-1">{recipe.preparationTime ? `${recipe.preparationTime} minutes` : "—"}</p>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Preparation Time</label>
+                      <p className="text-base mt-1">{recipe.preparationTime ? `${recipe.preparationTime} minutes` : "—"}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Cooking Time</label>
+                      <p className="text-base mt-1">{recipe.cookingTime ? `${recipe.cookingTime} minutes` : "—"}</p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Cooking Time</label>
-                    <p className="text-base mt-1">{recipe.cookingTime ? `${recipe.cookingTime} minutes` : "—"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Status</label>
-                    <p className="text-base mt-1">{recipe.isActive ? "Active" : "Inactive"}</p>
-                  </div>
+
                   {recipe.description && (
-                    <div className="md:col-span-2">
+                    <div>
                       <label className="text-sm font-medium text-muted-foreground">Description</label>
                       <p className="text-base mt-1">{recipe.description}</p>
                     </div>
                   )}
+
                   {recipe.instructions && (
-                    <div className="md:col-span-2">
+                    <div>
                       <label className="text-sm font-medium text-muted-foreground">Instructions</label>
                       <p className="text-base mt-1 whitespace-pre-wrap">{recipe.instructions}</p>
                     </div>
                   )}
+
+                  <div className="pt-4 border-t">
+                    <div className="grid grid-cols-1 gap-3 text-sm text-muted-foreground">
+                      <div>
+                        <span className="font-medium">Created:</span> {formatDate(recipe.createdAt)}
+                      </div>
+                      <div>
+                        <span className="font-medium">Last Updated:</span> {formatDate(recipe.updatedAt)}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
+                {/* Right Column: Items Section */}
                 {((recipe.items || recipe.ingredients) && (recipe.items?.length || recipe.ingredients?.length || 0) > 0) && (
-                  <div className="border-t pt-6">
-                    <div className="flex items-center justify-between mb-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold">Items</h3>
                       {costData && (
                         <div className="text-right">
@@ -474,31 +512,33 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                         </div>
                       )}
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                       {(recipe.items || recipe.ingredients || []).map((ri: any, index: number) => {
                         const itemId = ri.itemId || ri.ingredientId;
                         const item = ri.item || ri.ingredient;
                         const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingredientId) === itemId) || 
                                         costData?.items?.find((ci: any) => ci.itemId === itemId);
                         return (
-                          <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">{item?.name || `Item ${itemId}`}</span>
-                                <span className="text-muted-foreground">
+                          <div key={index} className="p-4 border rounded-lg bg-card">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="font-medium">{item?.name || `Item ${itemId}`}</span>
+                                </div>
+                                <div className="text-sm text-muted-foreground mb-2">
                                   {ri.quantity} {ri.unit}
-                                </span>
+                                </div>
+                                {costItem && costItem.hasPrice && (
+                                  <div className="text-sm text-muted-foreground">
+                                    {formatCurrency(costItem.unitPrice)}/{ri.unit} • {formatCurrency(costItem.totalCost)} total
+                                  </div>
+                                )}
+                                {costItem && !costItem.hasPrice && (
+                                  <div className="text-xs text-muted-foreground">
+                                    No price data available
+                                  </div>
+                                )}
                               </div>
-                              {costItem && costItem.hasPrice && (
-                                <div className="text-sm text-muted-foreground mt-1">
-                                  {formatCurrency(costItem.unitPrice)}/{ri.unit} • {formatCurrency(costItem.totalCost)} total
-                                </div>
-                              )}
-                              {costItem && !costItem.hasPrice && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  No price data available
-                                </div>
-                              )}
                             </div>
                           </div>
                         );
@@ -506,17 +546,6 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                     </div>
                   </div>
                 )}
-
-                <div className="pt-4 border-t">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-muted-foreground">
-                    <div>
-                      <span className="font-medium">Created:</span> {formatDate(recipe.createdAt)}
-                    </div>
-                    <div>
-                      <span className="font-medium">Last Updated:</span> {formatDate(recipe.updatedAt)}
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
           </CardContent>
