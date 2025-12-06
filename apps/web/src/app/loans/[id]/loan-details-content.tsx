@@ -28,14 +28,23 @@ import {
 import { Badge } from "@kit/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 import { Checkbox } from "@kit/ui/checkbox";
-import { Save, X, Trash2, Calendar, MoreVertical, Edit2, Plus } from "lucide-react";
+import { Save, X, Trash2, Calendar, MoreVertical, Edit2, Plus, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLoanById, useUpdateLoan, useDeleteLoan, useLoanSchedule, useEntries, usePaymentsByEntry, useCreatePayment, useDeletePayment } from "@kit/hooks";
+import { useLoanById, useUpdateLoan, useDeleteLoan, useLoanSchedule, useEntries, usePaymentsByEntry, useCreatePayment, useDeletePayment, useGenerateLoanSchedule } from "@kit/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import type { LoanStatus } from "@kit/types";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@kit/ui/table";
+import { EditableScheduleRow } from "./schedule/loan-schedule-editable";
 
 interface LoanDetailsContentProps {
   loanId: string;
@@ -55,6 +64,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
   const { data: schedule } = useLoanSchedule(loanId);
   const updateLoan = useUpdateLoan();
   const deleteMutation = useDeleteLoan();
+  const generateSchedule = useGenerateLoanSchedule();
   
   // Fetch the loan's input entry
   const { data: entriesData } = useEntries({
@@ -71,6 +81,58 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
   );
   const createPayment = useCreatePayment();
   const deletePayment = useDeletePayment();
+  
+  // Fetch all entries for schedule
+  const { data: allEntriesData } = useEntries({
+    direction: 'output',
+    entryType: 'loan_payment',
+    referenceId: parseInt(loanId),
+    includePayments: true,
+    limit: 1000,
+  });
+  
+  const handleScheduleUpdate = () => {
+    // Hooks handle invalidation automatically
+  };
+  
+  const handleGenerateSchedule = async () => {
+    try {
+      await generateSchedule.mutateAsync(loanId);
+      toast.success("Loan schedule generated successfully");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to generate loan schedule");
+    }
+  };
+  
+  const handleExportSchedule = () => {
+    if (!schedule || schedule.length === 0) {
+      toast.error("No schedule data to export");
+      return;
+    }
+
+    const csv = [
+      ['Month', 'Payment Date', 'Principal Payment', 'Interest Payment', 'Total Payment', 'Remaining Balance', 'Status'].join(','),
+      ...schedule.map(entry => [
+        entry.month,
+        entry.paymentDate,
+        entry.principalPayment,
+        entry.interestPayment,
+        entry.totalPayment,
+        entry.remainingBalance,
+        entry.isPaid ? 'Paid' : 'Pending',
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `loan-schedule-${loan?.loanNumber || 'loan'}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Schedule exported successfully");
+  };
+  
   
   // Calculate payment totals
   const totalPaid = loanEntry ? (payments.reduce((sum, p) => sum + p.amount, 0)) : 0;
@@ -230,10 +292,6 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => router.push(`/loans/${loanId}/schedule`)}>
-                  <Calendar className="mr-2 h-4 w-4" />
-                  View Schedule
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsEditing(true)}>
                   <Edit2 className="mr-2 h-4 w-4" />
                   Edit
@@ -604,6 +662,101 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Amortization Schedule Card */}
+        {!isEditing && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Amortization Schedule</CardTitle>
+                  <CardDescription>
+                    {schedule && schedule.length > 0 ? (
+                      <>
+                        {schedule.length} payment(s) scheduled
+                        {loan.offPaymentMonths && loan.offPaymentMonths.length > 0 && (
+                          <span className="ml-2">
+                            • {loan.offPaymentMonths.length} interest-only month{loan.offPaymentMonths.length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      "No schedule generated yet"
+                    )}
+                  </CardDescription>
+                </div>
+                <div className="flex space-x-2">
+                  {(!schedule || schedule.length === 0) && (
+                    <Button
+                      onClick={handleGenerateSchedule}
+                      disabled={generateSchedule.isPending}
+                    >
+                      {generateSchedule.isPending ? "Generating..." : "Generate Schedule"}
+                    </Button>
+                  )}
+                  {schedule && schedule.length > 0 && (
+                    <Button variant="outline" onClick={handleExportSchedule}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Export CSV
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {schedule && schedule.length > 0 ? (
+                <div className="rounded-md border overflow-x-auto max-h-[600px] overflow-y-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                      <TableRow>
+                        <TableHead>Month</TableHead>
+                        <TableHead>Payment Date</TableHead>
+                        <TableHead className="text-right">Principal</TableHead>
+                        <TableHead className="text-right">Interest</TableHead>
+                        <TableHead className="text-right">Total Payment</TableHead>
+                        <TableHead className="text-right">Remaining Balance</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {schedule.map((entry, index) => (
+                        <EditableScheduleRow
+                          key={entry.id || index}
+                          entry={entry}
+                          loanId={loanId}
+                          onUpdate={handleScheduleUpdate}
+                          allEntries={allEntriesData?.data || []}
+                          offPaymentMonths={loan.offPaymentMonths || []}
+                        />
+                      ))}
+                      <TableRow className="font-semibold bg-muted sticky bottom-0">
+                        <TableCell colSpan={2}>Total</TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(schedule.reduce((sum, e) => sum + e.principalPayment, 0))}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(schedule.reduce((sum, e) => sum + e.interestPayment, 0))}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(schedule.reduce((sum, e) => sum + e.totalPayment, 0))}
+                        </TableCell>
+                        <TableCell colSpan={2}></TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-10">
+                  <p className="text-muted-foreground mb-4">No schedule generated yet.</p>
+                  <Button onClick={handleGenerateSchedule} disabled={generateSchedule.isPending}>
+                    {generateSchedule.isPending ? "Generating..." : "Generate Amortization Schedule"}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

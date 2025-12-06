@@ -65,6 +65,13 @@ export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], 
 
   const handleSave = async () => {
     try {
+      // Prevent editing if entry is paid or partially paid
+      if (totalPaid > 0) {
+        toast.error("Cannot edit entry that has payments recorded");
+        setIsEditing(false);
+        return;
+      }
+
       await updateMutation.mutateAsync({
         loanId,
         scheduleId: String(entry.id),
@@ -306,7 +313,16 @@ export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], 
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsEditing(true)}>
+              <DropdownMenuItem 
+                onClick={() => {
+                  if (totalPaid > 0) {
+                    toast.error("Cannot edit entry that has payments recorded");
+                    return;
+                  }
+                  setIsEditing(true);
+                }}
+                disabled={totalPaid > 0}
+              >
                 <Edit2 className="mr-2 h-4 w-4" />
                 Edit Entry
               </DropdownMenuItem>

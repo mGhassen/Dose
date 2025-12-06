@@ -16,19 +16,22 @@ import {
 } from "@kit/ui/dropdown-menu";
 import { Plus, Trash2, MoreVertical, Edit2, Check, X } from "lucide-react";
 import { Checkbox } from "@kit/ui/checkbox";
-import { useCreateActualPayment, useDeleteActualPayment, useActualPayments } from "@kit/hooks";
+import { useCreateActualPayment, useDeleteActualPayment } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
+import type { ActualPayment } from "@kit/lib";
 import type { LeasingTimelineEntry } from "@/lib/calculations/leasing-timeline";
 
 interface EditableLeasingTimelineRowProps {
   entry: LeasingTimelineEntry;
   leasingId: number;
+  leasingEndDate?: string | null;
+  allActualPayments?: ActualPayment[];
   onUpdate: () => void;
 }
 
-export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: EditableLeasingTimelineRowProps) {
+export function EditableLeasingTimelineRow({ entry, leasingId, leasingEndDate, allActualPayments, onUpdate }: EditableLeasingTimelineRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
@@ -36,16 +39,12 @@ export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: Edita
     paymentDate: entry.paymentDate.split('T')[0],
     amount: entry.amount.toString(),
     isFixedAmount: entry.isFixedAmount || false,
-    shouldProject: false,
   });
   
-  const { data: actualPayments } = useActualPayments({
-    paymentType: 'leasing',
-    referenceId: String(leasingId),
-    month: entry.month,
-  });
+  // Filter payments for this specific entry month from the passed allActualPayments
+  const actualPayments = allActualPayments?.filter(p => p.month === entry.month) || [];
   
-  const totalPaid = actualPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+  const totalPaid = actualPayments.reduce((sum, p) => sum + p.amount, 0);
   const isFullyPaid = totalPaid >= entry.amount;
   const remainingToPay = Math.max(0, entry.amount - totalPaid);
   
@@ -86,41 +85,42 @@ export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: Edita
 
   const handleSave = async () => {
     try {
+      // Prevent editing if entry is paid or partially paid
+      if (totalPaid > 0) {
+        toast.error("Cannot edit entry that has payments recorded");
+        setIsEditing(false);
+        return;
+      }
+
       let entryId = entry.id;
       const newAmount = parseFloat(editData.amount);
       const isFixedAmount = editData.isFixedAmount;
-      const shouldProject = editData.shouldProject;
 
       if (newAmount <= 0) {
         toast.error("Amount must be greater than 0");
         return;
       }
 
-      // If entry doesn't have an ID, we need to ensure it exists in the database first
+      // If entry doesn't have an ID, we need to create it directly
       if (!entryId) {
-        // Generate timeline to create the entry
-        const generateResponse = await fetch(
-          `/api/leasing/${leasingId}/generate-timeline?startMonth=${entry.month}&endMonth=${entry.month}`,
-          { method: 'POST' }
-        );
-        if (!generateResponse.ok) {
-          throw new Error('Failed to create timeline entry');
+        // Create the entry directly in the database
+        const createResponse = await fetch(`/api/leasing/${leasingId}/timeline`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            month: entry.month,
+            paymentDate: editData.paymentDate,
+            amount: newAmount,
+            isFixedAmount: isFixedAmount,
+          }),
+        });
+        
+        if (!createResponse.ok) {
+          const error = await createResponse.json();
+          throw new Error(error.error || 'Failed to create timeline entry');
         }
-
-        // Fetch the created entry to get its ID
-        const timelineResponse = await fetch(
-          `/api/leasing/${leasingId}/timeline?startMonth=${entry.month}&endMonth=${entry.month}`
-        );
-        if (!timelineResponse.ok) {
-          throw new Error('Failed to fetch timeline entry');
-        }
-        const timelineEntries: any[] = await timelineResponse.json();
-        const createdEntry = timelineEntries.find(
-          (e: any) => e.month === entry.month && e.paymentDate.split('T')[0] === entry.paymentDate.split('T')[0]
-        );
-        if (!createdEntry) {
-          throw new Error('Created entry not found');
-        }
+        
+        const createdEntry = await createResponse.json();
         entryId = createdEntry.id;
       }
 
@@ -140,22 +140,55 @@ export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: Edita
         throw new Error(error.error || 'Failed to update entry');
       }
 
-      // If should project and not fixed, regenerate timeline for future entries
-      if (shouldProject && !isFixedAmount) {
-        const startMonth = entry.month;
-        const endDate = new Date();
-        endDate.setFullYear(endDate.getFullYear() + 1);
-        const endMonth = endDate.toISOString().slice(0, 7);
+      // Get the updated entry from the response (PUT returns the updated entry)
+      const updatedEntry = await response.json();
+      const updatedMonth = updatedEntry.month || entry.month;
 
-        // Call generate timeline to regenerate future entries
-        await fetch(`/api/leasing/${leasingId}/generate-timeline?startMonth=${startMonth}&endMonth=${endMonth}`, {
-          method: 'POST',
-        });
+      console.log(`[leasing-timeline-editable] Updated entry: id=${entryId}, originalMonth=${entry.month}, updatedMonth=${updatedMonth}, amount=${newAmount}, isFixed=${isFixedAmount}, entryFromResponse=`, updatedEntry);
+
+      // Small delay to ensure database commit
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // ALWAYS recalculate when amount changes, unless entry is explicitly marked as fixed
+      // (Fixed entries won't be recalculated by the backend, but we still call it to update others)
+      console.log(`\n[FRONTEND] ========== RECALCULATE REQUEST ==========`);
+      console.log(`[FRONTEND] Entry ${entryId} updated:`);
+      console.log(`  - Month: ${updatedMonth}`);
+      console.log(`  - New Amount: ${newAmount}`);
+      console.log(`  - Is Fixed: ${isFixedAmount}`);
+      console.log(`[FRONTEND] Calling recalculate endpoint...`);
+      
+      // Call recalculate endpoint to update only affected entries
+      // The backend will skip if entry is fixed, but we still call it to update other entries
+      const recalculateResponse = await fetch(`/api/leasing/${leasingId}/timeline/recalculate?entryId=${entryId}`, {
+        method: 'POST',
+      });
+      
+      if (!recalculateResponse.ok) {
+        let errorMessage = 'Failed to recalculate timeline entries';
+        try {
+          const error = await recalculateResponse.json();
+          errorMessage = error.error || error.message || errorMessage;
+          console.error(`[FRONTEND] ❌ Failed to recalculate timeline (${recalculateResponse.status}):`, error);
+        } catch (e) {
+          const text = await recalculateResponse.text();
+          console.error(`[FRONTEND] ❌ Failed to recalculate timeline (${recalculateResponse.status}):`, text);
+          errorMessage = text || errorMessage;
+        }
+        toast.error(errorMessage);
+      } else {
+        try {
+          const result = await recalculateResponse.json();
+          console.log(`[FRONTEND] ✅ Recalculate response:`, result);
+          console.log(`[FRONTEND] ========== END RECALCULATE REQUEST ==========\n`);
+        } catch (e) {
+          console.error(`[FRONTEND] ⚠️  Could not parse recalculate response:`, e);
+        }
       }
 
       setIsEditing(false);
       onUpdate();
-      toast.success("Entry updated" + (shouldProject && !isFixedAmount ? " and timeline projected" : ""));
+      toast.success("Entry updated" + (!isFixedAmount ? " and timeline projected" : ""));
     } catch (error: any) {
       toast.error(error?.message || "Failed to update entry");
     }
@@ -198,40 +231,22 @@ export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: Edita
                 onCheckedChange={(checked) => {
                   setEditData(prev => ({ 
                     ...prev, 
-                    isFixedAmount: checked as boolean,
-                    shouldProject: checked ? false : prev.shouldProject
+                    isFixedAmount: checked as boolean
                   }));
                 }}
               />
               <Label htmlFor="editIsFixedAmount" className="text-xs cursor-pointer">
-                Fixed
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="editShouldProject"
-                checked={editData.shouldProject}
-                onCheckedChange={(checked) => {
-                  setEditData(prev => ({ 
-                    ...prev, 
-                    shouldProject: checked as boolean,
-                    isFixedAmount: checked ? false : prev.isFixedAmount
-                  }));
-                }}
-                disabled={editData.isFixedAmount}
-              />
-              <Label htmlFor="editShouldProject" className="text-xs cursor-pointer">
-                Project
+                Fixed (won't be recalculated)
               </Label>
             </div>
           </div>
         </TableCell>
         <TableCell>
           <Badge 
-            variant={isFullyPaid ? "default" : isPastDue ? "destructive" : totalPaid > 0 ? "outline" : isProjected ? "secondary" : "outline"}
+            variant={entry.amount === 0 ? "outline" : isFullyPaid ? "default" : isPastDue ? "destructive" : totalPaid > 0 ? "outline" : isProjected ? "secondary" : "outline"}
             className={totalPaid > 0 && !isFullyPaid ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700" : ""}
           >
-            {isFullyPaid ? "Paid" : totalPaid > 0 ? "Partially Paid" : isProjected ? "Projected" : "Pending"}
+            {entry.amount === 0 ? "No payment" : isFullyPaid ? "Paid" : totalPaid > 0 ? "Partially Paid" : isProjected ? "Projected" : "Pending"}
           </Badge>
         </TableCell>
         <TableCell className="text-sm text-muted-foreground">
@@ -255,7 +270,6 @@ export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: Edita
                   paymentDate: entry.paymentDate.split('T')[0],
                   amount: entry.amount.toString(),
                   isFixedAmount: entry.isFixedAmount || false,
-                  shouldProject: false,
                 });
               }}
             >
@@ -281,11 +295,17 @@ export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: Edita
         <TableCell className="font-semibold">
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
-              {formatCurrency(entry.amount)}
-              {entry.isFixedAmount && (
-                <Badge variant="outline" className="text-xs">
-                  Fixed
-                </Badge>
+              {entry.amount === 0 ? (
+                <span className="text-muted-foreground italic">No payment</span>
+              ) : (
+                <>
+                  {formatCurrency(entry.amount)}
+                  {entry.isFixedAmount && (
+                    <Badge variant="outline" className="text-xs">
+                      Fixed
+                    </Badge>
+                  )}
+                </>
               )}
             </div>
             {totalPaid > 0 && (
@@ -298,10 +318,10 @@ export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: Edita
         </TableCell>
         <TableCell>
           <Badge 
-            variant={isFullyPaid ? "default" : isPastDue ? "destructive" : totalPaid > 0 ? "outline" : isProjected ? "secondary" : "outline"}
+            variant={entry.amount === 0 ? "outline" : isFullyPaid ? "default" : isPastDue ? "destructive" : totalPaid > 0 ? "outline" : isProjected ? "secondary" : "outline"}
             className={totalPaid > 0 && !isFullyPaid ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700" : ""}
           >
-            {isFullyPaid ? "Paid" : totalPaid > 0 ? "Partially Paid" : isProjected ? "Projected" : "Pending"}
+            {entry.amount === 0 ? "No payment" : isFullyPaid ? "Paid" : totalPaid > 0 ? "Partially Paid" : isProjected ? "Projected" : "Pending"}
           </Badge>
         </TableCell>
         <TableCell className="text-sm text-muted-foreground">
@@ -315,7 +335,16 @@ export function EditableLeasingTimelineRow({ entry, leasingId, onUpdate }: Edita
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsEditing(true)}>
+              <DropdownMenuItem 
+                onClick={() => {
+                  if (totalPaid > 0) {
+                    toast.error("Cannot edit entry that has payments recorded");
+                    return;
+                  }
+                  setIsEditing(true);
+                }}
+                disabled={totalPaid > 0}
+              >
                 <Edit2 className="mr-2 h-4 w-4" />
                 Edit Entry
               </DropdownMenuItem>

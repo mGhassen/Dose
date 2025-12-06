@@ -63,3 +63,40 @@ export async function GET(
   }
 }
 
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    
+    const supabase = createServerSupabaseClient();
+    
+    const insertData: any = {
+      leasing_id: parseInt(id),
+      month: body.month,
+      payment_date: body.paymentDate,
+      amount: body.amount,
+      is_projected: body.isProjected !== undefined ? body.isProjected : true,
+      is_fixed_amount: body.isFixedAmount || false,
+    };
+    
+    const { data, error } = await supabase
+      .from('leasing_timeline_entries')
+      .insert(insertData)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json(transformTimelineEntry(data), { status: 201 });
+  } catch (error: any) {
+    console.error('Error creating leasing timeline entry:', error);
+    return NextResponse.json(
+      { error: 'Failed to create leasing timeline entry', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+

@@ -18,13 +18,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@kit/ui/badge";
 import { Checkbox } from "@kit/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@kit/ui/radio-group";
-import { Save, X, Trash2, Calendar, MoreVertical, Edit2 } from "lucide-react";
+import { Save, X, Trash2, Calendar, MoreVertical, Edit2, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLeasingById, useUpdateLeasing, useDeleteLeasing } from "@kit/hooks";
+import { useLeasingById, useUpdateLeasing, useDeleteLeasing, useActualPayments } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
-import { formatDate } from "@kit/lib/date-format";
+import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 import type { LeasingType, ExpenseRecurrence } from "@kit/types";
+import { projectLeasingPayment } from "@/lib/calculations/leasing-timeline";
+import type { LeasingTimelineEntry } from "@/lib/calculations/leasing-timeline";
+import { EditableLeasingTimelineRow } from "./timeline/leasing-timeline-editable";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@kit/ui/table";
 
 interface LeasingDetailPageProps {
   params: Promise<{ id: string }>;
@@ -32,12 +44,21 @@ interface LeasingDetailPageProps {
 
 export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const { data: leasing, isLoading } = useLeasingById(resolvedParams?.id || "");
   const updateLeasing = useUpdateLeasing();
   const deleteMutation = useDeleteLeasing();
   const [amountMode, setAmountMode] = useState<"periodic" | "total">("periodic");
+  const [timeline, setTimeline] = useState<LeasingTimelineEntry[]>([]);
+  const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
+  
+  // Fetch all actual payments for this leasing once, instead of per-row
+  const { data: allActualPayments } = useActualPayments({
+    paymentType: 'leasing',
+    referenceId: resolvedParams?.id || '',
+  });
   
   const [formData, setFormData] = useState({
     name: "",
@@ -57,6 +78,182 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
   useEffect(() => {
     params.then(setResolvedParams);
   }, [params]);
+
+  const handleTimelineUpdate = () => {
+    queryClient.invalidateQueries({ queryKey: ['actual-payments'] });
+    // Just refetch timeline entries, don't regenerate
+    if (resolvedParams?.id && leasing) {
+      fetchTimelineEntries(false); // Pass false to skip generation
+    }
+  };
+
+  const fetchTimelineEntries = async (shouldGenerate: boolean = true) => {
+    if (!resolvedParams?.id || !leasing) return;
+
+    // Calculate date range: from startDate to endDate or 2 years in the future
+    const startDate = new Date(leasing.startDate);
+    const endDate = leasing.endDate ? new Date(leasing.endDate) : (() => {
+      const future = new Date();
+      future.setFullYear(future.getFullYear() + 2);
+      return future;
+    })();
+    
+    const startMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
+    const endMonth = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}`;
+
+    setIsLoadingTimeline(true);
+    try {
+      // Fetch stored entries directly - no need to generate if they already exist
+      const response = await fetch(
+        `/api/leasing/${resolvedParams.id}/timeline?startMonth=${startMonth}&endMonth=${endMonth}`
+      );
+      if (!response.ok) throw new Error('Failed to fetch timeline entries');
+      const storedEntries: LeasingTimelineEntry[] = await response.json();
+      
+      // Only generate timeline if no entries exist (first time viewing this leasing)
+      if (shouldGenerate && storedEntries.length === 0) {
+        await fetch(
+          `/api/leasing/${resolvedParams.id}/generate-timeline?startMonth=${startMonth}&endMonth=${endMonth}`,
+          { method: 'POST' }
+        );
+        // Fetch again after generation
+        const responseAfterGen = await fetch(
+          `/api/leasing/${resolvedParams.id}/timeline?startMonth=${startMonth}&endMonth=${endMonth}`
+        );
+        if (responseAfterGen.ok) {
+          const regeneratedEntries: LeasingTimelineEntry[] = await responseAfterGen.json();
+          storedEntries.push(...regeneratedEntries);
+        }
+      }
+
+      // Calculate entries for fallback/validation
+      const calculatedEntries = projectLeasingPayment(leasing, startMonth, endMonth);
+
+      // Create a map of all months between start and end dates
+      const allMonthsMap = new Map<string, LeasingTimelineEntry>();
+      const startDate = new Date(startMonth + '-01');
+      const endDate = new Date(endMonth + '-01');
+      endDate.setMonth(endDate.getMonth() + 1);
+      endDate.setDate(0); // Last day of endMonth
+      
+      // Generate all months in the range
+      const currentMonth = new Date(startDate);
+      while (currentMonth <= endDate) {
+        const monthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+        const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+        
+        // Create a default entry for this month (will be overridden if there's a payment)
+        allMonthsMap.set(monthKey, {
+          month: monthKey,
+          leasingId: leasing.id,
+          leasingName: leasing.name,
+          amount: 0,
+          isProjected: firstDayOfMonth > new Date(),
+          paymentDate: firstDayOfMonth.toISOString(),
+          isFixedAmount: false,
+        });
+        
+        currentMonth.setMonth(currentMonth.getMonth() + 1);
+      }
+
+      // Add calculated entries (these are months with payments)
+      calculatedEntries.forEach(entry => {
+        const monthKey = entry.month;
+        const existing = allMonthsMap.get(monthKey);
+        if (existing) {
+          // Update the existing month entry with payment details
+          allMonthsMap.set(monthKey, {
+            ...existing,
+            ...entry,
+            id: undefined,
+            isFixedAmount: false,
+          });
+        } else {
+          // Add new entry if month wasn't in range (shouldn't happen, but just in case)
+          allMonthsMap.set(monthKey, {
+            ...entry,
+            id: undefined,
+            isFixedAmount: false,
+          });
+        }
+      });
+
+      // Override with stored entries (preserves IDs, fixed amounts, payment data)
+      storedEntries.forEach(stored => {
+        const monthKey = stored.month;
+        const existing = allMonthsMap.get(monthKey);
+        if (existing) {
+          allMonthsMap.set(monthKey, {
+            ...existing,
+            id: stored.id,
+            amount: stored.isFixedAmount ? stored.amount : (stored.amount || existing.amount),
+            isFixedAmount: stored.isFixedAmount || false,
+            isPaid: stored.isPaid || false,
+            paidDate: stored.paidDate || undefined,
+            actualAmount: stored.actualAmount || undefined,
+            notes: stored.notes || undefined,
+            paymentDate: stored.paymentDate || existing.paymentDate,
+          });
+        }
+      });
+
+      const merged = Array.from(allMonthsMap.values()).sort((a, b) => 
+        a.month.localeCompare(b.month) || a.paymentDate.localeCompare(b.paymentDate)
+      );
+      setTimeline(merged);
+    } catch (error: any) {
+      console.error('Error fetching timeline:', error);
+      // Fallback to calculated entries
+      if (leasing) {
+        const startDate = new Date(leasing.startDate);
+        const endDate = leasing.endDate ? new Date(leasing.endDate) : (() => {
+          const future = new Date();
+          future.setFullYear(future.getFullYear() + 2);
+          return future;
+        })();
+        const startMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
+        const endMonth = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}`;
+        const entries = projectLeasingPayment(leasing, startMonth, endMonth);
+        setTimeline(entries);
+      }
+    } finally {
+      setIsLoadingTimeline(false);
+    }
+  };
+
+  useEffect(() => {
+    if (leasing && resolvedParams?.id && !isEditing) {
+      fetchTimelineEntries(false); // Never generate on page load - data is in DB
+    }
+  }, [leasing, resolvedParams?.id, isEditing]);
+
+  const handleExportTimeline = () => {
+    if (!leasing || timeline.length === 0) {
+      toast.error("No timeline data to export");
+      return;
+    }
+
+    const csv = [
+      ['Month', 'Leasing Name', 'Type', 'Amount', 'Payment Date', 'Status'].join(','),
+      ...timeline.map(entry => [
+        entry.month,
+        entry.leasingName,
+        leasing.type,
+        entry.amount,
+        entry.paymentDate,
+        entry.isProjected ? 'Projected' : 'Actual',
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `leasing-timeline-${leasing.name}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Timeline exported successfully");
+  };
 
   useEffect(() => {
     if (leasing) {
@@ -291,10 +488,6 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => router.push(`/leasing/${resolvedParams.id}/timeline`)}>
-                  <Calendar className="mr-2 h-4 w-4" />
-                  View Timeline
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsEditing(true)}>
                   <Edit2 className="mr-2 h-4 w-4" />
                   Edit
@@ -718,6 +911,93 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
             )}
           </CardContent>
         </Card>
+
+        {/* Timeline Card */}
+        {!isEditing && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Payment Timeline</CardTitle>
+                  <CardDescription>
+                    {timeline.length > 0 ? (
+                      <>
+                        {timeline.length} payment(s) scheduled
+                        {leasing.offPaymentMonths && leasing.offPaymentMonths.length > 0 && (
+                          <span className="ml-2">
+                            • {leasing.offPaymentMonths.length} off-payment month{leasing.offPaymentMonths.length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      "No timeline data available"
+                    )}
+                  </CardDescription>
+                </div>
+                {timeline.length > 0 && (
+                  <Button variant="outline" onClick={handleExportTimeline}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export CSV
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingTimeline ? (
+                <div className="flex items-center justify-center py-10">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+              ) : timeline.length > 0 ? (
+                <div className="rounded-md border overflow-x-auto max-h-[600px] overflow-y-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                      <TableRow>
+                        <TableHead>Month</TableHead>
+                        <TableHead>Payment Date</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Notes</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {timeline.map((entry, index) => (
+                        <EditableLeasingTimelineRow
+                          key={entry.id ? `entry-${entry.id}` : `${entry.month}-${index}`}
+                          entry={entry}
+                          leasingId={Number(resolvedParams?.id || 0)}
+                          leasingEndDate={leasing.endDate}
+                          allActualPayments={allActualPayments || []}
+                          onUpdate={handleTimelineUpdate}
+                        />
+                      ))}
+                      <TableRow className="font-semibold bg-muted sticky bottom-0">
+                        <TableCell colSpan={2}>Total</TableCell>
+                        <TableCell>
+                          {formatCurrency(timeline.reduce((sum, e) => sum + (e.amount > 0 ? e.amount : 0), 0))}
+                          {leasing.totalAmount && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              (Expected: {formatCurrency(leasing.totalAmount)})
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell colSpan={3}></TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-10">
+                  <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">
+                    No timeline data available.
+                    {!leasing.isActive && " This leasing payment is inactive."}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </AppLayout>
   );
