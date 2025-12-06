@@ -15,17 +15,7 @@ function transformSale(row: any): Sale {
     itemId: row.item_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    item: row.item ? {
-      id: row.item.id,
-      name: row.item.name,
-      description: row.item.description,
-      category: row.item.category,
-      sku: row.item.sku,
-      unit: row.item.unit,
-      unitPrice: row.item.unit_price ? parseFloat(row.item.unit_price) : undefined,
-      itemType: row.item.item_type,
-      isActive: row.item.is_active,
-    } : undefined,
+    item: undefined, // Will be populated separately
   };
 }
 
@@ -51,7 +41,7 @@ export async function GET(
     
     const { data, error } = await supabase
       .from('sales')
-      .select('*, item:items(*)')
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -64,28 +54,52 @@ export async function GET(
 
     let sale = transformSale(data);
     
-    // If item is null but item_id exists, it might be a recipe
-    if (!sale.item && sale.itemId) {
-      const { data: recipeData } = await supabase
-        .from('recipes')
+    // Fetch item if item_id exists (could be from items or recipes table)
+    if (sale.itemId) {
+      // Try items table first
+      const { data: itemData } = await supabase
+        .from('items')
         .select('*')
         .eq('id', sale.itemId)
         .single();
       
-      if (recipeData) {
+      if (itemData) {
         sale.item = {
-          id: recipeData.id,
-          name: recipeData.name,
-          description: recipeData.description,
-          category: recipeData.category,
-          sku: undefined,
-          unit: recipeData.unit || 'serving',
-          unitPrice: undefined,
-          itemType: 'recipe',
-          isActive: recipeData.is_active,
-          createdAt: recipeData.created_at,
-          updatedAt: recipeData.updated_at,
+          id: itemData.id,
+          name: itemData.name,
+          description: itemData.description,
+          category: itemData.category,
+          sku: itemData.sku,
+          unit: itemData.unit,
+          unitPrice: itemData.unit_price ? parseFloat(itemData.unit_price) : undefined,
+          itemType: itemData.item_type,
+          isActive: itemData.is_active,
+          createdAt: itemData.created_at,
+          updatedAt: itemData.updated_at,
         };
+      } else {
+        // Try recipes table
+        const { data: recipeData } = await supabase
+          .from('recipes')
+          .select('*')
+          .eq('id', sale.itemId)
+          .single();
+        
+        if (recipeData) {
+          sale.item = {
+            id: recipeData.id,
+            name: recipeData.name,
+            description: recipeData.description,
+            category: recipeData.category,
+            sku: undefined,
+            unit: recipeData.unit || 'serving',
+            unitPrice: undefined,
+            itemType: 'recipe',
+            isActive: recipeData.is_active,
+            createdAt: recipeData.created_at,
+            updatedAt: recipeData.updated_at,
+          };
+        }
       }
     }
 

@@ -85,6 +85,18 @@ export async function GET(
 
     if (itemsError) throw itemsError;
 
+    // Get the produced item for this recipe (if it exists)
+    const { data: producedItemData, error: producedItemError } = await supabase
+      .from('items')
+      .select('*')
+      .eq('produced_from_recipe_id', id)
+      .single();
+
+    // Ignore error if no produced item exists (PGRST116 = no rows found)
+    if (producedItemError && producedItemError.code !== 'PGRST116') {
+      throw producedItemError;
+    }
+
     const recipe: RecipeWithItems = {
       ...transformRecipe(recipeData),
       items: (itemsData || []).map(ri => ({
@@ -109,6 +121,22 @@ export async function GET(
       ingredientId: item.itemId,
       ingredient: item.item,
     }));
+
+    // Include produced item information if it exists
+    if (producedItemData) {
+      (recipe as any).producedItem = {
+        id: producedItemData.id,
+        name: producedItemData.name,
+        description: producedItemData.description,
+        unit: producedItemData.unit,
+        category: producedItemData.category,
+        itemType: producedItemData.item_type || 'item',
+        isActive: producedItemData.is_active,
+        createdAt: producedItemData.created_at,
+        updatedAt: producedItemData.updated_at,
+        producedFromRecipeId: producedItemData.produced_from_recipe_id,
+      };
+    }
 
     return NextResponse.json(recipe);
   } catch (error: any) {

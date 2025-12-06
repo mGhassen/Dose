@@ -503,37 +503,51 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                     </div>
                   )}
 
-                  {/* Item Information (shared with items) */}
+                  {/* Item Information (produced item) */}
                   <div className="pt-4 border-t">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium">Item Information</label>
-                        <Link href={`/items/${recipe.id}`}>
-                          <Button variant="outline" size="sm">
-                            View as Item
-                          </Button>
-                        </Link>
+                        <label className="text-sm font-medium">Produced Item Information</label>
+                        {(recipe as any).producedItem ? (
+                          <Link href={`/items/${(recipe as any).producedItem.id}`}>
+                            <Button variant="outline" size="sm">
+                              View Item
+                            </Button>
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Item will be created when recipe is produced</span>
+                        )}
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-muted-foreground">Category</label>
-                          <p className="text-base mt-1">{recipe.category || "—"}</p>
+                      {(recipe as any).producedItem ? (
+                        <>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm font-medium text-muted-foreground">Category</label>
+                              <p className="text-base mt-1">{(recipe as any).producedItem.category || recipe.category || "—"}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-muted-foreground">Unit</label>
+                              <p className="text-base mt-1">{(recipe as any).producedItem.unit || recipe.unit || "—"}</p>
+                            </div>
+                          </div>
+                          <div className="p-3 bg-muted rounded-lg">
+                            <p className="text-sm text-muted-foreground mb-2">
+                              This recipe produces an item that can be:
+                            </p>
+                            <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                              <li>Sold in sales transactions</li>
+                              <li>Used as an ingredient in other recipes</li>
+                              <li>Tracked in inventory and stock levels</li>
+                            </ul>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="p-3 bg-muted rounded-lg">
+                          <p className="text-sm text-muted-foreground">
+                            This recipe will create an item when produced. The item will use the recipe's category ({recipe.category || "—"}) and unit ({recipe.unit || "—"}).
+                          </p>
                         </div>
-                        <div>
-                          <label className="text-sm font-medium text-muted-foreground">Unit</label>
-                          <p className="text-base mt-1">{recipe.unit || "—"}</p>
-                        </div>
-                      </div>
-                      <div className="p-3 bg-muted rounded-lg">
-                        <p className="text-sm text-muted-foreground mb-2">
-                          This recipe is available as an item and can be:
-                        </p>
-                        <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                          <li>Sold in sales transactions</li>
-                          <li>Used as an ingredient in other recipes</li>
-                          <li>Tracked in inventory and stock levels</li>
-                        </ul>
-                      </div>
+                      )}
                     </div>
                   </div>
 

@@ -16,17 +16,7 @@ function transformSale(row: any): Sale {
     itemId: row.item_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    item: row.item ? {
-      id: row.item.id,
-      name: row.item.name,
-      description: row.item.description,
-      category: row.item.category,
-      sku: row.item.sku,
-      unit: row.item.unit,
-      unitPrice: row.item.unit_price ? parseFloat(row.item.unit_price) : undefined,
-      itemType: row.item.item_type,
-      isActive: row.item.is_active,
-    } : undefined,
+    item: undefined, // Will be populated separately
   };
 }
 
@@ -56,13 +46,10 @@ export async function GET(request: NextRequest) {
       .from('sales')
       .select('*', { count: 'exact', head: true });
 
-    // Build data query with item join (items can be from items table or recipes table)
+    // Build data query (items will be fetched manually since there's no FK)
     let query = supabase
       .from('sales')
-      .select(`
-        *,
-        item:items(*)
-      `)
+      .select('*')
       .order('date', { ascending: false });
 
     if (year) {
@@ -109,37 +96,80 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
     if (countError) throw countError;
 
-    // Transform sales and fetch recipe items if item is null (recipe not in items table)
-    const sales: Sale[] = await Promise.all((data || []).map(async (row: any) => {
-      let sale = transformSale(row);
+    // Fetch items in batch to avoid N+1 queries
+    const itemIds = [...new Set((data || []).map((row: any) => row.item_id).filter(Boolean))];
+    const itemsMap = new Map<number, any>();
+    
+    if (itemIds.length > 0) {
+      // Fetch items
+      const { data: itemsData } = await supabase
+        .from('items')
+        .select('*')
+        .in('id', itemIds);
       
-      // If item is null but item_id exists, it might be a recipe
-      if (!sale.item && sale.itemId) {
-        const { data: recipeData } = await supabase
+      if (itemsData) {
+        itemsData.forEach(item => {
+          itemsMap.set(item.id, item);
+        });
+      }
+      
+      // Fetch recipes for remaining item_ids
+      const foundItemIds = new Set(itemsData?.map(i => i.id) || []);
+      const recipeIds = itemIds.filter(id => !foundItemIds.has(id));
+      
+      if (recipeIds.length > 0) {
+        const { data: recipesData } = await supabase
           .from('recipes')
           .select('*')
-          .eq('id', sale.itemId)
-          .single();
+          .in('id', recipeIds);
         
-        if (recipeData) {
+        if (recipesData) {
+          recipesData.forEach(recipe => {
+            itemsMap.set(recipe.id, { ...recipe, item_type: 'recipe' });
+          });
+        }
+      }
+    }
+
+    // Transform sales with items
+    const sales: Sale[] = (data || []).map((row: any) => {
+      const sale = transformSale(row);
+      
+      if (sale.itemId && itemsMap.has(sale.itemId)) {
+        const itemData = itemsMap.get(sale.itemId);
+        if (itemData.item_type === 'recipe') {
           sale.item = {
-            id: recipeData.id,
-            name: recipeData.name,
-            description: recipeData.description,
-            category: recipeData.category,
+            id: itemData.id,
+            name: itemData.name,
+            description: itemData.description,
+            category: itemData.category,
             sku: undefined,
-            unit: recipeData.unit || 'serving',
+            unit: itemData.unit || 'serving',
             unitPrice: undefined,
             itemType: 'recipe',
-            isActive: recipeData.is_active,
-            createdAt: recipeData.created_at,
-            updatedAt: recipeData.updated_at,
+            isActive: itemData.is_active,
+            createdAt: itemData.created_at,
+            updatedAt: itemData.updated_at,
+          };
+        } else {
+          sale.item = {
+            id: itemData.id,
+            name: itemData.name,
+            description: itemData.description,
+            category: itemData.category,
+            sku: itemData.sku,
+            unit: itemData.unit,
+            unitPrice: itemData.unit_price ? parseFloat(itemData.unit_price) : undefined,
+            itemType: itemData.item_type,
+            isActive: itemData.is_active,
+            createdAt: itemData.created_at,
+            updatedAt: itemData.updated_at,
           };
         }
       }
       
       return sale;
-    }));
+    });
     
     const total = count || 0;
     
