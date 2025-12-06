@@ -18,6 +18,7 @@ function transformLeasing(row: any): LeasingPayment {
     isActive: row.is_active,
     offPaymentMonths: row.off_payment_months || [],
     firstPaymentAmount: row.first_payment_amount ? parseFloat(row.first_payment_amount) : undefined,
+    totalAmount: row.total_amount ? parseFloat(row.total_amount) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -41,6 +42,9 @@ function transformToSnakeCase(data: UpdateLeasingPaymentData): any {
   }
   if (data.firstPaymentAmount !== undefined) {
     result.first_payment_amount = data.firstPaymentAmount !== null ? data.firstPaymentAmount : null;
+  }
+  if (data.totalAmount !== undefined) {
+    result.total_amount = data.totalAmount !== null ? data.totalAmount : null;
   }
   result.updated_at = new Date().toISOString();
   return result;

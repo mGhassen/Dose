@@ -14,6 +14,7 @@ function transformTimelineEntry(row: any) {
     isPaid: row.is_paid,
     paidDate: row.paid_date,
     actualAmount: row.actual_amount ? parseFloat(row.actual_amount) : null,
+    isFixedAmount: row.is_fixed_amount || false,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

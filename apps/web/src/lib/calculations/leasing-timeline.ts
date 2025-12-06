@@ -5,12 +5,18 @@ import type { LeasingPayment } from '@kit/types';
 import { ExpenseRecurrence } from '@kit/types';
 
 export interface LeasingTimelineEntry {
+  id?: number;
   month: string; // YYYY-MM
   leasingId: number;
   leasingName: string;
   amount: number;
   isProjected: boolean;
   paymentDate: string; // ISO date
+  isFixedAmount?: boolean; // Whether this amount is fixed and should not be modified by projection
+  isPaid?: boolean;
+  paidDate?: string;
+  actualAmount?: number | null;
+  notes?: string | null;
 }
 
 /**

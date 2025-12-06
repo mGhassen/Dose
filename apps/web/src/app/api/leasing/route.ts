@@ -19,6 +19,7 @@ function transformLeasing(row: any): LeasingPayment {
     isActive: row.is_active,
     offPaymentMonths: row.off_payment_months || [],
     firstPaymentAmount: row.first_payment_amount ? parseFloat(row.first_payment_amount) : undefined,
+    totalAmount: row.total_amount ? parseFloat(row.total_amount) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -47,6 +48,11 @@ function transformToSnakeCase(data: CreateLeasingPaymentData): any {
   // Only include first_payment_amount if it's provided
   if (data.firstPaymentAmount !== undefined && data.firstPaymentAmount !== null) {
     result.first_payment_amount = data.firstPaymentAmount;
+  }
+  
+  // Only include total_amount if it's provided
+  if (data.totalAmount !== undefined && data.totalAmount !== null) {
+    result.total_amount = data.totalAmount;
   }
   
   return result;
@@ -104,9 +110,25 @@ export async function POST(request: NextRequest) {
   try {
     const body: CreateLeasingPaymentData = await request.json();
     
-    if (!body.name || !body.type || !body.amount || !body.frequency || !body.startDate) {
+    if (!body.name || !body.type || !body.frequency || !body.startDate) {
       return NextResponse.json(
         { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // Either amount or totalAmount must be provided
+    if (!body.amount && !body.totalAmount) {
+      return NextResponse.json(
+        { error: 'Either amount or totalAmount must be provided' },
+        { status: 400 }
+      );
+    }
+
+    // If totalAmount is provided, endDate is required
+    if (body.totalAmount && !body.endDate) {
+      return NextResponse.json(
+        { error: 'End date is required when using totalAmount' },
         { status: 400 }
       );
     }

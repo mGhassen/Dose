@@ -256,6 +256,7 @@ export interface LeasingPayment {
   isActive: boolean;
   offPaymentMonths?: number[]; // Array of month numbers (from start date) where no payment is made
   firstPaymentAmount?: number; // Optional different amount for the first payment
+  totalAmount?: number; // Total amount to pay over the lease period. If set, amount is calculated from this.
   createdAt: string;
   updatedAt: string;
 }
@@ -263,7 +264,7 @@ export interface LeasingPayment {
 export interface CreateLeasingPaymentData {
   name: string;
   type: LeasingType;
-  amount: number;
+  amount?: number; // Required if totalAmount is not provided
   startDate: string;
   endDate?: string;
   frequency: ExpenseRecurrence;
@@ -272,6 +273,7 @@ export interface CreateLeasingPaymentData {
   isActive?: boolean;
   offPaymentMonths?: number[]; // Array of month numbers (from start date) where no payment is made
   firstPaymentAmount?: number; // Optional different amount for the first payment
+  totalAmount?: number; // Total amount to pay. If provided, amount will be calculated from this, start date, end date, and frequency.
 }
 
 export interface UpdateLeasingPaymentData extends Partial<CreateLeasingPaymentData> {}

@@ -14,6 +14,7 @@ function transformTimelineEntry(row: any) {
     isPaid: row.is_paid,
     paidDate: row.paid_date,
     actualAmount: row.actual_amount ? parseFloat(row.actual_amount) : null,
+    isFixedAmount: row.is_fixed_amount || false,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -35,6 +36,7 @@ export async function PUT(
     if (body.amount !== undefined) updateData.amount = body.amount;
     if (body.actualAmount !== undefined) updateData.actual_amount = body.actualAmount || null;
     if (body.isProjected !== undefined) updateData.is_projected = body.isProjected;
+    if (body.isFixedAmount !== undefined) updateData.is_fixed_amount = body.isFixedAmount;
     if (body.isPaid !== undefined) {
       updateData.is_paid = body.isPaid;
       if (body.isPaid && !body.paidDate) {

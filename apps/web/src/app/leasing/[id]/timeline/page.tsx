@@ -45,21 +45,91 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [timeline, setTimeline] = useState<LeasingTimelineEntry[]>([]);
+  const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
 
   const handleTimelineUpdate = () => {
     queryClient.invalidateQueries({ queryKey: ['actual-payments'] });
+    // Refetch timeline entries
+    if (resolvedParams?.id && startMonth && endMonth) {
+      fetchTimelineEntries();
+    }
   };
 
   useEffect(() => {
     params.then(setResolvedParams);
   }, [params]);
 
-  useEffect(() => {
-    if (leasing && startMonth && endMonth) {
-      const entries = projectLeasingPayment(leasing, startMonth, endMonth);
-      setTimeline(entries);
+  const fetchTimelineEntries = async () => {
+    if (!resolvedParams?.id || !startMonth || !endMonth || !leasing) return;
+
+    setIsLoadingTimeline(true);
+    try {
+      // First, ensure timeline entries exist in database by generating them
+      await fetch(
+        `/api/leasing/${resolvedParams.id}/generate-timeline?startMonth=${startMonth}&endMonth=${endMonth}`,
+        { method: 'POST' }
+      );
+
+      // Then fetch stored entries
+      const response = await fetch(
+        `/api/leasing/${resolvedParams.id}/timeline?startMonth=${startMonth}&endMonth=${endMonth}`
+      );
+      if (!response.ok) throw new Error('Failed to fetch timeline entries');
+      const storedEntries: LeasingTimelineEntry[] = await response.json();
+
+      // Calculate entries for fallback/validation
+      const calculatedEntries = projectLeasingPayment(leasing, startMonth, endMonth);
+
+      // Merge: use stored entries when available, otherwise use calculated
+      const mergedMap = new Map<string, LeasingTimelineEntry>();
+      
+      // First, add all calculated entries
+      calculatedEntries.forEach(entry => {
+        const key = `${entry.month}-${entry.paymentDate.split('T')[0]}`;
+        mergedMap.set(key, {
+          ...entry,
+          id: undefined,
+          isFixedAmount: false,
+        });
+      });
+
+      // Then, override with stored entries (preserves IDs, fixed amounts, payment data)
+      storedEntries.forEach(stored => {
+        const key = `${stored.month}-${stored.paymentDate.split('T')[0]}`;
+        const calculated = mergedMap.get(key);
+        mergedMap.set(key, {
+          ...calculated!,
+          id: stored.id,
+          amount: stored.isFixedAmount ? stored.amount : (calculated?.amount || stored.amount),
+          isFixedAmount: stored.isFixedAmount || false,
+          isPaid: stored.isPaid || false,
+          paidDate: stored.paidDate || undefined,
+          actualAmount: stored.actualAmount || undefined,
+          notes: stored.notes || undefined,
+        });
+      });
+
+      const merged = Array.from(mergedMap.values()).sort((a, b) => 
+        a.month.localeCompare(b.month) || a.paymentDate.localeCompare(b.paymentDate)
+      );
+      setTimeline(merged);
+    } catch (error: any) {
+      console.error('Error fetching timeline:', error);
+      // Fallback to calculated entries
+      if (leasing) {
+        const entries = projectLeasingPayment(leasing, startMonth, endMonth);
+        setTimeline(entries);
+      }
+    } finally {
+      setIsLoadingTimeline(false);
     }
-  }, [leasing, startMonth, endMonth]);
+  };
+
+  useEffect(() => {
+    if (leasing && resolvedParams?.id && startMonth && endMonth) {
+      fetchTimelineEntries();
+    }
+  }, [leasing, resolvedParams?.id, startMonth, endMonth]);
 
   const handleExport = () => {
     if (!leasing || timeline.length === 0) {
@@ -286,7 +356,7 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
                   <TableBody>
                     {timeline.map((entry, index) => (
                       <EditableLeasingTimelineRow
-                        key={`${entry.month}-${index}`}
+                        key={entry.id ? `entry-${entry.id}` : `${entry.month}-${index}`}
                         entry={entry}
                         leasingId={Number(resolvedParams?.id || 0)}
                         onUpdate={handleTimelineUpdate}
