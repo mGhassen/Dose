@@ -390,6 +390,20 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Produced From Recipe */}
+                  {item.producedFromRecipeId && (
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Produced From Recipe</label>
+                      <div className="mt-1">
+                        <Link href={`/recipes/${item.producedFromRecipeId}`}>
+                          <Button variant="outline" size="sm">
+                            View Recipe
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Description */}

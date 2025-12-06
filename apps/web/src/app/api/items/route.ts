@@ -22,6 +22,7 @@ function transformItem(row: any): Item {
     unitPrice: row.unit_price ? parseFloat(row.unit_price) : undefined,
     vendorId: row.vendor_id,
     notes: row.notes,
+    producedFromRecipeId: row.produced_from_recipe_id,
   };
 }
 

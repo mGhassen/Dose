@@ -803,6 +803,7 @@ export interface Item {
   unitPrice?: number;
   vendorId?: number;
   notes?: string;
+  producedFromRecipeId?: number; // ID of recipe that produced this item
   // Recipe-specific fields (only when itemType === 'recipe')
   servingSize?: number;
   preparationTime?: number;

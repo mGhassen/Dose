@@ -96,6 +96,7 @@ export function useProduceRecipe() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       queryClient.invalidateQueries({ queryKey: ['recipes', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['items'] }); // Invalidate items to show newly produced item
       queryClient.invalidateQueries({ queryKey: ['stock-levels'] });
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
     },

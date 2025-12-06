@@ -53,7 +53,7 @@ export async function POST(
     const servingSize = recipeData.serving_size || 1;
     const multiplier = body.quantity / servingSize;
 
-    // Create stock movements for each item (can be items or other recipes)
+    // Step 1: Deduct ingredients from stock (OUT movements)
     const movements = [];
     for (const recipeItem of recipeData.items) {
       const item = recipeItem.item;
@@ -74,7 +74,7 @@ export async function POST(
         console.warn(`Low stock for item ${item.name}: ${stockLevel.quantity} available, ${quantityToDeduct} needed`);
       }
 
-      // Create stock movement
+      // Create stock movement (OUT)
       const { error: movementError } = await supabase
         .from('stock_movements')
         .insert({
@@ -90,13 +90,55 @@ export async function POST(
         });
 
       if (movementError) throw movementError;
-      movements.push({ itemId: item.id, quantity: quantityToDeduct });
+      movements.push({ itemId: item.id, quantity: quantityToDeduct, type: 'OUT' });
     }
+
+    // Step 2: Create a new item for the produced output
+    const { data: producedItem, error: itemError } = await supabase
+      .from('items')
+      .insert({
+        name: recipeData.name,
+        description: recipeData.description || `Produced from recipe: ${recipeData.name}`,
+        category: recipeData.category,
+        unit: recipeData.unit || 'serving',
+        produced_from_recipe_id: Number(id),
+        item_type: 'item',
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (itemError) throw itemError;
+    if (!producedItem) {
+      throw new Error('Failed to create produced item');
+    }
+
+    // Step 3: Add the produced item to stock (IN movement)
+    const { error: inMovementError } = await supabase
+      .from('stock_movements')
+      .insert({
+        item_id: producedItem.id,
+        movement_type: StockMovementType.IN,
+        quantity: body.quantity,
+        unit: recipeData.unit || 'serving',
+        reference_type: StockMovementReferenceType.RECIPE,
+        reference_id: Number(id),
+        location: body.location || null,
+        movement_date: new Date().toISOString(),
+        notes: `Produced from recipe: ${recipeData.name}${body.notes ? ` - ${body.notes}` : ''}`,
+      });
+
+    if (inMovementError) throw inMovementError;
 
     return NextResponse.json({ 
       success: true, 
-      message: `Recipe produced successfully. ${movements.length} ingredient(s) deducted from stock.`,
+      message: `Recipe produced successfully. ${movements.length} ingredient(s) deducted, ${body.quantity} ${recipeData.unit || 'serving'}(s) of ${recipeData.name} added to stock.`,
       movements,
+      producedItem: {
+        id: producedItem.id,
+        name: producedItem.name,
+        quantity: body.quantity,
+      },
       recipe: {
         id: recipeData.id,
         name: recipeData.name,

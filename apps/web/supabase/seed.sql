@@ -44,10 +44,10 @@ SELECT setval('vendors_id_seq', (SELECT MAX(id) FROM vendors));
 -- ITEMS (50 inventory items)
 -- ============================================================================
 INSERT INTO items (id, name, description, category, sku, unit, unit_price, vendor_id, notes, item_type, is_active) VALUES
-(1, 'Premium Arabica Beans', 'High-quality arabica coffee beans from Colombia', 'Coffee', 'COFFEE-ARAB-001', 'kg', 28.50, 1, 'Best seller - premium quality', 'item', true),
-(2, 'Robusta Beans', 'Strong robusta coffee beans', 'Coffee', 'COFFEE-ROB-001', 'kg', 22.00, 1, 'For espresso blends', 'item', true),
-(3, 'Organic Milk', 'Fresh organic whole milk', 'Dairy', 'MILK-ORG-001', 'liter', 4.50, 2, 'Premium option', 'item', true),
-(4, 'Regular Milk', 'Standard whole milk', 'Dairy', 'MILK-REG-001', 'liter', 3.20, 2, 'Standard option', 'item', true),
+(1, 'Arabica Coffee Beans', 'Premium arabica coffee beans from Colombia', 'Coffee', 'COFFEE-ARAB-001', 'kg', 28.50, 1, 'Best seller - premium quality', 'item', true),
+(2, 'Robusta Coffee Beans', 'Strong robusta coffee beans', 'Coffee', 'COFFEE-ROB-001', 'kg', 22.00, 1, 'For espresso blends', 'item', true),
+(3, 'Espresso Beans', 'Dark roast espresso beans', 'Coffee', 'COFFEE-ESP-001', 'kg', 25.00, 1, 'For espresso', 'item', true),
+(4, 'Whole Milk', 'Fresh whole milk', 'Dairy', 'MILK-WHOLE-001', 'L', 3.20, 2, 'Standard whole milk', 'item', true),
 (5, 'Oat Milk', 'Plant-based oat milk', 'Dairy', 'MILK-OAT-001', 'liter', 5.50, 2, 'Vegan option', 'item', true),
 (6, 'Almond Milk', 'Plant-based almond milk', 'Dairy', 'MILK-ALM-001', 'liter', 6.00, 2, 'Vegan option', 'item', true),
 (7, 'Croissants', 'Fresh butter croissants', 'Pastry', 'PASTRY-CRO-001', 'piece', 2.50, 3, 'Daily delivery', 'item', true),
@@ -6110,18 +6110,15 @@ SELECT setval('payments_id_seq', (SELECT MAX(id) FROM payments));
 -- Seed data for ingredients, suppliers, recipes, and initial stock levels
 -- Note: This assumes the inventory management tables exist (from migration)
 
--- ITEMS - Coffee Shop Essentials (ingredients and non-food items)
--- Note: After migration, ingredients will be merged into items table
+-- ITEMS - Additional Coffee Shop Essentials (ingredients and non-food items)
+-- Note: These are additional items beyond the initial 50 items
 -- These will be inserted as items with item_type='item'
+-- Using ON CONFLICT to avoid duplicates if items already exist
 INSERT INTO items (name, description, unit, category, item_type, is_active) VALUES
--- Coffee & Espresso
-('Arabica Coffee Beans', 'Premium arabica coffee beans', 'kg', 'Coffee', 'item', true),
-('Robusta Coffee Beans', 'Robusta coffee beans for espresso', 'kg', 'Coffee', 'item', true),
-('Espresso Beans', 'Dark roast espresso beans', 'kg', 'Coffee', 'item', true),
+-- Coffee & Espresso (only if not already in first items section)
 ('Decaf Coffee Beans', 'Decaffeinated coffee beans', 'kg', 'Coffee', 'item', true),
 
--- Dairy & Alternatives
-('Whole Milk', 'Fresh whole milk', 'L', 'Dairy', 'item', true),
+-- Dairy & Alternatives (only if not already in first items section)
 ('Skim Milk', 'Low-fat skim milk', 'L', 'Dairy', 'item', true),
 ('Oat Milk', 'Oat milk alternative', 'L', 'Dairy Alternatives', 'item', true),
 ('Almond Milk', 'Almond milk alternative', 'L', 'Dairy Alternatives', 'item', true),
@@ -6129,10 +6126,7 @@ INSERT INTO items (name, description, unit, category, item_type, is_active) VALU
 ('Heavy Cream', 'Heavy whipping cream', 'L', 'Dairy', 'item', true),
 ('Half and Half', 'Half milk, half cream', 'L', 'Dairy', 'item', true),
 
--- Syrups & Flavors
-('Vanilla Syrup', 'Vanilla flavored syrup', 'L', 'Syrups', 'item', true),
-('Caramel Syrup', 'Caramel flavored syrup', 'L', 'Syrups', 'item', true),
-('Hazelnut Syrup', 'Hazelnut flavored syrup', 'L', 'Syrups', 'item', true),
+-- Syrups & Flavors (only if not already in first items section)
 ('Chocolate Syrup', 'Chocolate flavored syrup', 'L', 'Syrups', 'item', true),
 ('Simple Syrup', 'Basic sugar syrup', 'L', 'Syrups', 'item', true),
 
@@ -6345,6 +6339,54 @@ SELECT
 FROM items
 WHERE is_active = true 
   AND item_type = 'item'  -- Only items, not recipes
+  AND produced_from_recipe_id IS NULL  -- Only raw items, not produced items
+ON CONFLICT (item_id, location) DO NOTHING;
+
+-- ============================================================================
+-- PRODUCED ITEMS - Items created from recipes
+-- ============================================================================
+-- These are items that were produced from recipes (e.g., Espresso, Latte, etc.)
+INSERT INTO items (name, description, category, unit, item_type, produced_from_recipe_id, is_active)
+SELECT 
+  r.name,
+  r.description || ' (Produced from recipe)',
+  r.category,
+  r.unit,
+  'item' as item_type,
+  r.id as produced_from_recipe_id,
+  r.is_active
+FROM recipes r
+WHERE r.is_active = true
+  AND r.name IN ('Espresso', 'Double Espresso', 'Americano', 'Cappuccino', 'Latte', 'Mocha', 'Caramel Macchiato', 'Flat White', 'Cortado', 'Cold Brew', 'Iced Coffee', 'Iced Latte', 'Frappuccino', 'Hot Chocolate', 'Chai Latte')
+ON CONFLICT DO NOTHING;
+
+-- STOCK LEVELS FOR PRODUCED ITEMS
+-- Add initial stock for some produced items
+INSERT INTO stock_levels (item_id, quantity, unit, location, minimum_stock_level, maximum_stock_level)
+SELECT 
+  i.id,
+  CASE 
+    WHEN i.name IN ('Espresso', 'Double Espresso', 'Americano') THEN 50.0
+    WHEN i.name IN ('Cappuccino', 'Latte', 'Mocha', 'Caramel Macchiato', 'Flat White', 'Cortado') THEN 30.0
+    WHEN i.name IN ('Cold Brew', 'Iced Coffee', 'Iced Latte', 'Frappuccino') THEN 20.0
+    WHEN i.name IN ('Hot Chocolate', 'Chai Latte') THEN 15.0
+    ELSE 10.0
+  END as quantity,
+  i.unit,
+  'Main Storage' as location,
+  CASE 
+    WHEN i.name IN ('Espresso', 'Double Espresso', 'Americano') THEN 20.0
+    WHEN i.name IN ('Cappuccino', 'Latte', 'Mocha', 'Caramel Macchiato', 'Flat White', 'Cortado') THEN 10.0
+    ELSE 5.0
+  END as minimum_stock_level,
+  CASE 
+    WHEN i.name IN ('Espresso', 'Double Espresso', 'Americano') THEN 100.0
+    WHEN i.name IN ('Cappuccino', 'Latte', 'Mocha', 'Caramel Macchiato', 'Flat White', 'Cortado') THEN 60.0
+    ELSE 40.0
+  END as maximum_stock_level
+FROM items i
+WHERE i.produced_from_recipe_id IS NOT NULL
+  AND i.is_active = true
 ON CONFLICT (item_id, location) DO NOTHING;
 
 -- ============================================================================
