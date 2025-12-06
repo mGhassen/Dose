@@ -297,7 +297,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               <CardDescription>Update the details for this item</CardDescription>
             </CardHeader>
             <CardContent>
-            {isEditing ? (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Name */}
@@ -423,142 +422,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   </Button>
                 </div>
               </form>
-                  {/* Name */}
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Name</label>
-                    <p className="text-base font-semibold mt-1">{item.name}</p>
-                  </div>
-
-                  <Separator />
-
-                  {/* Status */}
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Status</label>
-                    <div className="mt-1">
-                      <Badge variant={item.isActive ? "default" : "secondary"}>
-                        {item.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* SKU */}
-                  {item.sku && (
-                    <>
-                      <Separator />
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">SKU</label>
-                        <p className="text-sm mt-1 font-mono">{item.sku}</p>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Category */}
-                  {item.category && (
-                    <>
-                      <Separator />
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Category</label>
-                        <p className="text-sm mt-1">{item.category}</p>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Unit */}
-                  {item.unit && (
-                    <>
-                      <Separator />
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Unit</label>
-                        <p className="text-sm mt-1">{item.unit}</p>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Unit Price */}
-                  {item.unitPrice !== undefined && (
-                    <>
-                      <Separator />
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Unit Price</label>
-                        <p className="text-base font-semibold mt-1">{formatCurrency(item.unitPrice)}</p>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Vendor */}
-                  {vendorName && (
-                    <>
-                      <Separator />
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Vendor</label>
-                        <div className="mt-1">
-                          <Badge variant="outline">{vendorName}</Badge>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Produced From Recipe */}
-                  {item.producedFromRecipeId && (
-                    <>
-                      <Separator />
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Source Recipe</label>
-                        <div className="mt-2">
-                          <Link href={`/recipes/${item.producedFromRecipeId}`}>
-                            <Button variant="outline" size="sm" className="w-full">
-                              View Recipe
-                            </Button>
-                          </Link>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <Separator />
-
-                  {/* Metadata */}
-                  <div className="space-y-2 text-xs text-muted-foreground">
-                    <div>
-                      <span className="font-medium">Created:</span> {formatDate(item.createdAt)}
-                    </div>
-                    <div>
-                      <span className="font-medium">Updated:</span> {formatDate(item.updatedAt)}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Description & Notes */}
-              {(item.description || item.notes) && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Additional Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {item.description && (
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground mb-2 block">Description</label>
-                        <p className="text-sm whitespace-pre-wrap">{item.description}</p>
-                      </div>
-                    )}
-                    {item.notes && (
-                      <>
-                        {item.description && <Separator />}
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-2 block">Notes</label>
-                          <p className="text-sm whitespace-pre-wrap">{item.notes}</p>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Column - Main Content (8 columns) */}
@@ -822,164 +687,138 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   <CardDescription>Basic information</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Name */}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Name</label>
+                    <p className="text-base font-semibold mt-1">{item.name}</p>
+                  </div>
 
-            {/* Stock Movements */}
-            {stockMovementsResponse?.data && stockMovementsResponse.data.length > 0 ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Stock Movements</CardTitle>
-                  <CardDescription>All stock movements for this item</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                    {stockMovementsResponse.data.map((movement) => {
-                      const isIn = movement.movementType === StockMovementType.IN;
-                      const isOut = movement.movementType === StockMovementType.OUT;
-                      return (
-                        <div key={movement.id} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              {isIn ? (
-                                <TrendingUp className="h-5 w-5 text-green-600" />
-                              ) : isOut ? (
-                                <TrendingDown className="h-5 w-5 text-red-600" />
-                              ) : (
-                                <Package className="h-5 w-5 text-muted-foreground" />
-                              )}
-                              <div>
-                                <div className="font-medium">
-                                  {isIn ? '+' : '-'}{movement.quantity} {movement.unit}
-                                </div>
-                                <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                                  <Badge variant={isIn ? "default" : "destructive"} className="text-xs">
-                                    {movement.movementType.toUpperCase()}
-                                  </Badge>
-                                  {movement.location && <span>• {movement.location}</span>}
-                                </div>
-                                {movement.notes && (
-                                  <div className="text-xs text-muted-foreground mt-1">{movement.notes}</div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {formatDate(movement.movementDate)}
-                            </div>
-                          </div>
+                  <Separator />
+
+                  {/* Status */}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Status</label>
+                    <div className="mt-1">
+                      <Badge variant={item.isActive ? "default" : "secondary"}>
+                        {item.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* SKU */}
+                  {item.sku && (
+                    <>
+                      <Separator />
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">SKU</label>
+                        <p className="text-sm mt-1 font-mono">{item.sku}</p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Category */}
+                  {item.category && (
+                    <>
+                      <Separator />
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Category</label>
+                        <p className="text-sm mt-1">{item.category}</p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Unit */}
+                  {item.unit && (
+                    <>
+                      <Separator />
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Unit</label>
+                        <p className="text-sm mt-1">{item.unit}</p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Unit Price */}
+                  {item.unitPrice !== undefined && (
+                    <>
+                      <Separator />
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Unit Price</label>
+                        <p className="text-base font-semibold mt-1">{formatCurrency(item.unitPrice)}</p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Vendor */}
+                  {vendorName && (
+                    <>
+                      <Separator />
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Vendor</label>
+                        <div className="mt-1">
+                          <Badge variant="outline">{vendorName}</Badge>
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-4 text-center">
-                    <Link href={`/stock-movements?itemId=${item.id}`}>
-                      <Button variant="outline" size="sm">
-                        View All Movements
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Stock Movements</CardTitle>
-                  <CardDescription>No movements recorded yet</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No stock movements have been recorded for this item.</p>
-                    <Link href={`/stock-movements/create?itemId=${item.id}`}>
-                      <Button variant="outline" size="sm" className="mt-4">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Record First Movement
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                      </div>
+                    </>
+                  )}
 
-            {/* Charts */}
-            {stockMovementsResponse?.data && stockMovementsResponse.data.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Analytics & Charts</CardTitle>
-                  <CardDescription>Visual insights into stock movements</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {/* Daily Movements Trend */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Daily Movements (Last 30 Days)</CardTitle>
-                        <CardDescription className="text-xs">Stock in vs stock out over time</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {dailyChartData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <AreaChart data={dailyChartData}>
-                              <defs>
-                                <linearGradient id="colorIn" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
-                                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                                </linearGradient>
-                                <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis 
-                                dataKey="date" 
-                                tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              />
-                              <YAxis />
-                              <Tooltip 
-                                formatter={(value: number) => value.toFixed(2)}
-                                labelFormatter={(value) => new Date(value).toLocaleDateString()}
-                              />
-                              <Legend />
-                              <Area type="monotone" dataKey="in" stroke="#22c55e" fillOpacity={1} fill="url(#colorIn)" name="Stock In" />
-                              <Area type="monotone" dataKey="out" stroke="#ef4444" fillOpacity={1} fill="url(#colorOut)" name="Stock Out" />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                            No data available
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                    
-                    {/* Movement Types Distribution */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Movement Types Distribution</CardTitle>
-                        <CardDescription className="text-xs">Breakdown by movement type</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {movementTypeData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={movementTypeData}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" />
-                              <YAxis />
-                              <Tooltip />
-                              <Legend />
-                              <Bar dataKey="value" fill="#3b82f6" name="Count" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                            No data available
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                  {/* Produced From Recipe */}
+                  {item.producedFromRecipeId && (
+                    <>
+                      <Separator />
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Source Recipe</label>
+                        <div className="mt-2">
+                          <Link href={`/recipes/${item.producedFromRecipeId}`}>
+                            <Button variant="outline" size="sm" className="w-full">
+                              View Recipe
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <Separator />
+
+                  {/* Metadata */}
+                  <div className="space-y-2 text-xs text-muted-foreground">
+                    <div>
+                      <span className="font-medium">Created:</span> {formatDate(item.createdAt)}
+                    </div>
+                    <div>
+                      <span className="font-medium">Updated:</span> {formatDate(item.updatedAt)}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-            )}
+
+              {/* Description & Notes */}
+              {(item.description || item.notes) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Additional Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {item.description && (
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-2 block">Description</label>
+                        <p className="text-sm whitespace-pre-wrap">{item.description}</p>
+                      </div>
+                    )}
+                    {item.notes && (
+                      <>
+                        {item.description && <Separator />}
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-2 block">Notes</label>
+                          <p className="text-sm whitespace-pre-wrap">{item.notes}</p>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         )}
       </div>
