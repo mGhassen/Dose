@@ -17,6 +17,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { Badge } from "@kit/ui/badge";
 import { Checkbox } from "@kit/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@kit/ui/radio-group";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useLeasingById, useUpdateLeasing, useDeleteLeasing } from "@kit/hooks";
@@ -36,11 +37,13 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
   const { data: leasing, isLoading } = useLeasingById(resolvedParams?.id || "");
   const updateLeasing = useUpdateLeasing();
   const deleteMutation = useDeleteLeasing();
+  const [amountMode, setAmountMode] = useState<"periodic" | "total">("periodic");
   
   const [formData, setFormData] = useState({
     name: "",
     type: "operating" as LeasingType,
     amount: "",
+    totalAmount: "",
     startDate: "",
     endDate: "",
     frequency: "monthly" as ExpenseRecurrence,
@@ -57,10 +60,13 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
 
   useEffect(() => {
     if (leasing) {
+      const hasTotalAmount = leasing.totalAmount !== undefined && leasing.totalAmount !== null;
+      setAmountMode(hasTotalAmount ? "total" : "periodic");
       setFormData({
         name: leasing.name,
         type: leasing.type,
-        amount: leasing.amount.toString(),
+        amount: hasTotalAmount ? "" : leasing.amount.toString(),
+        totalAmount: hasTotalAmount ? (leasing.totalAmount?.toString() || "") : "",
         startDate: leasing.startDate.split('T')[0],
         endDate: leasing.endDate ? leasing.endDate.split('T')[0] : "",
         frequency: leasing.frequency,
@@ -73,23 +79,92 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
     }
   }, [leasing]);
 
+  // Calculate periodic amount from total amount
+  const calculatePeriodicAmount = () => {
+    if (amountMode !== "total" || !formData.totalAmount || !formData.startDate || !formData.endDate) {
+      return null;
+    }
+
+    const start = new Date(formData.startDate);
+    const end = new Date(formData.endDate);
+    const totalAmount = parseFloat(formData.totalAmount);
+
+    if (isNaN(totalAmount) || start >= end) {
+      return null;
+    }
+
+    // Calculate number of payment periods based on frequency
+    let paymentCount = 0;
+    const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+
+    switch (formData.frequency) {
+      case "one_time":
+        return totalAmount;
+      case "monthly":
+        paymentCount = monthsDiff;
+        break;
+      case "quarterly":
+        paymentCount = Math.floor(monthsDiff / 3);
+        break;
+      case "yearly":
+        paymentCount = Math.floor(monthsDiff / 12);
+        break;
+      case "custom":
+        // For custom, assume monthly for calculation
+        paymentCount = monthsDiff;
+        break;
+    }
+
+    // Account for off-payment months
+    const effectivePaymentCount = paymentCount - (formData.offPaymentMonths?.length || 0);
+    
+    if (effectivePaymentCount <= 0) {
+      return null;
+    }
+
+    return totalAmount / effectivePaymentCount;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || formData.amount === "" || !formData.startDate) {
+    if (!formData.name || !formData.startDate) {
       toast.error("Please fill in all required fields");
       return;
+    }
+
+    if (amountMode === "periodic" && formData.amount === "") {
+      toast.error("Please enter the periodic amount");
+      return;
+    }
+
+    if (amountMode === "total") {
+      if (formData.totalAmount === "") {
+        toast.error("Please enter the total amount");
+        return;
+      }
+      if (!formData.endDate) {
+        toast.error("End date is required when using total amount mode");
+        return;
+      }
     }
 
     if (!resolvedParams?.id) return;
 
     try {
+      const calculatedAmount = amountMode === "total" ? calculatePeriodicAmount() : parseFloat(formData.amount);
+      
+      if (calculatedAmount === null || isNaN(calculatedAmount)) {
+        toast.error("Unable to calculate periodic amount. Please check your inputs.");
+        return;
+      }
+
       await updateLeasing.mutateAsync({
         id: resolvedParams.id,
         data: {
           name: formData.name,
           type: formData.type,
-          amount: parseFloat(formData.amount),
+          amount: calculatedAmount,
           startDate: formData.startDate,
           endDate: formData.endDate || undefined,
           frequency: formData.frequency,
@@ -98,6 +173,7 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
           isActive: formData.isActive,
           offPaymentMonths: formData.offPaymentMonths.length > 0 ? formData.offPaymentMonths : undefined,
           firstPaymentAmount: formData.firstPaymentAmount ? parseFloat(formData.firstPaymentAmount) : undefined,
+          totalAmount: amountMode === "total" ? parseFloat(formData.totalAmount) : undefined,
         },
       });
       toast.success("Leasing payment updated successfully");
@@ -277,18 +353,68 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
                     </Select>
                   </div>
 
-                  {/* Amount */}
-                  <div className="space-y-2">
-                    <Label htmlFor="amount">Amount *</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      step="0.01"
-                      value={formData.amount}
-                      onChange={(e) => handleInputChange('amount', e.target.value)}
-                      required
-                    />
+                  {/* Amount Mode */}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Amount Declaration Mode *</Label>
+                    <RadioGroup
+                      value={amountMode}
+                      onValueChange={(value) => setAmountMode(value as "periodic" | "total")}
+                      className="flex gap-6"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="periodic" id="periodic" />
+                        <Label htmlFor="periodic" className="cursor-pointer">
+                          Periodic Amount (per payment)
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="total" id="total" />
+                        <Label htmlFor="total" className="cursor-pointer">
+                          Total Amount (over lease period)
+                        </Label>
+                      </div>
+                    </RadioGroup>
                   </div>
+
+                  {/* Amount or Total Amount */}
+                  {amountMode === "periodic" ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="amount">Periodic Amount *</Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        step="0.01"
+                        value={formData.amount}
+                        onChange={(e) => handleInputChange('amount', e.target.value)}
+                        placeholder="0.00"
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Amount to pay per payment period
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="totalAmount">Total Amount *</Label>
+                      <Input
+                        id="totalAmount"
+                        type="number"
+                        step="0.01"
+                        value={formData.totalAmount}
+                        onChange={(e) => handleInputChange('totalAmount', e.target.value)}
+                        placeholder="0.00"
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Total amount to pay over the entire lease period
+                        {calculatePeriodicAmount() !== null && (
+                          <span className="block mt-1 font-medium">
+                            Calculated periodic amount: {calculatePeriodicAmount()?.toFixed(2)}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Frequency */}
                   <div className="space-y-2">
@@ -306,11 +432,16 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
                         <SelectItem value="quarterly">Quarterly</SelectItem>
                         <SelectItem value="yearly">Yearly</SelectItem>
                         <SelectItem value="custom">Custom</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    </SelectContent>
+                  </Select>
+                  {amountMode === "total" && (
+                    <p className="text-xs text-muted-foreground">
+                      Used to calculate payment schedule from total amount
+                    </p>
+                  )}
+                </div>
 
-                  {/* Start Date */}
+                {/* Start Date */}
                   <div className="space-y-2">
                     <Label htmlFor="startDate">Start Date *</Label>
                     <Input
@@ -324,13 +455,19 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
 
                   {/* End Date */}
                   <div className="space-y-2">
-                    <Label htmlFor="endDate">End Date</Label>
+                    <Label htmlFor="endDate">End Date {amountMode === "total" && "*"}</Label>
                     <Input
                       id="endDate"
                       type="date"
                       value={formData.endDate}
                       onChange={(e) => handleInputChange('endDate', e.target.value)}
+                      required={amountMode === "total"}
                     />
+                    {amountMode === "total" && (
+                      <p className="text-xs text-muted-foreground">
+                        Required to calculate periodic amount from total
+                      </p>
+                    )}
                   </div>
 
                   {/* Lessor */}
@@ -463,11 +600,31 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
                     </div>
                   </div>
 
-                  {/* Amount */}
+                  {/* Amount Declaration Mode */}
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Amount</label>
-                    <p className="text-base font-semibold mt-1">{formatCurrency(leasing.amount)}</p>
+                    <label className="text-sm font-medium text-muted-foreground">Amount Declaration Mode</label>
+                    <div className="mt-1">
+                      <Badge variant="outline">
+                        {leasing.totalAmount ? "Total Amount" : "Periodic Amount"}
+                      </Badge>
+                    </div>
                   </div>
+
+                  {/* Amount or Total Amount */}
+                  {leasing.totalAmount ? (
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Total Amount</label>
+                      <p className="text-base font-semibold mt-1">{formatCurrency(leasing.totalAmount)}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        (Periodic amount: {formatCurrency(leasing.amount)})
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Periodic Amount</label>
+                      <p className="text-base font-semibold mt-1">{formatCurrency(leasing.amount)}</p>
+                    </div>
+                  )}
 
                   {/* Frequency */}
                   <div>

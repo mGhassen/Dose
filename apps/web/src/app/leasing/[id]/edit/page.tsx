@@ -49,14 +49,11 @@ export default function EditLeasingPage({ params }: EditLeasingPageProps) {
   useEffect(() => {
     if (leasing) {
       const hasTotalAmount = leasing.totalAmount !== undefined && leasing.totalAmount !== null;
-      const mode = hasTotalAmount ? "total" : "periodic";
-      setAmountMode(mode);
+      setAmountMode(hasTotalAmount ? "total" : "periodic");
       setFormData({
         name: leasing.name,
         type: leasing.type,
-        // Always populate amount with the stored amount (it's the calculated periodic amount if totalAmount exists)
-        amount: leasing.amount.toString(),
-        // Only populate totalAmount if it exists
+        amount: hasTotalAmount ? "" : leasing.amount.toString(),
         totalAmount: hasTotalAmount ? (leasing.totalAmount?.toString() || "") : "",
         startDate: leasing.startDate.split('T')[0],
         endDate: leasing.endDate ? leasing.endDate.split('T')[0] : "",
@@ -101,6 +98,7 @@ export default function EditLeasingPage({ params }: EditLeasingPageProps) {
         paymentCount = Math.floor(monthsDiff / 12);
         break;
       case "custom":
+        // For custom, assume monthly for calculation
         paymentCount = monthsDiff;
         break;
     }
