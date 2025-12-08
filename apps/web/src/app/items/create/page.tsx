@@ -11,13 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateItem, useVendors } from "@kit/hooks";
+import { useCreateItem, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
 
 export default function CreateItemPage() {
   const router = useRouter();
   const createItem = useCreateItem();
-  const { data: vendorsResponse } = useVendors({ limit: 1000 });
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -147,9 +147,9 @@ export default function CreateItemPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
-                      {vendorsResponse?.data?.map((vendor) => (
-                        <SelectItem key={vendor.id} value={vendor.id.toString()}>
-                          {vendor.name}
+                      {suppliersResponse?.data?.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                          {supplier.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -10,9 +10,7 @@ import { Badge } from "@kit/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
-import { ChefHat, Clock, CheckCircle, AlertCircle, Plus } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@kit/ui/button";
+import { ChefHat, Clock, CheckCircle, AlertCircle } from "lucide-react";
 
 export default function RecipesContent() {
   const router = useRouter();
@@ -162,12 +160,6 @@ export default function RecipesContent() {
             Manage your coffee shop recipes and drink formulas
           </p>
         </div>
-        <Link href="/recipes/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Recipe
-          </Button>
-        </Link>
       </div>
 
       {/* Summary Cards */}

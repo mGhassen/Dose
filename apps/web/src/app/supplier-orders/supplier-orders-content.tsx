@@ -12,9 +12,7 @@ import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 import { SupplierOrderStatus } from "@kit/types";
-import { ShoppingCart, Package, CheckCircle, Clock, Truck, Plus } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@kit/ui/button";
+import { ShoppingCart, Package, CheckCircle, Clock, Truck } from "lucide-react";
 
 export default function SupplierOrdersContent() {
   const router = useRouter();
@@ -186,12 +184,6 @@ export default function SupplierOrdersContent() {
             Manage purchase orders and track deliveries
           </p>
         </div>
-        <Link href="/supplier-orders/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Order
-          </Button>
-        </Link>
       </div>
 
       {/* Summary Cards */}

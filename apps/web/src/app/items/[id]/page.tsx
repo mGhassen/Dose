@@ -37,7 +37,7 @@ import {
   Area,
 } from 'recharts';
 import AppLayout from "@/components/app-layout";
-import { useItemById, useUpdateItem, useDeleteItem, useVendors, useStockMovements } from "@kit/hooks";
+import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -51,7 +51,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const { data: item, isLoading } = useItemById(resolvedParams?.id || "");
-  const { data: vendorsResponse } = useVendors({ limit: 1000 });
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const { data: stockMovementsResponse } = useStockMovements({ itemId: resolvedParams?.id || "", limit: 1000 });
   const updateItem = useUpdateItem();
   const deleteMutation = useDeleteItem();
@@ -249,7 +249,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     );
   }
 
-  const vendorName = item.vendorId && vendorsResponse?.data?.find(v => v.id === item.vendorId)?.name;
+  const supplierName = item.vendorId && suppliersResponse?.data?.find(s => s.id === item.vendorId)?.name;
 
   return (
     <AppLayout>
@@ -364,9 +364,9 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
-                        {vendorsResponse?.data?.map((vendor) => (
-                          <SelectItem key={vendor.id} value={vendor.id.toString()}>
-                            {vendor.name}
+                        {suppliersResponse?.data?.map((supplier) => (
+                          <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                            {supplier.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -750,13 +750,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   )}
 
                   {/* Vendor */}
-                  {vendorName && (
+                  {supplierName && (
                     <>
                       <Separator />
                       <div>
                         <label className="text-xs font-medium text-muted-foreground">Vendor</label>
                         <div className="mt-1">
-                          <Badge variant="outline">{vendorName}</Badge>
+                          <Badge variant="outline">{supplierName}</Badge>
                         </div>
                       </div>
                     </>

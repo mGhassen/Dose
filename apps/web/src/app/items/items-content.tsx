@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useItems, useDeleteItem, useVendors } from "@kit/hooks";
+import { useItems, useDeleteItem, useInventorySuppliers } from "@kit/hooks";
 import type { Item } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
@@ -18,11 +18,11 @@ export default function ItemsContent() {
     limit: 1000 // Fetch all for filtering, then paginate client-side
   });
   
-  const { data: vendorsResponse } = useVendors({ limit: 1000 });
-  const vendorMap = useMemo(() => {
-    if (!vendorsResponse?.data) return new Map<number, string>();
-    return new Map(vendorsResponse.data.map(v => [v.id, v.name]));
-  }, [vendorsResponse?.data]);
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
+  const supplierMap = useMemo(() => {
+    if (!suppliersResponse?.data) return new Map<number, string>();
+    return new Map(suppliersResponse.data.map(s => [s.id, s.name]));
+  }, [suppliersResponse?.data]);
   
   const filteredItems = useMemo(() => {
     if (!itemsResponse?.data) return [];
@@ -133,7 +133,7 @@ export default function ItemsContent() {
         item.category || '',
         item.unit || '',
         item.unitPrice || '',
-        item.vendorId ? vendorMap.get(item.vendorId) || '' : '',
+        item.vendorId ? supplierMap.get(item.vendorId) || '' : '',
         item.description || '',
         item.isActive ? 'Active' : 'Inactive',
       ].join(','))
@@ -154,7 +154,7 @@ export default function ItemsContent() {
         item.category || '',
         item.unit || '',
         item.unitPrice || '',
-        item.vendorId ? vendorMap.get(item.vendorId) || '' : '',
+        item.vendorId ? supplierMap.get(item.vendorId) || '' : '',
         item.description || '',
         item.isActive ? 'Active' : 'Inactive',
       ].join(','))

@@ -243,11 +243,6 @@ export const pathsConfig: NavigationConfig = {
           translationKey: "variables"
         },
         {
-          title: "suppliers",
-          url: "/inventory-suppliers",
-          translationKey: "suppliers"
-        },
-        {
           title: "metadata-enums",
           url: "/metadata-enums",
           translationKey: "metadataEnums"

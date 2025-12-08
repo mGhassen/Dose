@@ -10,9 +10,7 @@ import { Badge } from "@kit/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
-import { Building2, CheckCircle, AlertCircle, Phone, Plus } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@kit/ui/button";
+import { Building2, CheckCircle, AlertCircle, Phone } from "lucide-react";
 
 export default function SuppliersContent() {
   const router = useRouter();
@@ -161,12 +159,6 @@ export default function SuppliersContent() {
             Manage your coffee shop suppliers and vendors
           </p>
         </div>
-        <Link href="/inventory-suppliers/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Supplier
-          </Button>
-        </Link>
       </div>
 
       {/* Summary Cards */}

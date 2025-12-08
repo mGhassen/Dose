@@ -11,9 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 import { StockMovementType } from "@kit/types";
-import { ArrowUpDown, TrendingUp, TrendingDown, Package, Plus } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@kit/ui/button";
+import { ArrowUpDown, TrendingUp, TrendingDown, Package } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import {
   LineChart,
@@ -326,12 +324,6 @@ export default function StockMovementsContent() {
             Track all inventory movements, receipts, usage, and waste
           </p>
         </div>
-        <Link href="/stock-movements/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Record Movement
-          </Button>
-        </Link>
       </div>
 
       {/* Summary Cards */}
