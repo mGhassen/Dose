@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useLoans, useDeleteLoan } from "@kit/hooks";
+import { useLoans, useDeleteLoan, useInventorySuppliers } from "@kit/hooks";
+import Link from "next/link";
 import type { Loan, LoanStatus } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Button } from "@kit/ui/button";
@@ -17,7 +18,18 @@ import { toast } from "sonner";
 export default function LoansContent() {
   const router = useRouter();
   const { data: loans, isLoading } = useLoans();
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
+  const suppliers = suppliersResponse?.data || [];
   const deleteMutation = useDeleteLoan();
+  
+  // Create a map of supplier IDs to suppliers for display
+  const supplierMap = useMemo(() => {
+    const map = new Map<number, typeof suppliers[0]>();
+    if (suppliers && Array.isArray(suppliers)) {
+      suppliers.forEach(supplier => map.set(supplier.id, supplier));
+    }
+    return map;
+  }, [suppliers]);
 
 
   const columns: ColumnDef<Loan>[] = useMemo(() => [
@@ -78,7 +90,21 @@ export default function LoansContent() {
     {
       accessorKey: "lender",
       header: "Lender",
-      cell: ({ row }) => row.original.lender || <span className="text-muted-foreground">—</span>,
+      cell: ({ row }) => {
+        const loan = row.original;
+        if (loan.supplierId && supplierMap.has(loan.supplierId)) {
+          const supplier = supplierMap.get(loan.supplierId)!;
+          return (
+            <Link
+              href={`/inventory-suppliers/${loan.supplierId}`}
+              className="text-primary hover:underline"
+            >
+              {supplier.name}
+            </Link>
+          );
+        }
+        return loan.lender || <span className="text-muted-foreground">—</span>;
+      },
     },
     {
       id: "offPaymentMonths",
@@ -128,7 +154,7 @@ export default function LoansContent() {
         );
       },
     },
-  ], [router]);
+  ], [router, supplierMap]);
 
   const handleDelete = async (id: number) => {
     try {

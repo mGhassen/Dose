@@ -5,40 +5,44 @@
 -- Run with: supabase db reset (applies migrations then seed.sql)
 
 -- ============================================================================
--- VENDORS (30 vendor records)
+-- SUPPLIERS (30 supplier records - mix of supplier and vendor types)
 -- ============================================================================
-INSERT INTO vendors (id, name, email, phone, address, contact_person, notes, is_active) VALUES
-(1, 'Premium Coffee Roasters', 'orders@premiumcoffee.com', '+1 (555) 100-0001', '123 Coffee Bean Ave, Seattle, WA 98101', 'John Coffee', 'Primary coffee bean supplier', true),
-(2, 'Milk & Dairy Distributor', 'sales@milkdist.com', '+1 (555) 100-0002', '456 Dairy Lane, Portland, OR 97201', 'Sarah Milk', 'Fresh milk and dairy products', true),
-(3, 'Pastry Supplier Co.', 'orders@pastryco.com', '+1 (555) 100-0003', '789 Bakery St, San Francisco, CA 94102', 'Mike Baker', 'Fresh pastries and baked goods', true),
-(4, 'Equipment Solutions', 'info@equipment.com', '+1 (555) 100-0004', '321 Machine Blvd, Los Angeles, CA 90001', 'Emily Tech', 'Coffee machines and equipment', true),
-(5, 'Cleaning Services Pro', 'contact@cleaning.com', '+1 (555) 100-0005', '654 Clean Way, Chicago, IL 60601', 'Robert Clean', 'Professional cleaning services', true),
-(6, 'Marketing Agency', 'hello@marketing.com', '+1 (555) 100-0006', '987 Ad Ave, New York, NY 10001', 'Lisa Market', 'Digital marketing and social media', true),
-(7, 'Insurance Provider', 'info@insurance.com', '+1 (555) 100-0007', '147 Policy St, Boston, MA 02101', 'David Insure', 'Business insurance', true),
-(8, 'Utilities Company', 'service@utilities.com', '+1 (555) 100-0008', '258 Power Rd, Miami, FL 33101', 'Jennifer Power', 'Electricity and water', true),
-(9, 'Internet Provider', 'support@internet.com', '+1 (555) 100-0009', '369 Web Blvd, Austin, TX 78701', 'Michael Net', 'Internet and phone services', true),
-(10, 'Legal Services', 'contact@legal.com', '+1 (555) 100-0010', '741 Law St, Denver, CO 80201', 'James Law', 'Legal consultation', true),
-(11, 'Distributor 11', 'contact@distributor11.com', '+1 (555) 111-2011', '111 Distributor St, Portland, OR 10011', 'Contact Person 11', 'Auto-generated vendor 11', true),
-(12, 'Supplier 12', 'contact@supplier12.com', '+1 (555) 112-2012', '112 Supplier St, San Francisco, CA 10012', 'Contact Person 12', 'Auto-generated vendor 12', true),
-(13, 'Service Provider 13', 'contact@serviceprovider13.com', '+1 (555) 113-2013', '113 Service Provider St, Los Angeles, CA 10013', 'Contact Person 13', 'Auto-generated vendor 13', true),
-(14, 'Distributor 14', 'contact@distributor14.com', '+1 (555) 114-2014', '114 Distributor St, Chicago, IL 10014', 'Contact Person 14', 'Auto-generated vendor 14', true),
-(15, 'Supplier 15', 'contact@supplier15.com', '+1 (555) 115-2015', '115 Supplier St, New York, NY 10015', 'Contact Person 15', 'Auto-generated vendor 15', true),
-(16, 'Service Provider 16', 'contact@serviceprovider16.com', '+1 (555) 116-2016', '116 Service Provider St, Boston, MA 10016', 'Contact Person 16', 'Auto-generated vendor 16', true),
-(17, 'Distributor 17', 'contact@distributor17.com', '+1 (555) 117-2017', '117 Distributor St, Miami, FL 10017', 'Contact Person 17', 'Auto-generated vendor 17', true),
-(18, 'Supplier 18', 'contact@supplier18.com', '+1 (555) 118-2018', '118 Supplier St, Austin, TX 10018', 'Contact Person 18', 'Auto-generated vendor 18', true),
-(19, 'Service Provider 19', 'contact@serviceprovider19.com', '+1 (555) 119-2019', '119 Service Provider St, Denver, CO 10019', 'Contact Person 19', 'Auto-generated vendor 19', true),
-(20, 'Distributor 20', 'contact@distributor20.com', '+1 (555) 120-2020', '120 Distributor St, Seattle, WA 10020', 'Contact Person 20', 'Auto-generated vendor 20', true),
-(21, 'Supplier 21', 'contact@supplier21.com', '+1 (555) 121-2021', '121 Supplier St, Portland, OR 10021', 'Contact Person 21', 'Auto-generated vendor 21', true),
-(22, 'Service Provider 22', 'contact@serviceprovider22.com', '+1 (555) 122-2022', '122 Service Provider St, San Francisco, CA 10022', 'Contact Person 22', 'Auto-generated vendor 22', true),
-(23, 'Distributor 23', 'contact@distributor23.com', '+1 (555) 123-2023', '123 Distributor St, Los Angeles, CA 10023', 'Contact Person 23', 'Auto-generated vendor 23', true),
-(24, 'Supplier 24', 'contact@supplier24.com', '+1 (555) 124-2024', '124 Supplier St, Chicago, IL 10024', 'Contact Person 24', 'Auto-generated vendor 24', true),
-(25, 'Service Provider 25', 'contact@serviceprovider25.com', '+1 (555) 125-2025', '125 Service Provider St, New York, NY 10025', 'Contact Person 25', 'Auto-generated vendor 25', true),
-(26, 'Distributor 26', 'contact@distributor26.com', '+1 (555) 126-2026', '126 Distributor St, Boston, MA 10026', 'Contact Person 26', 'Auto-generated vendor 26', true),
-(27, 'Supplier 27', 'contact@supplier27.com', '+1 (555) 127-2027', '127 Supplier St, Miami, FL 10027', 'Contact Person 27', 'Auto-generated vendor 27', true),
-(28, 'Service Provider 28', 'contact@serviceprovider28.com', '+1 (555) 128-2028', '128 Service Provider St, Austin, TX 10028', 'Contact Person 28', 'Auto-generated vendor 28', true),
-(29, 'Distributor 29', 'contact@distributor29.com', '+1 (555) 129-2029', '129 Distributor St, Denver, CO 10029', 'Contact Person 29', 'Auto-generated vendor 29', true),
-(30, 'Supplier 30', 'contact@supplier30.com', '+1 (555) 130-2030', '130 Supplier St, Seattle, WA 10030', 'Contact Person 30', 'Auto-generated vendor 30', true);
-SELECT setval('vendors_id_seq', (SELECT MAX(id) FROM vendors));
+-- Note: Some suppliers are for items (supplier type), some are for expenses/subscriptions/loans/leasing (vendor type), some are both
+INSERT INTO suppliers (id, name, email, phone, address, contact_person, notes, supplier_type, is_active) VALUES
+-- Suppliers for items (inventory suppliers)
+(1, 'Premium Coffee Roasters', 'orders@premiumcoffee.com', '+1 (555) 100-0001', '123 Coffee Bean Ave, Seattle, WA 98101', 'John Coffee', 'Primary coffee bean supplier', ARRAY['supplier']::VARCHAR(50)[], true),
+(2, 'Milk & Dairy Distributor', 'sales@milkdist.com', '+1 (555) 100-0002', '456 Dairy Lane, Portland, OR 97201', 'Sarah Milk', 'Fresh milk and dairy products', ARRAY['supplier']::VARCHAR(50)[], true),
+(3, 'Pastry Supplier Co.', 'orders@pastryco.com', '+1 (555) 100-0003', '789 Bakery St, San Francisco, CA 94102', 'Mike Baker', 'Fresh pastries and baked goods', ARRAY['supplier']::VARCHAR(50)[], true),
+(4, 'Equipment Solutions', 'info@equipment.com', '+1 (555) 100-0004', '321 Machine Blvd, Los Angeles, CA 90001', 'Emily Tech', 'Coffee machines and equipment', ARRAY['supplier']::VARCHAR(50)[], true),
+-- Vendors for expenses/subscriptions/loans/leasing
+(5, 'Cleaning Services Pro', 'contact@cleaning.com', '+1 (555) 100-0005', '654 Clean Way, Chicago, IL 60601', 'Robert Clean', 'Professional cleaning services', ARRAY['vendor']::VARCHAR(50)[], true),
+(6, 'Marketing Agency', 'hello@marketing.com', '+1 (555) 100-0006', '987 Ad Ave, New York, NY 10001', 'Lisa Market', 'Digital marketing and social media', ARRAY['vendor']::VARCHAR(50)[], true),
+(7, 'Insurance Provider', 'info@insurance.com', '+1 (555) 100-0007', '147 Policy St, Boston, MA 02101', 'David Insure', 'Business insurance', ARRAY['vendor']::VARCHAR(50)[], true),
+(8, 'Utilities Company', 'service@utilities.com', '+1 (555) 100-0008', '258 Power Rd, Miami, FL 33101', 'Jennifer Power', 'Electricity and water', ARRAY['vendor']::VARCHAR(50)[], true),
+(9, 'Internet Provider', 'support@internet.com', '+1 (555) 100-0009', '369 Web Blvd, Austin, TX 78701', 'Michael Net', 'Internet and phone services', ARRAY['vendor']::VARCHAR(50)[], true),
+(10, 'Legal Services', 'contact@legal.com', '+1 (555) 100-0010', '741 Law St, Denver, CO 80201', 'James Law', 'Legal consultation', ARRAY['vendor']::VARCHAR(50)[], true),
+-- Both supplier and vendor types
+(11, 'Distributor 11', 'contact@distributor11.com', '+1 (555) 111-2011', '111 Distributor St, Portland, OR 10011', 'Contact Person 11', 'Auto-generated supplier 11', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(12, 'Supplier 12', 'contact@supplier12.com', '+1 (555) 112-2012', '112 Supplier St, San Francisco, CA 10012', 'Contact Person 12', 'Auto-generated supplier 12', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(13, 'Service Provider 13', 'contact@serviceprovider13.com', '+1 (555) 113-2013', '113 Service Provider St, Los Angeles, CA 10013', 'Contact Person 13', 'Auto-generated supplier 13', ARRAY['vendor']::VARCHAR(50)[], true),
+(14, 'Distributor 14', 'contact@distributor14.com', '+1 (555) 114-2014', '114 Distributor St, Chicago, IL 10014', 'Contact Person 14', 'Auto-generated supplier 14', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(15, 'Supplier 15', 'contact@supplier15.com', '+1 (555) 115-2015', '115 Supplier St, New York, NY 10015', 'Contact Person 15', 'Auto-generated supplier 15', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(16, 'Service Provider 16', 'contact@serviceprovider16.com', '+1 (555) 116-2016', '116 Service Provider St, Boston, MA 10016', 'Contact Person 16', 'Auto-generated supplier 16', ARRAY['vendor']::VARCHAR(50)[], true),
+(17, 'Distributor 17', 'contact@distributor17.com', '+1 (555) 117-2017', '117 Distributor St, Miami, FL 10017', 'Contact Person 17', 'Auto-generated supplier 17', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(18, 'Supplier 18', 'contact@supplier18.com', '+1 (555) 118-2018', '118 Supplier St, Austin, TX 10018', 'Contact Person 18', 'Auto-generated supplier 18', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(19, 'Service Provider 19', 'contact@serviceprovider19.com', '+1 (555) 119-2019', '119 Service Provider St, Denver, CO 10019', 'Contact Person 19', 'Auto-generated supplier 19', ARRAY['vendor']::VARCHAR(50)[], true),
+(20, 'Distributor 20', 'contact@distributor20.com', '+1 (555) 120-2020', '120 Distributor St, Seattle, WA 10020', 'Contact Person 20', 'Auto-generated supplier 20', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(21, 'Supplier 21', 'contact@supplier21.com', '+1 (555) 121-2021', '121 Supplier St, Portland, OR 10021', 'Contact Person 21', 'Auto-generated supplier 21', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(22, 'Service Provider 22', 'contact@serviceprovider22.com', '+1 (555) 122-2022', '122 Service Provider St, San Francisco, CA 10022', 'Contact Person 22', 'Auto-generated supplier 22', ARRAY['vendor']::VARCHAR(50)[], true),
+(23, 'Distributor 23', 'contact@distributor23.com', '+1 (555) 123-2023', '123 Distributor St, Los Angeles, CA 10023', 'Contact Person 23', 'Auto-generated supplier 23', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(24, 'Supplier 24', 'contact@supplier24.com', '+1 (555) 124-2024', '124 Supplier St, Chicago, IL 10024', 'Contact Person 24', 'Auto-generated supplier 24', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(25, 'Service Provider 25', 'contact@serviceprovider25.com', '+1 (555) 125-2025', '125 Service Provider St, New York, NY 10025', 'Contact Person 25', 'Auto-generated supplier 25', ARRAY['vendor']::VARCHAR(50)[], true),
+(26, 'Distributor 26', 'contact@distributor26.com', '+1 (555) 126-2026', '126 Distributor St, Boston, MA 10026', 'Contact Person 26', 'Auto-generated supplier 26', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(27, 'Supplier 27', 'contact@supplier27.com', '+1 (555) 127-2027', '127 Supplier St, Miami, FL 10027', 'Contact Person 27', 'Auto-generated supplier 27', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(28, 'Service Provider 28', 'contact@serviceprovider28.com', '+1 (555) 128-2028', '128 Service Provider St, Austin, TX 10028', 'Contact Person 28', 'Auto-generated supplier 28', ARRAY['vendor']::VARCHAR(50)[], true),
+(29, 'Distributor 29', 'contact@distributor29.com', '+1 (555) 129-2029', '129 Distributor St, Denver, CO 10029', 'Contact Person 29', 'Auto-generated supplier 29', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true),
+(30, 'Supplier 30', 'contact@supplier30.com', '+1 (555) 130-2030', '130 Supplier St, Seattle, WA 10030', 'Contact Person 30', 'Auto-generated supplier 30', ARRAY['supplier', 'vendor']::VARCHAR(50)[], true);
+SELECT setval('suppliers_id_seq', (SELECT MAX(id) FROM suppliers));
 
 -- ============================================================================
 -- ITEMS (50 inventory items)

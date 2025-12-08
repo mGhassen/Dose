@@ -17,7 +17,8 @@ function transformSubscription(row: any): Subscription {
     startDate: row.start_date,
     endDate: row.end_date,
     description: row.description,
-    vendor: row.vendor,
+    vendor: row.vendor, // Keep for backward compatibility
+    supplierId: row.supplier_id || undefined,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -33,7 +34,8 @@ function transformToSnakeCase(data: CreateSubscriptionData): any {
     start_date: data.startDate,
     end_date: data.endDate,
     description: data.description,
-    vendor: data.vendor,
+    vendor: data.vendor, // Keep for backward compatibility
+    supplier_id: data.supplierId || null,
     is_active: data.isActive ?? true,
   };
 }
@@ -132,7 +134,8 @@ export async function POST(request: NextRequest) {
         amount: body.amount,
         description: body.description,
         category: body.category,
-        vendor: body.vendor,
+        vendor: body.vendor, // Keep for backward compatibility
+        supplier_id: body.supplierId || null,
         entry_date: body.startDate,
         reference_id: data.id,
         is_active: body.isActive ?? true,

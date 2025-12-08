@@ -24,6 +24,7 @@ export default function CreateSupplierPage() {
     contactPerson: "",
     paymentTerms: "",
     notes: "",
+    supplierType: ['supplier'] as ('supplier' | 'vendor')[],
     isActive: true,
   });
 
@@ -44,6 +45,7 @@ export default function CreateSupplierPage() {
         contactPerson: formData.contactPerson || undefined,
         paymentTerms: formData.paymentTerms || undefined,
         notes: formData.notes || undefined,
+        supplierType: formData.supplierType,
         isActive: formData.isActive,
       });
       toast.success("Supplier created successfully");
@@ -145,6 +147,42 @@ export default function CreateSupplierPage() {
                     placeholder="Additional notes"
                     rows={3}
                   />
+                </div>
+
+                <div className="space-y-3 md:col-span-2">
+                  <Label>Supplier Type</Label>
+                  <div className="flex gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="type-supplier"
+                        checked={formData.supplierType.includes('supplier')}
+                        onCheckedChange={(checked) => {
+                          const newTypes = checked
+                            ? [...formData.supplierType.filter(t => t !== 'supplier'), 'supplier']
+                            : formData.supplierType.filter(t => t !== 'supplier');
+                          handleInputChange('supplierType', newTypes.length > 0 ? newTypes : ['vendor']);
+                        }}
+                      />
+                      <Label htmlFor="type-supplier" className="font-normal cursor-pointer">
+                        Supplier (for items/inventory)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="type-vendor"
+                        checked={formData.supplierType.includes('vendor')}
+                        onCheckedChange={(checked) => {
+                          const newTypes = checked
+                            ? [...formData.supplierType.filter(t => t !== 'vendor'), 'vendor']
+                            : formData.supplierType.filter(t => t !== 'vendor');
+                          handleInputChange('supplierType', newTypes.length > 0 ? newTypes : ['supplier']);
+                        }}
+                      />
+                      <Label htmlFor="type-vendor" className="font-normal cursor-pointer">
+                        Vendor (for expenses/subscriptions/loans/leasing)
+                      </Label>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex items-center space-x-2">

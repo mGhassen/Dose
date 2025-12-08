@@ -15,7 +15,8 @@ function transformExpense(row: any): Expense {
     amount: parseFloat(row.amount),
     subscriptionId: row.subscription_id || undefined,
     description: row.description,
-    vendor: row.vendor,
+    vendor: row.vendor, // Keep for backward compatibility
+    supplierId: row.supplier_id || undefined,
     expenseDate: row.expense_date || row.start_date, // Fallback to start_date for migration
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -29,7 +30,8 @@ function transformToSnakeCase(data: CreateExpenseData): any {
     amount: data.amount,
     subscription_id: data.subscriptionId || null,
     description: data.description,
-    vendor: data.vendor,
+    vendor: data.vendor, // Keep for backward compatibility
+    supplier_id: data.supplierId || null,
     expense_date: data.expenseDate,
     recurrence: 'one_time', // Expenses are always one-time
     start_date: data.expenseDate, // Required field, use expense_date
@@ -155,7 +157,8 @@ export async function POST(request: NextRequest) {
         amount: body.amount,
         description: body.description,
         category: body.category,
-        vendor: body.vendor,
+        vendor: body.vendor, // Keep for backward compatibility
+        supplier_id: body.supplierId || null,
         entry_date: body.expenseDate,
         reference_id: data.id,
         is_active: true,

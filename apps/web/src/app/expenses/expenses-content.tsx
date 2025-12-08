@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useExpenses, useDeleteExpense, useSubscriptions } from "@kit/hooks";
+import { useExpenses, useDeleteExpense, useSubscriptions, useInventorySuppliers } from "@kit/hooks";
+import Link from "next/link";
 import { useYear } from "@/contexts/year-context";
 import type { Expense, ExpenseCategory } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
@@ -28,6 +29,8 @@ export default function ExpensesContent() {
   
   const { data: subscriptionsResponse } = useSubscriptions();
   const subscriptions = subscriptionsResponse?.data || [];
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
+  const suppliers = suppliersResponse?.data || [];
   
   const expenses = expensesResponse?.data || [];
   const totalCount = expensesResponse?.pagination?.total || 0;
@@ -42,6 +45,15 @@ export default function ExpensesContent() {
     }
     return map;
   }, [subscriptions]);
+  
+  // Create a map of supplier IDs to suppliers for display
+  const supplierMap = useMemo(() => {
+    const map = new Map<number, typeof suppliers[0]>();
+    if (suppliers && Array.isArray(suppliers)) {
+      suppliers.forEach(supplier => map.set(supplier.id, supplier));
+    }
+    return map;
+  }, [suppliers]);
   
   // Calculate summary stats from expenses
   const totalExpenses = useMemo(() => {
@@ -107,9 +119,23 @@ export default function ExpensesContent() {
     {
       accessorKey: "vendor",
       header: "Vendor",
-      cell: ({ row }) => row.original.vendor || <span className="text-muted-foreground">—</span>,
+      cell: ({ row }) => {
+        const expense = row.original;
+        if (expense.supplierId && supplierMap.has(expense.supplierId)) {
+          const supplier = supplierMap.get(expense.supplierId)!;
+          return (
+            <Link
+              href={`/inventory-suppliers/${expense.supplierId}`}
+              className="text-primary hover:underline"
+            >
+              {supplier.name}
+            </Link>
+          );
+        }
+        return expense.vendor || <span className="text-muted-foreground">—</span>;
+      },
     },
-  ], [subscriptionMap]);
+  ], [subscriptionMap, supplierMap]);
 
   const handleDelete = async (id: number) => {
     try {

@@ -19,7 +19,8 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections } from "@kit/hooks";
+import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections, useInventorySupplierById } from "@kit/hooks";
+import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
@@ -43,6 +44,7 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const { data: subscription, isLoading } = useSubscriptionById(subscriptionId);
+  const { data: supplier } = useInventorySupplierById(subscription?.supplierId?.toString() || "");
   const updateSubscription = useUpdateSubscription();
   const deleteMutation = useDeleteSubscription();
   
@@ -437,9 +439,20 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                   {/* Vendor */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Vendor</label>
-                    <p className="text-base mt-1">
-                      {subscription.vendor || <span className="text-muted-foreground">—</span>}
-                    </p>
+                    <div className="mt-1">
+                      {subscription.supplierId && supplier ? (
+                        <Link
+                          href={`/inventory-suppliers/${subscription.supplierId}`}
+                          className="text-base text-primary hover:underline"
+                        >
+                          {supplier.name}
+                        </Link>
+                      ) : subscription.vendor ? (
+                        <p className="text-base">{subscription.vendor}</p>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Status */}

@@ -15,7 +15,8 @@ function transformLeasing(row: any): LeasingPayment {
     endDate: row.end_date,
     frequency: row.frequency,
     description: row.description,
-    lessor: row.lessor,
+    lessor: row.lessor, // Keep for backward compatibility
+    supplierId: row.supplier_id || undefined,
     isActive: row.is_active,
     offPaymentMonths: row.off_payment_months || [],
     firstPaymentAmount: row.first_payment_amount ? parseFloat(row.first_payment_amount) : undefined,
@@ -34,7 +35,8 @@ function transformToSnakeCase(data: CreateLeasingPaymentData): any {
     end_date: data.endDate,
     frequency: data.frequency,
     description: data.description,
-    lessor: data.lessor,
+    lessor: data.lessor, // Keep for backward compatibility
+    supplier_id: data.supplierId || null,
     is_active: data.isActive ?? true,
   };
   

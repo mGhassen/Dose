@@ -20,7 +20,7 @@ import {
 } from "@kit/ui/dropdown-menu";
 import { Save, X, Trash2, MoreVertical, Edit2, ShoppingCart, DollarSign, Package, TrendingUp, Building2, Plus } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useInventorySupplierById, useUpdateInventorySupplier, useDeleteInventorySupplier, useSupplierOrders, useItems, useStockMovements } from "@kit/hooks";
+import { useInventorySupplierById, useUpdateInventorySupplier, useDeleteInventorySupplier, useSupplierOrders, useItems, useStockMovements, useExpenses, useSubscriptions, useLeasing, useLoans } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
 import { formatCurrency } from "@kit/lib/config";
@@ -38,8 +38,64 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
   const { data: ordersResponse } = useSupplierOrders({ supplierId: resolvedParams?.id || "", limit: 1000 });
   const { data: itemsResponse } = useItems({ limit: 1000 });
   const { data: stockMovementsResponse } = useStockMovements({ limit: 1000 });
+  const { data: expensesResponse } = useExpenses({ limit: 1000 });
+  const { data: subscriptionsResponse } = useSubscriptions({ limit: 1000 });
+  const { data: loansResponse } = useLoans();
+  const { data: leasingResponse } = useLeasing();
   const updateSupplier = useUpdateInventorySupplier();
   const deleteMutation = useDeleteInventorySupplier();
+
+  // Check if supplier is a vendor
+  const isVendor = useMemo(() => {
+    return supplier?.supplierType?.includes('vendor') || false;
+  }, [supplier?.supplierType]);
+
+  // Filter vendor-related data
+  const vendorExpenses = useMemo(() => {
+    if (!expensesResponse?.data || !resolvedParams?.id) return [];
+    return expensesResponse.data.filter(e => e.supplierId === Number(resolvedParams.id));
+  }, [expensesResponse?.data, resolvedParams?.id]);
+
+  const vendorSubscriptions = useMemo(() => {
+    if (!subscriptionsResponse?.data || !resolvedParams?.id) return [];
+    return subscriptionsResponse.data.filter(s => s.supplierId === Number(resolvedParams.id));
+  }, [subscriptionsResponse?.data, resolvedParams?.id]);
+
+  const vendorLoans = useMemo(() => {
+    if (!loansResponse || !resolvedParams?.id) return [];
+    return loansResponse.filter(l => l.supplierId === Number(resolvedParams.id));
+  }, [loansResponse, resolvedParams?.id]);
+
+  const vendorLeasing = useMemo(() => {
+    if (!leasingResponse || !resolvedParams?.id) return [];
+    return leasingResponse.filter(l => l.supplierId === Number(resolvedParams.id));
+  }, [leasingResponse, resolvedParams?.id]);
+
+  // Calculate vendor statistics
+  const vendorStats = useMemo(() => {
+    const expensesTotal = vendorExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const subscriptionsTotal = vendorSubscriptions.reduce((sum, s) => sum + s.amount, 0);
+    const loansTotal = vendorLoans.reduce((sum, l) => sum + l.principalAmount, 0);
+    const leasingTotal = vendorLeasing.reduce((sum, l) => sum + (l.totalAmount || l.amount || 0), 0);
+    
+    return {
+      expensesTotal,
+      subscriptionsTotal,
+      loansTotal,
+      leasingTotal,
+      totalVendorSpending: expensesTotal + subscriptionsTotal + loansTotal + leasingTotal,
+      expensesCount: vendorExpenses.length,
+      subscriptionsCount: vendorSubscriptions.length,
+      loansCount: vendorLoans.length,
+      leasingCount: vendorLeasing.length,
+    };
+  }, [vendorExpenses, vendorSubscriptions, vendorLoans, vendorLeasing]);
+
+  // Get items linked to this supplier (via vendorId)
+  const supplierItems = useMemo(() => {
+    if (!itemsResponse?.data || !resolvedParams?.id) return [];
+    return itemsResponse.data.filter(i => i.vendorId === Number(resolvedParams.id));
+  }, [itemsResponse?.data, resolvedParams?.id]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -108,6 +164,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
     contactPerson: "",
     paymentTerms: "",
     notes: "",
+    supplierType: ['supplier'] as ('supplier' | 'vendor')[],
     isActive: true,
   });
 
@@ -125,6 +182,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
         contactPerson: supplier.contactPerson || "",
         paymentTerms: supplier.paymentTerms || "",
         notes: supplier.notes || "",
+        supplierType: supplier.supplierType || ['supplier'],
         isActive: supplier.isActive,
       });
     }
@@ -143,16 +201,17 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
     try {
       await updateSupplier.mutateAsync({
         id: resolvedParams.id,
-        data: {
-          name: formData.name,
-          email: formData.email || undefined,
-          phone: formData.phone || undefined,
-          address: formData.address || undefined,
-          contactPerson: formData.contactPerson || undefined,
-          paymentTerms: formData.paymentTerms || undefined,
-          notes: formData.notes || undefined,
-          isActive: formData.isActive,
-        },
+          data: {
+            name: formData.name,
+            email: formData.email || undefined,
+            phone: formData.phone || undefined,
+            address: formData.address || undefined,
+            contactPerson: formData.contactPerson || undefined,
+            paymentTerms: formData.paymentTerms || undefined,
+            notes: formData.notes || undefined,
+            supplierType: formData.supplierType,
+            isActive: formData.isActive,
+          },
       });
       toast.success("Supplier updated successfully");
       setIsEditing(false);
@@ -329,6 +388,42 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                       onChange={(e) => handleInputChange('notes', e.target.value)}
                       rows={3}
                     />
+                  </div>
+
+                  <div className="space-y-3 md:col-span-2">
+                    <Label>Supplier Type</Label>
+                    <div className="flex gap-4">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="type-supplier"
+                          checked={formData.supplierType.includes('supplier')}
+                          onCheckedChange={(checked) => {
+                            const newTypes = checked
+                              ? [...formData.supplierType.filter(t => t !== 'supplier'), 'supplier']
+                              : formData.supplierType.filter(t => t !== 'supplier');
+                            handleInputChange('supplierType', newTypes.length > 0 ? newTypes : ['vendor']);
+                          }}
+                        />
+                        <Label htmlFor="type-supplier" className="font-normal cursor-pointer">
+                          Supplier (for items/inventory)
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="type-vendor"
+                          checked={formData.supplierType.includes('vendor')}
+                          onCheckedChange={(checked) => {
+                            const newTypes = checked
+                              ? [...formData.supplierType.filter(t => t !== 'vendor'), 'vendor']
+                              : formData.supplierType.filter(t => t !== 'vendor');
+                            handleInputChange('supplierType', newTypes.length > 0 ? newTypes : ['supplier']);
+                          }}
+                        />
+                        <Label htmlFor="type-vendor" className="font-normal cursor-pointer">
+                          Vendor (for expenses/subscriptions/loans/leasing)
+                        </Label>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex items-center space-x-2">
@@ -546,6 +641,216 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                   </CardContent>
                 </Card>
               )}
+
+              {/* Vendor-related sections (only if supplier is a vendor) */}
+              {isVendor && (
+                <>
+                  {/* Vendor Spending Summary */}
+                  {vendorStats.totalVendorSpending > 0 && (
+                    <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg mb-1">Total Vendor Spending</CardTitle>
+                            <CardDescription>All expenses, subscriptions, loans, and leasing</CardDescription>
+                          </div>
+                          <DollarSign className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-5xl font-bold text-blue-600 dark:text-blue-400 mb-4">
+                          {formatCurrency(vendorStats.totalVendorSpending)}
+                        </div>
+                        <div className="grid grid-cols-4 gap-4 mt-4">
+                          <div>
+                            <div className="text-sm text-muted-foreground">Expenses</div>
+                            <div className="text-lg font-semibold">{formatCurrency(vendorStats.expensesTotal)}</div>
+                            <div className="text-xs text-muted-foreground">{vendorStats.expensesCount} items</div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-muted-foreground">Subscriptions</div>
+                            <div className="text-lg font-semibold">{formatCurrency(vendorStats.subscriptionsTotal)}</div>
+                            <div className="text-xs text-muted-foreground">{vendorStats.subscriptionsCount} active</div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-muted-foreground">Loans</div>
+                            <div className="text-lg font-semibold">{formatCurrency(vendorStats.loansTotal)}</div>
+                            <div className="text-xs text-muted-foreground">{vendorStats.loansCount} loans</div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-muted-foreground">Leasing</div>
+                            <div className="text-lg font-semibold">{formatCurrency(vendorStats.leasingTotal)}</div>
+                            <div className="text-xs text-muted-foreground">{vendorStats.leasingCount} leases</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Expenses */}
+                  {vendorExpenses.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle>Expenses</CardTitle>
+                            <CardDescription>Expenses linked to this vendor</CardDescription>
+                          </div>
+                          <Link href={`/expenses?supplierId=${supplier.id}`}>
+                            <Button variant="outline" size="sm">View All</Button>
+                          </Link>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                          {vendorExpenses.slice(0, 10).map((expense) => (
+                            <Link key={expense.id} href={`/expenses/${expense.id}`}>
+                              <div className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="font-medium">{expense.name}</div>
+                                    <div className="text-sm text-muted-foreground">{formatDate(expense.expenseDate)}</div>
+                                  </div>
+                                  <div className="text-right font-semibold">{formatCurrency(expense.amount)}</div>
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Subscriptions */}
+                  {vendorSubscriptions.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle>Subscriptions</CardTitle>
+                            <CardDescription>Active subscriptions with this vendor</CardDescription>
+                          </div>
+                          <Link href={`/subscriptions?supplierId=${supplier.id}`}>
+                            <Button variant="outline" size="sm">View All</Button>
+                          </Link>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                          {vendorSubscriptions.slice(0, 10).map((subscription) => (
+                            <Link key={subscription.id} href={`/subscriptions/${subscription.id}`}>
+                              <div className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="font-medium">{subscription.name}</div>
+                                    <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                      <span>{subscription.recurrence}</span>
+                                      {subscription.isActive && <Badge variant="default" className="text-xs">Active</Badge>}
+                                    </div>
+                                  </div>
+                                  <div className="text-right font-semibold">{formatCurrency(subscription.amount)}</div>
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Loans */}
+                  {vendorLoans.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle>Loans</CardTitle>
+                            <CardDescription>Loans from this vendor</CardDescription>
+                          </div>
+                          <Link href={`/loans?supplierId=${supplier.id}`}>
+                            <Button variant="outline" size="sm">View All</Button>
+                          </Link>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                          {vendorLoans.slice(0, 10).map((loan) => (
+                            <Link key={loan.id} href={`/loans/${loan.id}`}>
+                              <div className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="font-medium">{loan.name}</div>
+                                    <div className="text-sm text-muted-foreground">{loan.loanNumber} • {formatCurrency(loan.principalAmount)}</div>
+                                  </div>
+                                  <Badge variant="outline">{loan.status}</Badge>
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Leasing */}
+                  {vendorLeasing.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle>Leasing</CardTitle>
+                            <CardDescription>Leasing agreements with this vendor</CardDescription>
+                          </div>
+                          <Link href={`/leasing?supplierId=${supplier.id}`}>
+                            <Button variant="outline" size="sm">View All</Button>
+                          </Link>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                          {vendorLeasing.slice(0, 10).map((leasing) => (
+                            <Link key={leasing.id} href={`/leasing/${leasing.id}`}>
+                              <div className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="font-medium">{leasing.name}</div>
+                                    <div className="text-sm text-muted-foreground">{leasing.frequency} • {formatCurrency(leasing.amount)}</div>
+                                  </div>
+                                  {leasing.isActive && <Badge variant="default">Active</Badge>}
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              )}
+
+              {/* Items linked via vendorId */}
+              {supplierItems.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Items Linked to Vendor</CardTitle>
+                    <CardDescription>Items that reference this supplier as vendor</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                      {supplierItems.map((item) => (
+                        <Link key={item.id} href={`/items/${item.id}`}>
+                          <div className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                            <div className="flex items-center justify-between">
+                              <div className="font-medium">{item.name}</div>
+                              <Badge variant="outline">{item.category || 'No category'}</Badge>
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Right Column - Sidebar (4 columns) */}
@@ -572,6 +877,20 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                       <Badge variant={supplier.isActive ? "default" : "secondary"}>
                         {supplier.isActive ? "Active" : "Inactive"}
                       </Badge>
+                    </div>
+                  </div>
+
+                  {/* Supplier Type */}
+                  <Separator />
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Type</label>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {supplier.supplierType?.includes('supplier') && (
+                        <Badge variant="outline">Supplier</Badge>
+                      )}
+                      {supplier.supplierType?.includes('vendor') && (
+                        <Badge variant="outline">Vendor</Badge>
+                      )}
                     </div>
                   </div>
 

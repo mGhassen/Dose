@@ -20,7 +20,8 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@kit/ui/radio-group";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLeasingById, useUpdateLeasing, useDeleteLeasing, useActualPayments } from "@kit/hooks";
+import { useLeasingById, useUpdateLeasing, useDeleteLeasing, useActualPayments, useInventorySupplierById } from "@kit/hooks";
+import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
@@ -48,6 +49,7 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const { data: leasing, isLoading } = useLeasingById(resolvedParams?.id || "");
+  const { data: supplier } = useInventorySupplierById(leasing?.supplierId?.toString() || "");
   const updateLeasing = useUpdateLeasing();
   const deleteMutation = useDeleteLeasing();
   const [amountMode, setAmountMode] = useState<"periodic" | "total">("periodic");
@@ -842,9 +844,20 @@ export default function LeasingDetailPage({ params }: LeasingDetailPageProps) {
                   {/* Lessor */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Lessor</label>
-                    <p className="text-base mt-1">
-                      {leasing.lessor || <span className="text-muted-foreground">—</span>}
-                    </p>
+                    <div className="mt-1">
+                      {leasing.supplierId && supplier ? (
+                        <Link
+                          href={`/inventory-suppliers/${leasing.supplierId}`}
+                          className="text-base text-primary hover:underline"
+                        >
+                          {supplier.name}
+                        </Link>
+                      ) : leasing.lessor ? (
+                        <p className="text-base">{leasing.lessor}</p>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Status */}

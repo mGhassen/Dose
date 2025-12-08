@@ -2,10 +2,11 @@ import { apiRequest } from './api';
 import type { Supplier, CreateSupplierData, UpdateSupplierData, PaginatedResponse, PaginationParams } from '@kit/types';
 
 export const inventorySuppliersApi = {
-  getAll: (params?: PaginationParams) => {
+  getAll: (params?: PaginationParams & { supplierType?: 'supplier' | 'vendor' }) => {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.supplierType) searchParams.append('supplierType', params.supplierType);
     const query = searchParams.toString();
     return apiRequest<PaginatedResponse<Supplier>>('GET', `/api/suppliers${query ? `?${query}` : ''}`);
   },

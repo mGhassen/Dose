@@ -14,7 +14,8 @@ import { Badge } from "@kit/ui/badge";
 import { Edit2, Trash2, Calendar, MoreVertical } from "lucide-react";
 import { useMemo } from "react";
 import AppLayout from "@/components/app-layout";
-import { useExpenseById, useDeleteExpense, useSubscriptions } from "@kit/hooks";
+import { useExpenseById, useDeleteExpense, useSubscriptions, useInventorySupplierById } from "@kit/hooks";
+import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -29,6 +30,7 @@ export default function ExpenseDetailsContent({ expenseId }: ExpenseDetailsConte
   const { data: expense, isLoading } = useExpenseById(expenseId);
   const { data: subscriptionsResponse } = useSubscriptions();
   const subscriptions = subscriptionsResponse?.data || [];
+  const { data: supplier } = useInventorySupplierById(expense?.supplierId?.toString() || "");
   const deleteMutation = useDeleteExpense();
   
   const subscriptionMap = useMemo(() => {
@@ -176,9 +178,20 @@ export default function ExpenseDetailsContent({ expenseId }: ExpenseDetailsConte
               {/* Vendor */}
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Vendor</label>
-                <p className="text-base mt-1">
-                  {expense.vendor || <span className="text-muted-foreground">—</span>}
-                </p>
+                <div className="mt-1">
+                  {expense.supplierId && supplier ? (
+                    <Link
+                      href={`/inventory-suppliers/${expense.supplierId}`}
+                      className="text-base text-primary hover:underline"
+                    >
+                      {supplier.name}
+                    </Link>
+                  ) : expense.vendor ? (
+                    <p className="text-base">{expense.vendor}</p>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </div>
               </div>
             </div>
 

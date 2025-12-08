@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useLeasing, useDeleteLeasing } from "@kit/hooks";
+import { useLeasing, useDeleteLeasing, useInventorySuppliers } from "@kit/hooks";
+import Link from "next/link";
 import type { LeasingPayment, LeasingType, ExpenseRecurrence } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Button } from "@kit/ui/button";
@@ -16,7 +17,18 @@ import { Calendar } from "lucide-react";
 export default function LeasingContent() {
   const router = useRouter();
   const { data: leasing, isLoading } = useLeasing();
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
+  const suppliers = suppliersResponse?.data || [];
   const deleteMutation = useDeleteLeasing();
+  
+  // Create a map of supplier IDs to suppliers for display
+  const supplierMap = useMemo(() => {
+    const map = new Map<number, typeof suppliers[0]>();
+    if (suppliers && Array.isArray(suppliers)) {
+      suppliers.forEach(supplier => map.set(supplier.id, supplier));
+    }
+    return map;
+  }, [suppliers]);
 
   const columns: ColumnDef<LeasingPayment>[] = useMemo(() => [
     {
@@ -80,7 +92,21 @@ export default function LeasingContent() {
     {
       accessorKey: "lessor",
       header: "Lessor",
-      cell: ({ row }) => row.original.lessor || <span className="text-muted-foreground">—</span>,
+      cell: ({ row }) => {
+        const leasingPayment = row.original;
+        if (leasingPayment.supplierId && supplierMap.has(leasingPayment.supplierId)) {
+          const supplier = supplierMap.get(leasingPayment.supplierId)!;
+          return (
+            <Link
+              href={`/inventory-suppliers/${leasingPayment.supplierId}`}
+              className="text-primary hover:underline"
+            >
+              {supplier.name}
+            </Link>
+          );
+        }
+        return leasingPayment.lessor || <span className="text-muted-foreground">—</span>;
+      },
     },
     {
       accessorKey: "isActive",
@@ -91,7 +117,7 @@ export default function LeasingContent() {
         </Badge>
       ),
     },
-  ], []);
+  ], [supplierMap]);
 
   const handleDelete = async (id: number) => {
     try {

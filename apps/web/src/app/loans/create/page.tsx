@@ -10,14 +10,17 @@ import { Textarea } from "@kit/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateLoan } from "@kit/hooks";
+import { useCreateLoan, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
 import type { LoanStatus } from "@kit/types";
 import { Checkbox } from "@kit/ui/checkbox";
+import Link from "next/link";
 
 export default function CreateLoanPage() {
   const router = useRouter();
   const createLoan = useCreateLoan();
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
+  const suppliers = suppliersResponse?.data || [];
   const [formData, setFormData] = useState({
     name: "",
     loanNumber: "",
@@ -27,6 +30,7 @@ export default function CreateLoanPage() {
     startDate: new Date().toISOString().split('T')[0],
     status: "active" as LoanStatus,
     lender: "",
+    supplierId: "",
     description: "",
     offPaymentMonths: [] as number[],
   });
@@ -50,6 +54,7 @@ export default function CreateLoanPage() {
         startDate: formData.startDate,
         status: formData.status,
         lender: formData.lender || undefined,
+        supplierId: formData.supplierId ? parseInt(formData.supplierId) : undefined,
         description: formData.description || undefined,
         offPaymentMonths: formData.offPaymentMonths.length > 0 ? formData.offPaymentMonths : undefined,
       });
@@ -192,15 +197,30 @@ export default function CreateLoanPage() {
                   </Select>
                 </div>
 
-                {/* Lender */}
+                {/* Lender/Supplier */}
                 <div className="space-y-2">
-                  <Label htmlFor="lender">Lender</Label>
-                  <Input
-                    id="lender"
-                    value={formData.lender}
-                    onChange={(e) => handleInputChange('lender', e.target.value)}
-                    placeholder="Bank or lender name"
-                  />
+                  <Label htmlFor="supplierId">Lender</Label>
+                  <Select
+                    value={formData.supplierId || "none"}
+                    onValueChange={(value) => handleInputChange('supplierId', value === "none" ? "" : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select lender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {suppliers.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                          {supplier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.supplierId && (
+                    <Link href={`/inventory-suppliers/${formData.supplierId}`} className="text-xs text-blue-600 hover:underline">
+                      View lender details →
+                    </Link>
+                  )}
                 </div>
               </div>
 

@@ -81,15 +81,30 @@ export async function GET(
     }
 
     // Build Square API request
-    const locationIds = searchParams.getAll('location_ids');
+    let locationIds = searchParams.getAll('location_ids');
     const cursor = searchParams.get('cursor');
     const limit = searchParams.get('limit');
     const queryParam = searchParams.get('query');
 
     const requestBody: any = {};
     
+    // If no location_ids provided, try to get from integration config
+    if (locationIds.length === 0) {
+      const configLocationId = integration.config?.location_id;
+      if (configLocationId) {
+        locationIds = [configLocationId];
+      }
+    }
+    
+    // Square requires at least one location_id for orders search
     if (locationIds.length > 0) {
       requestBody.location_ids = locationIds;
+    } else {
+      // If still no location_ids, return error
+      return NextResponse.json(
+        { error: 'Location ID is required for orders search. Please sync locations first or specify location_ids in the query.' },
+        { status: 400 }
+      );
     }
     
     if (queryParam) {
@@ -107,7 +122,6 @@ export async function GET(
           }
         }
         requestBody.query = query;
-        console.log('Orders request body:', JSON.stringify(requestBody, null, 2));
       } catch (e) {
         console.error('Invalid query JSON:', e);
         // Invalid JSON, ignore

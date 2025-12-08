@@ -15,7 +15,8 @@ function transformLoan(row: any): Loan {
     durationMonths: row.duration_months,
     startDate: row.start_date,
     status: row.status,
-    lender: row.lender,
+    lender: row.lender, // Keep for backward compatibility
+    supplierId: row.supplier_id || undefined,
     description: row.description,
     offPaymentMonths: row.off_payment_months || [],
     createdAt: row.created_at,
@@ -32,7 +33,8 @@ function transformToSnakeCase(data: CreateLoanData): any {
     duration_months: data.durationMonths,
     start_date: data.startDate,
     status: data.status || 'active',
-    lender: data.lender,
+    lender: data.lender, // Keep for backward compatibility
+    supplier_id: data.supplierId || null,
     description: data.description,
   };
   

@@ -15,7 +15,8 @@ function transformSubscription(row: any): Subscription {
     startDate: row.start_date,
     endDate: row.end_date,
     description: row.description,
-    vendor: row.vendor,
+    vendor: row.vendor, // Keep for backward compatibility
+    supplierId: row.supplier_id || undefined,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -31,7 +32,8 @@ function transformToSnakeCase(data: UpdateSubscriptionData): any {
   if (data.startDate !== undefined) result.start_date = data.startDate;
   if (data.endDate !== undefined) result.end_date = data.endDate;
   if (data.description !== undefined) result.description = data.description;
-  if (data.vendor !== undefined) result.vendor = data.vendor;
+  if (data.vendor !== undefined) result.vendor = data.vendor; // Keep for backward compatibility
+  if (data.supplierId !== undefined) result.supplier_id = data.supplierId || null;
   if (data.isActive !== undefined) result.is_active = data.isActive;
 
   result.updated_at = new Date().toISOString();

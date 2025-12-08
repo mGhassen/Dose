@@ -11,13 +11,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateSubscription } from "@kit/hooks";
+import { useCreateSubscription, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseCategory, ExpenseRecurrence } from "@kit/types";
+import Link from "next/link";
 
 export default function CreateSubscriptionPage() {
   const router = useRouter();
   const createSubscription = useCreateSubscription();
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
+  const suppliers = suppliersResponse?.data || [];
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
@@ -27,6 +30,7 @@ export default function CreateSubscriptionPage() {
     endDate: "",
     description: "",
     vendor: "",
+    supplierId: "",
     isActive: true,
   });
 
@@ -48,6 +52,7 @@ export default function CreateSubscriptionPage() {
         endDate: formData.endDate || undefined,
         description: formData.description || undefined,
         vendor: formData.vendor || undefined,
+        supplierId: formData.supplierId ? parseInt(formData.supplierId) : undefined,
         isActive: formData.isActive,
       });
       toast.success("Subscription created successfully");
@@ -172,15 +177,30 @@ export default function CreateSubscriptionPage() {
                   </p>
                 </div>
 
-                {/* Vendor */}
+                {/* Supplier/Vendor */}
                 <div className="space-y-2">
-                  <Label htmlFor="vendor">Vendor</Label>
-                  <Input
-                    id="vendor"
-                    value={formData.vendor}
-                    onChange={(e) => handleInputChange('vendor', e.target.value)}
-                    placeholder="Vendor name"
-                  />
+                  <Label htmlFor="supplierId">Vendor</Label>
+                  <Select
+                    value={formData.supplierId || "none"}
+                    onValueChange={(value) => handleInputChange('supplierId', value === "none" ? "" : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select vendor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {suppliers.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                          {supplier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.supplierId && (
+                    <Link href={`/inventory-suppliers/${formData.supplierId}`} className="text-xs text-blue-600 hover:underline">
+                      View vendor details →
+                    </Link>
+                  )}
                 </div>
 
                 {/* Is Active */}

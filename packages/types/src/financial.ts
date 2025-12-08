@@ -84,7 +84,8 @@ export interface Subscription {
   startDate: string; // ISO date
   endDate?: string; // ISO date (optional for recurring)
   description?: string;
-  vendor?: string;
+  vendor?: string; // Deprecated: use supplierId instead
+  supplierId?: number; // Link to supplier (vendor type)
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -98,7 +99,8 @@ export interface CreateSubscriptionData {
   startDate: string;
   endDate?: string;
   description?: string;
-  vendor?: string;
+  vendor?: string; // Deprecated: use supplierId instead
+  supplierId?: number; // Link to supplier (vendor type)
   isActive?: boolean;
 }
 
@@ -150,7 +152,8 @@ export interface Expense {
   amount: number;
   subscriptionId?: number; // Optional link to subscription
   description?: string;
-  vendor?: string;
+  vendor?: string; // Deprecated: use supplierId instead
+  supplierId?: number; // Link to supplier (vendor type)
   expenseDate: string; // ISO date - when the expense occurred
   createdAt: string;
   updatedAt: string;
@@ -162,7 +165,8 @@ export interface CreateExpenseData {
   amount: number;
   subscriptionId?: number; // Optional link to subscription
   description?: string;
-  vendor?: string;
+  vendor?: string; // Deprecated: use supplierId instead
+  supplierId?: number; // Link to supplier (vendor type)
   expenseDate: string; // ISO date - when the expense occurred
 }
 
@@ -223,7 +227,8 @@ export interface LeasingPayment {
   endDate?: string;
   frequency: ExpenseRecurrence; // monthly, quarterly, yearly
   description?: string;
-  lessor?: string;
+  lessor?: string; // Deprecated: use supplierId instead
+  supplierId?: number; // Link to supplier (vendor type)
   isActive: boolean;
   offPaymentMonths?: number[]; // Array of month numbers (from start date) where no payment is made
   firstPaymentAmount?: number; // Optional different amount for the first payment
@@ -240,7 +245,8 @@ export interface CreateLeasingPaymentData {
   endDate?: string;
   frequency: ExpenseRecurrence;
   description?: string;
-  lessor?: string;
+  lessor?: string; // Deprecated: use supplierId instead
+  supplierId?: number; // Link to supplier (vendor type)
   isActive?: boolean;
   offPaymentMonths?: number[]; // Array of month numbers (from start date) where no payment is made
   firstPaymentAmount?: number; // Optional different amount for the first payment
@@ -262,7 +268,8 @@ export interface Loan {
   durationMonths: number;
   startDate: string;
   status: LoanStatus;
-  lender?: string;
+  lender?: string; // Deprecated: use supplierId instead
+  supplierId?: number; // Link to supplier (vendor type)
   description?: string;
   offPaymentMonths?: number[]; // Array of month numbers where only interest is paid (no principal)
   createdAt: string;
@@ -290,7 +297,8 @@ export interface CreateLoanData {
   durationMonths: number;
   startDate: string;
   status?: LoanStatus;
-  lender?: string;
+  lender?: string; // Deprecated: use supplierId instead
+  supplierId?: number; // Link to supplier (vendor type)
   description?: string;
   offPaymentMonths?: number[]; // Array of month numbers where only interest is paid (no principal)
 }
@@ -897,6 +905,8 @@ export type UpdateRecipeIngredientData = UpdateRecipeItemData;
 // SUPPLIERS
 // ============================================================================
 
+export type SupplierType = 'supplier' | 'vendor';
+
 export interface Supplier {
   id: number;
   name: string;
@@ -906,6 +916,7 @@ export interface Supplier {
   contactPerson?: string;
   paymentTerms?: string;
   notes?: string;
+  supplierType: SupplierType[]; // Can be ['supplier'], ['vendor'], or ['supplier', 'vendor']
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -919,6 +930,7 @@ export interface CreateSupplierData {
   contactPerson?: string;
   paymentTerms?: string;
   notes?: string;
+  supplierType?: SupplierType[]; // Defaults to ['supplier']
   isActive?: boolean;
 }
 

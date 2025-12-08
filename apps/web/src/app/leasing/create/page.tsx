@@ -10,15 +10,18 @@ import { Textarea } from "@kit/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateLeasing } from "@kit/hooks";
+import { useCreateLeasing, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
 import type { LeasingType, ExpenseRecurrence } from "@kit/types";
 import { Checkbox } from "@kit/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@kit/ui/radio-group";
+import Link from "next/link";
 
 export default function CreateLeasingPage() {
   const router = useRouter();
   const createLeasing = useCreateLeasing();
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
+  const suppliers = suppliersResponse?.data || [];
   const [amountMode, setAmountMode] = useState<"periodic" | "total">("periodic");
   const [formData, setFormData] = useState({
     name: "",
@@ -30,6 +33,7 @@ export default function CreateLeasingPage() {
     frequency: "monthly" as ExpenseRecurrence,
     description: "",
     lessor: "",
+    supplierId: "",
     isActive: true,
     offPaymentMonths: [] as number[],
     firstPaymentAmount: "",
@@ -122,6 +126,7 @@ export default function CreateLeasingPage() {
         frequency: formData.frequency,
         description: formData.description || undefined,
         lessor: formData.lessor || undefined,
+        supplierId: formData.supplierId ? parseInt(formData.supplierId) : undefined,
         isActive: formData.isActive,
         offPaymentMonths: formData.offPaymentMonths.length > 0 ? formData.offPaymentMonths : undefined,
         firstPaymentAmount: formData.firstPaymentAmount ? parseFloat(formData.firstPaymentAmount) : undefined,
@@ -327,15 +332,30 @@ export default function CreateLeasingPage() {
                   )}
                 </div>
 
-                {/* Lessor */}
+                {/* Lessor/Supplier */}
                 <div className="space-y-2">
-                  <Label htmlFor="lessor">Lessor</Label>
-                  <Input
-                    id="lessor"
-                    value={formData.lessor}
-                    onChange={(e) => handleInputChange('lessor', e.target.value)}
-                    placeholder="Lessor name or company"
-                  />
+                  <Label htmlFor="supplierId">Lessor</Label>
+                  <Select
+                    value={formData.supplierId || "none"}
+                    onValueChange={(value) => handleInputChange('supplierId', value === "none" ? "" : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select lessor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {suppliers.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                          {supplier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.supplierId && (
+                    <Link href={`/inventory-suppliers/${formData.supplierId}`} className="text-xs text-blue-600 hover:underline">
+                      View lessor details →
+                    </Link>
+                  )}
                 </div>
 
                 {/* Status */}

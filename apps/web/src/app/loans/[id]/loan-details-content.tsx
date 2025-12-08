@@ -30,7 +30,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2, Plus, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLoanById, useUpdateLoan, useDeleteLoan, useLoanSchedule, useEntries, usePaymentsByEntry, useCreatePayment, useDeletePayment, useGenerateLoanSchedule } from "@kit/hooks";
+import { useLoanById, useUpdateLoan, useDeleteLoan, useLoanSchedule, useEntries, usePaymentsByEntry, useCreatePayment, useDeletePayment, useGenerateLoanSchedule, useInventorySupplierById } from "@kit/hooks";
+import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -61,6 +62,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   
   const { data: loan, isLoading } = useLoanById(loanId);
+  const { data: supplier } = useInventorySupplierById(loan?.supplierId?.toString() || "");
   const { data: schedule } = useLoanSchedule(loanId);
   const updateLoan = useUpdateLoan();
   const deleteMutation = useDeleteLoan();
@@ -535,9 +537,20 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                   {/* Lender */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Lender</label>
-                    <p className="text-base mt-1">
-                      {loan.lender || <span className="text-muted-foreground">—</span>}
-                    </p>
+                    <div className="mt-1">
+                      {loan.supplierId && supplier ? (
+                        <Link
+                          href={`/inventory-suppliers/${loan.supplierId}`}
+                          className="text-base text-primary hover:underline"
+                        >
+                          {supplier.name}
+                        </Link>
+                      ) : loan.lender ? (
+                        <p className="text-base">{loan.lender}</p>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Off-Payment Months */}

@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useSubscriptions, useDeleteSubscription } from "@kit/hooks";
+import { useSubscriptions, useDeleteSubscription, useInventorySuppliers } from "@kit/hooks";
+import Link from "next/link";
 import { useYear } from "@/contexts/year-context";
 import type { Subscription, ExpenseCategory, ExpenseRecurrence } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
@@ -24,6 +25,8 @@ export default function SubscriptionsContent() {
     page, 
     limit: 1000 // Fetch all for year filtering, then paginate client-side
   });
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
+  const suppliers = suppliersResponse?.data || [];
   
   // Filter by year (subscriptions active in the selected year) and paginate client-side
   const filteredSubscriptions = useMemo(() => {
@@ -46,6 +49,15 @@ export default function SubscriptionsContent() {
   
   const totalPages = Math.ceil(filteredSubscriptions.length / pageSize);
   const deleteMutation = useDeleteSubscription();
+  
+  // Create a map of supplier IDs to suppliers for display
+  const supplierMap = useMemo(() => {
+    const map = new Map<number, typeof suppliers[0]>();
+    if (suppliers && Array.isArray(suppliers)) {
+      suppliers.forEach(supplier => map.set(supplier.id, supplier));
+    }
+    return map;
+  }, [suppliers]);
 
   const columns: ColumnDef<Subscription>[] = useMemo(() => [
     {
@@ -115,7 +127,21 @@ export default function SubscriptionsContent() {
     {
       accessorKey: "vendor",
       header: "Vendor",
-      cell: ({ row }) => row.original.vendor || <span className="text-muted-foreground">—</span>,
+      cell: ({ row }) => {
+        const subscription = row.original;
+        if (subscription.supplierId && supplierMap.has(subscription.supplierId)) {
+          const supplier = supplierMap.get(subscription.supplierId)!;
+          return (
+            <Link
+              href={`/inventory-suppliers/${subscription.supplierId}`}
+              className="text-primary hover:underline"
+            >
+              {supplier.name}
+            </Link>
+          );
+        }
+        return subscription.vendor || <span className="text-muted-foreground">—</span>;
+      },
     },
     {
       accessorKey: "isActive",
@@ -126,7 +152,7 @@ export default function SubscriptionsContent() {
         </Badge>
       ),
     },
-  ], []);
+  ], [supplierMap]);
 
   const handleDelete = async (id: number) => {
     try {

@@ -12,7 +12,8 @@ function transformExpense(row: any): Expense {
     amount: parseFloat(row.amount),
     subscriptionId: row.subscription_id || undefined,
     description: row.description,
-    vendor: row.vendor,
+    vendor: row.vendor, // Keep for backward compatibility
+    supplierId: row.supplier_id || undefined,
     expenseDate: row.expense_date || row.start_date, // Fallback to start_date for migration
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -27,7 +28,8 @@ function transformToSnakeCase(data: UpdateExpenseData): any {
   if (data.subscriptionId !== undefined) result.subscription_id = data.subscriptionId || null;
   if (data.expenseDate !== undefined) result.expense_date = data.expenseDate;
   if (data.description !== undefined) result.description = data.description;
-  if (data.vendor !== undefined) result.vendor = data.vendor;
+  if (data.vendor !== undefined) result.vendor = data.vendor; // Keep for backward compatibility
+  if (data.supplierId !== undefined) result.supplier_id = data.supplierId || null;
   result.updated_at = new Date().toISOString();
   return result;
 }

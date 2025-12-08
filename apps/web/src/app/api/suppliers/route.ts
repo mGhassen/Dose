@@ -15,6 +15,7 @@ function transformSupplier(row: any): Supplier {
     contactPerson: row.contact_person,
     paymentTerms: row.payment_terms,
     notes: row.notes,
+    supplierType: row.supplier_type || ['supplier'], // Default to ['supplier'] if not set
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -30,6 +31,7 @@ function transformToSnakeCase(data: CreateSupplierData): any {
     contact_person: data.contactPerson,
     payment_terms: data.paymentTerms,
     notes: data.notes,
+    supplier_type: data.supplierType || ['supplier'], // Default to ['supplier']
     is_active: data.isActive ?? true,
   };
 }
@@ -38,18 +40,28 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const { page, limit, offset } = getPaginationParams(searchParams);
+    const supplierType = searchParams.get('supplierType'); // Filter by type: 'supplier' or 'vendor'
 
     const supabase = createServerSupabaseClient();
     
-    const countQuery = supabase
+    let countQuery = supabase
       .from('suppliers')
       .select('*', { count: 'exact', head: true });
 
-    const query = supabase
+    let query = supabase
       .from('suppliers')
       .select('*')
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .order('created_at', { ascending: false });
+
+    // Filter by supplier type if provided
+    if (supplierType) {
+      // Use PostgreSQL array contains operator
+      const filterFn = (q: any) => q.contains('supplier_type', [supplierType]);
+      countQuery = filterFn(countQuery);
+      query = filterFn(query);
+    }
+
+    query = query.range(offset, offset + limit - 1);
 
     const [{ data, error }, { count, error: countError }] = await Promise.all([
       query,

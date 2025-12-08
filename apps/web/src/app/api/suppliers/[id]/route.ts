@@ -14,6 +14,7 @@ function transformSupplier(row: any): Supplier {
     contactPerson: row.contact_person,
     paymentTerms: row.payment_terms,
     notes: row.notes,
+    supplierType: row.supplier_type || ['supplier'], // Default to ['supplier'] if not set
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -29,6 +30,7 @@ function transformToSnakeCase(data: UpdateSupplierData): any {
   if (data.contactPerson !== undefined) result.contact_person = data.contactPerson;
   if (data.paymentTerms !== undefined) result.payment_terms = data.paymentTerms;
   if (data.notes !== undefined) result.notes = data.notes;
+  if (data.supplierType !== undefined) result.supplier_type = data.supplierType;
   if (data.isActive !== undefined) result.is_active = data.isActive;
   return result;
 }

@@ -10,9 +10,10 @@ import { Textarea } from "@kit/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLoanById, useUpdateLoan } from "@kit/hooks";
+import { useLoanById, useUpdateLoan, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
 import type { LoanStatus } from "@kit/types";
+import Link from "next/link";
 
 interface EditLoanPageProps {
   params: Promise<{ id: string }>;
@@ -23,6 +24,8 @@ export default function EditLoanPage({ params }: EditLoanPageProps) {
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: loan, isLoading } = useLoanById(resolvedParams?.id || "");
   const updateLoan = useUpdateLoan();
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
+  const suppliers = suppliersResponse?.data || [];
   
   const [formData, setFormData] = useState({
     name: "",
@@ -33,6 +36,7 @@ export default function EditLoanPage({ params }: EditLoanPageProps) {
     startDate: "",
     status: "active" as LoanStatus,
     lender: "",
+    supplierId: "",
     description: "",
   });
 
@@ -51,6 +55,7 @@ export default function EditLoanPage({ params }: EditLoanPageProps) {
         startDate: loan.startDate.split('T')[0],
         status: loan.status,
         lender: loan.lender || "",
+        supplierId: loan.supplierId?.toString() || "",
         description: loan.description || "",
       });
     }
@@ -79,6 +84,7 @@ export default function EditLoanPage({ params }: EditLoanPageProps) {
           startDate: formData.startDate,
           status: formData.status,
           lender: formData.lender || undefined,
+          supplierId: formData.supplierId ? parseInt(formData.supplierId) : undefined,
           description: formData.description || undefined,
         },
       });
@@ -229,15 +235,30 @@ export default function EditLoanPage({ params }: EditLoanPageProps) {
                   </Select>
                 </div>
 
-                {/* Lender */}
+                {/* Lender/Supplier */}
                 <div className="space-y-2">
-                  <Label htmlFor="lender">Lender</Label>
-                  <Input
-                    id="lender"
-                    value={formData.lender}
-                    onChange={(e) => handleInputChange('lender', e.target.value)}
-                    placeholder="Bank or lender name"
-                  />
+                  <Label htmlFor="supplierId">Lender</Label>
+                  <Select
+                    value={formData.supplierId || "none"}
+                    onValueChange={(value) => handleInputChange('supplierId', value === "none" ? "" : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select lender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {suppliers.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                          {supplier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.supplierId && (
+                    <Link href={`/inventory-suppliers/${formData.supplierId}`} className="text-xs text-blue-600 hover:underline">
+                      View lender details →
+                    </Link>
+                  )}
                 </div>
               </div>
 

@@ -243,9 +243,9 @@ export const pathsConfig: NavigationConfig = {
           translationKey: "variables"
         },
         {
-          title: "vendors",
-          url: "/vendors",
-          translationKey: "vendors"
+          title: "suppliers",
+          url: "/inventory-suppliers",
+          translationKey: "suppliers"
         },
         {
           title: "metadata-enums",

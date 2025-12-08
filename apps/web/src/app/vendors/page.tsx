@@ -1,13 +1,16 @@
 "use client";
 
-import AppLayout from '@/components/app-layout';
-import VendorsContent from "./vendors-content";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function VendorsPage() {
-  return (
-    <AppLayout>
-      <VendorsContent />
-    </AppLayout>
-  );
+  const router = useRouter();
+  
+  useEffect(() => {
+    // Redirect to suppliers page (vendors have been merged into suppliers)
+    router.replace("/inventory-suppliers");
+  }, [router]);
+
+  return null;
 }
 
