@@ -9,3 +9,5 @@ UPDATE personnel SET salary_frequency = 'monthly' WHERE salary_frequency IS NULL
 
 CREATE INDEX IF NOT EXISTS idx_personnel_salary_frequency ON personnel(salary_frequency);
 
+
+

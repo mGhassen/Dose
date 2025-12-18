@@ -309,3 +309,5 @@ CROSS JOIN (VALUES
 WHERE e.name = 'StockMovementReferenceType'
 ON CONFLICT (enum_id, name) DO NOTHING;
 
+
+

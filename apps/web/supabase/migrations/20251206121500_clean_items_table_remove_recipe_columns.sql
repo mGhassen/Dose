@@ -21,3 +21,5 @@ UPDATE items SET item_type = 'item' WHERE item_type IS NULL OR item_type = 'reci
 -- (These should be in recipes table instead)
 DELETE FROM items WHERE item_type = 'recipe';
 
+
+

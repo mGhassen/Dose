@@ -6,3 +6,5 @@ ADD COLUMN IF NOT EXISTS off_payment_months INTEGER[] DEFAULT '{}';
 
 COMMENT ON COLUMN loans.off_payment_months IS 'Array of month numbers where only interest is paid (no principal payment)';
 
+
+

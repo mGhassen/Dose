@@ -34,3 +34,5 @@ CREATE INDEX idx_entries_direction_type ON entries(direction, entry_type);
 CREATE TRIGGER update_entries_updated_at BEFORE UPDATE ON entries
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+
+

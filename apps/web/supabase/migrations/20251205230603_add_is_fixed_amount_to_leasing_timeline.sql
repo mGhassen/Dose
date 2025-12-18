@@ -6,3 +6,5 @@ ADD COLUMN IF NOT EXISTS is_fixed_amount BOOLEAN DEFAULT false;
 
 CREATE INDEX IF NOT EXISTS idx_leasing_timeline_is_fixed_amount ON leasing_timeline_entries(is_fixed_amount);
 
+
+

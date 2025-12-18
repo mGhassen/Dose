@@ -2,3 +2,5 @@
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS item_id BIGINT REFERENCES items(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_sales_item_id ON sales(item_id);
 
+
+

@@ -36,3 +36,5 @@ supabase migration new <migration_name>
 
 Then edit the generated migration file in `apps/web/supabase/migrations/`.
 
+
+

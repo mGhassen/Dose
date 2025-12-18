@@ -80,3 +80,5 @@ CREATE POLICY "Allow authenticated users to delete metadata_enum_values"
   ON metadata_enum_values FOR DELETE
   USING (auth.role() = 'authenticated');
 
+
+
