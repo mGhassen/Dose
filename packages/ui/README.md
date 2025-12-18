@@ -1,6 +1,6 @@
 # @kit/ui
 
-Shared UI components and Tailwind CSS configuration for SmartLogBook.
+Shared UI components and Tailwind CSS configuration for Dose.
 
 ## Usage
 

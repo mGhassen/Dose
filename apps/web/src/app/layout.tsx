@@ -13,8 +13,8 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "SmartLogBook - Railway Locomotive Inspection System",
-  description: "Railway locomotive inspection and maintenance management system",
+  title: "Dose - Financial Management System",
+  description: "Financial management and planning system",
 };
 
 export default async function RootLayout({

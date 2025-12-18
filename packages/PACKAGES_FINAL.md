@@ -29,7 +29,7 @@ Contains MSW mock setup from `apps/web/src/mocks/`:
 - `browser.ts` - Browser worker setup
 - `server.ts` - Node server setup
 - `data.ts` - Mock data
-- `handlers/` - Request handlers (auth, smartlogbook)
+- `handlers/` - Request handlers (auth, dose)
 
 ## Existing Packages
 

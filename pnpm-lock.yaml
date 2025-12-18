@@ -8,6 +8,8 @@ overrides:
   '@types/react': 19.1.8
   '@types/react-dom': 19.1.6
 
+packageExtensionsChecksum: sha256-BGAzV3/RvVoCs7ra1x1kJ+g6UJcOLMBzChFCrmyeGuM=
+
 importers:
 
   .: {}

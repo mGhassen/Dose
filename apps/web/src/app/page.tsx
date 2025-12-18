@@ -19,8 +19,8 @@ export default function Home() {
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
-        <h1 className="text-2xl font-bold mb-2">SmartLogBook</h1>
-        <p className="text-muted-foreground">Railway Locomotive Inspection System</p>
+        <h1 className="text-2xl font-bold mb-2">Dose</h1>
+        <p className="text-muted-foreground">Financial planning and budget management application</p>
         <div className="mt-4">
           <span className="text-lg text-muted-foreground">Loading...</span>
         </div>

@@ -1,5 +1,5 @@
 {
-  "name": "sunnybudget",
+  "name": "dose",
   "version": "1.0.0",
   "description": "Next.js monorepo boilerplate with modern architecture",
   "private": true,
@@ -52,6 +52,11 @@
     "overrides": {
       "@types/react": "19.1.8",
       "@types/react-dom": "19.1.6"
+    },
+    "packageExtensions": {
+      "@remix-run/node": {
+        "bin": {}
+      }
     }
   }
 }

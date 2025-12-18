@@ -161,7 +161,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">
-            Welcome to SunnyBudget
+            Welcome to Dose
           </CardTitle>
           <CardDescription>Sign in to your account to continue</CardDescription>
         </CardHeader>
@@ -259,7 +259,7 @@ export default function LoginPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handlePrefilledLogin("admin@sunnybudget.com", "password123")}
+                    onClick={() => handlePrefilledLogin("admin@dose.com", "password123")}
                     disabled={isLoading}
                     className="text-xs"
                   >
@@ -275,7 +275,7 @@ export default function LoginPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handlePrefilledLogin("manager@sunnybudget.com", "password123")}
+                    onClick={() => handlePrefilledLogin("manager@dose.com", "password123")}
                     disabled={isLoading}
                     className="text-xs"
                   >
@@ -291,7 +291,7 @@ export default function LoginPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handlePrefilledLogin("user@sunnybudget.com", "password123")}
+                    onClick={() => handlePrefilledLogin("user@dose.com", "password123")}
                     disabled={isLoading}
                     className="text-xs"
                   >
@@ -307,7 +307,7 @@ export default function LoginPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handlePrefilledLogin("analyst@sunnybudget.com", "password123")}
+                    onClick={() => handlePrefilledLogin("analyst@dose.com", "password123")}
                     disabled={isLoading}
                     className="text-xs"
                   >

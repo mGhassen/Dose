@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Script to create test users in SunnyBudget Supabase
+ * Script to create test users in Dose Supabase
  * Creates auth users and account/profile records
  */
 
@@ -87,28 +87,28 @@ console.log(`🔗 Using Supabase URL: ${supabaseUrl}`);
 const admin = createClient(supabaseUrl, serviceRoleKey);
 const supabase = admin; // Use admin client for database operations too
 
-// SunnyBudget test users
+// Dose test users
 const testUsers = [
   // Admin users
   {
-    email: 'admin@sunnybudget.com',
+    email: 'admin@dose.com',
     password: 'password123',
     firstName: 'Admin',
     lastName: 'User',
     isAdmin: true,
-    profileEmail: 'admin.contact@sunnybudget.com',
+    profileEmail: 'admin.contact@dose.com',
     status: 'active',
     phone: '+1 555 0100',
     address: '123 Admin Street, City, State 12345',
     profession: 'System Administrator'
   },
   {
-    email: 'manager@sunnybudget.com',
+    email: 'manager@dose.com',
     password: 'password123',
     firstName: 'Manager',
     lastName: 'User',
     isAdmin: true,
-    profileEmail: 'manager.contact@sunnybudget.com',
+    profileEmail: 'manager.contact@dose.com',
     status: 'active',
     phone: '+1 555 0101',
     address: '456 Manager Avenue, City, State 12345',
@@ -117,24 +117,24 @@ const testUsers = [
   
   // Regular users
   {
-    email: 'user@sunnybudget.com',
+    email: 'user@dose.com',
     password: 'password123',
     firstName: 'John',
     lastName: 'Doe',
     isAdmin: false,
-    profileEmail: 'john.contact@sunnybudget.com',
+    profileEmail: 'john.contact@dose.com',
     status: 'active',
     phone: '+1 555 0102',
     address: '789 User Lane, City, State 12345',
     profession: 'Financial Analyst'
   },
   {
-    email: 'analyst@sunnybudget.com',
+    email: 'analyst@dose.com',
     password: 'password123',
     firstName: 'Jane',
     lastName: 'Smith',
     isAdmin: false,
-    profileEmail: 'jane.contact@sunnybudget.com',
+    profileEmail: 'jane.contact@dose.com',
     status: 'active',
     phone: '+1 555 0103',
     address: '321 Analyst Road, City, State 12345',
@@ -143,12 +143,12 @@ const testUsers = [
   
   // Pending user (for testing approval flow)
   {
-    email: 'pending@sunnybudget.com',
+    email: 'pending@dose.com',
     password: 'password123',
     firstName: 'Pending',
     lastName: 'User',
     isAdmin: false,
-    profileEmail: 'pending.contact@sunnybudget.com',
+    profileEmail: 'pending.contact@dose.com',
     status: 'pending',
     phone: '+1 555 0104',
     address: '654 Pending Street, City, State 12345',
@@ -157,7 +157,7 @@ const testUsers = [
 ];
 
 async function createTestUsers() {
-  console.log('🚀 Creating SunnyBudget test users in Supabase auth...\n');
+  console.log('🚀 Creating Dose test users in Supabase auth...\n');
   
   for (const user of testUsers) {
     try {
@@ -341,7 +341,7 @@ async function createTestUsers() {
     }
   }
   
-  console.log('\n🎉 All SunnyBudget test users creation completed!');
+  console.log('\n🎉 All Dose test users creation completed!');
   console.log('\n🔐 Login Credentials:');
   testUsers.forEach(user => {
     console.log(`${user.email} / ${user.password}`);

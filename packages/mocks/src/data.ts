@@ -1,4 +1,4 @@
-// Mock data for SmartLogBook entities
+// Mock data for Dose entities
 // Organized with proper relationships and realistic data structure
 
 // ============================================================================
@@ -2311,7 +2311,7 @@ export const mockSettings = [
   {
     id: 1,
     key: 'system_name',
-    value: 'SmartLogBook Console',
+    value: 'Dose',
     description: 'Name of the system displayed in the application',
     category: 'general',
     type: 'string',
@@ -2482,7 +2482,7 @@ export const mockProfiles = [
     email: 'admin@kit.com',
     phone: '+33 1 23 45 67 95',
     avatar: '/avatars/user.jpg',
-    bio: 'Administrateur principal du système SmartLogBook avec accès complet aux fonctionnalités.',
+    bio: 'Administrateur principal du système Dose avec accès complet aux fonctionnalités.',
     department: 'Administration',
     position: 'Administrateur Principal',
     employeeId: 'EMP004',
@@ -2502,7 +2502,7 @@ export const mockProfiles = [
     certifications: [
       {
         name: 'Certificat Administrateur Principal',
-        issuer: 'SmartLogBook',
+        issuer: 'Dose',
         issueDate: '2010-05-01T00:00:00Z',
         expiryDate: '2025-05-01T00:00:00Z',
         status: 'active'

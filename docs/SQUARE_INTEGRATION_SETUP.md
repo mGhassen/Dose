@@ -1,6 +1,6 @@
 # Square POS Integration Setup Guide
 
-This guide will walk you through connecting your Square POS account to SunnyBudget.
+This guide will walk you through connecting your Square POS account to Dose.
 
 ## Prerequisites
 
@@ -14,8 +14,8 @@ This guide will walk you through connecting your Square POS account to SunnyBudg
 2. Sign in with your Square account
 3. Click **"Create Application"**
 4. Fill in the application details:
-   - **Application Name**: SunnyBudget Integration (or your preferred name)
-   - **Description**: Integration for syncing POS data with SunnyBudget
+   - **Application Name**: Dose Integration (or your preferred name)
+   - **Description**: Integration for syncing POS data with Dose
    - **Category**: Select an appropriate category
 5. Click **"Create Application"**
 
@@ -67,7 +67,7 @@ pnpm dev
 
 ## Step 6: Connect Square in the Application
 
-1. Navigate to **Settings** → **Integrations** in your SunnyBudget application
+1. Navigate to **Settings** → **Integrations** in your Dose application
 2. You'll see the **Square POS** integration card
 3. Click **"Connect Square"** button
 4. You'll be redirected to Square's authorization page
@@ -78,7 +78,7 @@ pnpm dev
    - **ORDERS_READ**: Read order information
    - **ITEMS_READ**: Read catalog items
 7. Click **"Allow"** to authorize the connection
-8. You'll be redirected back to SunnyBudget
+8. You'll be redirected back to Dose
 9. The integration status should now show **"Connected"**
 
 ## Step 7: Sync Data
@@ -103,7 +103,7 @@ For testing without a real Square account, you can use Square's Sandbox environm
 1. Go to [Square Developer Console](https://developer.squareup.com/console)
 2. Navigate to **"Sandbox Test Accounts"** in the left sidebar
 3. Click **"+ New sandbox test account"**
-4. Provide a name (e.g., "SunnyBudget Test") and select your country
+4. Provide a name (e.g., "Dose Test") and select your country
 5. Click **"Create"**
 
 ### Step 2: Authorize Your Test Account
@@ -203,7 +203,7 @@ After connecting Square:
 1. **Initial Sync**: Run a full sync to import all existing data
 2. **View Data**: Check the "Square Data" tab to see your synced information
 3. **Automate**: Set up automatic syncing (coming soon)
-4. **Map Data**: Map Square items to your SunnyBudget items (coming soon)
+4. **Map Data**: Map Square items to your Dose items (coming soon)
 
 ## Support
 

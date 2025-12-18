@@ -8,7 +8,7 @@
 const { execSync } = require('child_process');
 const path = require('path');
 
-console.log('🚀 Starting SunnyBudget database reset and user creation process...\n');
+console.log('🚀 Starting Dose database reset and user creation process...\n');
 
 try {
   // Step 0: Stop and start Supabase (clean start)
@@ -53,11 +53,11 @@ try {
   console.log('2. ✅ Test users created');
   
   console.log('\n🔐 Test User Credentials:');
-  console.log('Admin: admin@sunnybudget.com / password123');
-  console.log('Manager: manager@sunnybudget.com / password123');
-  console.log('User: user@sunnybudget.com / password123');
-  console.log('Analyst: analyst@sunnybudget.com / password123');
-  console.log('Pending: pending@sunnybudget.com / password123');
+  console.log('Admin: admin@dose.com / password123');
+  console.log('Manager: manager@dose.com / password123');
+  console.log('User: user@dose.com / password123');
+  console.log('Analyst: analyst@dose.com / password123');
+  console.log('Pending: pending@dose.com / password123');
 
 } catch (error) {
   console.error('❌ Error during reset and seed process:', error.message);

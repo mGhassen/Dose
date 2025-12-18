@@ -1,4 +1,4 @@
--- Auth Tables for SunnyBudget
+-- Auth Tables for Dose
 -- Creates accounts and profiles tables for user authentication
 
 -- ============================================================================

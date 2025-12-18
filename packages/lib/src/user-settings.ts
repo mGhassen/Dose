@@ -31,7 +31,7 @@ export const DEFAULT_USER_SETTINGS = {
 export type UserSettings = typeof DEFAULT_USER_SETTINGS;
 
 // localStorage key for user settings
-const USER_SETTINGS_KEY = 'smartlogbook-user-settings';
+const USER_SETTINGS_KEY = 'dose-user-settings';
 
 // Get user settings from localStorage or return defaults
 export const getUserSettings = (): UserSettings => {

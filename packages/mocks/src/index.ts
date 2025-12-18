@@ -5,5 +5,5 @@ export * from './data';
 
 // Export handlers
 export * from './handlers/auth';
-export * from './handlers/smartlogbook';
+export * from './handlers/dose';
 

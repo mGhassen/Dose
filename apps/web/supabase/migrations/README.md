@@ -1,6 +1,6 @@
 # Supabase Migrations
 
-This directory contains SQL migration files for the SunnyBudget database.
+This directory contains SQL migration files for the Dose database.
 
 ## Seed Data Migration
 

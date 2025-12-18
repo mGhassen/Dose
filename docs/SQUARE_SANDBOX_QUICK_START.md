@@ -69,13 +69,13 @@ SQUARE_USE_SANDBOX=true
 1. In Square Developer Console, go to **"Sandbox Test Accounts"**
 2. Click **"Open"** next to your test account
 3. This opens the Sandbox Dashboard in a new tab - **KEEP IT OPEN**
-4. Now go back to your SunnyBudget app
+4. Now go back to your Dose app
 5. Navigate to **Settings → Integrations**
 6. Click **"Connect Square"**
 7. You'll be redirected to Square's authorization page
 8. **The sandbox dashboard you opened earlier acts as your "logged in" session**
 9. Click **"Allow"** to authorize
-10. You'll be redirected back to SunnyBudget
+10. You'll be redirected back to Dose
 11. The integration should now be connected!
 
 ## Why Do I Need to Open the Sandbox Dashboard?
@@ -95,7 +95,7 @@ Once connected:
    - Go to **"Transactions"** to create test sales
 
 2. **Sync Data:**
-   - In SunnyBudget, go to **Settings → Integrations**
+   - In Dose, go to **Settings → Integrations**
    - Click **"Sync All Data"** or sync specific types
    - View synced data in the **"Square Data"** tab
 

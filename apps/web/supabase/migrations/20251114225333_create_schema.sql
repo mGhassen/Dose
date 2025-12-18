@@ -1,4 +1,4 @@
--- SunnyBudget Database Schema
+-- Dose Database Schema
 -- Creates all tables for the financial tracking application
 
 -- ============================================================================

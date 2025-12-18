@@ -1,4 +1,4 @@
-# How to Run Each Part of SmartLogBook
+# How to Run Each Part of Dose
 
 Quick reference guide for running web, mobile, and backend applications.
 
@@ -140,7 +140,7 @@ dotnet build
 #### Running with .NET CLI
 ```bash
 cd apps/backend
-dotnet run --project SmartLogBook.API
+dotnet run --project Dose.API
 ```
 
 **Access:**

@@ -1,7 +1,7 @@
 {
   "name": "@kit/web",
   "version": "0.2.7",
-  "description": "SmartLogBook Console - Railway locomotive maintenance management system",
+  "description": "Dose - Financial management system",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",

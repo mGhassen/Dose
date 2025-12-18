@@ -32,7 +32,7 @@ import {
   locationLevelsHandlers,
   locationLevelsSpecialHandlers,
   metadataEnumsHandlers
-} from './handlers/smartlogbook';
+} from './handlers/dose';
 
 // Runtime check for migration config (at MSW startup, not module load)
 const shouldUseMSWForFunctionality = (functionality: string): boolean => {

@@ -1,7 +1,7 @@
 {
   "name": "@kit/lib",
   "version": "0.1.0",
-  "description": "API client and utilities for SmartLogBook",
+  "description": "API client and utilities for Dose",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "private": true,

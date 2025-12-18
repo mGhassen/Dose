@@ -78,9 +78,9 @@ const AppConfigSchema = z
   );
 
 const appConfig = AppConfigSchema.parse({
-  name: process.env.NEXT_PUBLIC_PRODUCT_NAME || 'SmartLogBook',
-  title: process.env.NEXT_PUBLIC_SITE_TITLE || 'SmartLogBook Console',
-  description: process.env.NEXT_PUBLIC_SITE_DESCRIPTION || 'Railway maintenance management console',
+  name: process.env.NEXT_PUBLIC_PRODUCT_NAME || 'Dose',
+  title: process.env.NEXT_PUBLIC_SITE_TITLE || 'Dose',
+  description: process.env.NEXT_PUBLIC_SITE_DESCRIPTION || 'Financial planning and budget management application',
   url: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
   locale: process.env.NEXT_PUBLIC_DEFAULT_LOCALE || 'en',
   theme: (process.env.NEXT_PUBLIC_DEFAULT_THEME_MODE as 'light' | 'dark' | 'system') || 'system',

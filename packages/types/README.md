@@ -1,6 +1,6 @@
 # @kit/types
 
-Shared TypeScript types and interfaces for SmartLogBook.
+Shared TypeScript types and interfaces for Dose.
 
 ## Usage
 

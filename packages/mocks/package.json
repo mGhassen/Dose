@@ -1,7 +1,7 @@
 {
   "name": "@kit/mocks",
   "version": "0.1.0",
-  "description": "Mock Service Worker setup for SmartLogBook",
+  "description": "Mock Service Worker setup for Dose",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "private": true,
@@ -22,7 +22,7 @@
     "./server": "./src/server.ts",
     "./data": "./src/data.ts",
     "./handlers/auth": "./src/handlers/auth.ts",
-    "./handlers/smartlogbook": "./src/handlers/smartlogbook.ts"
+    "./handlers/dose": "./src/handlers/dose.ts"
   },
   "typesVersions": {
     "*": {

@@ -1,6 +1,6 @@
-# SmartLogBook Web Application
+# Dose Web Application
 
-Next.js 15 web application for SmartLogBook Console.
+Next.js 15 web application for Dose.
 
 ## Environment Setup
 

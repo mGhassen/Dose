@@ -1,16 +1,15 @@
-# SmartLogBook Console
+# Dose
 
-Railway locomotive maintenance management system with mobile and web applications.
+Financial management and planning system.
 
 ## Architecture
 
 This is a **monorepo** using pnpm workspaces with the following structure:
 
 ```
-smartlogbook-console/
+dose/
 ├── apps/
-│   ├── web/          # Next.js web application
-│   └── mobile/       # Expo React Native mobile application
+│   └── web/          # Next.js web application
 ├── packages/
 │   ├── types/        # Shared TypeScript types and interfaces
 │   ├── api-client/   # Universal API client with platform adapters

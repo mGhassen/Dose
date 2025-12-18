@@ -33,7 +33,7 @@ export default function UserSettingsPage() {
         <div>
           <h1 className="text-3xl font-bold">Paramètres du Compte</h1>
           <p className="text-muted-foreground">
-            Personnalisez votre expérience avec SmartLogBook Console. Les modifications sont sauvegardées automatiquement.
+            Personnalisez votre expérience avec Dose. Les modifications sont sauvegardées automatiquement.
           </p>
         <div className="mt-2 flex items-center gap-2 text-sm text-green-600">
           <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>

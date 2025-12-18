@@ -490,3 +490,4 @@ export const allHandlers = [
   // Add more entity handlers here as needed
   // Example: ...createCrudHandlers('entityname', mockData.entityname),
 ];
+
