@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   useSquareLocations,
   useSquareOrders,
   useSquarePayments,
   useSquareCatalog,
 } from '@kit/hooks';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { Button } from '@kit/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@kit/ui/tabs';
 import { Badge } from '@kit/ui/badge';
@@ -18,8 +17,6 @@ import {
   Package,
   Loader2,
   RefreshCw,
-  Calendar,
-  DollarSign,
   Download,
   MapPin,
 } from 'lucide-react';
@@ -33,7 +30,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@kit/ui/dropdown-menu';
-import { MoreVertical } from 'lucide-react';
+import DataTable from '@kit/ui/data-table';
+import { ColumnDef } from '@tanstack/react-table';
 
 interface SquareDataViewProps {
   integrationId: string;
@@ -102,6 +100,211 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
       currency: currency,
     }).format(amount / 100); // Square amounts are in cents
   };
+
+  // Column definitions for Locations
+  const locationsColumns: ColumnDef<any>[] = useMemo(() => [
+    {
+      id: 'name',
+      accessorKey: 'name',
+      header: 'Name',
+    },
+    {
+      id: 'address',
+      accessorKey: 'address',
+      header: 'Address',
+      cell: ({ row }) => {
+        const addr = row.original.address;
+        if (!addr) return '-';
+        return [
+          addr.address_line_1,
+          addr.locality,
+          addr.administrative_district_level_1,
+          addr.postal_code,
+        ].filter(Boolean).join(', ') || '-';
+      },
+    },
+    {
+      id: 'country',
+      accessorKey: 'address.country',
+      header: 'Country',
+    },
+    {
+      id: 'timezone',
+      accessorKey: 'timezone',
+      header: 'Timezone',
+    },
+    {
+      id: 'status',
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.original.status;
+        return (
+          <Badge variant={status === 'ACTIVE' ? 'default' : 'secondary'}>
+            {status || '-'}
+          </Badge>
+        );
+      },
+    },
+  ], []);
+
+  // Column definitions for Orders
+  const ordersColumns: ColumnDef<any>[] = useMemo(() => [
+    {
+      id: 'reference_id',
+      accessorKey: 'reference_id',
+      header: 'Reference ID',
+      cell: ({ row }) => row.original.reference_id || row.original.id,
+    },
+    {
+      id: 'created_at',
+      accessorKey: 'created_at',
+      header: 'Created At',
+      cell: ({ row }) => formatDateTime(row.original.created_at),
+    },
+    {
+      id: 'state',
+      accessorKey: 'state',
+      header: 'State',
+      cell: ({ row }) => (
+        <Badge variant={row.original.state === 'COMPLETED' ? 'default' : 'secondary'}>
+          {row.original.state || '-'}
+        </Badge>
+      ),
+    },
+    {
+      id: 'total',
+      accessorKey: 'net_amounts.total_money',
+      header: 'Total',
+      cell: ({ row }) => {
+        const money = row.original.net_amounts?.total_money;
+        if (!money) return '-';
+        return formatMoney(money.amount, money.currency);
+      },
+    },
+    {
+      id: 'item_count',
+      accessorKey: 'line_items',
+      header: 'Items',
+      cell: ({ row }) => row.original.line_items?.length || 0,
+    },
+    {
+      id: 'location_id',
+      accessorKey: 'location_id',
+      header: 'Location ID',
+    },
+  ], []);
+
+  // Column definitions for Payments
+  const paymentsColumns: ColumnDef<any>[] = useMemo(() => [
+    {
+      id: 'id',
+      accessorKey: 'id',
+      header: 'Payment ID',
+      cell: ({ row }) => row.original.id.slice(-8),
+    },
+    {
+      id: 'created_at',
+      accessorKey: 'created_at',
+      header: 'Created At',
+      cell: ({ row }) => formatDateTime(row.original.created_at),
+    },
+    {
+      id: 'amount',
+      accessorKey: 'amount_money',
+      header: 'Amount',
+      cell: ({ row }) => {
+        const money = row.original.amount_money;
+        if (!money) return '-';
+        return formatMoney(money.amount, money.currency);
+      },
+    },
+    {
+      id: 'status',
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={row.original.status === 'COMPLETED' ? 'default' : 'secondary'}>
+          {row.original.status || '-'}
+        </Badge>
+      ),
+    },
+    {
+      id: 'payment_method',
+      accessorKey: 'source_type',
+      header: 'Payment Method',
+    },
+    {
+      id: 'card_last_4',
+      accessorKey: 'card_details.card.last_4',
+      header: 'Card Last 4',
+      cell: ({ row }) => {
+        const last4 = row.original.card_details?.card?.last_4;
+        return last4 ? `•••• ${last4}` : '-';
+      },
+    },
+    {
+      id: 'order_id',
+      accessorKey: 'order_id',
+      header: 'Order ID',
+    },
+  ], []);
+
+  // Column definitions for Catalog
+  const catalogColumns: ColumnDef<any>[] = useMemo(() => [
+    {
+      id: 'name',
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => {
+        const item = row.original;
+        return item.item_data?.name ||
+          item.category_data?.name ||
+          item.item_variation_data?.name ||
+          'Unknown';
+      },
+    },
+    {
+      id: 'type',
+      accessorKey: 'type',
+      header: 'Type',
+    },
+    {
+      id: 'description',
+      accessorKey: 'item_data.description',
+      header: 'Description',
+    },
+    {
+      id: 'price',
+      accessorKey: 'item_variation_data.price_money',
+      header: 'Price',
+      cell: ({ row }) => {
+        const money = row.original.item_variation_data?.price_money;
+        if (!money) return '-';
+        return formatMoney(money.amount, money.currency);
+      },
+    },
+    {
+      id: 'sku',
+      accessorKey: 'item_variation_data.sku',
+      header: 'SKU',
+    },
+    {
+      id: 'category_id',
+      accessorKey: 'item_data.category_id',
+      header: 'Category ID',
+    },
+    {
+      id: 'is_deleted',
+      accessorKey: 'is_deleted',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={row.original.is_deleted ? 'secondary' : 'default'}>
+          {row.original.is_deleted ? 'Deleted' : 'Active'}
+        </Badge>
+      ),
+    },
+  ], []);
 
   const exportToCsv = (data: any[], filename: string, headers: string[], getRow: (item: any) => string[]) => {
     const csv = [
@@ -283,334 +486,123 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
         </TabsList>
 
         <TabsContent value="locations">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Square Locations</CardTitle>
-                  <CardDescription>Your Square business locations</CardDescription>
-                </div>
-                {locations && locations.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={handleExportLocations}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Export CSV
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {locationsLoading ? (
-                <div className="flex items-center justify-center h-32">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : locations && locations.length > 0 ? (
-                <div className="space-y-4">
-                  {locations.map((location: any) => (
-                    <div key={location.id} className="p-4 border rounded-lg">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold">{location.name}</h3>
-                          {location.address && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {[
-                                location.address.address_line_1,
-                                location.address.locality,
-                                location.address.administrative_district_level_1,
-                                location.address.postal_code,
-                              ]
-                                .filter(Boolean)
-                                .join(', ')}
-                            </p>
-                          )}
-                          {location.timezone && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Timezone: {location.timezone}
-                            </p>
-                          )}
-                        </div>
-                        {location.status && (
-                          <Badge variant={location.status === 'ACTIVE' ? 'default' : 'secondary'}>
-                            {location.status}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">No locations found</p>
-              )}
-            </CardContent>
-          </Card>
+          <DataTable
+            data={locations || []}
+            columns={locationsColumns}
+            loading={locationsLoading}
+            title="Square Locations"
+            description="Your Square business locations"
+            exportButton={locations && locations.length > 0 ? {
+              onClick: handleExportLocations,
+              label: 'Export CSV'
+            } : undefined}
+            searchKey="name"
+            searchPlaceholder="Search locations..."
+          />
         </TabsContent>
 
-        <TabsContent value="orders">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Square Orders</CardTitle>
-                  <CardDescription>Orders from your Square POS</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  {orders?.orders && orders.orders.length > 0 && (
-                    <Button variant="outline" size="sm" onClick={handleExportOrders}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Export CSV
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => refetchOrders()}>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Refresh
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Start Date</Label>
-                  <Input
-                    type="date"
-                    value={dateRange.start}
-                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>End Date</Label>
-                  <Input
-                    type="date"
-                    value={dateRange.end}
-                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                  />
-                </div>
-              </div>
+        <TabsContent value="orders" className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Start Date</Label>
+              <Input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>End Date</Label>
+              <Input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+              />
+            </div>
+          </div>
 
-              {ordersLoading || (activeTab === 'orders' && locationsLoading) ? (
-                <div className="flex items-center justify-center h-32">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : activeTab === 'orders' && (!locations || locations.length === 0) ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground mb-2">No locations found. Please sync locations first.</p>
-                  {onSync && (
-                    <Button variant="outline" size="sm" onClick={() => onSync('locations')}>
-                      <MapPin className="w-4 h-4 mr-2" />
-                      Sync Locations
-                    </Button>
-                  )}
-                </div>
-              ) : orders?.orders && orders.orders.length > 0 ? (
-                <div className="space-y-4">
-                  {orders.orders.map((order) => (
-                    <div key={order.id} className="p-4 border rounded-lg">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h3 className="font-semibold">Order {order.reference_id || order.id}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {formatDateTime(order.created_at)}
-                          </p>
-                        </div>
-                        <Badge variant={order.state === 'COMPLETED' ? 'default' : 'secondary'}>
-                          {order.state}
-                        </Badge>
-                      </div>
-                      {order.net_amounts?.total_money && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <DollarSign className="w-4 h-4 text-muted-foreground" />
-                          <span className="font-semibold">
-                            {formatMoney(
-                              order.net_amounts.total_money.amount,
-                              order.net_amounts.total_money.currency
-                            )}
-                          </span>
-                        </div>
-                      )}
-                      {order.line_items && order.line_items.length > 0 && (
-                        <div className="mt-3 pt-3 border-t">
-                          <p className="text-sm font-medium mb-2">Items:</p>
-                          <ul className="space-y-1">
-                            {order.line_items.slice(0, 3).map((item, idx) => (
-                              <li key={idx} className="text-sm text-muted-foreground">
-                                {item.quantity}x {item.name || 'Unknown Item'}
-                                {item.total_money && (
-                                  <span className="ml-2">
-                                    {formatMoney(
-                                      item.total_money.amount,
-                                      item.total_money.currency
-                                    )}
-                                  </span>
-                                )}
-                              </li>
-                            ))}
-                            {order.line_items.length > 3 && (
-                              <li className="text-sm text-muted-foreground">
-                                +{order.line_items.length - 3} more items
-                              </li>
-                            )}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">No orders found</p>
+          {activeTab === 'orders' && (!locations || locations.length === 0) ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground mb-2">No locations found. Please sync locations first.</p>
+              {onSync && (
+                <Button variant="outline" size="sm" onClick={() => onSync('locations')}>
+                  <MapPin className="w-4 h-4 mr-2" />
+                  Sync Locations
+                </Button>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          ) : (
+            <DataTable
+              data={orders?.orders || []}
+              columns={ordersColumns}
+              loading={ordersLoading || (activeTab === 'orders' && locationsLoading)}
+              title="Square Orders"
+              description="Orders from your Square POS"
+              exportButton={orders?.orders && orders.orders.length > 0 ? {
+                onClick: handleExportOrders,
+                label: 'Export CSV'
+              } : undefined}
+              refreshButton={refetchOrders ? {
+                onClick: () => refetchOrders()
+              } : undefined}
+              searchKey="reference_id"
+              searchPlaceholder="Search orders..."
+            />
+          )}
         </TabsContent>
 
-        <TabsContent value="payments">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Square Payments</CardTitle>
-                  <CardDescription>Payment transactions from Square</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  {payments?.payments && payments.payments.length > 0 && (
-                    <Button variant="outline" size="sm" onClick={handleExportPayments}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Export CSV
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => refetchPayments()}>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Refresh
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Start Date</Label>
-                  <Input
-                    type="date"
-                    value={dateRange.start}
-                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>End Date</Label>
-                  <Input
-                    type="date"
-                    value={dateRange.end}
-                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                  />
-                </div>
-              </div>
+        <TabsContent value="payments" className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Start Date</Label>
+              <Input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>End Date</Label>
+              <Input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+              />
+            </div>
+          </div>
 
-              {paymentsLoading ? (
-                <div className="flex items-center justify-center h-32">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : payments?.payments && payments.payments.length > 0 ? (
-                <div className="space-y-4">
-                  {payments.payments.map((payment) => (
-                    <div key={payment.id} className="p-4 border rounded-lg">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h3 className="font-semibold">Payment {payment.id.slice(-8)}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {formatDateTime(payment.created_at)}
-                          </p>
-                        </div>
-                        <Badge variant={payment.status === 'COMPLETED' ? 'default' : 'secondary'}>
-                          {payment.status}
-                        </Badge>
-                      </div>
-                      {payment.amount_money && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <DollarSign className="w-4 h-4 text-muted-foreground" />
-                          <span className="font-semibold">
-                            {formatMoney(
-                              payment.amount_money.amount,
-                              payment.amount_money.currency
-                            )}
-                          </span>
-                        </div>
-                      )}
-                      {payment.card_details?.card && (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          Card: {payment.card_details.card.card_brand} ••••{' '}
-                          {payment.card_details.card.last_4}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">No payments found</p>
-              )}
-            </CardContent>
-          </Card>
+          <DataTable
+            data={payments?.payments || []}
+            columns={paymentsColumns}
+            loading={paymentsLoading}
+            title="Square Payments"
+            description="Payment transactions from Square"
+            exportButton={payments?.payments && payments.payments.length > 0 ? {
+              onClick: handleExportPayments,
+              label: 'Export CSV'
+            } : undefined}
+            refreshButton={refetchPayments ? {
+              onClick: () => refetchPayments()
+            } : undefined}
+            searchKey="id"
+            searchPlaceholder="Search payments..."
+          />
         </TabsContent>
 
         <TabsContent value="catalog">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Square Catalog</CardTitle>
-                  <CardDescription>Items, variations, and categories from your Square catalog</CardDescription>
-                </div>
-                {catalog?.objects && catalog.objects.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={handleExportCatalog}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Export CSV
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {catalogLoading ? (
-                <div className="flex items-center justify-center h-32">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : catalog?.objects && catalog.objects.length > 0 ? (
-                <div className="space-y-4">
-                  {catalog.objects.map((item) => (
-                    <div key={item.id} className="p-4 border rounded-lg">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold">
-                            {item.item_data?.name ||
-                              item.category_data?.name ||
-                              item.item_variation_data?.name ||
-                              'Unknown'}
-                          </h3>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Type: {item.type}
-                          </p>
-                          {item.item_data?.description && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {item.item_data.description}
-                            </p>
-                          )}
-                          {item.item_variation_data?.price_money && (
-                            <p className="text-sm font-medium mt-2">
-                              {formatMoney(
-                                item.item_variation_data.price_money.amount,
-                                item.item_variation_data.price_money.currency
-                              )}
-                            </p>
-                          )}
-                        </div>
-                        {item.is_deleted && (
-                          <Badge variant="secondary">Deleted</Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">No catalog items found</p>
-              )}
-            </CardContent>
-          </Card>
+          <DataTable
+            data={catalog?.objects || []}
+            columns={catalogColumns}
+            loading={catalogLoading}
+            title="Square Catalog"
+            description="Items, variations, and categories from your Square catalog"
+            exportButton={catalog?.objects && catalog.objects.length > 0 ? {
+              onClick: handleExportCatalog,
+              label: 'Export CSV'
+            } : undefined}
+            searchKey="name"
+            searchPlaceholder="Search catalog..."
+          />
         </TabsContent>
       </Tabs>
     </div>
