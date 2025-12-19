@@ -46,27 +46,27 @@ async function syncSquareIntegration(
   integration: any,
   syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'full'
 ): Promise<{ records_synced: number; records_failed: number; error?: string }> {
-  // This is a placeholder - implement actual Square API calls
-  // For now, we'll just update the sync status
-  
   const accessToken = integration.access_token; // Should be decrypted in production
   
   if (!accessToken) {
-    throw new Error('Access token not found');
+    console.error('[Sync] Access token not found for integration:', integration.id);
+    throw new Error('Access token not found. Please reconnect the integration.');
   }
+
+  console.log('[Sync] Starting sync for integration:', {
+    integrationId: integration.id,
+    syncType,
+    hasAccessToken: !!accessToken,
+    tokenLength: accessToken.length,
+    tokenPrefix: accessToken.substring(0, 10) + '...',
+    sandbox: SQUARE_API_BASE.includes('sandbox'),
+  });
 
   let recordsSynced = 0;
   let recordsFailed = 0;
   let error: string | undefined;
 
   try {
-    // TODO: Implement actual Square API sync
-    // - Fetch orders, payments, catalog items, locations
-    // - Store/update data in your database
-    // - Handle pagination
-    // - Handle rate limiting
-    
-    // Placeholder implementation
     if (syncType === 'locations' || syncType === 'full') {
       // Fetch locations
       const locationsResponse = await fetch(`${SQUARE_API_BASE}/v2/locations`, {
@@ -79,16 +79,39 @@ async function syncSquareIntegration(
       if (locationsResponse.ok) {
         const locationsData = await locationsResponse.json();
         recordsSynced += locationsData.locations?.length || 0;
+        console.log('[Sync] Successfully fetched locations:', recordsSynced);
       } else {
+        const errorText = await locationsResponse.text();
+        let errorDetails;
+        try {
+          errorDetails = JSON.parse(errorText);
+        } catch {
+          errorDetails = errorText;
+        }
         recordsFailed++;
-        error = `Failed to fetch locations: ${locationsResponse.statusText}`;
+        const errorMsg = errorDetails?.errors?.[0]?.detail || locationsResponse.statusText || 'Unknown error';
+        error = `Failed to fetch locations: ${errorMsg}`;
+        console.error('[Sync] Failed to fetch locations:', {
+          status: locationsResponse.status,
+          statusText: locationsResponse.statusText,
+          details: errorDetails,
+          apiBase: SQUARE_API_BASE,
+          errorCode: errorDetails?.errors?.[0]?.code,
+          errorCategory: errorDetails?.errors?.[0]?.category,
+          errorDetail: errorDetails?.errors?.[0]?.detail,
+          fullError: JSON.stringify(errorDetails, null, 2),
+        });
       }
     }
 
-    // Update integration sync status
     return { records_synced: recordsSynced, records_failed: recordsFailed, error };
   } catch (err: any) {
-    error = err.message;
+    error = err.message || 'Unknown error occurred during sync';
+    console.error('[Sync] Error during sync:', {
+      error: err.message,
+      stack: err.stack,
+      integrationId: integration.id,
+    });
     return { records_synced: recordsSynced, records_failed: recordsFailed, error };
   }
 }
@@ -123,6 +146,19 @@ export async function POST(
       return NextResponse.json(
         { error: 'Integration is not connected' },
         { status: 400 }
+      );
+    }
+
+    // Verify access token exists
+    if (!integration.access_token) {
+      console.error('[Sync] Integration has no access token:', {
+        integrationId: id,
+        status: integration.status,
+        is_active: integration.is_active,
+      });
+      return NextResponse.json(
+        { error: 'Access token not found. Please reconnect the integration.' },
+        { status: 401 }
       );
     }
 

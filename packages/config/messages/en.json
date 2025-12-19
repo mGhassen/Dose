@@ -206,6 +206,7 @@
     "settings": "Settings",
         "metadataEnums": "Metadata Enums",
         "integrations": "Integrations",
+        "connectedIntegrations": "Connected Integrations",
         "profile": "Profile",
         "logout": "Logout",
         "login": "Login",

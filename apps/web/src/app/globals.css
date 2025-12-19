@@ -2,124 +2,134 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import EPT Design System */
-/* @import '../components/ept/ept.css'; */
+/*
+  Replit-like system theme (neutral, low saturation, compact controls)
+  Notes:
+  - Replit UI is mostly neutral gray, almost no “blue wash”
+  - Primary actions are often outline or subtle fill, not big saturated buttons
+*/
 
 @layer base {
   :root {
+    /* Light (kept minimal) */
     --background: 0 0% 100%;
-    --foreground: 220.9091 39.2857% 10.9804%;
+    --foreground: 222 47% 11%;
+
     --card: 0 0% 100%;
-    --card-foreground: 220.9091 39.2857% 10.9804%;
+    --card-foreground: 222 47% 11%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 220.9091 39.2857% 10.9804%;
-    --primary: 21.7450 65.6388% 55.4902%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 180 17.5879% 39.0196%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 220.0000 14.2857% 95.8824%;
-    --muted-foreground: 220 8.9362% 46.0784%;
-    --accent: 0 0% 93.3333%;
-    --accent-foreground: 220.9091 39.2857% 10.9804%;
-    --destructive: 0 84.2365% 60.1961%;
-    --destructive-foreground: 0 0% 98.0392%;
-    --border: 220 13.0435% 90.9804%;
-    --input: 220 13.0435% 90.9804%;
-    --ring: 21.7450 65.6388% 55.4902%;
-    --chart-1: 180 17.3913% 45.0980%;
-    --chart-2: 22.2973 75.5102% 61.5686%;
-    --chart-3: 31.2000 92.5926% 78.8235%;
-    --chart-4: 0 0% 53.3333%;
-    --chart-5: 0 0% 60%;
-    --sidebar: 220.0000 14.2857% 95.8824%;
-    --sidebar-foreground: 220.9091 39.2857% 10.9804%;
-    --sidebar-primary: 21.7450 65.6388% 55.4902%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 222 47% 11%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 16% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 16% 96%;
+    --muted-foreground: 215 16% 40%;
+
+    --accent: 210 16% 94%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 215 20% 65%;
+
+    --sidebar: 210 16% 96%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 222 47% 11%;
+    --sidebar-primary-foreground: 210 40% 98%;
     --sidebar-accent: 0 0% 100%;
-    --sidebar-accent-foreground: 220.9091 39.2857% 10.9804%;
-    --sidebar-border: 220 13.0435% 90.9804%;
-    --sidebar-ring: 21.7450 65.6388% 55.4902%;
-    --font-sans: Geist Mono, ui-monospace, monospace;
-    --font-serif: serif;
-    --font-mono: JetBrains Mono, monospace;
-    --radius: 0.75rem;
-    --shadow-x: 0px;
-    --shadow-y: 1px;
-    --shadow-blur: 4px;
-    --shadow-spread: 0px;
-    --shadow-opacity: 0.05;
-    --shadow-color: #000000;
-    --shadow-2xs: 0px 1px 4px 0px hsl(0 0% 0% / 0.03);
-    --shadow-xs: 0px 1px 4px 0px hsl(0 0% 0% / 0.03);
-    --shadow-sm: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 1px 2px -1px hsl(0 0% 0% / 0.05);
-    --shadow: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 1px 2px -1px hsl(0 0% 0% / 0.05);
-    --shadow-md: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 2px 4px -1px hsl(0 0% 0% / 0.05);
-    --shadow-lg: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 4px 6px -1px hsl(0 0% 0% / 0.05);
-    --shadow-xl: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 8px 10px -1px hsl(0 0% 0% / 0.05);
-    --shadow-2xl: 0px 1px 4px 0px hsl(0 0% 0% / 0.13);
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 20% 90%;
+    --sidebar-ring: 215 20% 65%;
+
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto,
+      "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+
+    /* Replit feels a bit tighter than shadcn defaults */
+    --radius: 0.5rem;
+
+    /* subtle shadows */
+    --shadow-color: 0 0% 0%;
+    --shadow-2xs: 0px 1px 6px 0px hsl(var(--shadow-color) / 0.06);
+    --shadow-xs: 0px 1px 10px 0px hsl(var(--shadow-color) / 0.08);
+    --shadow-sm: 0px 2px 14px 0px hsl(var(--shadow-color) / 0.10);
+    --shadow: 0px 4px 18px 0px hsl(var(--shadow-color) / 0.12);
+    --shadow-md: 0px 8px 26px 0px hsl(var(--shadow-color) / 0.14);
+    --shadow-lg: 0px 12px 36px 0px hsl(var(--shadow-color) / 0.16);
+    --shadow-xl: 0px 18px 48px 0px hsl(var(--shadow-color) / 0.18);
+
     --tracking-normal: 0rem;
     --spacing: 0.25rem;
   }
-  
+
+  /* Replit-like dark values (very low saturation, hue around 228 to 232) */
   .dark {
-    --background: 270 5.5556% 7.0588%;
-    --foreground: 0 0% 75.6863%;
-    --card: 0 0% 7.0588%;
-    --card-foreground: 0 0% 75.6863%;
-    --popover: 270 5.5556% 7.0588%;
-    --popover-foreground: 0 0% 75.6863%;
-    --primary: 22.2973 75.5102% 61.5686%;
-    --primary-foreground: 270 5.5556% 7.0588%;
-    --secondary: 180 17.3913% 45.0980%;
-    --secondary-foreground: 270 5.5556% 7.0588%;
-    --muted: 0 0% 13.3333%;
-    --muted-foreground: 0 0% 53.3333%;
-    --accent: 0 0% 20%;
-    --accent-foreground: 0 0% 75.6863%;
-    --destructive: 180 17.3913% 45.0980%;
-    --destructive-foreground: 270 5.5556% 7.0588%;
-    --border: 0 0% 13.3333%;
-    --input: 0 0% 13.3333%;
-    --ring: 22.2973 75.5102% 61.5686%;
-    --chart-1: 180 17.3913% 45.0980%;
-    --chart-2: 22.2973 75.5102% 61.5686%;
-    --chart-3: 31.2000 92.5926% 78.8235%;
-    --chart-4: 0 0% 53.3333%;
-    --chart-5: 0 0% 60%;
-    --sidebar: 0 0% 7.0588%;
-    --sidebar-foreground: 0 0% 75.6863%;
-    --sidebar-primary: 22.2973 75.5102% 61.5686%;
-    --sidebar-primary-foreground: 270 5.5556% 7.0588%;
-    --sidebar-accent: 0 0% 20%;
-    --sidebar-accent-foreground: 0 0% 75.6863%;
-    --sidebar-border: 0 0% 13.3333%;
-    --sidebar-ring: 22.2973 75.5102% 61.5686%;
-    --font-sans: Geist Mono, ui-monospace, monospace;
-    --font-serif: serif;
-    --font-mono: JetBrains Mono, monospace;
-    --radius: 0.75rem;
-    --shadow-x: 0px;
-    --shadow-y: 1px;
-    --shadow-blur: 4px;
-    --shadow-spread: 0px;
-    --shadow-opacity: 0.05;
-    --shadow-color: #000000;
-    --shadow-2xs: 0px 1px 4px 0px hsl(0 0% 0% / 0.03);
-    --shadow-xs: 0px 1px 4px 0px hsl(0 0% 0% / 0.03);
-    --shadow-sm: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 1px 2px -1px hsl(0 0% 0% / 0.05);
-    --shadow: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 1px 2px -1px hsl(0 0% 0% / 0.05);
-    --shadow-md: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 2px 4px -1px hsl(0 0% 0% / 0.05);
-    --shadow-lg: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 4px 6px -1px hsl(0 0% 0% / 0.05);
-    --shadow-xl: 0px 1px 4px 0px hsl(0 0% 0% / 0.05), 0px 8px 10px -1px hsl(0 0% 0% / 0.05);
-    --shadow-2xl: 0px 1px 4px 0px hsl(0 0% 0% / 0.13);
+    --background: 230 10% 9%;
+    --foreground: 0 0% 86%;
+
+    --card: 230 10% 11%;
+    --card-foreground: 0 0% 86%;
+
+    --popover: 230 10% 11%;
+    --popover-foreground: 0 0% 86%;
+
+    /* “Primary” in Replit is usually neutral, not saturated */
+    --primary: 0 0% 88%;
+    --primary-foreground: 230 10% 9%;
+
+    --secondary: 230 10% 14%;
+    --secondary-foreground: 0 0% 86%;
+
+    --muted: 230 10% 14%;
+    --muted-foreground: 0 0% 60%;
+
+    --accent: 230 10% 16%;
+    --accent-foreground: 0 0% 86%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 96%;
+
+    --border: 230 8% 18%;
+    --input: 230 8% 18%;
+
+    /* focus ring stays subtle, not blue */
+    --ring: 0 0% 55%;
+
+    --sidebar: 230 10% 10%;
+    --sidebar-foreground: 0 0% 82%;
+    --sidebar-primary: 0 0% 88%;
+    --sidebar-primary-foreground: 230 10% 9%;
+    --sidebar-accent: 230 10% 14%;
+    --sidebar-accent-foreground: 0 0% 86%;
+    --sidebar-border: 230 8% 18%;
+    --sidebar-ring: 0 0% 55%;
+
+    --shadow-color: 0 0% 0%;
+    --shadow-2xs: 0px 1px 10px 0px hsl(var(--shadow-color) / 0.22);
+    --shadow-xs: 0px 2px 14px 0px hsl(var(--shadow-color) / 0.26);
+    --shadow-sm: 0px 6px 22px 0px hsl(var(--shadow-color) / 0.28);
+    --shadow: 0px 8px 28px 0px hsl(var(--shadow-color) / 0.30);
+    --shadow-md: 0px 12px 40px 0px hsl(var(--shadow-color) / 0.32);
+    --shadow-lg: 0px 18px 56px 0px hsl(var(--shadow-color) / 0.34);
+    --shadow-xl: 0px 24px 70px 0px hsl(var(--shadow-color) / 0.38);
   }
-  
+
   body {
     letter-spacing: var(--tracking-normal);
   }
 }
 
-html, body {
+html,
+body {
   height: 100%;
   overflow-x: hidden;
 }
@@ -127,8 +137,7 @@ html, body {
 body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
-  letter-spacing: var(--tracking-normal);
+  font-family: var(--font-sans);
   margin: 0;
   padding: 0;
 }
@@ -137,15 +146,32 @@ body {
   border-color: hsl(var(--border));
 }
 
-/* Responsive improvements */
-@media (max-width: 640px) {
-  .container {
-    padding-left: 1rem;
-    padding-right: 1rem;
+/* Replit-like: compact controls by default (fix “buttons are big”) */
+@layer base {
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    font-size: 0.875rem; /* 14px */
+    line-height: 1.25rem;
+  }
+
+  /* Inputs feel slim in Replit */
+  input,
+  select,
+  textarea {
+    min-height: 36px;
+  }
+
+  /* Buttons feel slimmer than shadcn defaults */
+  button,
+  [role="button"] {
+    min-height: 34px;
   }
 }
 
-/* Ensure dialogs are properly contained on small screens */
+/* Dialog containment on small screens */
 @media (max-width: 480px) {
   [data-radix-dialog-content] {
     margin: 1rem;
@@ -153,17 +179,25 @@ body {
   }
 }
 
-/* Improve touch targets on mobile */
+/* Responsive container padding */
+@media (max-width: 640px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* Touch targets only on mobile */
 @media (max-width: 768px) {
-  button, 
-  [role="button"], 
-  input[type="button"], 
+  button,
+  [role="button"],
+  input[type="button"],
   input[type="submit"] {
     min-height: 44px;
   }
 }
 
-/* Data table overflow handling */
+/* Table overflow */
 .table-container {
   overflow-x: auto;
   max-width: 100%;
@@ -174,7 +208,7 @@ body {
   table-layout: auto;
 }
 
-/* Ensure proper containment for layout components */
+/* Layout containment */
 .layout-container {
   height: 100vh;
   overflow: hidden;
@@ -188,8 +222,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Prevent horizontal overflow on small screens */
-
 /* Hide number input spinners */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
@@ -200,11 +232,25 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
-@media (max-width: 1024px) {
-  .table-container {
-    margin-left: -1rem;
-    margin-right: -1rem;
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
+
+/* Subtle selection, not blue */
+::selection {
+  background: hsl(var(--foreground) / 0.18);
+}
+
+/* Thin scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
 }

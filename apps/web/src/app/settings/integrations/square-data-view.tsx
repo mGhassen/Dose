@@ -21,26 +21,46 @@ import {
   Calendar,
   DollarSign,
   Download,
+  MapPin,
 } from 'lucide-react';
 import { formatDateTime } from '@kit/lib/date-format';
 import { Input } from '@kit/ui/input';
 import { Label } from '@kit/ui/label';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@kit/ui/dropdown-menu';
+import { MoreVertical } from 'lucide-react';
 
 interface SquareDataViewProps {
   integrationId: string;
+  onSync?: (syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'full') => void;
+  isSyncing?: boolean;
 }
 
-export default function SquareDataView({ integrationId }: SquareDataViewProps) {
+export default function SquareDataView({ integrationId, onSync, isSyncing }: SquareDataViewProps) {
   const [activeTab, setActiveTab] = useState('locations');
   const [dateRange, setDateRange] = useState({
     start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0],
   });
 
-  const { data: locations, isLoading: locationsLoading } = useSquareLocations(integrationId);
-  const { data: orders, isLoading: ordersLoading, refetch: refetchOrders } = useSquareOrders(
+  // Fetch data automatically when tab is active
+  // Always fetch locations first (needed for orders)
+  const { data: locations, isLoading: locationsLoading, error: locationsError } = useSquareLocations(integrationId, {
+    enabled: activeTab === 'locations' || activeTab === 'orders', // Also fetch when orders tab is active
+  });
+  
+  // Get location IDs from locations data or use empty array
+  const locationIds = locations && locations.length > 0 ? locations.map((loc: any) => loc.id) : [];
+  
+  const { data: orders, isLoading: ordersLoading, refetch: refetchOrders, error: ordersError } = useSquareOrders(
     integrationId,
     {
+      location_ids: locationIds.length > 0 ? locationIds : undefined,
       query: {
         filter: {
           date_time_filter: {
@@ -51,18 +71,30 @@ export default function SquareDataView({ integrationId }: SquareDataViewProps) {
           },
         },
       },
+    },
+    {
+      enabled: activeTab === 'orders' && locationIds.length > 0, // Only fetch orders if we have location IDs
     }
   );
-  const { data: payments, isLoading: paymentsLoading, refetch: refetchPayments } = useSquarePayments(
+  const { data: payments, isLoading: paymentsLoading, refetch: refetchPayments, error: paymentsError } = useSquarePayments(
     integrationId,
     {
       begin_time: dateRange.start,
       end_time: dateRange.end,
+    },
+    {
+      enabled: activeTab === 'payments',
     }
   );
-  const { data: catalog, isLoading: catalogLoading } = useSquareCatalog(integrationId, {
-    types: ['ITEM', 'ITEM_VARIATION', 'CATEGORY'],
-  });
+  const { data: catalog, isLoading: catalogLoading, error: catalogError } = useSquareCatalog(
+    integrationId,
+    {
+      types: ['ITEM', 'ITEM_VARIATION', 'CATEGORY'],
+    },
+    {
+      enabled: activeTab === 'catalog',
+    }
+  );
 
   const formatMoney = (amount: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('en-US', {
@@ -94,10 +126,11 @@ export default function SquareDataView({ integrationId }: SquareDataViewProps) {
   };
 
   const handleExportLocations = () => {
-    if (!locations || locations.length === 0) return;
+    const locationsList = locations || [];
+    if (locationsList.length === 0) return;
     
     exportToCsv(
-      locations,
+      locationsList,
       `square-locations-${new Date().toISOString().split('T')[0]}.csv`,
       ['ID', 'Name', 'Address', 'City', 'State', 'Postal Code', 'Country', 'Timezone', 'Status'],
       (location) => [
@@ -179,6 +212,56 @@ export default function SquareDataView({ integrationId }: SquareDataViewProps) {
 
   return (
     <div className="space-y-4">
+      {/* Sync Menu */}
+      {onSync && (
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">Square Data</h3>
+            <p className="text-sm text-muted-foreground">View and manage your Square POS data</p>
+          </div>
+          <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={isSyncing}>
+                  {isSyncing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Sync Data
+                    </>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => onSync('full')} disabled={isSyncing}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Sync All Data
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onSync('orders')} disabled={isSyncing}>
+                  <ShoppingCart className="w-4 h-4 mr-2" />
+                  Sync Orders
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSync('payments')} disabled={isSyncing}>
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Sync Payments
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSync('catalog')} disabled={isSyncing}>
+                  <Package className="w-4 h-4 mr-2" />
+                  Sync Catalog
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSync('locations')} disabled={isSyncing}>
+                  <MapPin className="w-4 h-4 mr-2" />
+                  Sync Locations
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
+      )}
+      
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="locations">
@@ -222,7 +305,7 @@ export default function SquareDataView({ integrationId }: SquareDataViewProps) {
                 </div>
               ) : locations && locations.length > 0 ? (
                 <div className="space-y-4">
-                  {locations.map((location) => (
+                  {locations.map((location: any) => (
                     <div key={location.id} className="p-4 border rounded-lg">
                       <div className="flex items-start justify-between">
                         <div>
@@ -303,9 +386,19 @@ export default function SquareDataView({ integrationId }: SquareDataViewProps) {
                 </div>
               </div>
 
-              {ordersLoading ? (
+              {ordersLoading || (activeTab === 'orders' && locationsLoading) ? (
                 <div className="flex items-center justify-center h-32">
                   <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : activeTab === 'orders' && (!locations || locations.length === 0) ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-2">No locations found. Please sync locations first.</p>
+                  {onSync && (
+                    <Button variant="outline" size="sm" onClick={() => onSync('locations')}>
+                      <MapPin className="w-4 h-4 mr-2" />
+                      Sync Locations
+                    </Button>
+                  )}
                 </div>
               ) : orders?.orders && orders.orders.length > 0 ? (
                 <div className="space-y-4">

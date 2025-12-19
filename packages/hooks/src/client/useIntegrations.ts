@@ -21,7 +21,24 @@ import type {
 export function useIntegrations() {
   return useQuery({
     queryKey: ['integrations'],
-    queryFn: () => integrationsApi.getAll(),
+    queryFn: async () => {
+      try {
+        const data = await integrationsApi.getAll();
+        // Ensure we always return an array
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error('Error fetching integrations:', error);
+        // Return empty array on error to prevent infinite loops
+        return [];
+      }
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes - data is fresh for 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache for 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false, // Don't retry to prevent infinite loops on errors
+    // Let the global config handle refetchOnMount, but ensure we have initial data
+    placeholderData: [], // Use empty array as placeholder to prevent undefined issues
   });
 }
 
@@ -152,8 +169,9 @@ export function useSyncStatus(integrationId: string) {
     queryKey: ['integrations', integrationId, 'sync', 'status'],
     queryFn: () => integrationsApi.getSyncStatus(integrationId),
     enabled: !!integrationId,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Poll every 2 seconds if sync is in progress
+      const data = query.state.data;
       if (data?.status === 'in_progress') {
         return 2000;
       }
@@ -163,14 +181,15 @@ export function useSyncStatus(integrationId: string) {
 }
 
 // Square-specific hooks
-export function useSquareLocations(integrationId: string) {
+export function useSquareLocations(integrationId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['integrations', integrationId, 'square', 'locations'],
     queryFn: async () => {
       const response = await integrationsApi.square.getLocations(integrationId);
       return response.locations || [];
     },
-    enabled: !!integrationId,
+    enabled: options?.enabled !== undefined ? options.enabled : !!integrationId,
+    retry: false, // Don't retry on auth errors
   });
 }
 
@@ -181,12 +200,14 @@ export function useSquareOrders(
     query?: any;
     limit?: number;
     cursor?: string;
-  }
+  },
+  options?: { enabled?: boolean }
 ) {
   return useQuery({
     queryKey: ['integrations', integrationId, 'square', 'orders', params],
     queryFn: () => integrationsApi.square.getOrders(integrationId, params),
-    enabled: !!integrationId,
+    enabled: options?.enabled !== undefined ? options.enabled : !!integrationId,
+    retry: false, // Don't retry on auth errors
   });
 }
 
@@ -210,12 +231,14 @@ export function useSquarePayments(
     last_4?: string;
     card_brand?: string;
     limit?: number;
-  }
+  },
+  options?: { enabled?: boolean }
 ) {
   return useQuery({
     queryKey: ['integrations', integrationId, 'square', 'payments', params],
     queryFn: () => integrationsApi.square.getPayments(integrationId, params),
-    enabled: !!integrationId,
+    enabled: options?.enabled !== undefined ? options.enabled : !!integrationId,
+    retry: false, // Don't retry on auth errors
   });
 }
 
@@ -233,12 +256,14 @@ export function useSquareCatalog(
     types?: string[];
     cursor?: string;
     catalog_version?: number;
-  }
+  },
+  options?: { enabled?: boolean }
 ) {
   return useQuery({
     queryKey: ['integrations', integrationId, 'square', 'catalog', params],
     queryFn: () => integrationsApi.square.getCatalog(integrationId, params),
-    enabled: !!integrationId,
+    enabled: options?.enabled !== undefined ? options.enabled : !!integrationId,
+    retry: false, // Don't retry on auth errors
   });
 }
 

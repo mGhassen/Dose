@@ -207,6 +207,8 @@
     "users": "Utilisateurs",
     "settings": "Paramètres",
     "metadataEnums": "Énumérations Métadonnées",
+    "integrations": "Intégrations",
+    "connectedIntegrations": "Intégrations Connectées",
     "profile": "Profil",
     "logout": "Déconnexion",
     "login": "Connexion",

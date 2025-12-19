@@ -3,49 +3,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { SquareListLocationsResponse } from '@kit/types';
+import { getIntegrationWithValidToken } from '../_utils';
 
 const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
 const SQUARE_API_BASE = SQUARE_USE_SANDBOX 
   ? 'https://connect.squareupsandbox.com'
   : 'https://connect.squareup.com';
-
-async function getIntegrationAndVerifyAccess(
-  supabase: any,
-  integrationId: string
-): Promise<{ integration: any; error: any }> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { integration: null, error: { status: 401, message: 'Unauthorized' } };
-  }
-
-  const { data: account } = await supabase
-    .from('accounts')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single();
-
-  if (!account) {
-    return { integration: null, error: { status: 404, message: 'Account not found' } };
-  }
-
-  const { data: integration, error } = await supabase
-    .from('integrations')
-    .select('*')
-    .eq('id', integrationId)
-    .eq('account_id', account.id)
-    .eq('integration_type', 'square')
-    .single();
-
-  if (error) {
-    return { integration: null, error: { status: 404, message: 'Square integration not found' } };
-  }
-
-  if (integration.status !== 'connected') {
-    return { integration: null, error: { status: 400, message: 'Integration is not connected' } };
-  }
-
-  return { integration, error: null };
-}
 
 export async function GET(
   request: NextRequest,
@@ -61,35 +24,76 @@ export async function GET(
 
     const supabase = createServerSupabaseClient(authHeader);
     
-    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
+    const result = await getIntegrationWithValidToken(supabase, id, authHeader);
     
-    if (accessError) {
+    if (result.error) {
       return NextResponse.json(
-        { error: accessError.message },
-        { status: accessError.status }
+        { error: result.error.message },
+        { status: result.error.status }
       );
     }
 
-    const accessToken = integration.access_token; // Should be decrypted in production
+    const { accessToken } = result;
+
+    // Trim any whitespace that might have been added
+    const cleanToken = accessToken.trim();
     
-    if (!accessToken) {
-      return NextResponse.json(
-        { error: 'Access token not found' },
-        { status: 401 }
-      );
-    }
+    console.log('[Square Locations] Using access token:', {
+      integrationId: id,
+      tokenLength: cleanToken.length,
+      tokenPrefix: cleanToken.substring(0, 15) + '...',
+      tokenSuffix: '...' + cleanToken.substring(cleanToken.length - 10),
+      fullToken: cleanToken, // Log full token for debugging
+      hasWhitespace: cleanToken !== accessToken,
+      sandbox: SQUARE_API_BASE.includes('sandbox'),
+    });
+
+    const squareAuthHeader = `Bearer ${cleanToken}`;
+    console.log('[Square Locations] Authorization header:', {
+      headerLength: squareAuthHeader.length,
+      headerPrefix: squareAuthHeader.substring(0, 20) + '...',
+    });
 
     const response = await fetch(`${SQUARE_API_BASE}/v2/locations`, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': squareAuthHeader,
         'Square-Version': '2024-01-18',
       },
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      let errorDetails;
+      try {
+        errorDetails = JSON.parse(errorText);
+      } catch {
+        errorDetails = errorText;
+      }
+      
+      const errorCode = errorDetails?.errors?.[0]?.code;
+      const errorCategory = errorDetails?.errors?.[0]?.category;
+      const errorDetail = errorDetails?.errors?.[0]?.detail;
+      
+      console.error('[Square Locations] API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorCode,
+        errorCategory,
+        errorDetail,
+        fullError: JSON.stringify(errorDetails, null, 2),
+        apiBase: SQUARE_API_BASE,
+        hasToken: !!accessToken,
+        tokenLength: accessToken?.length,
+      });
+      
+      // Provide clearer error message for authentication errors
+      let errorMsg = errorDetail || errorCode || response.statusText;
+      if (response.status === 401 && (errorCode === 'UNAUTHORIZED' || errorCategory === 'AUTHENTICATION_ERROR')) {
+        errorMsg = 'Access token is invalid or expired. Please reconnect the integration with a fresh token from Square Developer Console.';
+      }
+      
       return NextResponse.json(
-        { error: `Square API error: ${response.statusText}`, details: errorText },
+        { error: `Square API error: ${errorMsg}`, details: errorDetails },
         { status: response.status }
       );
     }

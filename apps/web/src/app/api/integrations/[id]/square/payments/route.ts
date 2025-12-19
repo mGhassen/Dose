@@ -3,49 +3,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { SquareListPaymentsResponse } from '@kit/types';
+import { getIntegrationWithValidToken } from '../_utils';
 
 const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
 const SQUARE_API_BASE = SQUARE_USE_SANDBOX 
   ? 'https://connect.squareupsandbox.com'
   : 'https://connect.squareup.com';
-
-async function getIntegrationAndVerifyAccess(
-  supabase: any,
-  integrationId: string
-): Promise<{ integration: any; error: any }> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { integration: null, error: { status: 401, message: 'Unauthorized' } };
-  }
-
-  const { data: account } = await supabase
-    .from('accounts')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single();
-
-  if (!account) {
-    return { integration: null, error: { status: 404, message: 'Account not found' } };
-  }
-
-  const { data: integration, error } = await supabase
-    .from('integrations')
-    .select('*')
-    .eq('id', integrationId)
-    .eq('account_id', account.id)
-    .eq('integration_type', 'square')
-    .single();
-
-  if (error) {
-    return { integration: null, error: { status: 404, message: 'Square integration not found' } };
-  }
-
-  if (integration.status !== 'connected') {
-    return { integration: null, error: { status: 400, message: 'Integration is not connected' } };
-  }
-
-  return { integration, error: null };
-}
 
 export async function GET(
   request: NextRequest,
@@ -62,23 +25,23 @@ export async function GET(
 
     const supabase = createServerSupabaseClient(authHeader);
     
-    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
+    const result = await getIntegrationWithValidToken(supabase, id, authHeader);
     
-    if (accessError) {
+    if (result.error) {
       return NextResponse.json(
-        { error: accessError.message },
-        { status: accessError.status }
+        { error: result.error.message },
+        { status: result.error.status }
       );
     }
 
-    const accessToken = integration.access_token; // Should be decrypted in production
-    
-    if (!accessToken) {
-      return NextResponse.json(
-        { error: 'Access token not found' },
-        { status: 401 }
-      );
-    }
+    const { accessToken } = result;
+
+    console.log('[Square Payments] Using access token:', {
+      integrationId: id,
+      tokenLength: accessToken.length,
+      tokenPrefix: accessToken.substring(0, 10) + '...',
+      sandbox: SQUARE_API_BASE.includes('sandbox'),
+    });
 
     // Build query parameters
     let beginTime = searchParams.get('begin_time');
@@ -128,11 +91,14 @@ export async function GET(
       } catch {
         errorDetails = errorText;
       }
-      console.error('Square Payments API Error:', {
+      console.error('[Square Payments] API Error:', {
         status: response.status,
         statusText: response.statusText,
         details: errorDetails,
         queryParams: queryParams.toString(),
+        apiBase: SQUARE_API_BASE,
+        hasToken: !!accessToken,
+        tokenLength: accessToken?.length,
       });
       return NextResponse.json(
         { error: `Square API error: ${response.statusText}`, details: errorDetails },

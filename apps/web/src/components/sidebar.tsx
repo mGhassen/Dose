@@ -38,6 +38,8 @@ import {
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { pathsConfig, type MenuItem } from '@kit/config/paths.config'
+import { useIntegrations } from '@kit/hooks'
+import { Square, Link2 } from 'lucide-react'
 
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
@@ -98,26 +100,63 @@ type ProcessedMenuItem = {
   items?: ProcessedMenuItem[];
 }
 
+// Integration icon mapping
+const integrationIconMap: Record<string, LucideIcon> = {
+  square: Square,
+  // Add more integration icons here as needed
+}
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const t = useTranslations('navigation');
+  const { data: integrations, isLoading: integrationsLoading } = useIntegrations();
   
   const data = useMemo(() => {
     const processMenuItems = (items: MenuItem[]): ProcessedMenuItem[] => {
-      return items.map((item: MenuItem) => ({
-        title: item.translationKey ? t(item.translationKey) : item.title,
-        url: item.url,
-        icon: item.icon ? (iconMap[item.icon as keyof typeof iconMap] || FileText) : FileText,
-        translationKey: item.translationKey,
-        isActive: item.isActive,
-        items: item.items ? processMenuItems(item.items) : undefined,
-      }))
+      return items.map((item: MenuItem) => {
+        // If this is the integrations menu item, add connected integrations as submenu items
+        if (item.url === '/settings/integrations' && !integrationsLoading && integrations && Array.isArray(integrations)) {
+          const connectedIntegrations = integrations.filter((i: any) => i?.status === 'connected');
+          const integrationSubItems: ProcessedMenuItem[] = connectedIntegrations.map((integration: any) => {
+            const integrationName = integration.name || integration.integration_type;
+            const Icon = integrationIconMap[integration.integration_type] || Link2;
+            
+            return {
+              title: integrationName,
+              url: `/settings/integrations/${integration.id}`,
+              icon: Icon,
+              translationKey: undefined,
+              isActive: false,
+            };
+          });
+
+          return {
+            title: item.translationKey ? t(item.translationKey) : item.title,
+            url: item.url,
+            icon: item.icon ? (iconMap[item.icon as keyof typeof iconMap] || FileText) : FileText,
+            translationKey: item.translationKey,
+            isActive: item.isActive,
+            items: integrationSubItems.length > 0 
+              ? integrationSubItems 
+              : (item.items ? processMenuItems(item.items) : undefined),
+          };
+        }
+
+        return {
+          title: item.translationKey ? t(item.translationKey) : item.title,
+          url: item.url,
+          icon: item.icon ? (iconMap[item.icon as keyof typeof iconMap] || FileText) : FileText,
+          translationKey: item.translationKey,
+          isActive: item.isActive,
+          items: item.items ? processMenuItems(item.items) : undefined,
+        };
+      });
     }
 
     return {
       navMain: processMenuItems(pathsConfig.navMain),
       navSecondary: processMenuItems(pathsConfig.navSecondary),
     }
-  }, [t])
+  }, [t, integrations, integrationsLoading])
 
   return (
     <Sidebar variant="inset" {...props}>

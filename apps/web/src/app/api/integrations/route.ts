@@ -64,11 +64,18 @@ export async function GET(request: NextRequest) {
       .from('integrations')
       .select('*')
       .eq('account_id', account.id)
-      .eq('is_active', true)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[GET /api/integrations] Supabase error:', error);
+      throw error;
+    }
 
+    console.log('[GET /api/integrations] Found integrations:', data?.length || 0, 'for account:', account.id);
+    if (data && data.length > 0) {
+      console.log('[GET /api/integrations] Integration statuses:', data.map(i => ({ id: i.id, type: i.integration_type, status: i.status, is_active: i.is_active })));
+    }
+    
     const integrations: Integration[] = (data || []).map(transformIntegration);
     
     return NextResponse.json(integrations);
