@@ -1,6 +1,6 @@
 # ☀️ Dose ☕️ 
 
-**SunnyLife** is a professional-grade financial management and budgeting system designed specifically for the restaurant industry. It transforms complex financial data from Excel workbooks into a centralized, intelligent ecosystem for real-time decision-making and forecasting.
+**Dose** is a professional-grade financial management and budgeting system designed specifically for the restaurant industry. It transforms complex financial data from Excel workbooks into a centralized, intelligent ecosystem for real-time decision-making and forecasting.
 
 ## 🚀 Key Features
 
@@ -71,4 +71,4 @@ Refer to `cursor.md` for the complete guide on:
 - Financial data models and calculation logic.
 
 ---
-*Developed by The Sunny Side.*
+*Developed by Dose Team.*

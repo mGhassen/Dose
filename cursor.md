@@ -718,7 +718,7 @@ When creating a new entity, ensure:
 
 ### Application Overview
 
-**SunnyLife** is a modern budgeting and financial-tracking platform for restaurant management. The application imports, stores, computes, and visualizes all financial data from Excel workbooks through structured data models, automated calculations, dashboards, and CRUD interfaces.
+**Dose** is a modern budgeting and financial-tracking platform for restaurant management. The application imports, stores, computes, and visualizes all financial data from Excel workbooks through structured data models, automated calculations, dashboards, and CRUD interfaces.
 
 **Technology Stack:**
 - **Backend**: Next.js 15 API Routes

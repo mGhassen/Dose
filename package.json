@@ -4,7 +4,11 @@
   "description": "Next.js monorepo boilerplate with modern architecture",
   "private": true,
   "author": "Ghassen MENAOUAR",
-  "company": "The Sunny Side",
+  "company": "Dose Team",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mGhassen/Dose.git"
+  },
   "license": "MIT",
   "workspaces": [
     "apps/web"
