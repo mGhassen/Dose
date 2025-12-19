@@ -1,4 +1,4 @@
-# ☀️ SunnyLife (Internal: Dose)
+# ☀️ Dose ☕️ 
 
 **SunnyLife** is a professional-grade financial management and budgeting system designed specifically for the restaurant industry. It transforms complex financial data from Excel workbooks into a centralized, intelligent ecosystem for real-time decision-making and forecasting.
 
