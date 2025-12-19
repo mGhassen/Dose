@@ -1,137 +1,74 @@
-# Dose
+# ☀️ SunnyLife (Internal: Dose)
 
-Financial management and planning system.
+**SunnyLife** is a professional-grade financial management and budgeting system designed specifically for the restaurant industry. It transforms complex financial data from Excel workbooks into a centralized, intelligent ecosystem for real-time decision-making and forecasting.
 
-## Architecture
+## 🚀 Key Features
 
-This is a **monorepo** using pnpm workspaces with the following structure:
+*   **Financial Intelligence**: Automated generation of **Profit & Loss** (CR), **Balance Sheets** (Bilan), and **Financial Plans**.
+*   **Operational Tracking**: Manage **Sales** (on-site, delivery, catering), **Expenses**, and **Leasing** payments.
+*   **Workforce Management**: Track **Personnel** salaries and automated employer charge calculations.
+*   **Asset Management**: Automated **Loan Amortization** schedules and **Investment Depreciation** tracking.
+*   **Cash Flow & BFR**: Real-time **Cash Flow** monitoring and **Working Capital (BFR)** analysis.
+*   **Advanced Analytics**: High-performance dashboards powered by **Recharts** for trend visualization.
+
+## 🏗️ Architecture & Philosophy
+
+The project is built as a modular **pnpm monorepo** designed for scalability and code reuse.
+
+### The Stack
+- **Framework**: Next.js 15 (App Router) + React 19.
+- **Database**: Supabase (PostgreSQL) for persistence.
+- **UI**: shadcn/ui + Tailwind CSS.
+- **State Management**: React Query (TanStack Query) + React Hook Form + Zod.
+- **Mocking**: MSW (Mock Service Worker) for network-level interception.
+
+### Core Philosophy
+- **Logic in Code, Not DB**: All financial computations and business logic reside in **TypeScript API Routes**. The database is used strictly for data storage.
+- **Network Interception**: No mock data is ever hardcoded in API routes; development data is handled via MSW.
+- **Strict Standards**: Mandatory use of the `DataTablePage` pattern for all list views (advanced filtering, bulk actions, localStorage persistence).
+
+## 📂 Project Structure
 
 ```
 dose/
 ├── apps/
-│   └── web/          # Next.js web application
+│   └── web/             # Next.js 15 Web Application
 ├── packages/
-│   ├── types/        # Shared TypeScript types and interfaces
-│   ├── api-client/   # Universal API client with platform adapters
-│   ├── api/          # Shared API endpoint definitions
-│   └── shared/       # Shared utilities and constants
-└── package.json      # Root workspace configuration
+│   ├── types/           # Domain-driven TypeScript interfaces
+│   ├── hooks/           # Shared React Query & logic hooks
+│   ├── lib/             # Supabase client & core API definitions
+│   ├── ui/              # Shared UI component library (shadcn/ui)
+│   ├── config/          # Shared configuration (i18n, paths, auth)
+│   ├── mocks/           # MSW Handlers and mock data
+│   └── shared/          # Universal utilities
+└── package.json         # Root workspace configuration
 ```
 
-## Shared Packages
+## 🛠️ Getting Started
 
-### @kit/types
-Contains all shared TypeScript types and interfaces used across mobile and web applications.
+### 1. Prerequisites
+- **Node.js**: 18.0.0+
+- **pnpm**: 9.0.0+
+- **Docker Desktop**: Required for local Supabase services.
 
-**Usage:**
-```typescript
-import type { User, CreateUserData, AuthResponse } from '@kit/types';
-```
-
-### @kit/api-client
-Universal API client that works with platform-specific adapters. Provides a consistent interface for making HTTP requests.
-
-**Usage:**
-```typescript
-import { ApiClient } from '@kit/api-client';
-import { createWebAdapter } from './adapters/web';
-
-const adapter = createWebAdapter();
-const client = new ApiClient(adapter);
-
-const users = await client.get('/api/users');
-```
-
-### @kit/api
-Shared API endpoint definitions. All functions are factories that accept an `ApiClient` instance.
-
-**Usage:**
-```typescript
-import { ApiClient } from '@kit/api-client';
-import { createUsersApi, createAuthApi } from '@kit/api';
-
-const client = new ApiClient(adapter);
-const usersApi = createUsersApi(client);
-const authApi = createAuthApi(client);
-
-const users = await usersApi.getUsers();
-await authApi.login({ email, password });
-```
-
-### @kit/shared
-Shared utilities and constants.
-
-**Usage:**
-```typescript
-import { buildUrl, normalizeEndpoint } from '@kit/shared';
-```
-
-## Adding New Packages
-
-1. Create a new directory under `packages/`
-2. Add a `package.json` with the package name following `@kit/<name>`
-3. Use `workspace:*` for internal dependencies
-4. Update `pnpm-workspace.yaml` if needed (already includes `packages/*`)
-5. Run `pnpm install` to link packages
-
-## Development
-
-### Installing Dependencies
+### 2. Setup
 ```bash
+# Install dependencies
 pnpm install
+
+# Start local Supabase stack
+pnpm supabase:web start
+
+# Run the development server
+pnpm dev
 ```
 
-### Running Apps
-```bash
-# Web
-pnpm dev:web
+## 📜 Development Rules
+Refer to `cursor.md` for the complete guide on:
+- Entity creation workflow.
+- `DataTablePage` implementation rules.
+- API Route patterns.
+- Financial data models and calculation logic.
 
-# Mobile
-pnpm dev:mobile
-```
-
-### Type Checking
-```bash
-# Check all packages
-pnpm type-check:packages
-
-# Check specific app
-pnpm type-check:web
-```
-
-## Package Development
-
-When working on shared packages:
-
-1. Make changes to the package source
-2. Changes are automatically available to consuming apps (no build step needed with TypeScript)
-3. Run `pnpm type-check:packages` to verify types
-4. Apps will pick up changes on hot reload
-
-## Adding Shared Code
-
-### Shared Types
-Add new types to `packages/types/src/` and export from `packages/types/src/index.ts`.
-
-### Shared API Endpoints
-1. Add types to `packages/types/src/` if needed
-2. Create API functions in `packages/api/src/`
-3. Export from `packages/api/src/index.ts`
-4. Use factory pattern: `create<Resource>Api(client: ApiClient)`
-
-### Platform Adapters
-Create platform-specific adapters in each app:
-- Web: `apps/web/src/lib/api/adapters/web.ts`
-- Mobile: `apps/mobile/src/lib/api/adapters/mobile.ts`
-
-See example adapters in:
-- `packages/api-client/src/adapters/web-adapter.example.ts`
-- `packages/api-client/src/adapters/mobile-adapter.example.ts`
-
-## Best Practices
-
-1. **Keep packages small and focused** - Each package should have a single responsibility
-2. **Use workspace dependencies** - Use `workspace:*` for internal packages
-3. **Platform-specific code stays in apps** - Only truly shared code goes in packages
-4. **Type everything** - Use TypeScript for all packages
-5. **Factory pattern for APIs** - Makes APIs platform-agnostic
+---
+*Developed by The Sunny Side.*

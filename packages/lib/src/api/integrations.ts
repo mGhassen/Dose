@@ -54,7 +54,7 @@ export const integrationsApi = {
       sync_type: syncType || 'full',
     }),
   getSyncStatus: (id: string) =>
-    apiRequest<IntegrationSyncData | null>('GET', `/api/integrations/${id}/sync/status`),
+    apiRequest<IntegrationSyncData | null>('GET', `/api/integrations/${id}/sync`),
 
   // Square-specific data fetching
   square: {
