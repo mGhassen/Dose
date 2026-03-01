@@ -36,9 +36,11 @@ interface EditableSubscriptionTimelineRowProps {
   projection: SubscriptionProjection;
   subscriptionId: number;
   onUpdate: () => void;
+  /** When true, first column shows subscription name instead of month (for "By month" view) */
+  showSubscriptionName?: boolean;
 }
 
-export function EditableSubscriptionTimelineRow({ projection, subscriptionId, onUpdate }: EditableSubscriptionTimelineRowProps) {
+export function EditableSubscriptionTimelineRow({ projection, subscriptionId, onUpdate, showSubscriptionName }: EditableSubscriptionTimelineRowProps) {
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
   const [isDeletePaymentDialogOpen, setIsDeletePaymentDialogOpen] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
@@ -326,7 +328,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
     <>
       <TableRow className={isPastDue ? "bg-destructive/10" : isProjected && !isFullyPaid ? "bg-muted/50" : ""}>
         <TableCell className="font-medium">
-          {formatMonthYear(date)}
+          {showSubscriptionName ? projection.subscriptionName : formatMonthYear(date)}
         </TableCell>
         <TableCell className="font-semibold">
           <div className="flex flex-col">
