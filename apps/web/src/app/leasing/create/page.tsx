@@ -13,6 +13,7 @@ import AppLayout from "@/components/app-layout";
 import { useCreateLeasing, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
 import type { LeasingType, ExpenseRecurrence } from "@kit/types";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { Checkbox } from "@kit/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@kit/ui/radio-group";
 import Link from "next/link";
@@ -28,7 +29,7 @@ export default function CreateLeasingPage() {
     type: "operating" as LeasingType,
     amount: "",
     totalAmount: "",
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: dateToYYYYMMDD(new Date()),
     endDate: "",
     frequency: "monthly" as ExpenseRecurrence,
     description: "",

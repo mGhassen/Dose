@@ -200,7 +200,7 @@ export default function LoansOutputContent() {
       </div>
 
       {/* Table View */}
-      <div className="-mx-4">
+      <div>
         <DataTablePage
           title=""
           description=""

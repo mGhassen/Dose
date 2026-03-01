@@ -25,7 +25,7 @@ function transformToSnakeCase(data: CreateSupplierOrderData): any {
   return {
     supplier_id: data.supplierId,
     order_number: data.orderNumber,
-    order_date: data.orderDate || new Date().toISOString().split('T')[0],
+    order_date: data.orderDate || (await import('@kit/lib')).dateToYYYYMMDD(new Date()),
     expected_delivery_date: data.expectedDeliveryDate,
     status: data.status || 'pending',
     notes: data.notes,

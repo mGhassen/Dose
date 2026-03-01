@@ -14,6 +14,7 @@ import AppLayout from "@/components/app-layout";
 import { useCreateVariable } from "@kit/hooks";
 import { toast } from "sonner";
 import type { VariableType } from "@kit/types";
+import { dateToYYYYMMDD } from "@kit/lib";
 
 export default function CreateVariablePage() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function CreateVariablePage() {
     type: "" as VariableType | "",
     value: "",
     unit: "",
-    effectiveDate: new Date().toISOString().split('T')[0],
+    effectiveDate: dateToYYYYMMDD(new Date()),
     endDate: "",
     description: "",
     isActive: true,

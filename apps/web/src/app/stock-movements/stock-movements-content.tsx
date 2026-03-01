@@ -559,7 +559,7 @@ export default function StockMovementsContent() {
       </Tabs>
 
       {/* Table View */}
-      <div className="-mx-4">
+      <div>
         <DataTablePage
           title=""
           description=""

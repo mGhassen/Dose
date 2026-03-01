@@ -148,7 +148,7 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -195,8 +195,8 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
           </CardHeader>
           <CardContent>
             {isEditing ? (
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Date */}
                   <div className="space-y-2">
                     <Label htmlFor="date">Date *</Label>
@@ -299,7 +299,7 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
                 </div>
 
                 {/* Actions */}
-                <div className="flex justify-end space-x-4 pt-6">
+                <div className="flex justify-end space-x-4 pt-4">
                   <Button
                     type="button"
                     variant="outline"
@@ -315,18 +315,18 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
                 </div>
               </form>
             ) : (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Date */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Date</label>
-                    <p className="text-base font-semibold mt-1">{formatDate(sale.date)}</p>
+                    <p className="text-base font-semibold mt-0.5">{formatDate(sale.date)}</p>
                   </div>
 
                   {/* Type */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Type</label>
-                    <div className="mt-1">
+                    <div className="mt-0.5">
                       <Badge variant="outline">
                         {typeLabels[sale.type] || sale.type}
                       </Badge>
@@ -336,13 +336,13 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
                   {/* Amount */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Amount</label>
-                    <p className="text-base font-semibold mt-1">{formatCurrency(sale.amount)}</p>
+                    <p className="text-base font-semibold mt-0.5">{formatCurrency(sale.amount)}</p>
                   </div>
 
                   {/* Quantity */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Quantity</label>
-                    <p className="text-base mt-1">
+                    <p className="text-base mt-0.5">
                       {sale.quantity || <span className="text-muted-foreground">—</span>}
                     </p>
                   </div>
@@ -350,7 +350,7 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
                   {/* Item/Recipe */}
                   <div className="md:col-span-2">
                     <label className="text-sm font-medium text-muted-foreground">Item/Recipe</label>
-                    <div className="mt-1">
+                    <div className="mt-0.5">
                       {sale.item ? (
                         <div className="flex items-center gap-2">
                           <Link href={sale.item.itemType === 'recipe' ? `/recipes/${sale.item.id}` : `/items/${sale.item.id}`}>
@@ -376,13 +376,13 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
                 {sale.description && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Description</label>
-                    <p className="text-base mt-1 whitespace-pre-wrap">{sale.description}</p>
+                    <p className="text-base mt-0.5 whitespace-pre-wrap">{sale.description}</p>
                   </div>
                 )}
 
                 {/* Metadata */}
-                <div className="pt-4 border-t">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-muted-foreground">
+                <div className="pt-3 border-t">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground">
                     <div>
                       <span className="font-medium">Created:</span> {formatDate(sale.createdAt)}
                     </div>

@@ -14,6 +14,7 @@ import AppLayout from "@/components/app-layout";
 import { useCreateExpense, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseCategory } from "@kit/types";
+import { dateToYYYYMMDD } from "@kit/lib";
 import Link from "next/link";
 
 export default function CreateExpensePage() {
@@ -25,7 +26,7 @@ export default function CreateExpensePage() {
     name: "",
     category: "" as ExpenseCategory | "",
     amount: "",
-    expenseDate: new Date().toISOString().split('T')[0],
+    expenseDate: dateToYYYYMMDD(new Date()),
     description: "",
     vendor: "",
     supplierId: "",

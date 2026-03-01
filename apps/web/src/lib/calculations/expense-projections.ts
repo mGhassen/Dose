@@ -130,8 +130,19 @@ export function projectExpensesForYear(
   expenses: Expense[],
   year: string // YYYY
 ): ExpenseProjection[] {
-  const startMonth = `${year}-01`;
-  const endMonth = `${year}-12`;
+  return projectExpensesForDateRange(expenses, `${year}-01-01`, `${year}-12-31`);
+}
+
+/**
+ * Project all expenses for a date range (startDate/endDate as YYYY-MM-DD)
+ */
+export function projectExpensesForDateRange(
+  expenses: Expense[],
+  startDate: string,
+  endDate: string
+): ExpenseProjection[] {
+  const startMonth = startDate.slice(0, 7);
+  const endMonth = endDate.slice(0, 7);
   const allProjections: ExpenseProjection[] = [];
 
   for (const expense of expenses) {

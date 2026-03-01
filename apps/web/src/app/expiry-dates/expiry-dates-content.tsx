@@ -169,7 +169,7 @@ export default function ExpiryDatesContent() {
         </div>
       </div>
 
-      <div className="-mx-4">
+      <div>
         <DataTablePage
           title=""
           description=""

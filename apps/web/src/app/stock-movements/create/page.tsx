@@ -13,6 +13,7 @@ import AppLayout from "@/components/app-layout";
 import { useCreateStockMovement, useItems } from "@kit/hooks";
 import { toast } from "sonner";
 import { StockMovementType } from "@kit/types";
+import { dateToYYYYMMDD } from "@kit/lib";
 
 export default function CreateStockMovementPage() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function CreateStockMovementPage() {
     unit: "",
     location: "",
     notes: "",
-    movementDate: new Date().toISOString().split('T')[0],
+    movementDate: dateToYYYYMMDD(new Date()),
   });
 
   const handleSubmit = async (e: React.FormEvent) => {

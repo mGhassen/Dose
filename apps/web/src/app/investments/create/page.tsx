@@ -13,6 +13,7 @@ import AppLayout from "@/components/app-layout";
 import { useCreateInvestment } from "@kit/hooks";
 import { toast } from "sonner";
 import type { InvestmentType, DepreciationMethod } from "@kit/types";
+import { dateToYYYYMMDD } from "@kit/lib";
 
 export default function CreateInvestmentPage() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function CreateInvestmentPage() {
     name: "",
     type: "" as InvestmentType | "",
     amount: "",
-    purchaseDate: new Date().toISOString().split('T')[0],
+    purchaseDate: dateToYYYYMMDD(new Date()),
     usefulLifeMonths: "",
     depreciationMethod: "" as DepreciationMethod | "",
     residualValue: "0",

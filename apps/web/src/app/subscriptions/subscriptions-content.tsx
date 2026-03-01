@@ -243,7 +243,7 @@ export default function SubscriptionsContent() {
       </div>
 
       {/* Table View */}
-      <div className="-mx-4">
+      <div>
         <DataTablePage
           title=""
           description=""

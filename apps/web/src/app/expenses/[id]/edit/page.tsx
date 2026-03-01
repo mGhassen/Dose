@@ -14,6 +14,7 @@ import AppLayout from "@/components/app-layout";
 import { useExpenseById, useUpdateExpense, useSubscriptions, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseCategory } from "@kit/types";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { UnifiedSelector } from "@/components/unified-selector";
 import Link from "next/link";
 
@@ -36,7 +37,7 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
     category: "" as ExpenseCategory | "",
     amount: "",
     subscriptionId: "",
-    expenseDate: new Date().toISOString().split('T')[0],
+    expenseDate: dateToYYYYMMDD(new Date()),
     description: "",
     vendor: "",
     supplierId: "",

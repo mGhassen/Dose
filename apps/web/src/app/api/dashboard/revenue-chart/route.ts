@@ -2,18 +2,18 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { getMonthsInRange } from '@kit/lib/date-periods';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const year = searchParams.get('year') || new Date().getFullYear().toString();
+    const startDate = searchParams.get('startDate') || `${year}-01-01`;
+    const endDate = searchParams.get('endDate') || `${year}-12-31`;
 
-    const startDate = `${year}-01-01`;
-    const endDate = `${year}-12-31`;
-
+    const monthsInRange = getMonthsInRange(startDate, endDate);
     const supabase = createServerSupabaseClient();
 
-    // Fetch all sales for the year (with pagination to get all records)
     let allSales: any[] = [];
     let page = 0;
     const pageSize = 1000;
@@ -38,24 +38,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const data = allSales;
-
-    // Group by month
     const monthlyData: Record<string, number> = {};
-    const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
-    
-    months.forEach(month => {
-      monthlyData[month] = 0;
+    monthsInRange.forEach(m => { monthlyData[m] = 0; });
+
+    (allSales || []).forEach((sale: any) => {
+      const month = sale.date.slice(0, 7);
+      if (monthlyData[month] !== undefined) {
+        monthlyData[month] += parseFloat(sale.amount);
+      }
     });
 
-    (data || []).forEach((sale: any) => {
-      const month = sale.date.slice(5, 7); // Extract MM from YYYY-MM-DD
-      monthlyData[month] = (monthlyData[month] || 0) + parseFloat(sale.amount);
-    });
-
-    // Format for chart
-    const chartData = months.map(month => ({
-      month: `${year}-${month}`,
+    const chartData = monthsInRange.map(month => ({
+      month,
       revenue: monthlyData[month] || 0,
     }));
 

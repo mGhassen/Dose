@@ -14,6 +14,7 @@ import AppLayout from "@/components/app-layout";
 import { useCreatePersonnel, useVariables } from "@kit/hooks";
 import { toast } from "sonner";
 import type { PersonnelType } from "@kit/types";
+import { dateToYYYYMMDD } from "@kit/lib";
 
 export default function CreatePersonnelPage() {
   const router = useRouter();
@@ -41,7 +42,7 @@ export default function CreatePersonnelPage() {
     type: "" as PersonnelType | "",
     baseSalary: "",
     salaryFrequency: "monthly" as "yearly" | "monthly" | "weekly",
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: dateToYYYYMMDD(new Date()),
     endDate: "",
     isActive: true,
     notes: "",

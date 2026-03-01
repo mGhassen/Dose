@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import type { LoanStatus } from "@kit/types";
 import { Checkbox } from "@kit/ui/checkbox";
 import Link from "next/link";
+import { dateToYYYYMMDD } from "@kit/lib";
 
 export default function CreateLoanPage() {
   const router = useRouter();
@@ -27,7 +28,7 @@ export default function CreateLoanPage() {
     principalAmount: "",
     interestRate: "",
     durationMonths: "",
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: dateToYYYYMMDD(new Date()),
     status: "active" as LoanStatus,
     lender: "",
     supplierId: "",

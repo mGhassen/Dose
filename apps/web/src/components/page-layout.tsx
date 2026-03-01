@@ -39,7 +39,7 @@ export function PageLayout({
   className = ""
 }: PageLayoutProps) {
   return (
-    <div className={`space-y-6 min-h-0 ${className}`}>
+    <div className={`space-y-4 min-h-0 ${className}`}>
       {/* Page Header */}
       {(title || description) && (
         <div className="space-y-2">
@@ -54,7 +54,7 @@ export function PageLayout({
       )}
 
       {/* Page Content */}
-      <div className="space-y-6 min-h-0">
+      <div className="space-y-4 min-h-0">
         {children}
       </div>
     </div>
@@ -97,7 +97,7 @@ export function DataTableLayout({
   showFilters = true
 }: DataTableLayoutProps) {
   return (
-    <div className={`space-y-6 min-h-0 max-w-full overflow-hidden ${className}`}>
+    <div className={`space-y-4 min-h-0 max-w-full overflow-hidden ${className}`}>
       {/* Page Header */}
       {(title || description) && (
         <div className="space-y-2">

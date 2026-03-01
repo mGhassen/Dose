@@ -46,7 +46,7 @@ export async function POST(
     if (body.actualDeliveryDate) {
       updateData.actual_delivery_date = body.actualDeliveryDate;
     } else {
-      updateData.actual_delivery_date = new Date().toISOString().split('T')[0];
+      updateData.actual_delivery_date = (await import('@kit/lib')).dateToYYYYMMDD(new Date());
     }
 
     const { error: updateError } = await supabase

@@ -13,13 +13,14 @@ import AppLayout from "@/components/app-layout";
 import { useCreateSale, useItems } from "@kit/hooks";
 import { toast } from "sonner";
 import type { SalesType } from "@kit/types";
+import { dateToYYYYMMDD } from "@kit/lib";
 
 export default function CreateSalePage() {
   const router = useRouter();
   const createSale = useCreateSale();
   const { data: itemsResponse } = useItems({ limit: 1000, includeRecipes: true });
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: dateToYYYYMMDD(new Date()),
     type: "" as SalesType | "",
     amount: "",
     quantity: "",

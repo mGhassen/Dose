@@ -2,40 +2,41 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { getMonthsInRange } from '@kit/lib/date-periods';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const year = searchParams.get('year') || new Date().getFullYear().toString();
+    const startDate = searchParams.get('startDate') || `${year}-01-01`;
+    const endDate = searchParams.get('endDate') || `${year}-12-31`;
+
+    const monthsInRange = getMonthsInRange(startDate, endDate);
+    const firstMonth = monthsInRange[0] || `${year}-01`;
+    const lastMonth = monthsInRange[monthsInRange.length - 1] || `${year}-12`;
 
     const supabase = createServerSupabaseClient();
 
     const { data, error } = await supabase
       .from('profit_and_loss')
       .select('month, net_profit')
-      .gte('month', `${year}-01`)
-      .lte('month', `${year}-12`)
+      .gte('month', firstMonth)
+      .lte('month', lastMonth)
       .order('month', { ascending: true });
 
     if (error) throw error;
 
-    // Create map of all months
     const monthlyData: Record<string, number> = {};
-    const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
-    
-    months.forEach(month => {
-      monthlyData[month] = 0;
-    });
+    monthsInRange.forEach(m => { monthlyData[m] = 0; });
 
-    // Fill in actual data
     (data || []).forEach((pl: any) => {
-      const month = pl.month.slice(5, 7); // Extract MM from YYYY-MM
-      monthlyData[month] = parseFloat(pl.net_profit || '0');
+      if (monthlyData[pl.month] !== undefined) {
+        monthlyData[pl.month] = parseFloat(pl.net_profit || '0');
+      }
     });
 
-    // Format for chart
-    const chartData = months.map(month => ({
-      month: `${year}-${month}`,
+    const chartData = monthsInRange.map(month => ({
+      month,
       profit: monthlyData[month] || 0,
     }));
 

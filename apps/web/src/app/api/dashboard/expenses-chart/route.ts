@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { getMonthsInRange } from '@kit/lib/date-periods';
 
 function transformExpense(row: any) {
   return {
@@ -17,7 +18,10 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const year = searchParams.get('year') || new Date().getFullYear().toString();
+    const startDate = searchParams.get('startDate') || `${year}-01-01`;
+    const endDate = searchParams.get('endDate') || `${year}-12-31`;
 
+    const monthsInRange = getMonthsInRange(startDate, endDate);
     const supabase = createServerSupabaseClient();
 
     const { data, error } = await supabase
@@ -29,26 +33,20 @@ export async function GET(request: NextRequest) {
 
     const expenses = (data || []).map(transformExpense);
 
-    // Project expenses for the year
-    const { projectExpensesForYear } = await import('@/lib/calculations/expense-projections');
-    const expenseProjections = projectExpensesForYear(expenses, year);
+    const { projectExpensesForDateRange } = await import('@/lib/calculations/expense-projections');
+    const expenseProjections = projectExpensesForDateRange(expenses, startDate, endDate);
 
-    // Group by month
     const monthlyData: Record<string, number> = {};
-    const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
-    
-    months.forEach(month => {
-      monthlyData[month] = 0;
-    });
+    monthsInRange.forEach(m => { monthlyData[m] = 0; });
 
     expenseProjections.forEach(proj => {
-      const month = proj.month.slice(5, 7); // Extract MM from YYYY-MM
-      monthlyData[month] = (monthlyData[month] || 0) + proj.amount;
+      if (monthlyData[proj.month] !== undefined) {
+        monthlyData[proj.month] += proj.amount;
+      }
     });
 
-    // Format for chart
-    const chartData = months.map(month => ({
-      month: `${year}-${month}`,
+    const chartData = monthsInRange.map(month => ({
+      month,
       expenses: monthlyData[month] || 0,
     }));
 

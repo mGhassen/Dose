@@ -206,7 +206,7 @@ export default function InputsContent() {
       </div>
 
       {/* Table View */}
-      <div className="-mx-4">
+      <div>
         <DataTablePage
           title=""
           description=""

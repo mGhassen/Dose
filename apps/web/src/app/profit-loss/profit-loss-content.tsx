@@ -572,7 +572,7 @@ export default function ProfitLossContent() {
         </TabsContent>
 
         <TabsContent value="table" className="space-y-4">
-          <div className="-mx-4">
+          <div>
             <DataTablePage
               title=""
               description=""

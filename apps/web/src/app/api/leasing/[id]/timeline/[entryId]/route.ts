@@ -40,7 +40,7 @@ export async function PUT(
     if (body.isPaid !== undefined) {
       updateData.is_paid = body.isPaid;
       if (body.isPaid && !body.paidDate) {
-        updateData.paid_date = new Date().toISOString().split('T')[0];
+        updateData.paid_date = (await import('@kit/lib')).dateToYYYYMMDD(new Date());
       } else if (!body.isPaid) {
         updateData.paid_date = null;
       }

@@ -13,6 +13,7 @@ import AppLayout from "@/components/app-layout";
 import { useSupplierOrderById, useUpdateSupplierOrder, useDeleteSupplierOrder, useReceiveSupplierOrder } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
 import { SupplierOrderStatus } from "@kit/types";
 import {
@@ -38,7 +39,7 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
   const receiveOrder = useReceiveSupplierOrder();
   
   const [receiveItems, setReceiveItems] = useState<Array<{ itemId: number; receivedQuantity: number; location: string }>>([]);
-  const [actualDeliveryDate, setActualDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
+  const [actualDeliveryDate, setActualDeliveryDate] = useState(dateToYYYYMMDD(new Date()));
 
   useEffect(() => {
     params.then(setResolvedParams);

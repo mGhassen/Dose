@@ -15,6 +15,7 @@ import { useLoans, useLoanSchedule, useEntries, usePaymentsByEntry, useCreatePay
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate } from "@kit/lib/date-format";
 import type { Loan, LoanScheduleEntry } from "@kit/lib";
 
@@ -25,7 +26,7 @@ export default function CreateLoanPaymentPage() {
   const [selectedLoanId, setSelectedLoanId] = useState<string>("");
   const [selectedScheduleEntry, setSelectedScheduleEntry] = useState<LoanScheduleEntry | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
-  const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [paymentDate, setPaymentDate] = useState<string>(dateToYYYYMMDD(new Date()));
   const [paymentAmount, setPaymentAmount] = useState<string>("");
   const [paymentNotes, setPaymentNotes] = useState<string>("");
   

@@ -1,45 +1,52 @@
 // React Query hooks for Dashboard
 
 import { useQuery } from '@tanstack/react-query';
-import { dashboardApi, type FinancialKPIs } from '@kit/lib';
+import { dashboardApi, type FinancialKPIs, type DashboardDateParams } from '@kit/lib';
 
-export function useFinancialKPIs(year: string) {
+type DateParams = string | DashboardDateParams;
+
+export function useFinancialKPIs(params: DateParams) {
+  const key = typeof params === 'string' ? params : `${params.startDate}-${params.endDate}`;
   return useQuery<FinancialKPIs>({
-    queryKey: ['dashboard', 'kpis', year],
-    queryFn: () => dashboardApi.getFinancialKPIs(year),
-    enabled: !!year,
+    queryKey: ['dashboard', 'kpis', key],
+    queryFn: () => dashboardApi.getFinancialKPIs(params),
+    enabled: !!params && (typeof params === 'string' ? true : !!(params.year || (params.startDate && params.endDate))),
   });
 }
 
-export function useRevenueChart(year: string) {
+export function useRevenueChart(params: DateParams) {
+  const key = typeof params === 'string' ? params : `${params.startDate}-${params.endDate}`;
   return useQuery<Array<{ month: string; revenue: number }>>({
-    queryKey: ['dashboard', 'revenue-chart', year],
-    queryFn: () => dashboardApi.getRevenueChartData(year),
-    enabled: !!year,
+    queryKey: ['dashboard', 'revenue-chart', key],
+    queryFn: () => dashboardApi.getRevenueChartData(params),
+    enabled: !!params && (typeof params === 'string' ? true : !!(params.year || (params.startDate && params.endDate))),
   });
 }
 
-export function useExpensesChart(year: string) {
+export function useExpensesChart(params: DateParams) {
+  const key = typeof params === 'string' ? params : `${params.startDate}-${params.endDate}`;
   return useQuery<Array<{ month: string; expenses: number }>>({
-    queryKey: ['dashboard', 'expenses-chart', year],
-    queryFn: () => dashboardApi.getExpensesChartData(year),
-    enabled: !!year,
+    queryKey: ['dashboard', 'expenses-chart', key],
+    queryFn: () => dashboardApi.getExpensesChartData(params),
+    enabled: !!params && (typeof params === 'string' ? true : !!(params.year || (params.startDate && params.endDate))),
   });
 }
 
-export function useProfitChart(year: string) {
+export function useProfitChart(params: DateParams) {
+  const key = typeof params === 'string' ? params : `${params.startDate}-${params.endDate}`;
   return useQuery<Array<{ month: string; profit: number }>>({
-    queryKey: ['dashboard', 'profit-chart', year],
-    queryFn: () => dashboardApi.getProfitChartData(year),
-    enabled: !!year,
+    queryKey: ['dashboard', 'profit-chart', key],
+    queryFn: () => dashboardApi.getProfitChartData(params),
+    enabled: !!params && (typeof params === 'string' ? true : !!(params.year || (params.startDate && params.endDate))),
   });
 }
 
-export function useCashFlowChart(year: string) {
-  return useQuery<Array<{ month: string; inflows: number; outflows: number }>>({
-    queryKey: ['dashboard', 'cash-flow-chart', year],
-    queryFn: () => dashboardApi.getCashFlowChartData(year),
-    enabled: !!year,
+export function useCashFlowChart(params: DateParams) {
+  const key = typeof params === 'string' ? params : `${params.startDate}-${params.endDate}`;
+  return useQuery<Array<{ month: string; inflows: number; outflows: number; cashFlow?: number; balance?: number }>>({
+    queryKey: ['dashboard', 'cash-flow-chart', key],
+    queryFn: () => dashboardApi.getCashFlowChartData(params),
+    enabled: !!params && (typeof params === 'string' ? true : !!(params.year || (params.startDate && params.endDate))),
   });
 }
 

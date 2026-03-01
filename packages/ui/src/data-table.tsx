@@ -359,12 +359,12 @@ export default function DataTable({
           <thead className="bg-muted/50 border-b border-border">
             <tr>
               {renderExpandedRow && (
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-10">
+                <th className="px-2 py-1.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-10">
                   <span className="sr-only">Expand</span>
                 </th>
               )}
               {selectable && (
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="relative px-2 py-1.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   <Checkbox
                     checked={isAllSelected}
                     onCheckedChange={handleSelectAll}
@@ -378,7 +378,7 @@ export default function DataTable({
                 return (
                   <th 
                     key={columnKey} 
-                    className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                    className="px-2 py-1.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-foreground font-medium">
@@ -408,7 +408,7 @@ export default function DataTable({
               <tr>
                 <td 
                   colSpan={getVisibleColumns().length + (selectable ? 1 : 0) + (renderExpandedRow !== undefined ? 1 : 0)} 
-                  className="px-6 py-12 text-center text-sm text-muted-foreground"
+                  className="px-4 py-8 text-center text-sm text-muted-foreground"
                 >
                   No data available
                 </td>
@@ -428,7 +428,7 @@ export default function DataTable({
                       onClick={() => handleRowClick(row)}
                     >
                       {renderExpandedRow && (
-                        <td className="px-3 py-4">
+                        <td className="px-2 py-1.5">
                           {canExpand ? (
                             <Button
                               variant="ghost"
@@ -448,7 +448,7 @@ export default function DataTable({
                         </td>
                       )}
                       {selectable && (
-                        <td className="px-3 py-4">
+                        <td className="relative px-2 py-1.5">
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={(checked) => {
@@ -467,7 +467,7 @@ export default function DataTable({
                     return (
                       <td 
                         key={columnKey} 
-                        className="px-3 py-4 text-sm text-foreground"
+                        className="px-2 py-1.5 text-sm text-foreground"
                       >
                         {column.cell && typeof column.cell === 'function' ? (
                           column.cell({ 
@@ -499,7 +499,7 @@ export default function DataTable({
                       <tr key={`${rowIndex}-expanded`}>
                         <td 
                           colSpan={getVisibleColumns().length + (selectable ? 1 : 0) + (renderExpandedRow !== undefined ? 1 : 0)}
-                          className="px-3 py-4 bg-muted/30 border-b border-border"
+                          className="px-2 py-1.5 bg-muted/30 border-b border-border"
                         >
                           {renderExpandedRow(row)}
                         </td>
@@ -515,7 +515,7 @@ export default function DataTable({
 
       {/* Pagination */}
       {pagination && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-card">
+        <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-card">
           <div className="flex items-center gap-4">
             <div className="text-sm text-muted-foreground">
               Showing {sortedData.length === 0 ? 0 : ((currentPage - 1) * currentPageSize) + 1} to {Math.min(currentPage * currentPageSize, sortedData.length)} of {sortedData.length} entries

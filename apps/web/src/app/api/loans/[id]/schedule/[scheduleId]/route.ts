@@ -40,7 +40,7 @@ export async function PUT(
       updateData.is_paid = body.isPaid;
       if (body.isPaid && !body.paidDate) {
         // Auto-set paid date if marking as paid
-        updateData.paid_date = new Date().toISOString().split('T')[0];
+        updateData.paid_date = (await import('@kit/lib')).dateToYYYYMMDD(new Date());
       } else if (!body.isPaid) {
         updateData.paid_date = null;
       }

@@ -13,6 +13,7 @@ import AppLayout from "@/components/app-layout";
 import { useCreateSupplierOrder, useInventorySuppliers, useItems } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { SupplierOrderStatus } from "@kit/types";
 
 interface OrderItem {
@@ -35,7 +36,7 @@ export default function CreateSupplierOrderPage() {
   const [formData, setFormData] = useState({
     supplierId: "",
     orderNumber: "",
-    orderDate: new Date().toISOString().split('T')[0],
+    orderDate: dateToYYYYMMDD(new Date()),
     expectedDeliveryDate: "",
     notes: "",
   });

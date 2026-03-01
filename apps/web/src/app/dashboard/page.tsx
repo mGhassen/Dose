@@ -1,37 +1,63 @@
 "use client";
 
+import { useState, useMemo, useCallback } from "react";
 import { useAuth } from "@kit/hooks";
 import { useFinancialKPIs, useRevenueChart, useExpensesChart, useProfitChart, useCashFlowChart } from "@kit/hooks";
-import { useTranslations } from 'next-intl';
 import { formatCurrency } from "@kit/lib/config";
+import { formatShortDate } from "@kit/lib/date-format";
+import { getDateRangeForPreset } from "@kit/lib/date-periods";
+import { safeLocalStorage } from "@kit/lib/localStorage";
+
+const DASHBOARD_PERIOD_KEY = "dashboard-period";
+
+function getInitialDateRange() {
+  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
+  try {
+    const saved = safeLocalStorage.getItem(DASHBOARD_PERIOD_KEY);
+    if (saved) {
+      const { startDate, endDate } = JSON.parse(saved);
+      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return { startDate, endDate };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return getDateRangeForPreset("this_year");
+}
 import AppLayout from "@/components/app-layout";
-import { useYear } from "@/contexts/year-context";
+import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
-  Wallet, 
-  Users, 
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Wallet,
+  Users,
   CreditCard,
-  ArrowUpDown,
   BarChart3
 } from "lucide-react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
-import { Calendar } from "lucide-react";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const t = useTranslations('dashboard');
-  const { selectedYear, setSelectedYear, availableYears } = useYear();
-  
-  // Fetch data using selectedYear - filter is optional, defaults to current year
-  const { data: kpis, isLoading: kpisLoading } = useFinancialKPIs(selectedYear);
-  const { data: revenueData, isLoading: revenueLoading } = useRevenueChart(selectedYear);
-  const { data: expensesData, isLoading: expensesLoading } = useExpensesChart(selectedYear);
-  const { data: profitData, isLoading: profitLoading } = useProfitChart(selectedYear);
-  const { data: cashFlowData, isLoading: cashFlowLoading } = useCashFlowChart(selectedYear);
+  const [dateRange, setDateRange] = useState(getInitialDateRange);
+
+  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange(range);
+    safeLocalStorage.setItem(DASHBOARD_PERIOD_KEY, JSON.stringify(range));
+  }, []);
+
+  const apiParams = useMemo(
+    () => ({ startDate: dateRange.startDate, endDate: dateRange.endDate }),
+    [dateRange.startDate, dateRange.endDate]
+  );
+
+  const { data: kpis, isLoading: kpisLoading } = useFinancialKPIs(apiParams);
+  const { data: revenueData, isLoading: revenueLoading } = useRevenueChart(apiParams);
+  const { data: expensesData, isLoading: expensesLoading } = useExpensesChart(apiParams);
+  const { data: profitData, isLoading: profitLoading } = useProfitChart(apiParams);
+  const { data: cashFlowData, isLoading: cashFlowLoading } = useCashFlowChart(apiParams);
 
   return (
     <AppLayout>
@@ -40,24 +66,10 @@ export default function Dashboard() {
           <div>
             <h1 className="text-2xl font-bold">Financial Dashboard</h1>
             <p className="text-muted-foreground">
-              Welcome back, {user?.firstName || user?.email || 'User'}! Here's your financial overview.
+              Welcome back, {user?.firstName || user?.email || "User"}! Here&apos;s your financial overview.
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-[100px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availableYears.map((year) => (
-                  <SelectItem key={year} value={year}>
-                    {year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
         </div>
 
         {/* KPI Cards */}
@@ -72,7 +84,7 @@ export default function Dashboard() {
                 {kpisLoading ? '...' : kpis ? formatCurrency(kpis.totalRevenue) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Revenue for {selectedYear}
+                Revenue for {formatShortDate(dateRange.startDate)} – {formatShortDate(dateRange.endDate)}
               </p>
             </CardContent>
           </Card>

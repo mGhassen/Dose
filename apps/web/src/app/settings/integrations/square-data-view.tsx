@@ -780,7 +780,7 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="locations" className="-mx-4">
+        <TabsContent value="locations" className="">
           <DataTablePage
             title="Square Locations"
             description="Your Square business locations"
@@ -803,7 +803,7 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
           />
         </TabsContent>
 
-        <TabsContent value="orders" className="-mx-4">
+        <TabsContent value="orders" className="">
           {activeTab === 'orders' && (!locations || locations.length === 0) ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground mb-2">No locations found. Please sync locations first.</p>
@@ -848,7 +848,7 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
           )}
         </TabsContent>
 
-        <TabsContent value="payments" className="-mx-4">
+        <TabsContent value="payments" className="">
           <DataTablePage
             title="Square Payments"
             description="Payment transactions from Square"
@@ -882,7 +882,7 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
           />
         </TabsContent>
 
-        <TabsContent value="catalog" className="-mx-4">
+        <TabsContent value="catalog" className="">
           <DataTablePage
             title="Square Catalog"
             description="Items with their variations, modifiers, and taxes"

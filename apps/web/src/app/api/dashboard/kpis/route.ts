@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { getMonthsInRange } from '@kit/lib/date-periods';
 
 function transformSale(row: any) {
   return {
@@ -56,22 +57,28 @@ function transformWorkingCapital(row: any) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const year = searchParams.get('year') || new Date().getFullYear().toString();
+    const yearParam = searchParams.get('year');
+    const startDateParam = searchParams.get('startDate');
+    const endDateParam = searchParams.get('endDate');
 
-    const startDate = `${year}-01-01`;
-    const endDate = `${year}-12-31`;
+    const year = yearParam || new Date().getFullYear().toString();
+    const startDate = startDateParam || `${year}-01-01`;
+    const endDate = endDateParam || `${year}-12-31`;
+
+    const monthsInRange = getMonthsInRange(startDate, endDate);
+    const firstMonth = monthsInRange[0] || `${year}-01`;
+    const lastMonth = monthsInRange[monthsInRange.length - 1] || `${year}-12`;
 
     const supabase = createServerSupabaseClient();
 
-    // Fetch all data for the year
     const [salesResult, expensesResult, personnelResult, loansResult, cashFlowResult, workingCapitalResult, profitLossResult] = await Promise.all([
       supabase.from('sales').select('date, amount').gte('date', startDate).lte('date', endDate),
       supabase.from('expenses').select('amount, recurrence, start_date, end_date, is_active').eq('is_active', true),
       supabase.from('personnel').select('base_salary, employer_charges, employer_charges_type, start_date, end_date, is_active').eq('is_active', true),
       supabase.from('loans').select('principal_amount, status').eq('status', 'active'),
-      supabase.from('cash_flow').select('month, closing_balance').eq('month', `${year}-12`),
-      supabase.from('working_capital').select('month, working_capital_need').eq('month', `${year}-12`),
-      supabase.from('profit_and_loss').select('total_revenue, cost_of_goods_sold, net_profit').gte('month', `${year}-01`).lte('month', `${year}-12`),
+      supabase.from('cash_flow').select('month, closing_balance').eq('month', lastMonth),
+      supabase.from('working_capital').select('month, working_capital_need').eq('month', lastMonth),
+      supabase.from('profit_and_loss').select('total_revenue, cost_of_goods_sold, net_profit').gte('month', firstMonth).lte('month', lastMonth),
     ]);
 
     if (salesResult.error) throw salesResult.error;
@@ -90,35 +97,26 @@ export async function GET(request: NextRequest) {
     const workingCapital = workingCapitalResult.data?.[0] ? transformWorkingCapital(workingCapitalResult.data[0]) : null;
     const profitLoss = profitLossResult.data || [];
 
-    // Calculate Total Revenue
     const totalRevenue = sales.reduce((sum, sale) => sum + sale.amount, 0);
 
-    // Calculate Total Expenses (project expenses for the year)
-    const { projectExpensesForYear } = await import('@/lib/calculations/expense-projections');
-    const expenseProjections = projectExpensesForYear(expenses, year);
+    const { projectExpensesForDateRange } = await import('@/lib/calculations/expense-projections');
+    const expenseProjections = projectExpensesForDateRange(expenses, startDate, endDate);
     const totalExpenses = expenseProjections.reduce((sum, proj) => sum + proj.amount, 0);
 
-    // Calculate Net Profit
     const netProfit = profitLoss.reduce((sum, pl) => sum + parseFloat(pl.net_profit || '0'), 0) || (totalRevenue - totalExpenses);
 
-    // Calculate Cash Balance (from latest cash flow or 0)
     const cashBalance = cashFlow?.closingBalance || 0;
-
-    // Calculate Working Capital
     const workingCapitalValue = workingCapital?.workingCapitalNeed || 0;
-
-    // Calculate Total Debt (sum of active loans)
     const totalDebt = loans.reduce((sum, loan) => sum + loan.principalAmount, 0);
 
-    // Calculate Personnel Cost (monthly, then multiply by 12 for annual)
-    const personnelCost = personnel.reduce((sum, person) => {
+    const monthlyPersonnelCost = personnel.reduce((sum, person) => {
       const charges = person.employerChargesType === 'percentage'
         ? person.baseSalary * (person.employerCharges / 100)
         : person.employerCharges;
       return sum + person.baseSalary + charges;
-    }, 0) * 12; // Annual cost
+    }, 0);
+    const personnelCost = monthlyPersonnelCost * monthsInRange.length;
 
-    // Calculate Gross Profit
     const costOfGoodsSold = profitLoss.reduce((sum, pl) => sum + parseFloat(pl.cost_of_goods_sold || '0'), 0);
     const grossProfit = totalRevenue - costOfGoodsSold;
 

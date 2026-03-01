@@ -182,7 +182,7 @@ export default function ItemsContent() {
       </div>
 
       {/* Table View */}
-      <div className="-mx-4">
+      <div>
         <DataTablePage
           title=""
           description=""

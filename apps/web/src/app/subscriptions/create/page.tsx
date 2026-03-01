@@ -15,6 +15,7 @@ import { useCreateSubscription, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseCategory, ExpenseRecurrence } from "@kit/types";
 import Link from "next/link";
+import { dateToYYYYMMDD } from "@kit/lib";
 
 export default function CreateSubscriptionPage() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function CreateSubscriptionPage() {
     category: "" as ExpenseCategory | "",
     amount: "",
     recurrence: "monthly" as ExpenseRecurrence,
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: dateToYYYYMMDD(new Date()),
     endDate: "",
     description: "",
     vendor: "",
