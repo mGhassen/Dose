@@ -18,13 +18,15 @@ import {
   BarChart3
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { Calendar } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const t = useTranslations('dashboard');
-  const { selectedYear } = useYear();
+  const { selectedYear, setSelectedYear, availableYears } = useYear();
   
-  // Fetch data using selectedYear from context
+  // Fetch data using selectedYear - filter is optional, defaults to current year
   const { data: kpis, isLoading: kpisLoading } = useFinancialKPIs(selectedYear);
   const { data: revenueData, isLoading: revenueLoading } = useRevenueChart(selectedYear);
   const { data: expensesData, isLoading: expensesLoading } = useExpensesChart(selectedYear);
@@ -34,11 +36,28 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Financial Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome back, {user?.firstName || user?.email || 'User'}! Here's your financial overview.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Financial Dashboard</h1>
+            <p className="text-muted-foreground">
+              Welcome back, {user?.firstName || user?.email || 'User'}! Here's your financial overview.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-[100px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableYears.map((year) => (
+                  <SelectItem key={year} value={year}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* KPI Cards */}
