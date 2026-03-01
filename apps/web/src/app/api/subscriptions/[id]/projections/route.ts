@@ -28,7 +28,6 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const startMonth = searchParams.get('startMonth');
     const endMonth = searchParams.get('endMonth');
-    
     const supabase = createServerSupabaseClient();
     
     let query = supabase

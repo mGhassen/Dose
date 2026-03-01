@@ -11,10 +11,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
-import { Plus, Trash2, MoreVertical, Calendar } from "lucide-react";
+import { Trash2, MoreVertical, Calendar } from "lucide-react";
 import { useUpdateSubscriptionProjectionEntry, useCreateOrUpdateSubscriptionProjectionEntry, useSubscriptionProjections, usePaymentsByEntry, useCreatePayment, useDeletePayment } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -48,7 +47,16 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
   const [showPayments, setShowPayments] = useState(false);
   const [entryId, setEntryId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
-  
+  const [dialogExpectedAmount, setDialogExpectedAmount] = useState<number>(0);
+
+  const expectedAmount = projection.amount;
+
+  useEffect(() => {
+    if (isPaidDialogOpen) {
+      setDialogExpectedAmount(expectedAmount);
+    }
+  }, [isPaidDialogOpen, expectedAmount]);
+
   // Fetch stored projection entries to get the entry ID and payment status
   const { data: storedProjections } = useSubscriptionProjections(subscriptionId.toString());
   const projectionEntry: any = storedProjections?.find((p: any) => p.month === projection.month);
@@ -76,9 +84,10 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
   
   // Calculate total paid from all payments
   const totalPaid = payments.reduce((sum, payment) => sum + (payment.isPaid ? payment.amount : 0), 0);
-  const isFullyPaid = totalPaid >= projection.amount;
-  const remainingToPay = Math.max(0, projection.amount - totalPaid);
+  const isFullyPaid = totalPaid >= expectedAmount;
+  const remainingToPay = Math.max(0, expectedAmount - totalPaid);
   const hasPartialPayment = totalPaid > 0 && !isFullyPaid;
+  const remainingInDialog = Math.max(0, dialogExpectedAmount - totalPaid);
   
   const updateProjectionEntry = useUpdateSubscriptionProjectionEntry();
   const createOrUpdateProjectionEntry = useCreateOrUpdateSubscriptionProjectionEntry();
@@ -123,7 +132,9 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
     }
   };
 
-  const handleAddPayment = async (paidDate: string, amount: number, paymentMethod?: string, notes?: string) => {
+  const handleAddPayment = async (paidDate: string, amount: number, paymentMethod?: string, notes?: string, expectedAmountForMonth?: number) => {
+    const effectiveExpectedAmount = expectedAmountForMonth ?? expectedAmount;
+    let createdProjectionId: number | null = null;
     try {
       // First ensure we have a projection entry and entry
       let currentEntryId = entryId;
@@ -134,7 +145,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
           subscriptionId: subscriptionId.toString(),
           data: {
             month: projection.month,
-            amount: projection.amount,
+            amount: effectiveExpectedAmount,
             isProjected: projection.isProjected,
             isPaid: false, // Will be updated when payment is added
             paidDate: null,
@@ -142,7 +153,8 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
             notes: null,
           },
         });
-        
+        createdProjectionId = projectionResult?.id ?? null;
+
         // Fetch entry ID after creating projection (with retry in case of timing issues)
         let retries = 3;
         while (!currentEntryId && retries > 0) {
@@ -173,7 +185,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
             subscriptionId: subscriptionId.toString(),
             data: {
               month: projection.month,
-              amount: projection.amount,
+              amount: effectiveExpectedAmount,
               isProjected: projection.isProjected,
               isPaid: false,
               paidDate: null,
@@ -216,29 +228,26 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
         notes: notes || undefined,
       });
       
-      // Update projection entry to reflect payment status (without creating duplicate payment)
+      // Update projection entry to reflect payment status
       const newTotalPaid = totalPaid + amount;
-      const isNowFullyPaid = newTotalPaid >= projection.amount;
+      const isNowFullyPaid = newTotalPaid >= effectiveExpectedAmount;
+      const entryIdToUpdate = projectionEntry?.id ?? createdProjectionId;
       
-      if (projectionEntry?.id) {
-        // Update projection entry status
-        // Only set isPaid to true when fully paid, never set to false (that would delete all payments)
+      if (entryIdToUpdate) {
         const updateData: any = {
           actualAmount: newTotalPaid,
-          notes: notes || projectionEntry.notes,
+          notes: notes || projectionEntry?.notes,
+          amount: effectiveExpectedAmount,
         };
-        
-        // Only update isPaid if it changes to fully paid
-        // Never set isPaid to false when adding a partial payment - that would delete all payments
         const storedEntry: any = storedProjections?.find((p: any) => p.month === projection.month);
-        if (isNowFullyPaid && storedEntry && !storedEntry.isPaid) {
+        if (isNowFullyPaid && (!storedEntry || !storedEntry.isPaid)) {
           updateData.isPaid = true;
           updateData.paidDate = paidDate;
         }
         
         await updateProjectionEntry.mutateAsync({
           subscriptionId: subscriptionId.toString(),
-          entryId: projectionEntry.id.toString(),
+          entryId: entryIdToUpdate.toString(),
           data: updateData,
         });
       }
@@ -252,6 +261,39 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
     }
   };
   
+  const handleSaveExpectedAmount = async () => {
+    if (dialogExpectedAmount <= 0) {
+      toast.error("Expected amount must be greater than 0");
+      return;
+    }
+    try {
+      if (projectionEntry?.id) {
+        await updateProjectionEntry.mutateAsync({
+          subscriptionId: subscriptionId.toString(),
+          entryId: projectionEntry.id.toString(),
+          data: { amount: dialogExpectedAmount },
+        });
+      } else {
+        await createOrUpdateProjectionEntry.mutateAsync({
+          subscriptionId: subscriptionId.toString(),
+          data: {
+            month: projection.month,
+            amount: dialogExpectedAmount,
+            isProjected: projection.isProjected,
+            isPaid: false,
+            paidDate: null,
+            actualAmount: null,
+            notes: null,
+          },
+        });
+      }
+      onUpdate();
+      toast.success("Expected amount updated");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update expected amount");
+    }
+  };
+
   const handleDeletePaymentClick = (paymentId: number) => {
     setPaymentToDelete(paymentId);
     setDeleteConfirmText("");
@@ -279,7 +321,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
       
       // Recalculate total after deletion
       const newTotalPaid = totalPaid - payment.amount;
-      const isNowFullyPaid = newTotalPaid >= projection.amount;
+      const isNowFullyPaid = newTotalPaid >= expectedAmount;
       
       // Update projection entry status - only update actualAmount, don't change isPaid
       // Changing isPaid to false would trigger the API to delete all payments
@@ -357,21 +399,10 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {!isFullyPaid && (
-                <DropdownMenuItem onClick={() => setIsPaidDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  {hasPartialPayment ? 'Add Payment' : 'Mark as Paid'}
-                </DropdownMenuItem>
-              )}
-              {payments.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setIsPaidDialogOpen(true)}>
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Manage Payments
-                  </DropdownMenuItem>
-                </>
-              )}
+              <DropdownMenuItem onClick={() => setIsPaidDialogOpen(true)}>
+                <Calendar className="mr-2 h-4 w-4" />
+                Manage Payments
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
@@ -396,7 +427,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                   </div>
                 ))}
                 <div className="pt-2 border-t">
-                  <span className="text-sm font-semibold">Total Paid: {formatCurrency(totalPaid)} / {formatCurrency(projection.amount)}</span>
+                  <span className="text-sm font-semibold">Total Paid: {formatCurrency(totalPaid)} / {formatCurrency(expectedAmount)}</span>
                 </div>
               </div>
             </div>
@@ -409,12 +440,28 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
           <DialogHeader>
             <DialogTitle>Manage Payments</DialogTitle>
             <DialogDescription>
-              Add payments for this subscription. Total due: {formatCurrency(projection.amount)} | 
-              Already paid: {formatCurrency(totalPaid)} | 
-              Remaining: {formatCurrency(remainingToPay)}
+              Add payments for this subscription. Total due: {formatCurrency(dialogExpectedAmount)} |
+              Already paid: {formatCurrency(totalPaid)} |
+              Remaining: {formatCurrency(remainingInDialog)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="expectedAmount">Expected amount for this month</Label>
+              <Input
+                id="expectedAmount"
+                type="number"
+                step="0.01"
+                min="0"
+                value={dialogExpectedAmount || ""}
+                onChange={(e) => setDialogExpectedAmount(parseFloat(e.target.value) || 0)}
+              />
+              {dialogExpectedAmount !== expectedAmount && (
+                <p className="text-xs text-muted-foreground">
+                  Overriding default {formatCurrency(expectedAmount)}
+                </p>
+              )}
+            </div>
             {/* Existing Payments List */}
             {payments.length > 0 && (
               <div className="space-y-2">
@@ -453,7 +500,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
             )}
             
             {/* Add New Payment Form */}
-            {remainingToPay > 0 && (
+            {remainingInDialog > 0 && (
               <div className="space-y-4 border-t pt-4">
                 <Label className="text-base font-semibold">Add New Payment</Label>
                 <div className="space-y-2">
@@ -471,11 +518,11 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                     type="number"
                     step="0.01"
                     min="0.01"
-                    max={remainingToPay}
-                    defaultValue={remainingToPay.toString()}
+                    max={remainingInDialog}
+                    defaultValue={remainingInDialog.toString()}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Maximum: {formatCurrency(remainingToPay)}
+                    Maximum: {formatCurrency(remainingInDialog)}
                   </p>
                 </div>
                 <UnifiedSelector
@@ -509,7 +556,16 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
             >
               Close
             </Button>
-            {remainingToPay > 0 && (
+            {dialogExpectedAmount !== expectedAmount && (
+              <Button
+                variant="outline"
+                onClick={handleSaveExpectedAmount}
+                disabled={updateProjectionEntry.isPending || createOrUpdateProjectionEntry.isPending}
+              >
+                Save Amount
+              </Button>
+            )}
+            {remainingInDialog > 0 && (
               <Button
                 onClick={() => {
                   const dateInput = document.getElementById('paidDate') as HTMLInputElement;
@@ -522,8 +578,8 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                     return;
                   }
                   
-                  if (amount > remainingToPay) {
-                    toast.error(`Payment amount cannot exceed remaining balance of ${formatCurrency(remainingToPay)}`);
+                  if (amount > remainingInDialog) {
+                    toast.error(`Payment amount cannot exceed remaining balance of ${formatCurrency(remainingInDialog)}`);
                     return;
                   }
                   
@@ -531,7 +587,8 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                     dateInput?.value || new Date().toISOString().split('T')[0],
                     amount,
                     paymentMethod || undefined,
-                    notesInput?.value || undefined
+                    notesInput?.value || undefined,
+                    dialogExpectedAmount
                   );
                 }}
                 disabled={createPayment.isPending || updateProjectionEntry.isPending}

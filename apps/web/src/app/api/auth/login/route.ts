@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
       accessiblePortals
     };
     
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: transformedUser,
       session: {
@@ -118,6 +118,16 @@ export async function POST(request: NextRequest) {
       },
       message: 'Login successful'
     });
+
+    response.cookies.set('access_token', authData.session.access_token, {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    return response;
     
   } catch (error: any) {
     console.error('Login error:', error);

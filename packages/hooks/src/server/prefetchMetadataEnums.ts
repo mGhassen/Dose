@@ -5,10 +5,14 @@ import { getEnumValues } from '@kit/lib/api/metadata-enums';
 
 export async function prefetchMetadataEnums(queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['metadataEnums', 'all'],
-    queryFn: getAllMetadataEnums,
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['metadataEnums', 'all'],
+      queryFn: getAllMetadataEnums,
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 

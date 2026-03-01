@@ -164,10 +164,20 @@ export function useUpdateSubscriptionProjectionEntry() {
     mutationFn: ({ subscriptionId, entryId, data }: { 
       subscriptionId: string; 
       entryId: string; 
-      data: { isPaid?: boolean; paidDate?: string | null; actualAmount?: number | null; notes?: string | null } 
+      data: { amount?: number; isPaid?: boolean; paidDate?: string | null; actualAmount?: number | null; notes?: string | null } 
     }) => 
       subscriptionsApi.updateProjectionEntry(subscriptionId, entryId, data),
-    onSuccess: (_, variables) => {
+    onSuccess: (updatedEntry, variables) => {
+      const entryIdNum = parseInt(variables.entryId, 10);
+      queryClient.setQueriesData(
+        { queryKey: ['subscriptions', variables.subscriptionId, 'projections'] },
+        (old: unknown) => {
+          if (!old || !Array.isArray(old)) return old;
+          return old.map((p: { id?: number }) =>
+            p.id === entryIdNum ? { ...p, ...updatedEntry } : p
+          );
+        }
+      );
       queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.subscriptionId, 'projections'] });
       queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.subscriptionId] });
       queryClient.invalidateQueries({ queryKey: ['entries'] });

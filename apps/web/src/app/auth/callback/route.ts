@@ -45,15 +45,21 @@ export async function GET(request: NextRequest) {
 
     // Handle Google OAuth callback with tokens (legacy)
     if (accessToken && refreshToken && userId) {
-      
-      // Store tokens in a way that the client can access them
       const redirectUrl = new URL('/auth/login', request.url);
       redirectUrl.searchParams.set('google_auth', 'success');
       redirectUrl.searchParams.set('access_token', accessToken);
       redirectUrl.searchParams.set('refresh_token', refreshToken);
       redirectUrl.searchParams.set('user_id', userId);
-      
-      return NextResponse.redirect(redirectUrl);
+
+      const response = NextResponse.redirect(redirectUrl);
+      response.cookies.set('access_token', accessToken, {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7,
+      });
+      return response;
     }
 
     // Default fallback to login page

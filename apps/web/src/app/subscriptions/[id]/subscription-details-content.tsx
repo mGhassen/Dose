@@ -63,13 +63,19 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
   })() : [];
   
   // Merge calculated projections with stored entries (to get payment status)
+  // Derive isPaid from actualAmount >= amount to avoid sync issues with DB is_paid flag
   const mergedProjections = calculatedProjections.map(calcProj => {
     const stored = storedProjections?.find((p: any) => p.month === calcProj.month);
+    const amount = stored?.amount != null ? parseFloat(stored.amount) : calcProj.amount;
+    const actualAmount = stored?.actualAmount != null ? parseFloat(stored.actualAmount) : null;
+    const isPaid = stored
+      ? (actualAmount != null && amount > 0 ? actualAmount >= amount : !!stored.isPaid)
+      : false;
     return {
       ...calcProj,
-      // Add stored data if it exists
+      amount,
       id: stored?.id,
-      isPaid: stored?.isPaid || false,
+      isPaid,
       paidDate: stored?.paidDate,
       actualAmount: stored?.actualAmount,
       notes: stored?.notes,

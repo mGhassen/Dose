@@ -352,7 +352,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           window.__authToken = token;
         }
 
-        
+        // Sync token to cookie for server-side prefetch (fire-and-forget)
+        fetch('/api/auth/sync-cookie', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          credentials: 'include',
+        }).catch(() => {});
+
         const user = await fetchSession(token);
         
         if (user) {

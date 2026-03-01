@@ -52,7 +52,7 @@ export const subscriptionsApi = {
   },
   createOrUpdateProjectionEntry: (id: string, data: { month: string; amount: number; isProjected?: boolean; isPaid?: boolean; paidDate?: string | null; actualAmount?: number | null; notes?: string | null }) =>
     apiRequest<SubscriptionProjection>('POST', `/api/subscriptions/${id}/projections`, data),
-  updateProjectionEntry: (id: string, entryId: string, data: { isPaid?: boolean; paidDate?: string | null; actualAmount?: number | null; notes?: string | null }) => 
+  updateProjectionEntry: (id: string, entryId: string, data: { amount?: number; isPaid?: boolean; paidDate?: string | null; actualAmount?: number | null; notes?: string | null }) => 
     apiRequest<SubscriptionProjection>('PUT', `/api/subscriptions/${id}/projections/${entryId}`, data),
   deleteProjectionEntry: (id: string, entryId: string) => 
     apiRequest<void>('DELETE', `/api/subscriptions/${id}/projections/${entryId}`),

@@ -1,5 +1,5 @@
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
-import { prefetchSubscription } from '@kit/hooks';
+import { prefetchSubscription, prefetchSubscriptionProjections } from '@kit/hooks';
 import SubscriptionDetailsContent from './subscription-details-content';
 
 interface PageProps {
@@ -9,7 +9,6 @@ interface PageProps {
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
 
-  // Validate ID
   if (!id || id.trim() === '') {
     return (
       <div className="container py-6">
@@ -23,8 +22,8 @@ export default async function Page({ params }: PageProps) {
     );
   }
 
-  // Prefetch data on server
   const queryClient = await prefetchSubscription(id);
+  await prefetchSubscriptionProjections(id, queryClient);
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

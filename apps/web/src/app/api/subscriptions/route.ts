@@ -6,7 +6,6 @@ import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Subscription, CreateSubscriptionData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
-// Helper functions for transformation
 function transformSubscription(row: any): Subscription {
   return {
     id: row.id,
@@ -46,7 +45,6 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const isActive = searchParams.get('isActive');
     const { page, limit, offset } = getPaginationParams(searchParams);
-
     const supabase = createServerSupabaseClient();
     
     // Build count query

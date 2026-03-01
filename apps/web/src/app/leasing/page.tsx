@@ -1,12 +1,15 @@
-"use client";
-
+import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
+import { prefetchLeasing } from '@kit/hooks';
 import AppLayout from '@/components/app-layout';
 import LeasingContent from './leasing-content';
 
-export default function Page() {
+export default async function Page() {
+  const queryClient = await prefetchLeasing();
   return (
-    <AppLayout>
-      <LeasingContent />
-    </AppLayout>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <AppLayout>
+        <LeasingContent />
+      </AppLayout>
+    </HydrationBoundary>
   );
 }

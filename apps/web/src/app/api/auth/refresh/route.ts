@@ -36,12 +36,22 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    return NextResponse.json({
+    const response = NextResponse.json({
       access_token: sessionData.session.access_token,
       refresh_token: sessionData.session.refresh_token,
       expires_in: sessionData.session.expires_in,
       token_type: 'Bearer'
     });
+
+    response.cookies.set('access_token', sessionData.session.access_token, {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    return response;
     
   } catch (error: any) {
     console.error('Refresh error:', error);

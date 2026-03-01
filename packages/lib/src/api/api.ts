@@ -23,6 +23,21 @@ async function getAuthTokenForRequest(): Promise<string | null> {
 // Deduplicate in-flight GET requests (helps with React StrictMode double-invoke in dev)
 const inflightRequests = new Map<string, Promise<any>>();
 
+async function getServerBaseUrl(): Promise<string> {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  try {
+    const { headers } = await import('next/headers');
+    const h = await headers();
+    const host = h.get('host');
+    if (host) {
+      const proto = h.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+      return `${proto}://${host}`;
+    }
+  } catch {}
+  return `http://localhost:${process.env.PORT || '3000'}`;
+}
+
 export async function apiRequest<T>(
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   endpoint: string,
@@ -32,12 +47,9 @@ export async function apiRequest<T>(
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   let url = `${API_BASE_URL}${normalizedEndpoint}`;
   
-  // On server, we need absolute URLs for fetch
   const isServer = typeof window === 'undefined';
   if (isServer && url.startsWith('/')) {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || '3000'}`);
-    url = `${baseUrl}${url}`;
+    url = `${await getServerBaseUrl()}${url}`;
   }
   
   const headers: Record<string, string> = {
@@ -168,10 +180,7 @@ export async function apiRequest<T>(
         // For 403, provide more helpful context
         if (response.status === 403) {
           console.error(`[API] 403 Forbidden for ${method} ${endpoint}`);
-          console.error(`[API] This usually means:`);
-          console.error(`  - User lacks required permissions/role`);
-          console.error(`  - Token is invalid or expired`);
-          console.error(`  - Backend RLS policies blocking access`);
+          console.error(`[API] Common causes: port mismatch (server fetches wrong URL), missing auth cookie, or token not forwarded.`);
         }
         
         const error = new Error(errorMessage);
@@ -234,12 +243,9 @@ export async function apiBlobRequest(
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   let url = `${API_BASE_URL}${normalizedEndpoint}`;
   
-  // On server, we need absolute URLs for fetch
   const isServer = typeof window === 'undefined';
   if (isServer && url.startsWith('/')) {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || '3000'}`);
-    url = `${baseUrl}${url}`;
+    url = `${await getServerBaseUrl()}${url}`;
   }
   
   const headers: Record<string, string> = {

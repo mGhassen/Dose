@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 
 export interface UpdateSubscriptionProjectionEntryData {
+  amount?: number;
   isPaid?: boolean;
   paidDate?: string | null;
   actualAmount?: number | null;
@@ -28,6 +29,7 @@ function transformProjectionEntry(row: any) {
 
 function transformToSnakeCase(data: UpdateSubscriptionProjectionEntryData): any {
   const result: any = {};
+  if ('amount' in data && data.amount !== undefined) result.amount = data.amount;
   if ('isPaid' in data) result.is_paid = data.isPaid;
   if ('paidDate' in data) result.paid_date = data.paidDate || null;
   if ('actualAmount' in data) result.actual_amount = data.actualAmount !== undefined ? data.actualAmount : null;
@@ -42,7 +44,6 @@ export async function PUT(
   try {
     const { id, entryId } = await params;
     const body: UpdateSubscriptionProjectionEntryData = await request.json();
-
     const supabase = createServerSupabaseClient();
     
     // Verify the projection entry belongs to this subscription
@@ -82,6 +83,13 @@ export async function PUT(
         .maybeSingle();
 
       if (!entryError && entryData) {
+        if (body.amount !== undefined) {
+          await supabase
+            .from('entries')
+            .update({ amount: body.amount })
+            .eq('id', entryData.id);
+        }
+
         // Update the entry's payment status
         // Only create payment if paidDate is provided AND no payments exist yet
         // This prevents duplicate payments when payments are managed separately

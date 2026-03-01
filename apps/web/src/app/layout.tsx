@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
+
+export const dynamic = 'force-dynamic';
 import { TooltipProvider } from '@kit/ui/tooltip';
 import { AuthProvider } from '@kit/hooks/use-auth';
 import Providers from "./providers";

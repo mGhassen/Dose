@@ -4,28 +4,40 @@ import { financialPlanApi } from '@kit/lib/api/financial-plan';
 
 export async function prefetchFinancialPlan(queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['financial-plan'],
-    queryFn: () => financialPlanApi.getAll(),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['financial-plan'],
+      queryFn: () => financialPlanApi.getAll(),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 
 export async function prefetchFinancialPlanById(id: string, queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['financial-plan', id],
-    queryFn: () => financialPlanApi.getById(id),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['financial-plan', id],
+      queryFn: () => financialPlanApi.getById(id),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 
 export async function prefetchFinancialPlanByMonth(month: string, queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['financial-plan', 'month', month],
-    queryFn: () => financialPlanApi.getByMonth(month),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['financial-plan', 'month', month],
+      queryFn: () => financialPlanApi.getByMonth(month),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 

@@ -13,10 +13,14 @@ export async function prefetchUsers(queryClient?: QueryClient) {
 
 export async function prefetchUser(id: number, queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['users', id],
-    queryFn: () => usersApi.getUser(id),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['users', id],
+      queryFn: () => usersApi.getUser(id),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 

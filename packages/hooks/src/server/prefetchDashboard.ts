@@ -11,50 +11,70 @@ function getDefaultParams() {
 export async function prefetchFinancialKPIs(queryClient?: QueryClient) {
   const params = getDefaultParams();
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['dashboard', 'kpis', `${params.startDate}-${params.endDate}`],
-    queryFn: () => dashboardApi.getFinancialKPIs(params),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['dashboard', 'kpis', `${params.startDate}-${params.endDate}`],
+      queryFn: () => dashboardApi.getFinancialKPIs(params),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 
 export async function prefetchRevenueChart(queryClient?: QueryClient) {
   const params = getDefaultParams();
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['dashboard', 'revenue-chart', `${params.startDate}-${params.endDate}`],
-    queryFn: () => dashboardApi.getRevenueChartData(params),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['dashboard', 'revenue-chart', `${params.startDate}-${params.endDate}`],
+      queryFn: () => dashboardApi.getRevenueChartData(params),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 
 export async function prefetchExpensesChart(queryClient?: QueryClient) {
   const params = getDefaultParams();
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['dashboard', 'expenses-chart', `${params.startDate}-${params.endDate}`],
-    queryFn: () => dashboardApi.getExpensesChartData(params),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['dashboard', 'expenses-chart', `${params.startDate}-${params.endDate}`],
+      queryFn: () => dashboardApi.getExpensesChartData(params),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 
 export async function prefetchProfitChart(queryClient?: QueryClient) {
   const params = getDefaultParams();
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['dashboard', 'profit-chart', `${params.startDate}-${params.endDate}`],
-    queryFn: () => dashboardApi.getProfitChartData(params),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['dashboard', 'profit-chart', `${params.startDate}-${params.endDate}`],
+      queryFn: () => dashboardApi.getProfitChartData(params),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 
 export async function prefetchCashFlowChart(queryClient?: QueryClient) {
   const params = getDefaultParams();
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['dashboard', 'cash-flow-chart', `${params.startDate}-${params.endDate}`],
-    queryFn: () => dashboardApi.getCashFlowChartData(params),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['dashboard', 'cash-flow-chart', `${params.startDate}-${params.endDate}`],
+      queryFn: () => dashboardApi.getCashFlowChartData(params),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 

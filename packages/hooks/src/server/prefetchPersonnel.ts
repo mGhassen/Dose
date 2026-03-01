@@ -2,21 +2,29 @@ import { QueryClient } from '@tanstack/react-query';
 import { makeQueryClient } from '@kit/lib/queryClient.server';
 import { personnelApi } from '@kit/lib/api/personnel';
 
-export async function prefetchPersonnel(queryClient?: QueryClient) {
+export async function prefetchPersonnel(queryClient?: QueryClient, params?: { page?: number; limit?: number }) {
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['personnel'],
-    queryFn: () => personnelApi.getAll(),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['personnel', params],
+      queryFn: () => personnelApi.getAll(params),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 
 export async function prefetchPersonnelById(id: string, queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['personnel', id],
-    queryFn: () => personnelApi.getById(id),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['personnel', id],
+      queryFn: () => personnelApi.getById(id),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 

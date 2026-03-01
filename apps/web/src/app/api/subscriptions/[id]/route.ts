@@ -78,7 +78,6 @@ export async function PUT(
   try {
     const { id } = await params;
     const body: UpdateSubscriptionData = await request.json();
-
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from('subscriptions')

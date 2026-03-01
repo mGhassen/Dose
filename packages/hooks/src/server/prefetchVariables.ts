@@ -4,19 +4,27 @@ import { variablesApi } from '@kit/lib/api/variables';
 
 export async function prefetchVariables(queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['variables'],
-    queryFn: () => variablesApi.getAll(),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['variables'],
+      queryFn: () => variablesApi.getAll(),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 
 export async function prefetchVariable(id: string, queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['variables', id],
-    queryFn: () => variablesApi.getById(id),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['variables', id],
+      queryFn: () => variablesApi.getById(id),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 

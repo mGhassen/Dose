@@ -13,19 +13,27 @@ export async function prefetchInvestments(queryClient?: QueryClient) {
 
 export async function prefetchInvestment(id: string, queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['investments', id],
-    queryFn: () => investmentsApi.getById(id),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['investments', id],
+      queryFn: () => investmentsApi.getById(id),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 
 export async function prefetchInvestmentDepreciation(investmentId: string, queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['investments', investmentId, 'depreciation'],
-    queryFn: () => investmentsApi.getDepreciation(investmentId),
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['investments', investmentId, 'depreciation'],
+      queryFn: () => investmentsApi.getDepreciation(investmentId),
+    });
+  } catch {
+    // Prefetch failed - client will fetch
+  }
   return qc;
 }
 
