@@ -15,7 +15,7 @@ import {
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
 import { StockMovementType } from "@kit/types";
@@ -354,23 +354,14 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
                   {/* Vendor */}
                   <div className="space-y-2">
-                    <Label htmlFor="vendorId">Vendor</Label>
-                    <Select
-                      value={formData.vendorId || "none"}
-                      onValueChange={(value) => handleInputChange('vendorId', value === "none" ? "" : value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select vendor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {suppliersResponse?.data?.map((supplier) => (
-                          <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                            {supplier.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <UnifiedSelector
+                      label="Vendor"
+                      type="vendor"
+                      items={suppliersResponse?.data ?? []}
+                      selectedId={formData.vendorId ? parseInt(formData.vendorId) : undefined}
+                      onSelect={(item) => handleInputChange('vendorId', item.id === 0 ? '' : String(item.id))}
+                      placeholder="Select vendor"
+                    />
                   </div>
 
                   {/* Is Active */}

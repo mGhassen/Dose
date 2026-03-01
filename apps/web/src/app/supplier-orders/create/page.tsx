@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X, Plus, Trash2, Calculator } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateSupplierOrder, useInventorySuppliers, useItems } from "@kit/hooks";
@@ -136,23 +136,15 @@ export default function CreateSupplierOrderPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="supplierId">Supplier *</Label>
-                  <Select
-                    value={formData.supplierId}
-                    onValueChange={(value) => handleInputChange('supplierId', value)}
+                  <UnifiedSelector
+                    label="Supplier"
                     required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select supplier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.filter(s => s.isActive).map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    type="supplier"
+                    items={suppliers.filter(s => s.isActive)}
+                    selectedId={formData.supplierId ? parseInt(formData.supplierId) : undefined}
+                    onSelect={(item) => handleInputChange('supplierId', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select supplier"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -215,22 +207,19 @@ export default function CreateSupplierOrderPage() {
                   return (
                     <div key={index} className="grid grid-cols-12 gap-4 items-end p-4 border rounded-lg">
                       <div className="col-span-12 md:col-span-4">
-                        <Label>Item *</Label>
-                        <Select
-                          value={item.itemId.toString()}
-                          onValueChange={(value) => updateItem(index, 'itemId', parseInt(value))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select item" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {allItems.filter(i => i.isActive && i.itemType === 'item').map((it) => (
-                              <SelectItem key={it.id} value={it.id.toString()}>
-                                {it.name} ({it.unit})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <UnifiedSelector
+                          label="Item"
+                          required
+                          type="item"
+                          items={allItems.filter(i => i.isActive && i.itemType === 'item').map((it) => ({
+                            ...it,
+                            id: it.id,
+                            name: `${it.name} (${it.unit})`,
+                          }))}
+                          selectedId={item.itemId || undefined}
+                          onSelect={(sel) => updateItem(index, 'itemId', sel.id === 0 ? 0 : Number(sel.id))}
+                          placeholder="Select item"
+                        />
                       </div>
                       <div className="col-span-6 md:col-span-2">
                         <Label>Quantity *</Label>

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateInvestment } from "@kit/hooks";
@@ -88,26 +88,21 @@ export default function CreateInvestmentPage() {
                   />
                 </div>
 
-                {/* Type */}
-                <div className="space-y-2">
-                  <Label htmlFor="type">Type *</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value) => handleInputChange('type', value)}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="equipment">Equipment</SelectItem>
-                      <SelectItem value="renovation">Renovation</SelectItem>
-                      <SelectItem value="technology">Technology</SelectItem>
-                      <SelectItem value="vehicle">Vehicle</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <UnifiedSelector
+                  label="Type"
+                  required
+                  type="type"
+                  items={[
+                    { id: 'equipment', name: 'Equipment' },
+                    { id: 'renovation', name: 'Renovation' },
+                    { id: 'technology', name: 'Technology' },
+                    { id: 'vehicle', name: 'Vehicle' },
+                    { id: 'other', name: 'Other' },
+                  ]}
+                  selectedId={formData.type || undefined}
+                  onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))}
+                  placeholder="Select type"
+                />
 
                 {/* Amount */}
                 <div className="space-y-2">
@@ -148,24 +143,19 @@ export default function CreateInvestmentPage() {
                   />
                 </div>
 
-                {/* Depreciation Method */}
-                <div className="space-y-2">
-                  <Label htmlFor="depreciationMethod">Depreciation Method *</Label>
-                  <Select
-                    value={formData.depreciationMethod}
-                    onValueChange={(value) => handleInputChange('depreciationMethod', value)}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="straight_line">Straight Line</SelectItem>
-                      <SelectItem value="declining_balance">Declining Balance</SelectItem>
-                      <SelectItem value="units_of_production">Units of Production</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <UnifiedSelector
+                  label="Depreciation Method"
+                  required
+                  type="method"
+                  items={[
+                    { id: 'straight_line', name: 'Straight Line' },
+                    { id: 'declining_balance', name: 'Declining Balance' },
+                    { id: 'units_of_production', name: 'Units of Production' },
+                  ]}
+                  selectedId={formData.depreciationMethod || undefined}
+                  onSelect={(item) => handleInputChange('depreciationMethod', item.id === 0 ? '' : String(item.id))}
+                  placeholder="Select method"
+                />
 
                 {/* Residual Value */}
                 <div className="space-y-2">

@@ -8,7 +8,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X, Plus, Trash2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateRecipe, useItems } from "@kit/hooks";
@@ -214,22 +214,14 @@ export default function CreateRecipePage() {
                       items.map((item, index) => (
                         <div key={index} className="space-y-3 p-4 border rounded-lg bg-card">
                           <div className="space-y-2">
-                            <Label>Item</Label>
-                            <Select
-                              value={item.itemId ? item.itemId.toString() : undefined}
-                              onValueChange={(value) => updateItem(index, 'itemId', parseInt(value))}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select item" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {itemsResponse?.data?.filter(i => i.itemType === 'item').map((it) => (
-                                  <SelectItem key={it.id} value={it.id.toString()}>
-                                    {it.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <UnifiedSelector
+                              label="Item"
+                              type="item"
+                              items={itemsResponse?.data?.filter(i => i.itemType === 'item') ?? []}
+                              selectedId={item.itemId || undefined}
+                              onSelect={(sel) => updateItem(index, 'itemId', sel.id === 0 ? 0 : Number(sel.id))}
+                              placeholder="Select item"
+                            />
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-2">

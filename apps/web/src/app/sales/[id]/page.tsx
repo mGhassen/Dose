@@ -14,7 +14,7 @@ import {
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Badge } from "@kit/ui/badge";
 import { Save, X, Trash2, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
@@ -209,26 +209,21 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
                     />
                   </div>
 
-                  {/* Type */}
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Type *</Label>
-                    <Select
-                      value={formData.type}
-                      onValueChange={(value) => handleInputChange('type', value)}
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="on_site">On Site</SelectItem>
-                        <SelectItem value="delivery">Delivery</SelectItem>
-                        <SelectItem value="takeaway">Takeaway</SelectItem>
-                        <SelectItem value="catering">Catering</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <UnifiedSelector
+                    label="Type"
+                    required
+                    type="type"
+                    items={[
+                      { id: 'on_site', name: 'On Site' },
+                      { id: 'delivery', name: 'Delivery' },
+                      { id: 'takeaway', name: 'Takeaway' },
+                      { id: 'catering', name: 'Catering' },
+                      { id: 'other', name: 'Other' },
+                    ]}
+                    selectedId={formData.type || undefined}
+                    onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select type"
+                  />
 
                   {/* Amount */}
                   <div className="space-y-2">
@@ -258,28 +253,15 @@ export default function SaleDetailPage({ params }: SaleDetailPageProps) {
 
                   {/* Item/Recipe */}
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="itemId">Item/Recipe</Label>
-                    <Select
-                      value={formData.itemId || "none"}
-                      onValueChange={(value) => handleInputChange('itemId', value === "none" ? "" : value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select item or recipe (optional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {itemsResponse?.data?.filter(i => i.itemType === 'item').map((item) => (
-                          <SelectItem key={item.id} value={item.id.toString()}>
-                            {item.name} {item.category ? `(${item.category})` : ''}
-                          </SelectItem>
-                        ))}
-                        {itemsResponse?.data?.filter(i => i.itemType === 'recipe').map((recipe) => (
-                          <SelectItem key={recipe.id} value={recipe.id.toString()}>
-                            {recipe.name} (Recipe)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <UnifiedSelector
+                      label="Item/Recipe"
+                      type="item"
+                      items={(itemsResponse?.data ?? []).filter(i => i.itemType === 'item' || i.itemType === 'recipe')}
+                      selectedId={formData.itemId ? parseInt(formData.itemId) : undefined}
+                      onSelect={(item) => handleInputChange('itemId', item.id === 0 ? '' : String(item.id))}
+                      placeholder="Select item or recipe (optional)"
+                      getDisplayName={(i) => (i as { itemType?: string }).itemType === 'recipe' ? `${i.name} (Recipe)` : `${i.name} ${(i as { category?: string }).category ? `(${(i as { category?: string }).category})` : ''}`}
+                    />
                     <p className="text-xs text-muted-foreground">
                       Link this sale to a specific item or recipe
                     </p>

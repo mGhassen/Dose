@@ -14,13 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@kit/ui/dialog";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kit/ui/select";
 import { useToast } from "@kit/hooks";
 import { User } from "@kit/hooks";
 

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
@@ -160,25 +160,20 @@ export default function CreatePersonnelPage() {
                   />
                 </div>
 
-                {/* Type */}
-                <div className="space-y-2">
-                  <Label htmlFor="type">Type *</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value) => handleInputChange('type', value)}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="full_time">Full Time</SelectItem>
-                      <SelectItem value="part_time">Part Time</SelectItem>
-                      <SelectItem value="contractor">Contractor</SelectItem>
-                      <SelectItem value="intern">Intern</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <UnifiedSelector
+                  label="Type"
+                  required
+                  type="type"
+                  items={[
+                    { id: 'full_time', name: 'Full Time' },
+                    { id: 'part_time', name: 'Part Time' },
+                    { id: 'contractor', name: 'Contractor' },
+                    { id: 'intern', name: 'Intern' },
+                  ]}
+                  selectedId={formData.type || undefined}
+                  onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))}
+                  placeholder="Select type"
+                />
 
                 {/* Base Salary */}
                 <div className="space-y-2">
@@ -194,23 +189,20 @@ export default function CreatePersonnelPage() {
                   />
                 </div>
 
-                {/* Salary Frequency */}
                 <div className="space-y-2">
-                  <Label htmlFor="salaryFrequency">Salary Package Frequency *</Label>
-                  <Select
-                    value={formData.salaryFrequency}
-                    onValueChange={(value) => handleInputChange('salaryFrequency', value)}
+                  <UnifiedSelector
+                    label="Salary Package Frequency"
                     required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select frequency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="yearly">Yearly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    type="frequency"
+                    items={[
+                      { id: 'yearly', name: 'Yearly' },
+                      { id: 'monthly', name: 'Monthly' },
+                      { id: 'weekly', name: 'Weekly' },
+                    ]}
+                    selectedId={formData.salaryFrequency || undefined}
+                    onSelect={(item) => handleInputChange('salaryFrequency', String(item.id))}
+                    placeholder="Select frequency"
+                  />
                   <p className="text-xs text-muted-foreground">
                     Select the frequency of the salary package
                   </p>

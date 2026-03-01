@@ -6,7 +6,7 @@ import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateStockLevel, useItems } from "@kit/hooks";
@@ -86,23 +86,19 @@ export default function CreateStockLevelPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="itemId">Item *</Label>
-                  <Select
-                    value={formData.itemId}
-                    onValueChange={(value) => handleInputChange('itemId', value)}
+                  <UnifiedSelector
+                    label="Item"
                     required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select item" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {items.filter(i => i.isActive && i.itemType === 'item').map((item) => (
-                        <SelectItem key={item.id} value={item.id.toString()}>
-                          {item.name} ({item.unit})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    type="item"
+                    items={items.filter(i => i.isActive && i.itemType === 'item').map((item) => ({
+                      ...item,
+                      id: item.id,
+                      name: `${item.name} (${item.unit})`,
+                    }))}
+                    selectedId={formData.itemId ? parseInt(formData.itemId) : undefined}
+                    onSelect={(item) => handleInputChange('itemId', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select item"
+                  />
                 </div>
 
                 <div className="space-y-2">

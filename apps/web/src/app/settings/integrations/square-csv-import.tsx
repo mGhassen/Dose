@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@kit/ui/button';
 import { Label } from '@kit/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@kit/ui/select';
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Upload, FileText, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { useToast } from '@kit/hooks';
 import Papa from 'papaparse';
@@ -138,19 +138,18 @@ export default function SquareCsvImport({ integrationId, onImportComplete }: Squ
 
   return (
     <div className="space-y-4 py-4">
-      <div>
-        <Label>Import Type</Label>
-        <Select value={importType} onValueChange={(value: any) => setImportType(value)}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="orders">Orders</SelectItem>
-            <SelectItem value="payments">Payments</SelectItem>
-            <SelectItem value="catalog">Catalog Items</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <UnifiedSelector
+        label="Import Type"
+        type="type"
+        items={[
+          { id: 'orders', name: 'Orders' },
+          { id: 'payments', name: 'Payments' },
+          { id: 'catalog', name: 'Catalog Items' },
+        ]}
+        selectedId={importType || undefined}
+        onSelect={(item) => setImportType(String(item.id))}
+        placeholder="Select import type"
+      />
 
       <div>
         <Label>CSV File</Label>

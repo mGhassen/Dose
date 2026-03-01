@@ -8,13 +8,7 @@ import { Label } from "@kit/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { Badge } from "@kit/ui/badge";
 import { Separator } from "@kit/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import {
   Popover,
   PopoverContent,
@@ -188,50 +182,30 @@ export function UnifiedFilter({
     switch (option.type) {
       case 'select':
         return (
-          <Select
-            value={value as string || ""}
-            onValueChange={(val) => handleFilterChange(option.key, val)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={option.placeholder || `Select ${option.label}`} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All {option.label}</SelectItem>
-              {option.options?.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <UnifiedSelector
+            label=""
+            type={option.key}
+            items={[
+              { id: 'all', name: `All ${option.label}` },
+              ...(option.options?.map((o) => ({ id: o.value, name: o.label })) ?? []),
+            ]}
+            selectedId={(value as string) || undefined}
+            onSelect={(item) => handleFilterChange(option.key, item.id === 0 ? '' : String(item.id))}
+            placeholder={option.placeholder || `Select ${option.label}`}
+          />
         );
-        
       case 'multiselect':
         const selectedValues = (value as string[]) || [];
         return (
-          <Select
-            value=""
-            onValueChange={(val) => {
-              if (val && !selectedValues.includes(val)) {
-                handleFilterChange(option.key, [...selectedValues, val]);
-              }
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={option.placeholder || `Select ${option.label}`} />
-            </SelectTrigger>
-            <SelectContent>
-              {option.options?.map((opt) => (
-                <SelectItem 
-                  key={opt.value} 
-                  value={opt.value}
-                  disabled={selectedValues.includes(opt.value)}
-                >
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <UnifiedSelector
+            label=""
+            mode="multi"
+            type={option.key}
+            items={option.options?.map((o) => ({ id: o.value, name: o.label })) ?? []}
+            selectedIds={selectedValues}
+            onSelectionChange={(ids) => handleFilterChange(option.key, ids)}
+            placeholder={option.placeholder || `Select ${option.label}`}
+          />
         );
         
       case 'date':

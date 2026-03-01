@@ -1,18 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@kit/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@kit/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@kit/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@kit/ui/select';
+import { Select, SelectContent, SelectTrigger, SelectValue } from '@kit/ui/select';
 import { Checkbox } from '@kit/ui/checkbox';
 import { Badge } from '@kit/ui/badge';
 import { Label } from '@kit/ui/label';
 import { Plus, Search, Copy } from 'lucide-react';
 import RelatedDataLink from '@/components/related-data-link';
+import { useTranslations } from 'next-intl';
+import { cn } from '@kit/lib/utils';
 
 interface UnifiedSelectorItem {
-  id: number;
+  id: number | string;
   name?: string;
   code?: string;
   text?: string;
@@ -24,37 +26,32 @@ interface UnifiedSelectorItem {
 }
 
 interface UnifiedSelectorProps {
-  // Mode: single or multi
   mode?: 'single' | 'multi';
-  
-  // Items to display
   items: UnifiedSelectorItem[];
   isLoading?: boolean;
-  
-  // Single select props
-  selectedId?: number; // For single select: show selected value
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  loadingMore?: boolean;
+  selectedId?: number | string;
+  selectedDisplayName?: string;
   onSelect?: (item: UnifiedSelectorItem) => void;
   onDuplicate?: (item: UnifiedSelectorItem) => void;
   onCreateNew?: () => void;
-  
-  // Multi select props
-  selectedIds?: number[];
-  onSelectionChange?: (selectedIds: number[]) => void;
-  
-  // Display props
-  type?: string; // For single select: 'action' | 'question' | 'operation' | etc.
-  buttonText?: string; // For single select button (overrides selected value display)
+  selectedIds?: (number | string)[];
+  onSelectionChange?: (selectedIds: (number | string)[]) => void;
+  type?: string;
+  buttonText?: string;
   placeholder?: string;
   searchPlaceholder?: string;
   label?: string;
-  required?: boolean; // Whether the field is required (adds asterisk to label)
-  disabled?: boolean; // Whether the selector is disabled
+  required?: boolean;
+  disabled?: boolean;
   manageLink?: {
     href: string;
     text: string;
   };
-  
-  // Customization
+  id?: string;
+  className?: string;
   renderItem?: (item: UnifiedSelectorItem, isSelected?: boolean) => React.ReactNode;
   getDisplayName?: (item: UnifiedSelectorItem) => string;
 }
@@ -63,7 +60,11 @@ export function UnifiedSelector({
   mode = 'single',
   items,
   isLoading = false,
+  hasMore = false,
+  onLoadMore,
+  loadingMore = false,
   selectedId,
+  selectedDisplayName,
   onSelect,
   onDuplicate,
   onCreateNew,
@@ -78,10 +79,15 @@ export function UnifiedSelector({
   disabled = false,
   manageLink,
   renderItem,
-  getDisplayName
+  getDisplayName,
+  id,
+  className
 }: UnifiedSelectorProps) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
+  const commandListRef = useRef<HTMLDivElement>(null);
+  const selectedItemRef = useRef<HTMLDivElement>(null);
+  const tCommon = useTranslations('common');
 
   const filteredItems = items.filter(item => {
     const searchLower = searchValue.toLowerCase();
@@ -91,7 +97,7 @@ export function UnifiedSelector({
         ? (item.name || item.act)
         : mode === 'single' && type === 'question'
         ? item.text
-        : (item.name || item.code || `Item ${item.id}`);
+        : (item.name || item.code || `${tCommon('item')} ${item.id}`);
     const description = item.description || '';
     const code = item.code || '';
     
@@ -104,7 +110,6 @@ export function UnifiedSelector({
     );
   });
 
-  // Single select handlers
   const handleSelect = (item: UnifiedSelectorItem) => {
     setOpen(false);
     setSearchValue('');
@@ -113,11 +118,9 @@ export function UnifiedSelector({
     }
   };
 
-  // Handler to clear selection
   const handleClearSelection = () => {
     setOpen(false);
     setSearchValue('');
-    // Call onSelect with id: 0 to indicate no selection
     onSelect?.({ id: 0 } as UnifiedSelectorItem);
   };
 
@@ -133,16 +136,46 @@ export function UnifiedSelector({
     onCreateNew?.();
   };
 
-  // Multi select handlers
-  const handleCheckboxChange = (itemId: number, checked: boolean) => {
+  useEffect(() => {
+    if (open && mode === 'single' && selectedItemRef.current) {
+      setTimeout(() => {
+        selectedItemRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }, 100);
+    }
+  }, [open, mode]);
+
+  useEffect(() => {
+    if (!open || !hasMore || !onLoadMore || loadingMore) return;
+    const commandList = commandListRef.current;
+    if (!commandList) return;
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const { scrollTop, scrollHeight, clientHeight } = commandList;
+          if (scrollHeight - scrollTop - clientHeight < 150 && hasMore && !loadingMore) {
+            onLoadMore();
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    commandList.addEventListener('scroll', handleScroll, { passive: true });
+    return () => commandList.removeEventListener('scroll', handleScroll);
+  }, [open, hasMore, onLoadMore, loadingMore]);
+
+  const handleCheckboxChange = (itemId: number | string, checked: boolean) => {
     if (checked) {
       onSelectionChange?.([...selectedIds, itemId]);
     } else {
-      onSelectionChange?.(selectedIds.filter(id => id !== itemId));
+      onSelectionChange?.(selectedIds.filter(id => String(id) !== String(itemId)));
     }
   };
 
-  // Default render for single select
   const defaultSingleRenderItem = (item: UnifiedSelectorItem) => {
     const name = getDisplayName 
       ? getDisplayName(item)
@@ -151,7 +184,7 @@ export function UnifiedSelector({
         : type === 'question'
         ? item.text
         : item.name;
-    const displayName = name || `Unnamed ${type}`;
+    const displayName = name || `${tCommon('unnamed')} ${type}`;
     const description = item.description || '';
     
     return (
@@ -176,7 +209,7 @@ export function UnifiedSelector({
               e.stopPropagation();
               handleDuplicate(item);
             }}
-            title={`Duplicate ${type}`}
+            title={`${tCommon('duplicate')} ${type}`}
           >
             <Copy className="h-3.5 w-3.5" />
           </Button>
@@ -185,7 +218,6 @@ export function UnifiedSelector({
     );
   };
 
-  // Default render for multi select
   const defaultMultiRenderItem = (item: UnifiedSelectorItem, isSelected: boolean) => {
     const name = getDisplayName ? getDisplayName(item) : (item.name || item.code || `Item ${item.id}`);
     
@@ -215,7 +247,7 @@ export function UnifiedSelector({
           )}
           {item.localizations && item.localizations.length > 0 && (
             <span className="text-xs text-muted-foreground leading-tight mt-0.5">
-              📍 {item.localizations.length} location{item.localizations.length !== 1 ? 's' : ''}
+              📍 {item.localizations.length} {tCommon('location')}{item.localizations.length !== 1 ? 's' : ''}
               {item.localizations.slice(0, 2).map((loc: any) => loc.name || loc.code).filter(Boolean).join(', ')}
               {item.localizations.length > 2 && '...'}
             </span>
@@ -225,39 +257,48 @@ export function UnifiedSelector({
     );
   };
 
-  // Single select mode (Popover with Button)
   if (mode === 'single') {
-    // Determine button text: show selected value if selectedId is provided, otherwise use buttonText or default
-    const selectedItem = selectedId ? items.find(item => item.id === selectedId) : null;
-    const displayButtonText = buttonText 
-      ? buttonText 
-      : selectedItem 
+    const hasSelectedId = selectedId != null && selectedId !== '' && (typeof selectedId === 'string' || !Number.isNaN(Number(selectedId)));
+    const selectedItem = hasSelectedId ? items.find(item => String(item.id) === String(selectedId)) : null;
+    const displayButtonText = buttonText
+      ? buttonText
+      : selectedItem
         ? (getDisplayName ? getDisplayName(selectedItem) : (selectedItem.name || selectedItem.code || `Item ${selectedItem.id}`))
-        : placeholder || `Select ${type}`;
+        : hasSelectedId && selectedDisplayName
+          ? selectedDisplayName
+          : hasSelectedId
+            ? `${tCommon('item')} ${selectedId}`
+            : placeholder || `${tCommon('select')} ${type}`;
     
-    // Format label with asterisk if required
     const displayLabel = label ? (required && !label.endsWith(' *') ? `${label} *` : label) : undefined;
     
     return (
       <div className="space-y-2">
         {displayLabel && (
-          <div className="relative">
-            <Label>{displayLabel}</Label>
-            {manageLink && (
-              <RelatedDataLink 
-                href={manageLink.href} 
-                className="text-xs absolute right-0 top-0"
-              >
+          manageLink ? (
+            <div className="flex items-center justify-between">
+              <Label htmlFor={id}>{displayLabel}</Label>
+              <RelatedDataLink href={manageLink.href} className="text-xs">
                 {manageLink.text}
               </RelatedDataLink>
-            )}
-          </div>
+            </div>
+          ) : (
+            <Label htmlFor={id}>{displayLabel}</Label>
+          )
         )}
         <Popover open={disabled ? false : open} onOpenChange={disabled ? undefined : setOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="default" className="w-full justify-start text-left font-normal px-3 text-base md:text-sm shadow-md" disabled={disabled}>
-              <span className="truncate">{displayButtonText}</span>
-            </Button>
+            <button
+              type="button"
+              id={id}
+              disabled={disabled}
+              className={cn(
+                "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background shadow-md placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+                className
+              )}
+            >
+              <span className="truncate text-left">{displayButtonText}</span>
+            </button>
           </PopoverTrigger>
           <PopoverContent className="w-96 p-0" align="start" sideOffset={5}>
           <Command>
@@ -265,28 +306,26 @@ export function UnifiedSelector({
               <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <input
                 type="text"
-                placeholder={searchPlaceholder || `Search ${type}s...`}
+                placeholder={searchPlaceholder || `${tCommon('search')} ${type}s...`}
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
                 className="flex h-10 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 shadow-none"
               />
             </div>
-            <CommandList className="max-h-80">
+            <CommandList ref={commandListRef} className="max-h-80">
               <CommandEmpty>
                 {isLoading ? 'Loading...' : `No ${type}s found.`}
               </CommandEmpty>
               
-              {/* Clear Selection Option */}
               <CommandGroup>
                 <CommandItem
                   onSelect={handleClearSelection}
                   className="cursor-pointer px-3 py-2"
                 >
-                  <span className="text-muted-foreground">No selection</span>
+                  <span className="text-muted-foreground">{tCommon('noSelection')}</span>
                 </CommandItem>
               </CommandGroup>
               
-              {/* Create New Option */}
               {onCreateNew && (
                 <CommandGroup>
                   <CommandItem
@@ -294,31 +333,23 @@ export function UnifiedSelector({
                     className="flex items-center gap-2 cursor-pointer px-3 py-2"
                   >
                     <Plus className="h-4 w-4" />
-                    <span className="font-medium">Create new {type}</span>
+                    <span className="font-medium">{tCommon('createNew', { entity: type })}</span>
                   </CommandItem>
                 </CommandGroup>
               )}
 
-              {/* Existing Items */}
               {filteredItems.length > 0 ? (
-                <CommandGroup heading={`Select existing ${type}s`}>
+                <CommandGroup heading={tCommon('selectExisting', { item: type })}>
                   {filteredItems.map((item) => {
+                    const isSelected = hasSelectedId && String(item.id) === String(selectedId);
                     return (
                       <CommandItem
                         key={item.id}
                         value={item.id.toString()}
-                        onSelect={(value) => {
-                          // Find the item and select it
-                          const selectedItem = filteredItems.find(i => i.id.toString() === value);
-                          if (selectedItem) {
-                            handleSelect(selectedItem);
-                          }
-                        }}
-                        className="cursor-pointer p-0"
-                        onMouseDown={(e) => {
-                          // Prevent any default form submission behavior
-                          e.preventDefault();
-                        }}
+                        onSelect={() => handleSelect(item)}
+                        className={`cursor-pointer p-0 ${isSelected ? 'bg-accent' : ''}`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        ref={isSelected ? selectedItemRef : undefined}
                       >
                         {renderItem ? renderItem(item) : defaultSingleRenderItem(item)}
                       </CommandItem>
@@ -328,13 +359,33 @@ export function UnifiedSelector({
               ) : items.length > 0 ? (
                 <CommandGroup>
                   <CommandItem disabled>
-                    <span className="text-muted-foreground text-sm">No items match your search</span>
+                    <span className="text-muted-foreground text-sm">{tCommon('noItemsMatchSearch')}</span>
                   </CommandItem>
                 </CommandGroup>
               ) : (
                 <CommandGroup>
                   <CommandItem disabled>
-                    <span className="text-muted-foreground text-sm">No {type}s available</span>
+                    <span className="text-muted-foreground text-sm">{tCommon('noItemsAvailable', { item: type })}</span>
+                  </CommandItem>
+                </CommandGroup>
+              )}
+              
+              {hasMore && onLoadMore && (
+                <CommandGroup>
+                  <CommandItem
+                    value="__load_more__"
+                    onSelect={() => onLoadMore()}
+                    className="flex items-center justify-center py-1.5 text-xs text-muted-foreground cursor-pointer hover:bg-muted/50 border-t"
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? (
+                      <span className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
+                        Loading...
+                      </span>
+                    ) : (
+                      <span>Load more...</span>
+                    )}
                   </CommandItem>
                 </CommandGroup>
               )}
@@ -346,19 +397,17 @@ export function UnifiedSelector({
     );
   }
 
-  // Multi select mode (Select with checkboxes)
-  // Format label with asterisk if required
   const displayLabel = label ? (required && !label.endsWith(' *') ? `${label} *` : label) : undefined;
   
   return (
-    <div className="space-y-2">
+    <>
       {displayLabel && (
-        <div className="relative">
-          <Label>{displayLabel}</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor={id}>{displayLabel}</Label>
           {manageLink && (
             <RelatedDataLink 
               href={manageLink.href} 
-              className="text-xs absolute right-0 top-0"
+              className="text-xs"
             >
               {manageLink.text}
             </RelatedDataLink>
@@ -366,8 +415,8 @@ export function UnifiedSelector({
         </div>
       )}
       <Select open={open} onOpenChange={setOpen}>
-        <SelectTrigger className="h-10">
-          <SelectValue placeholder={selectedIds.length > 0 ? `${selectedIds.length} item${selectedIds.length !== 1 ? 's' : ''} selected` : placeholder || "Select items (multiple)"} />
+        <SelectTrigger id={id} className={cn("h-10 shadow-md text-base md:text-sm justify-start [&_svg]:hidden", className)}>
+          <SelectValue placeholder={selectedIds.length > 0 ? `${selectedIds.length} ${tCommon('item')}${selectedIds.length !== 1 ? 's' : ''} ${tCommon('selected')}` : placeholder || tCommon('selectItemsMultiple')} />
         </SelectTrigger>
         <SelectContent className="p-0" align="start">
           <Command>
@@ -375,21 +424,21 @@ export function UnifiedSelector({
               <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <input
                 type="text"
-                placeholder={searchPlaceholder || "Search items..."}
+                placeholder={searchPlaceholder || tCommon('searchItems')}
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
                 className="flex h-10 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 shadow-none"
               />
             </div>
-            <CommandList className="max-h-80">
+              <CommandList ref={commandListRef} className="max-h-80">
               <CommandEmpty>
-                {isLoading ? 'Loading...' : 'No items found.'}
+                {isLoading ? tCommon('loading') + '...' : tCommon('noItemsFound', { item: type })}
               </CommandEmpty>
               
               {filteredItems.length > 0 && (
                 <CommandGroup>
                   {filteredItems.map((item) => {
-                    const isSelected = selectedIds.includes(item.id);
+                    const isSelected = selectedIds.some(id => String(id) === String(item.id));
                     return (
                       <CommandItem
                         key={item.id}
@@ -403,6 +452,26 @@ export function UnifiedSelector({
                   })}
                 </CommandGroup>
               )}
+              
+              {hasMore && onLoadMore && (
+                <CommandGroup>
+                  <CommandItem
+                    value="__load_more__"
+                    onSelect={() => onLoadMore()}
+                    className="flex items-center justify-center py-1.5 text-xs text-muted-foreground cursor-pointer hover:bg-muted/50 border-t"
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? (
+                      <span className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
+                        Loading...
+                      </span>
+                    ) : (
+                      <span>Load more...</span>
+                    )}
+                  </CommandItem>
+                </CommandGroup>
+              )}
             </CommandList>
           </Command>
         </SelectContent>
@@ -410,12 +479,12 @@ export function UnifiedSelector({
       {selectedIds.length > 0 && (
         <div className="flex flex-wrap gap-2 mt-2">
           {selectedIds.map(itemId => {
-            const item = items.find((i) => i.id === itemId);
+            const item = items.find((i) => String(i.id) === String(itemId));
             if (!item) return null;
-            const name = getDisplayName ? getDisplayName(item) : (item.name || item.code || `Item ${item.id}`);
+            const name = getDisplayName ? getDisplayName(item) : (item.name || item.code || `${tCommon('item')} ${item.id}`);
             return (
-              <Badge key={itemId} variant="secondary" className="cursor-pointer" onClick={() => {
-                onSelectionChange?.(selectedIds.filter(id => id !== itemId));
+              <Badge key={String(itemId)} variant="secondary" className="cursor-pointer" onClick={() => {
+                onSelectionChange?.(selectedIds.filter(id => String(id) !== String(itemId)));
               }}>
                 #{item.id} - {name}
                 {item.code && item.name && ` (${item.code})`}
@@ -425,7 +494,6 @@ export function UnifiedSelector({
           })}
         </div>
       )}
-    </div>
+    </>
   );
 }
-

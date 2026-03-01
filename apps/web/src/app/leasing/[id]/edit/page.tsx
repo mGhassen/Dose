@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useLeasingById, useUpdateLeasing, useInventorySuppliers } from "@kit/hooks";
@@ -258,22 +258,18 @@ export default function EditLeasingPage({ params }: EditLeasingPageProps) {
                   />
                 </div>
 
-                {/* Type */}
-                <div className="space-y-2">
-                  <Label htmlFor="type">Type *</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value) => handleInputChange('type', value as LeasingType)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="operating">Operating</SelectItem>
-                      <SelectItem value="finance">Finance</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <UnifiedSelector
+                  label="Type"
+                  required
+                  type="type"
+                  items={[
+                    { id: 'operating', name: 'Operating' },
+                    { id: 'finance', name: 'Finance' },
+                  ]}
+                  selectedId={formData.type || undefined}
+                  onSelect={(item) => handleInputChange('type', String(item.id) as LeasingType)}
+                  placeholder="Select type"
+                />
 
                 {/* Amount Mode */}
                 <div className="space-y-2 md:col-span-2">
@@ -338,24 +334,22 @@ export default function EditLeasingPage({ params }: EditLeasingPageProps) {
                   </div>
                 )}
 
-                {/* Frequency */}
                 <div className="space-y-2">
-                  <Label htmlFor="frequency">Frequency *</Label>
-                  <Select
-                    value={formData.frequency}
-                    onValueChange={(value) => handleInputChange('frequency', value as ExpenseRecurrence)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="one_time">One Time</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="quarterly">Quarterly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
-                      <SelectItem value="custom">Custom</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <UnifiedSelector
+                    label="Frequency"
+                    required
+                    type="frequency"
+                    items={[
+                      { id: 'one_time', name: 'One Time' },
+                      { id: 'monthly', name: 'Monthly' },
+                      { id: 'quarterly', name: 'Quarterly' },
+                      { id: 'yearly', name: 'Yearly' },
+                      { id: 'custom', name: 'Custom' },
+                    ]}
+                    selectedId={formData.frequency || undefined}
+                    onSelect={(item) => handleInputChange('frequency', String(item.id) as ExpenseRecurrence)}
+                    placeholder="Select frequency"
+                  />
                   {amountMode === "total" && (
                     <p className="text-xs text-muted-foreground">
                       Used to calculate payment schedule from total amount
@@ -394,46 +388,28 @@ export default function EditLeasingPage({ params }: EditLeasingPageProps) {
 
                 {/* Lessor/Supplier */}
                 <div className="space-y-2">
-                  <Label htmlFor="supplierId">Lessor</Label>
-                  <Select
-                    value={formData.supplierId || "none"}
-                    onValueChange={(value) => handleInputChange('supplierId', value === "none" ? "" : value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select lessor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {suppliers.map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formData.supplierId && (
-                    <Link href={`/inventory-suppliers/${formData.supplierId}`} className="text-xs text-blue-600 hover:underline">
-                      View lessor details →
-                    </Link>
-                  )}
+                  <UnifiedSelector
+                    label="Lessor"
+                    type="lessor"
+                    items={suppliers}
+                    selectedId={formData.supplierId ? parseInt(formData.supplierId) : undefined}
+                    onSelect={(item) => handleInputChange('supplierId', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select lessor"
+                    manageLink={formData.supplierId ? { href: `/inventory-suppliers/${formData.supplierId}`, text: "View lessor details →" } : undefined}
+                  />
                 </div>
 
-                {/* Status */}
-                <div className="space-y-2">
-                  <Label htmlFor="isActive">Status</Label>
-                  <Select
-                    value={formData.isActive ? "true" : "false"}
-                    onValueChange={(value) => handleInputChange('isActive', value === "true")}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Active</SelectItem>
-                      <SelectItem value="false">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <UnifiedSelector
+                  label="Status"
+                  type="status"
+                  items={[
+                    { id: 'true', name: 'Active' },
+                    { id: 'false', name: 'Inactive' },
+                  ]}
+                  selectedId={formData.isActive ? 'true' : 'false'}
+                  onSelect={(item) => handleInputChange('isActive', String(item.id) === 'true')}
+                  placeholder="Select status"
+                />
               </div>
 
               {/* Description */}

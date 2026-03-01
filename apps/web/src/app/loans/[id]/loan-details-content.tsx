@@ -14,7 +14,7 @@ import {
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -396,24 +396,19 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                     />
                   </div>
 
-                  {/* Status */}
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status *</Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(value) => handleInputChange('status', value)}
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="paid_off">Paid Off</SelectItem>
-                        <SelectItem value="defaulted">Defaulted</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <UnifiedSelector
+                    label="Status"
+                    required
+                    type="status"
+                    items={[
+                      { id: 'active', name: 'Active' },
+                      { id: 'paid_off', name: 'Paid Off' },
+                      { id: 'defaulted', name: 'Defaulted' },
+                    ]}
+                    selectedId={formData.status || undefined}
+                    onSelect={(item) => handleInputChange('status', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select status"
+                  />
 
                   {/* Lender */}
                   <div className="space-y-2">
@@ -853,19 +848,19 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                       Maximum: {formatCurrency(remainingToPay)}
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="dialog-paymentMethod">Payment Method</Label>
-                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger id="dialog-paymentMethod">
-                        <SelectValue placeholder="Select payment method" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="card">Card</SelectItem>
-                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <UnifiedSelector
+                    label="Payment Method"
+                    type="method"
+                    id="dialog-paymentMethod"
+                    items={[
+                      { id: 'cash', name: 'Cash' },
+                      { id: 'card', name: 'Card' },
+                      { id: 'bank_transfer', name: 'Bank Transfer' },
+                    ]}
+                    selectedId={paymentMethod || undefined}
+                    onSelect={(item) => setPaymentMethod(item.id === 0 ? 'bank_transfer' : String(item.id))}
+                    placeholder="Select payment method"
+                  />
                   <div className="space-y-2">
                     <Label htmlFor="dialog-paymentNotes">Notes (optional)</Label>
                     <Input

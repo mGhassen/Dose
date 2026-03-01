@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
@@ -163,26 +163,21 @@ export default function EditVariablePage({ params }: EditVariablePageProps) {
                   />
                 </div>
 
-                {/* Type */}
-                <div className="space-y-2">
-                  <Label htmlFor="type">Type *</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value) => handleInputChange('type', value)}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cost">Cost</SelectItem>
-                      <SelectItem value="tax">Tax</SelectItem>
-                      <SelectItem value="inflation">Inflation</SelectItem>
-                      <SelectItem value="exchange_rate">Exchange Rate</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <UnifiedSelector
+                  label="Type"
+                  required
+                  type="type"
+                  items={[
+                    { id: 'cost', name: 'Cost' },
+                    { id: 'tax', name: 'Tax' },
+                    { id: 'inflation', name: 'Inflation' },
+                    { id: 'exchange_rate', name: 'Exchange Rate' },
+                    { id: 'other', name: 'Other' },
+                  ]}
+                  selectedId={formData.type || undefined}
+                  onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))}
+                  placeholder="Select type"
+                />
 
                 {/* Value */}
                 <div className="space-y-2">

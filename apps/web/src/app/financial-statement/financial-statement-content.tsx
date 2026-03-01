@@ -6,7 +6,7 @@ import { useYear } from "@/contexts/year-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import { Button } from "@kit/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import AppLayout from "@/components/app-layout";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -546,34 +546,33 @@ export default function FinancialStatementContent() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Select value={selectedPeriod} onValueChange={(value: 'year' | 'quarter' | 'month') => {
-              setSelectedPeriod(value);
-              if (value === 'year') {
-                setSelectedMonth('');
-              }
-            }}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="year">{t('period.year')}</SelectItem>
-                <SelectItem value="quarter">{t('period.quarter')}</SelectItem>
-                <SelectItem value="month">{t('period.month')}</SelectItem>
-              </SelectContent>
-            </Select>
+            <UnifiedSelector
+              label=""
+              type="period"
+              className="w-[180px]"
+              items={[
+                { id: 'year', name: t('period.year') },
+                { id: 'quarter', name: t('period.quarter') },
+                { id: 'month', name: t('period.month') },
+              ]}
+              selectedId={selectedPeriod || undefined}
+              onSelect={(item) => {
+                const value = String(item.id) as 'year' | 'quarter' | 'month';
+                setSelectedPeriod(value);
+                if (value === 'year') setSelectedMonth('');
+              }}
+              placeholder={t('period.selectPeriod')}
+            />
             {(selectedPeriod === 'quarter' || selectedPeriod === 'month') && (
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder={t('period.selectPeriod')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {monthOptions.map(month => (
-                    <SelectItem key={month.value} value={month.value}>
-                      {month.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <UnifiedSelector
+                label=""
+                type="month"
+                className="w-[200px]"
+                items={monthOptions.map((m) => ({ id: m.value, name: m.label }))}
+                selectedId={selectedMonth || undefined}
+                onSelect={(item) => setSelectedMonth(String(item.id))}
+                placeholder={t('period.selectPeriod')}
+              />
             )}
             <Button onClick={() => handleExport(incomeStatement)} variant="outline">
               <Download className="mr-2 h-4 w-4" />

@@ -14,7 +14,7 @@ import {
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2 } from "lucide-react";
@@ -262,29 +262,24 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                     />
                   </div>
 
-                  {/* Category */}
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category *</Label>
-                    <Select
-                      value={formData.category}
-                      onValueChange={(value) => handleInputChange('category', value)}
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="rent">Rent</SelectItem>
-                        <SelectItem value="utilities">Utilities</SelectItem>
-                        <SelectItem value="supplies">Supplies</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                        <SelectItem value="insurance">Insurance</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                        <SelectItem value="professional_services">Professional Services</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <UnifiedSelector
+                    label="Category"
+                    required
+                    type="category"
+                    items={[
+                      { id: 'rent', name: 'Rent' },
+                      { id: 'utilities', name: 'Utilities' },
+                      { id: 'supplies', name: 'Supplies' },
+                      { id: 'marketing', name: 'Marketing' },
+                      { id: 'insurance', name: 'Insurance' },
+                      { id: 'maintenance', name: 'Maintenance' },
+                      { id: 'professional_services', name: 'Professional Services' },
+                      { id: 'other', name: 'Other' },
+                    ]}
+                    selectedId={formData.category || undefined}
+                    onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select category"
+                  />
 
                   {/* Amount */}
                   <div className="space-y-2">
@@ -299,24 +294,20 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                     />
                   </div>
 
-                  {/* Recurrence */}
-                  <div className="space-y-2">
-                    <Label htmlFor="recurrence">Recurrence *</Label>
-                    <Select
-                      value={formData.recurrence}
-                      onValueChange={(value) => handleInputChange('recurrence', value as ExpenseRecurrence)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="quarterly">Quarterly</SelectItem>
-                        <SelectItem value="yearly">Yearly</SelectItem>
-                        <SelectItem value="custom">Custom</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <UnifiedSelector
+                    label="Recurrence"
+                    required
+                    type="recurrence"
+                    items={[
+                      { id: 'monthly', name: 'Monthly' },
+                      { id: 'quarterly', name: 'Quarterly' },
+                      { id: 'yearly', name: 'Yearly' },
+                      { id: 'custom', name: 'Custom' },
+                    ]}
+                    selectedId={formData.recurrence || undefined}
+                    onSelect={(item) => handleInputChange('recurrence', String(item.id) as ExpenseRecurrence)}
+                    placeholder="Select recurrence"
+                  />
 
                   {/* Start Date */}
                   <div className="space-y-2">

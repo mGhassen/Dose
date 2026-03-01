@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
@@ -15,7 +15,6 @@ import { useCreateExpense, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseCategory } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
-import Link from "next/link";
 
 export default function CreateExpensePage() {
   const router = useRouter();
@@ -89,29 +88,24 @@ export default function CreateExpensePage() {
                   />
                 </div>
 
-                {/* Category */}
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category *</Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => handleInputChange('category', value)}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="rent">Rent</SelectItem>
-                      <SelectItem value="utilities">Utilities</SelectItem>
-                      <SelectItem value="supplies">Supplies</SelectItem>
-                      <SelectItem value="marketing">Marketing</SelectItem>
-                      <SelectItem value="insurance">Insurance</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="professional_services">Professional Services</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <UnifiedSelector
+                  label="Category"
+                  required
+                  type="category"
+                  items={[
+                    { id: 'rent', name: 'Rent' },
+                    { id: 'utilities', name: 'Utilities' },
+                    { id: 'supplies', name: 'Supplies' },
+                    { id: 'marketing', name: 'Marketing' },
+                    { id: 'insurance', name: 'Insurance' },
+                    { id: 'maintenance', name: 'Maintenance' },
+                    { id: 'professional_services', name: 'Professional Services' },
+                    { id: 'other', name: 'Other' },
+                  ]}
+                  selectedId={formData.category || undefined}
+                  onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
+                  placeholder="Select category"
+                />
 
                 {/* Amount */}
                 <div className="space-y-2">
@@ -141,28 +135,15 @@ export default function CreateExpensePage() {
 
                 {/* Supplier/Vendor */}
                 <div className="space-y-2">
-                  <Label htmlFor="supplierId">Vendor</Label>
-                  <Select
-                    value={formData.supplierId || "none"}
-                    onValueChange={(value) => handleInputChange('supplierId', value === "none" ? "" : value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select vendor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {suppliers.map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formData.supplierId && (
-                    <Link href={`/inventory-suppliers/${formData.supplierId}`} className="text-xs text-blue-600 hover:underline">
-                      View vendor details →
-                    </Link>
-                  )}
+                  <UnifiedSelector
+                    label="Vendor"
+                    type="vendor"
+                    items={suppliers}
+                    selectedId={formData.supplierId ? parseInt(formData.supplierId) : undefined}
+                    onSelect={(item) => handleInputChange('supplierId', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select vendor"
+                    manageLink={formData.supplierId ? { href: `/inventory-suppliers/${formData.supplierId}`, text: "View vendor details →" } : undefined}
+                  />
                 </div>
 
               </div>

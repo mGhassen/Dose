@@ -35,7 +35,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from 'next-intl';
 import DataTable from "@kit/ui/data-table";
 import { UnifiedFilter, FilterOption, FilterState } from "@/components/unified-filter";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import GridView, { GridColumn, GridRow } from "@/components/grid-view";
 import ViewToggle from "@/components/view-toggle";
 import { formatMonthYear } from "@kit/lib/date-format";
@@ -1243,23 +1243,20 @@ export default function DataTablePage<T>({
                 </span>
                 <div className="flex items-center gap-1.5">
                   <span className="text-muted-foreground">per page</span>
-                  <Select 
-                    value={String(pagination.pageSize)} 
-                    onValueChange={(value) => {
-                      const newPageSize = parseInt(value, 10);
-                      pagination.onPageSizeChange(newPageSize);
-                    }}
-                  >
-                    <SelectTrigger className="h-7 w-14 text-xs border-border/60">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <UnifiedSelector
+                    label=""
+                    type="pageSize"
+                    className="h-7 w-14 text-xs border-border/60"
+                    items={[
+                      { id: '10', name: '10' },
+                      { id: '20', name: '20' },
+                      { id: '50', name: '50' },
+                      { id: '100', name: '100' },
+                    ]}
+                    selectedId={String(pagination.pageSize)}
+                    onSelect={(item) => pagination.onPageSizeChange(parseInt(String(item.id), 10))}
+                    placeholder=""
+                  />
                 </div>
               </div>
               {pagination.totalPages > 1 && (

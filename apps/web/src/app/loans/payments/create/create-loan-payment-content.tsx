@@ -6,7 +6,7 @@ import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
 import { Save, X, ChevronLeft, ChevronRight } from "lucide-react";
@@ -23,7 +23,7 @@ export default function CreateLoanPaymentPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<'select-loan' | 'select-schedule' | 'make-payment'>('select-loan');
-  const [selectedLoanId, setSelectedLoanId] = useState<string>("");
+  const [selectedLoanId, setSelectedLoanId] = useState<string | number | undefined>(undefined);
   const [selectedScheduleEntry, setSelectedScheduleEntry] = useState<LoanScheduleEntry | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
   const [paymentDate, setPaymentDate] = useState<string>(dateToYYYYMMDD(new Date()));
@@ -31,11 +31,12 @@ export default function CreateLoanPaymentPage() {
   const [paymentNotes, setPaymentNotes] = useState<string>("");
   
   const { data: loans } = useLoans();
-  const { data: schedule } = useLoanSchedule(selectedLoanId);
+  const loanIdStr = selectedLoanId != null ? String(selectedLoanId) : "";
+  const { data: schedule } = useLoanSchedule(loanIdStr);
   const { data: entriesData } = useEntries({
     direction: 'output',
     entryType: 'loan_payment',
-    referenceId: selectedLoanId ? parseInt(selectedLoanId) : undefined,
+    referenceId: selectedLoanId != null ? (typeof selectedLoanId === 'number' ? selectedLoanId : parseInt(selectedLoanId, 10)) : undefined,
     includePayments: true,
   });
   
@@ -105,7 +106,7 @@ export default function CreateLoanPaymentPage() {
             description: `Principal: ${selectedScheduleEntry.principalPayment}, Interest: ${selectedScheduleEntry.interestPayment}`,
             entryDate: selectedScheduleEntry.paymentDate,
             dueDate: selectedScheduleEntry.paymentDate,
-            referenceId: parseInt(selectedLoanId),
+            referenceId: typeof selectedLoanId === 'number' ? selectedLoanId : parseInt(String(selectedLoanId), 10),
             scheduleEntryId: selectedScheduleEntry.id,
             isActive: true,
           }),
@@ -135,7 +136,7 @@ export default function CreateLoanPaymentPage() {
       });
 
       queryClient.invalidateQueries({ queryKey: ['entries'] });
-      queryClient.invalidateQueries({ queryKey: ['loans', selectedLoanId, 'schedule'] });
+      queryClient.invalidateQueries({ queryKey: ['loans', loanIdStr, 'schedule'] });
       toast.success("Payment recorded successfully");
       router.push('/loans/output');
     } catch (error: any) {
@@ -143,7 +144,7 @@ export default function CreateLoanPaymentPage() {
     }
   };
 
-  const selectedLoan = loans?.find((l: Loan) => l.id.toString() === selectedLoanId);
+  const selectedLoan = loans?.find((l: Loan) => selectedLoanId != null && l.id.toString() === String(selectedLoanId));
 
   return (
     <AppLayout>
@@ -171,21 +172,21 @@ export default function CreateLoanPaymentPage() {
                 <CardDescription>Choose a loan to make a payment for</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="loan-select">Loan *</Label>
-                  <Select value={selectedLoanId} onValueChange={setSelectedLoanId}>
-                    <SelectTrigger id="loan-select">
-                      <SelectValue placeholder="Choose a loan..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {loans?.map((loan: Loan) => (
-                        <SelectItem key={loan.id} value={loan.id.toString()}>
-                          {loan.name} ({loan.loanNumber}) - {formatCurrency(loan.principalAmount)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <UnifiedSelector
+                  id="loan-select"
+                  label="Loan"
+                  required
+                  type="loan"
+                  items={loans?.map((loan: Loan) => ({
+                    id: loan.id,
+                    name: `${loan.name} (${loan.loanNumber}) - ${formatCurrency(loan.principalAmount)}`,
+                    ...loan,
+                  })) ?? []}
+                  selectedId={selectedLoanId}
+                  onSelect={(item) => setSelectedLoanId(item.id === 0 ? undefined : item.id)}
+                  placeholder="Choose a loan..."
+                  getDisplayName={(item) => (item as Loan).name ? `${(item as Loan).name} (${(item as Loan).loanNumber}) - ${formatCurrency((item as Loan).principalAmount)}` : String(item.name)}
+                />
                 {selectedLoanId && (
                   <div className="flex justify-end">
                     <Button
@@ -402,19 +403,19 @@ export default function CreateLoanPaymentPage() {
                           Maximum: {formatCurrency(remainingToPay)}
                         </p>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="payment-method">Payment Method</Label>
-                        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                          <SelectTrigger id="payment-method">
-                            <SelectValue placeholder="Select payment method" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cash">Cash</SelectItem>
-                            <SelectItem value="card">Card</SelectItem>
-                            <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <UnifiedSelector
+                        label="Payment Method"
+                        type="method"
+                        id="payment-method"
+                        items={[
+                          { id: 'cash', name: 'Cash' },
+                          { id: 'card', name: 'Card' },
+                          { id: 'bank_transfer', name: 'Bank Transfer' },
+                        ]}
+                        selectedId={paymentMethod || undefined}
+                        onSelect={(item) => setPaymentMethod(item.id === 0 ? 'bank_transfer' : String(item.id))}
+                        placeholder="Select payment method"
+                      />
                       <div className="space-y-2">
                         <Label htmlFor="payment-notes">Notes (optional)</Label>
                         <Input

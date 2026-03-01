@@ -2,7 +2,7 @@
 
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Download, FileSpreadsheet, FileText, FileImage } from "lucide-react";
 import { toast } from "@kit/hooks";
 
@@ -174,33 +174,27 @@ export function ExportData({ data, filename = "export", className = "" }: Export
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Select onValueChange={handleExport}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose export format" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="csv">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    CSV (Comma Separated Values)
-                  </div>
-                </SelectItem>
-                <SelectItem value="excel">
-                  <div className="flex items-center gap-2">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    Excel (.xlsx)
-                  </div>
-                </SelectItem>
-                <SelectItem value="json">
-                  <div className="flex items-center gap-2">
-                    <FileImage className="h-4 w-4" />
-                    JSON (JavaScript Object Notation)
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <UnifiedSelector
+            label=""
+            type="format"
+            className="w-full"
+            items={[
+              { id: 'csv', name: 'CSV (Comma Separated Values)' },
+              { id: 'excel', name: 'Excel (.xlsx)' },
+              { id: 'json', name: 'JSON (JavaScript Object Notation)' },
+            ]}
+            selectedId={undefined}
+            onSelect={(item) => { if (item.id !== 0) handleExport(String(item.id)); }}
+            placeholder="Choose export format"
+            renderItem={(item) => (
+              <div className="flex items-center gap-2">
+                {item.id === 'csv' && <FileText className="h-4 w-4" />}
+                {item.id === 'excel' && <FileSpreadsheet className="h-4 w-4" />}
+                {item.id === 'json' && <FileImage className="h-4 w-4" />}
+                <span>{item.name}</span>
+              </div>
+            )}
+          />
           
           <div className="text-sm text-muted-foreground">
             <p>• CSV: Best for data analysis and spreadsheet applications</p>

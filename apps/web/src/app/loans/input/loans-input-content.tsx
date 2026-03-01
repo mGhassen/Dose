@@ -12,7 +12,7 @@ import { Button } from "@kit/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Plus, Trash2, MoreVertical } from "lucide-react";
 import {
   DropdownMenu,
@@ -387,19 +387,19 @@ export default function LoansInputContent() {
                     Maximum: {formatCurrency(remainingToPay)}
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="paymentMethod">Payment Method</Label>
-                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                    <SelectTrigger id="paymentMethod">
-                      <SelectValue placeholder="Select payment method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="card">Card</SelectItem>
-                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <UnifiedSelector
+                  label="Payment Method"
+                  type="method"
+                  id="paymentMethod"
+                  items={[
+                    { id: 'cash', name: 'Cash' },
+                    { id: 'card', name: 'Card' },
+                    { id: 'bank_transfer', name: 'Bank Transfer' },
+                  ]}
+                  selectedId={paymentMethod || undefined}
+                  onSelect={(item) => setPaymentMethod(item.id === 0 ? 'bank_transfer' : String(item.id))}
+                  placeholder="Select payment method"
+                />
                 <div className="space-y-2">
                   <Label htmlFor="paymentNotes">Notes (optional)</Label>
                   <Input

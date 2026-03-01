@@ -7,13 +7,7 @@ import { Button } from "@kit/ui/button";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { 
   Wand2, 
   X, 
@@ -479,19 +473,19 @@ export default function BudgetsPage() {
                 className="mt-1"
               />
             </div>
-            <div>
-              <Label htmlFor="budget-period">Budget Period*</Label>
-              <Select value={budgetPeriod} onValueChange={setBudgetPeriod}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <UnifiedSelector
+              label="Budget Period"
+              required
+              type="period"
+              items={[
+                { id: 'monthly', name: 'Monthly' },
+                { id: 'quarterly', name: 'Quarterly' },
+                { id: 'yearly', name: 'Yearly' },
+              ]}
+              selectedId={budgetPeriod || undefined}
+              onSelect={(item) => setBudgetPeriod(String(item.id))}
+              placeholder="Select period"
+            />
             <div className="flex items-end gap-2">
               <Button
                 variant="link"

@@ -4,7 +4,7 @@ import { useUserSettings } from '@/components/user-settings-provider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { Label } from '@kit/ui/label';
 import { Switch } from '@kit/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@kit/ui/select';
+import { UnifiedSelector } from '@/components/unified-selector';
 import { Badge } from '@kit/ui/badge';
 import { Settings } from 'lucide-react';
 import AppLayout from '@/components/app-layout';
@@ -90,38 +90,29 @@ export default function UserSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="theme">Thème</Label>
-                <Select
-                  value={settings.theme}
-                  onValueChange={(value: 'light' | 'dark' | 'auto') => updateSetting('theme', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="light">Clair</SelectItem>
-                    <SelectItem value="dark">Sombre</SelectItem>
-                    <SelectItem value="auto">Automatique</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="language">Langue</Label>
-                <Select
-                  value={settings.language}
-                  onValueChange={(value: 'fr' | 'en') => updateSetting('language', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="fr">Français</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <UnifiedSelector
+                label="Thème"
+                type="theme"
+                items={[
+                  { id: 'light', name: 'Clair' },
+                  { id: 'dark', name: 'Sombre' },
+                  { id: 'auto', name: 'Automatique' },
+                ]}
+                selectedId={settings.theme || undefined}
+                onSelect={(item) => updateSetting('theme', String(item.id) as 'light' | 'dark' | 'auto')}
+                placeholder="Select theme"
+              />
+              <UnifiedSelector
+                label="Langue"
+                type="language"
+                items={[
+                  { id: 'fr', name: 'Français' },
+                  { id: 'en', name: 'English' },
+                ]}
+                selectedId={settings.language || undefined}
+                onSelect={(item) => updateSetting('language', String(item.id) as 'fr' | 'en')}
+                placeholder="Select language"
+              />
             </div>
           </CardContent>
         </Card>
@@ -136,99 +127,85 @@ export default function UserSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="timezone">Fuseau horaire</Label>
-                <Select
-                  value={settings.timezone}
-                  onValueChange={(value) => updateSetting('timezone', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UTC">UTC (UTC+0)</SelectItem>
-                    <SelectItem value="Europe/London">Europe/London (UTC+0)</SelectItem>
-                    <SelectItem value="Europe/Paris">Europe/Paris (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Berlin">Europe/Berlin (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Rome">Europe/Rome (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Madrid">Europe/Madrid (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Amsterdam">Europe/Amsterdam (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Brussels">Europe/Brussels (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Zurich">Europe/Zurich (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Vienna">Europe/Vienna (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Prague">Europe/Prague (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Warsaw">Europe/Warsaw (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Stockholm">Europe/Stockholm (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Oslo">Europe/Oslo (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Copenhagen">Europe/Copenhagen (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/Helsinki">Europe/Helsinki (UTC+2)</SelectItem>
-                    <SelectItem value="Europe/Athens">Europe/Athens (UTC+2)</SelectItem>
-                    <SelectItem value="Europe/Bucharest">Europe/Bucharest (UTC+2)</SelectItem>
-                    <SelectItem value="Europe/Sofia">Europe/Sofia (UTC+2)</SelectItem>
-                    <SelectItem value="Europe/Moscow">Europe/Moscow (UTC+3)</SelectItem>
-                    <SelectItem value="America/New_York">America/New_York (UTC-5)</SelectItem>
-                    <SelectItem value="America/Chicago">America/Chicago (UTC-6)</SelectItem>
-                    <SelectItem value="America/Denver">America/Denver (UTC-7)</SelectItem>
-                    <SelectItem value="America/Los_Angeles">America/Los_Angeles (UTC-8)</SelectItem>
-                    <SelectItem value="America/Toronto">America/Toronto (UTC-5)</SelectItem>
-                    <SelectItem value="America/Montreal">America/Montreal (UTC-5)</SelectItem>
-                    <SelectItem value="America/Vancouver">America/Vancouver (UTC-8)</SelectItem>
-                    <SelectItem value="Asia/Tokyo">Asia/Tokyo (UTC+9)</SelectItem>
-                    <SelectItem value="Asia/Shanghai">Asia/Shanghai (UTC+8)</SelectItem>
-                    <SelectItem value="Asia/Hong_Kong">Asia/Hong_Kong (UTC+8)</SelectItem>
-                    <SelectItem value="Asia/Singapore">Asia/Singapore (UTC+8)</SelectItem>
-                    <SelectItem value="Asia/Seoul">Asia/Seoul (UTC+9)</SelectItem>
-                    <SelectItem value="Asia/Dubai">Asia/Dubai (UTC+4)</SelectItem>
-                    <SelectItem value="Asia/Kolkata">Asia/Kolkata (UTC+5:30)</SelectItem>
-                    <SelectItem value="Asia/Bangkok">Asia/Bangkok (UTC+7)</SelectItem>
-                    <SelectItem value="Australia/Sydney">Australia/Sydney (UTC+10)</SelectItem>
-                    <SelectItem value="Australia/Melbourne">Australia/Melbourne (UTC+10)</SelectItem>
-                    <SelectItem value="Australia/Perth">Australia/Perth (UTC+8)</SelectItem>
-                    <SelectItem value="Pacific/Auckland">Pacific/Auckland (UTC+12)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dateFormat">Format de date</Label>
-                <Select
-                  value={settings.dateFormat}
-                  onValueChange={(value) => updateSetting('dateFormat', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DD/MM/YYYY">DD/MM/YYYY (31/12/2024)</SelectItem>
-                    <SelectItem value="MM/DD/YYYY">MM/DD/YYYY (12/31/2024)</SelectItem>
-                    <SelectItem value="YYYY-MM-DD">YYYY-MM-DD (2024-12-31)</SelectItem>
-                    <SelectItem value="DD-MM-YYYY">DD-MM-YYYY (31-12-2024)</SelectItem>
-                    <SelectItem value="MM-DD-YYYY">MM-DD-YYYY (12-31-2024)</SelectItem>
-                    <SelectItem value="DD.MM.YYYY">DD.MM.YYYY (31.12.2024)</SelectItem>
-                    <SelectItem value="MM.DD.YYYY">MM.DD.YYYY (12.31.2024)</SelectItem>
-                    <SelectItem value="DD MMM YYYY">DD MMM YYYY (31 Dec 2024)</SelectItem>
-                    <SelectItem value="MMM DD, YYYY">MMM DD, YYYY (Dec 31, 2024)</SelectItem>
-                    <SelectItem value="DD MMMM YYYY">DD MMMM YYYY (31 December 2024)</SelectItem>
-                    <SelectItem value="MMMM DD, YYYY">MMMM DD, YYYY (December 31, 2024)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="timeFormat">Format d'heure</Label>
-                <Select
-                  value={settings.timeFormat}
-                  onValueChange={(value: '12h' | '24h') => updateSetting('timeFormat', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="12h">12 heures</SelectItem>
-                    <SelectItem value="24h">24 heures</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <UnifiedSelector
+                label="Fuseau horaire"
+                type="timezone"
+                items={[
+                  { id: 'UTC', name: 'UTC (UTC+0)' },
+                  { id: 'Europe/London', name: 'Europe/London (UTC+0)' },
+                  { id: 'Europe/Paris', name: 'Europe/Paris (UTC+1)' },
+                  { id: 'Europe/Berlin', name: 'Europe/Berlin (UTC+1)' },
+                  { id: 'Europe/Rome', name: 'Europe/Rome (UTC+1)' },
+                  { id: 'Europe/Madrid', name: 'Europe/Madrid (UTC+1)' },
+                  { id: 'Europe/Amsterdam', name: 'Europe/Amsterdam (UTC+1)' },
+                  { id: 'Europe/Brussels', name: 'Europe/Brussels (UTC+1)' },
+                  { id: 'Europe/Zurich', name: 'Europe/Zurich (UTC+1)' },
+                  { id: 'Europe/Vienna', name: 'Europe/Vienna (UTC+1)' },
+                  { id: 'Europe/Prague', name: 'Europe/Prague (UTC+1)' },
+                  { id: 'Europe/Warsaw', name: 'Europe/Warsaw (UTC+1)' },
+                  { id: 'Europe/Stockholm', name: 'Europe/Stockholm (UTC+1)' },
+                  { id: 'Europe/Oslo', name: 'Europe/Oslo (UTC+1)' },
+                  { id: 'Europe/Copenhagen', name: 'Europe/Copenhagen (UTC+1)' },
+                  { id: 'Europe/Helsinki', name: 'Europe/Helsinki (UTC+2)' },
+                  { id: 'Europe/Athens', name: 'Europe/Athens (UTC+2)' },
+                  { id: 'Europe/Bucharest', name: 'Europe/Bucharest (UTC+2)' },
+                  { id: 'Europe/Sofia', name: 'Europe/Sofia (UTC+2)' },
+                  { id: 'Europe/Moscow', name: 'Europe/Moscow (UTC+3)' },
+                  { id: 'America/New_York', name: 'America/New_York (UTC-5)' },
+                  { id: 'America/Chicago', name: 'America/Chicago (UTC-6)' },
+                  { id: 'America/Denver', name: 'America/Denver (UTC-7)' },
+                  { id: 'America/Los_Angeles', name: 'America/Los_Angeles (UTC-8)' },
+                  { id: 'America/Toronto', name: 'America/Toronto (UTC-5)' },
+                  { id: 'America/Montreal', name: 'America/Montreal (UTC-5)' },
+                  { id: 'America/Vancouver', name: 'America/Vancouver (UTC-8)' },
+                  { id: 'Asia/Tokyo', name: 'Asia/Tokyo (UTC+9)' },
+                  { id: 'Asia/Shanghai', name: 'Asia/Shanghai (UTC+8)' },
+                  { id: 'Asia/Hong_Kong', name: 'Asia/Hong_Kong (UTC+8)' },
+                  { id: 'Asia/Singapore', name: 'Asia/Singapore (UTC+8)' },
+                  { id: 'Asia/Seoul', name: 'Asia/Seoul (UTC+9)' },
+                  { id: 'Asia/Dubai', name: 'Asia/Dubai (UTC+4)' },
+                  { id: 'Asia/Kolkata', name: 'Asia/Kolkata (UTC+5:30)' },
+                  { id: 'Asia/Bangkok', name: 'Asia/Bangkok (UTC+7)' },
+                  { id: 'Australia/Sydney', name: 'Australia/Sydney (UTC+10)' },
+                  { id: 'Australia/Melbourne', name: 'Australia/Melbourne (UTC+10)' },
+                  { id: 'Australia/Perth', name: 'Australia/Perth (UTC+8)' },
+                  { id: 'Pacific/Auckland', name: 'Pacific/Auckland (UTC+12)' },
+                ]}
+                selectedId={settings.timezone || undefined}
+                onSelect={(item) => updateSetting('timezone', String(item.id))}
+                placeholder="Select timezone"
+              />
+              <UnifiedSelector
+                label="Format de date"
+                type="dateFormat"
+                items={[
+                  { id: 'DD/MM/YYYY', name: 'DD/MM/YYYY (31/12/2024)' },
+                  { id: 'MM/DD/YYYY', name: 'MM/DD/YYYY (12/31/2024)' },
+                  { id: 'YYYY-MM-DD', name: 'YYYY-MM-DD (2024-12-31)' },
+                  { id: 'DD-MM-YYYY', name: 'DD-MM-YYYY (31-12-2024)' },
+                  { id: 'MM-DD-YYYY', name: 'MM-DD-YYYY (12-31-2024)' },
+                  { id: 'DD.MM.YYYY', name: 'DD.MM.YYYY (31.12.2024)' },
+                  { id: 'MM.DD.YYYY', name: 'MM.DD.YYYY (12.31.2024)' },
+                  { id: 'DD MMM YYYY', name: 'DD MMM YYYY (31 Dec 2024)' },
+                  { id: 'MMM DD, YYYY', name: 'MMM DD, YYYY (Dec 31, 2024)' },
+                  { id: 'DD MMMM YYYY', name: 'DD MMMM YYYY (31 December 2024)' },
+                  { id: 'MMMM DD, YYYY', name: 'MMMM DD, YYYY (December 31, 2024)' },
+                ]}
+                selectedId={settings.dateFormat || undefined}
+                onSelect={(item) => updateSetting('dateFormat', String(item.id))}
+                placeholder="Select date format"
+              />
+              <UnifiedSelector
+                label="Format d'heure"
+                type="timeFormat"
+                items={[
+                  { id: '12h', name: '12 heures' },
+                  { id: '24h', name: '24 heures' },
+                ]}
+                selectedId={settings.timeFormat || undefined}
+                onSelect={(item) => updateSetting('timeFormat', String(item.id) as '12h' | '24h')}
+                placeholder="Select time format"
+              />
             </div>
           </CardContent>
         </Card>
@@ -350,53 +327,37 @@ export default function UserSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="defaultView">Vue par défaut</Label>
-                <Select
-                  value={settings.dashboard.defaultView}
-                  onValueChange={(value) => 
-                    updateSetting('dashboard', { ...settings.dashboard, defaultView: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="overview">Vue d'ensemble</SelectItem>
-                    <SelectItem value="detailed">Vue détaillée</SelectItem>
-                    <SelectItem value="compact">Vue compacte</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="refreshInterval">Intervalle de rafraîchissement</Label>
-                <Select
-                  value={settings.dashboard.refreshInterval.toString()}
-                  onValueChange={(value) => 
-                    updateSetting('dashboard', { 
-                      ...settings.dashboard, 
-                      refreshInterval: parseInt(value) 
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10 secondes</SelectItem>
-                    <SelectItem value="15">15 secondes</SelectItem>
-                    <SelectItem value="30">30 secondes</SelectItem>
-                    <SelectItem value="60">1 minute</SelectItem>
-                    <SelectItem value="120">2 minutes</SelectItem>
-                    <SelectItem value="300">5 minutes</SelectItem>
-                    <SelectItem value="600">10 minutes</SelectItem>
-                    <SelectItem value="900">15 minutes</SelectItem>
-                    <SelectItem value="1800">30 minutes</SelectItem>
-                    <SelectItem value="3600">1 heure</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <UnifiedSelector
+                label="Vue par défaut"
+                type="view"
+                items={[
+                  { id: 'overview', name: "Vue d'ensemble" },
+                  { id: 'detailed', name: 'Vue détaillée' },
+                  { id: 'compact', name: 'Vue compacte' },
+                ]}
+                selectedId={settings.dashboard.defaultView || undefined}
+                onSelect={(item) => updateSetting('dashboard', { ...settings.dashboard, defaultView: String(item.id) })}
+                placeholder="Select view"
+              />
+              <UnifiedSelector
+                label="Intervalle de rafraîchissement"
+                type="interval"
+                items={[
+                  { id: '10', name: '10 secondes' },
+                  { id: '15', name: '15 secondes' },
+                  { id: '30', name: '30 secondes' },
+                  { id: '60', name: '1 minute' },
+                  { id: '120', name: '2 minutes' },
+                  { id: '300', name: '5 minutes' },
+                  { id: '600', name: '10 minutes' },
+                  { id: '900', name: '15 minutes' },
+                  { id: '1800', name: '30 minutes' },
+                  { id: '3600', name: '1 heure' },
+                ]}
+                selectedId={settings.dashboard.refreshInterval.toString()}
+                onSelect={(item) => updateSetting('dashboard', { ...settings.dashboard, refreshInterval: parseInt(String(item.id)) })}
+                placeholder="Select interval"
+              />
             </div>
 
             <div className="space-y-2">

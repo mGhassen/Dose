@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Outfit } from "next/font/google";
+import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from '@kit/ui/tooltip';
 import { AuthProvider } from '@kit/hooks/use-auth';
@@ -7,9 +7,9 @@ import Providers from "./providers";
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 
-const outfit = Outfit({
-  variable: "--font-outfit",
+const fontSans = DM_Sans({
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -54,8 +54,8 @@ export default async function RootLayout({
   } as const;
   
   return (
-    <html suppressHydrationWarning>
-      <body className={`${outfit.variable} antialiased h-full overflow-hidden`}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${fontSans.className} antialiased h-full overflow-hidden`}>
         {/* Expose migration config to client runtime for MSW */}
         <script
           dangerouslySetInnerHTML={{

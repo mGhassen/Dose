@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateStockMovement, useItems } from "@kit/hooks";
@@ -100,44 +100,31 @@ export default function CreateStockMovementPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="itemId">Item *</Label>
-                  <Select
-                    value={formData.itemId}
-                    onValueChange={(value) => handleInputChange('itemId', value)}
+                  <UnifiedSelector
+                    label="Item"
                     required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select item" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {items.filter(i => i.isActive && i.itemType === 'item').map((item) => (
-                        <SelectItem key={item.id} value={item.id.toString()}>
-                          {item.name} ({item.unit})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    type="item"
+                    items={items.filter(i => i.isActive && i.itemType === 'item').map((item) => ({
+                      ...item,
+                      id: item.id,
+                      name: `${item.name} (${item.unit})`,
+                    }))}
+                    selectedId={formData.itemId ? parseInt(formData.itemId) : undefined}
+                    onSelect={(item) => handleInputChange('itemId', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select item"
+                    getDisplayName={(item) => item.name ?? `Item ${item.id}`}
+                  />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="movementType">Movement Type *</Label>
-                  <Select
-                    value={formData.movementType}
-                    onValueChange={(value) => handleInputChange('movementType', value as StockMovementType)}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {movementTypeOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <UnifiedSelector
+                  label="Movement Type"
+                  required
+                  type="type"
+                  items={movementTypeOptions.map((o) => ({ id: o.value, name: o.label }))}
+                  selectedId={formData.movementType || undefined}
+                  onSelect={(item) => handleInputChange('movementType', String(item.id) as StockMovementType)}
+                  placeholder="Select type"
+                />
 
                 <div className="space-y-2">
                   <Label htmlFor="quantity">Quantity *</Label>

@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "@kit/ui/button";
 import { Input } from "@kit/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
@@ -390,7 +390,7 @@ export default function DataTable({
       if (isAllSelected) {
         setInternalSelectedRows(new Set());
       } else {
-        setInternalSelectedRows(new Set(allIds));
+        setInternalSelectedRows(new Set(allRowIds));
       }
     }
   };
@@ -472,29 +472,29 @@ export default function DataTable({
       const capturedRowId = rowId;
       
       return (
-      <div
-        key={rowKey}
-        className={`flex items-center border-b border-border hover:bg-muted/50 transition-colors group ${
-          onRowClick ? "cursor-pointer" : ""
-        }`}
-        onClick={() => onRowClick?.(row)}
-      >
+        <div
+          key={rowKey}
+          className={`flex items-center border-b border-border hover:bg-muted/50 transition-colors group ${
+            onRowClick ? "cursor-pointer" : ""
+          }`}
+          onClick={() => onRowClick?.(row)}
+        >
         {selectable && (
           <div className="p-3">
             <Checkbox
               checked={isSelected}
               onCheckedChange={(checked) => {
                 // Use captured rowId to ensure we're selecting the correct row
-                if (capturedRowId !== undefined) {
+                if (capturedRowId !== undefined && typeof checked === 'boolean') {
                   handleRowSelect(capturedRowId, checked);
                 }
               }}
               onClick={(e) => e.stopPropagation()}
             />
           </div>
-        )}
-        
-        {getVisibleColumns().map((column) => {
+          )}
+          
+          {getVisibleColumns().map((column) => {
           const value = row[column.key];
           const linkHref = column.linkTo ? column.linkTo(value, row) : null;
           
@@ -518,9 +518,10 @@ export default function DataTable({
               )}
             </div>
           );
-        })}
-      </div>
-    ));
+          })}
+        </div>
+      );
+    });
   };
 
   return (
@@ -588,19 +589,18 @@ export default function DataTable({
             )}
             
             <div className="flex gap-2">
-              <Select value={groupBy} onValueChange={setGroupBy}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Group by..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Grouping</SelectItem>
-                  {groupOptions.map((option) => (
-                    <SelectItem key={option.key} value={option.key}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <UnifiedSelector
+                label=""
+                type="groupBy"
+                className="w-48"
+                items={[
+                  { id: 'none', name: 'No Grouping' },
+                  ...groupOptions.map((o) => ({ id: o.key, name: o.label })),
+                ]}
+                selectedId={groupBy || undefined}
+                onSelect={(item) => setGroupBy(String(item.id))}
+                placeholder="Group by..."
+              />
               
               {filterOptions.length > 0 && (
                 <Button
@@ -666,22 +666,17 @@ export default function DataTable({
                 <div key={filter.key}>
                   <label className="text-sm font-medium">{filter.label}</label>
                   {filter.type === 'select' ? (
-                    <Select 
-                      value={filters[filter.key] || 'all'} 
-                      onValueChange={(value) => setFilters(prev => ({ ...prev, [filter.key]: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All {filter.label}</SelectItem>
-                        {filter.options?.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <UnifiedSelector
+                      label=""
+                      type={filter.key}
+                      items={[
+                        { id: 'all', name: `All ${filter.label}` },
+                        ...(filter.options?.map((o) => ({ id: o.value, name: o.label })) ?? []),
+                      ]}
+                      selectedId={filters[filter.key] || 'all'}
+                      onSelect={(item) => setFilters(prev => ({ ...prev, [filter.key]: item.id === 0 ? 'all' : String(item.id) }))}
+                      placeholder={`Select ${filter.label}`}
+                    />
                   ) : filter.type === 'date' ? (
                     <Input
                       type="date"
@@ -861,18 +856,21 @@ export default function DataTable({
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Rows per page:</span>
-              <Select value={currentPageSize.toString()} onValueChange={(value) => setCurrentPageSize(parseInt(value))}>
-                <SelectTrigger className="w-20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5</SelectItem>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="20">20</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
-                </SelectContent>
-              </Select>
+              <UnifiedSelector
+                label=""
+                type="pageSize"
+                className="w-20"
+                items={[
+                  { id: '5', name: '5' },
+                  { id: '10', name: '10' },
+                  { id: '20', name: '20' },
+                  { id: '50', name: '50' },
+                  { id: '100', name: '100' },
+                ]}
+                selectedId={currentPageSize.toString()}
+                onSelect={(item) => setCurrentPageSize(parseInt(String(item.id)))}
+                placeholder=""
+              />
             </div>
           </div>
           {totalPages > 1 && (

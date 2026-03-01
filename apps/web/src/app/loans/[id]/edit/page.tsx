@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useLoanById, useUpdateLoan, useInventorySuppliers } from "@kit/hooks";
@@ -216,49 +216,31 @@ export default function EditLoanPage({ params }: EditLoanPageProps) {
                   />
                 </div>
 
-                {/* Status */}
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status *</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => handleInputChange('status', value)}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="paid_off">Paid Off</SelectItem>
-                      <SelectItem value="defaulted">Defaulted</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <UnifiedSelector
+                  label="Status"
+                  required
+                  type="status"
+                  items={[
+                    { id: 'active', name: 'Active' },
+                    { id: 'paid_off', name: 'Paid Off' },
+                    { id: 'defaulted', name: 'Defaulted' },
+                  ]}
+                  selectedId={formData.status || undefined}
+                  onSelect={(item) => handleInputChange('status', item.id === 0 ? '' : String(item.id))}
+                  placeholder="Select status"
+                />
 
                 {/* Lender/Supplier */}
                 <div className="space-y-2">
-                  <Label htmlFor="supplierId">Lender</Label>
-                  <Select
-                    value={formData.supplierId || "none"}
-                    onValueChange={(value) => handleInputChange('supplierId', value === "none" ? "" : value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select lender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {suppliers.map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formData.supplierId && (
-                    <Link href={`/inventory-suppliers/${formData.supplierId}`} className="text-xs text-blue-600 hover:underline">
-                      View lender details →
-                    </Link>
-                  )}
+                  <UnifiedSelector
+                    label="Lender"
+                    type="lender"
+                    items={suppliers}
+                    selectedId={formData.supplierId ? parseInt(formData.supplierId) : undefined}
+                    onSelect={(item) => handleInputChange('supplierId', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select lender"
+                    manageLink={formData.supplierId ? { href: `/inventory-suppliers/${formData.supplierId}`, text: "View lender details →" } : undefined}
+                  />
                 </div>
               </div>
 

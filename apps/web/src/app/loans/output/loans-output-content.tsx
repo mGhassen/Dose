@@ -10,8 +10,7 @@ import type { Loan } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Button } from "@kit/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@kit/ui/dialog";
-import { Label } from "@kit/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
@@ -21,7 +20,7 @@ export default function LoansOutputContent() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [isLoanSelectDialogOpen, setIsLoanSelectDialogOpen] = useState(false);
-  const [selectedLoanId, setSelectedLoanId] = useState<string>("");
+  const [selectedLoanId, setSelectedLoanId] = useState<string | number | undefined>(undefined);
   
   const { data: entriesData, isLoading } = useEntries({ 
     direction: 'output', 
@@ -39,7 +38,7 @@ export default function LoansOutputContent() {
 
   const handleLoanSelect = () => {
     if (selectedLoanId) {
-      router.push(`/loans/${selectedLoanId}/schedule`);
+      router.push(`/loans/${String(selectedLoanId)}/schedule`);
     }
   };
 
@@ -240,28 +239,30 @@ export default function LoansOutputContent() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="loan-select">Loan *</Label>
-              <Select value={selectedLoanId} onValueChange={setSelectedLoanId}>
-                <SelectTrigger id="loan-select">
-                  <SelectValue placeholder="Choose a loan..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {loans?.map((loan: Loan) => (
-                    <SelectItem key={loan.id} value={loan.id.toString()}>
-                      {loan.name} ({loan.loanNumber}) - {formatCurrency(loan.principalAmount)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <UnifiedSelector
+              id="loan-select"
+              label="Loan"
+              required
+              type="loan"
+              items={loans?.map((loan: Loan) => ({
+                id: loan.id,
+                name: `${loan.name} (${loan.loanNumber}) - ${formatCurrency(loan.principalAmount)}`,
+                ...loan,
+              })) ?? []}
+              selectedId={selectedLoanId || undefined}
+              onSelect={(item) => setSelectedLoanId(item.id === 0 ? undefined : item.id)}
+              placeholder="Choose a loan..."
+              getDisplayName={(item) =>
+                item.name ?? `${(item as Loan).name} (${(item as Loan).loanNumber}) - ${formatCurrency((item as Loan).principalAmount)}`
+              }
+            />
           </div>
           <div className="flex justify-end space-x-2">
             <Button
               variant="outline"
               onClick={() => {
                 setIsLoanSelectDialogOpen(false);
-                setSelectedLoanId("");
+                setSelectedLoanId(undefined);
               }}
             >
               Cancel

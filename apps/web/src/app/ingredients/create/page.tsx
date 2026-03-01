@@ -8,7 +8,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X, Info } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateIngredient } from "@kit/hooks";
@@ -128,21 +128,14 @@ export default function CreateIngredientPage() {
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  <Select
-                    value={formData.unit}
-                    onValueChange={(value) => handleInputChange('unit', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COMMON_UNITS.map((unit) => (
-                        <SelectItem key={unit.value} value={unit.value}>
-                          {unit.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <UnifiedSelector
+                    label=""
+                    type="unit"
+                    items={COMMON_UNITS.map((u) => ({ id: u.value, name: u.label }))}
+                    selectedId={formData.unit || undefined}
+                    onSelect={(item) => handleInputChange('unit', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select unit"
+                  />
                   <Input
                     value={formData.unit}
                     onChange={(e) => handleInputChange('unit', e.target.value)}
@@ -166,21 +159,14 @@ export default function CreateIngredientPage() {
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => handleInputChange('category', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COMMON_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <UnifiedSelector
+                    label=""
+                    type="category"
+                    items={COMMON_CATEGORIES.map((c) => ({ id: c, name: c }))}
+                    selectedId={formData.category || undefined}
+                    onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select category"
+                  />
                   <Input
                     value={formData.category}
                     onChange={(e) => handleInputChange('category', e.target.value)}

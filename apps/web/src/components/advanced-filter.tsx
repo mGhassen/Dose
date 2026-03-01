@@ -5,7 +5,7 @@ import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@kit/ui/select";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Calendar } from "@kit/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@kit/ui/popover";
 import { Badge } from "@kit/ui/badge";
@@ -118,34 +118,25 @@ export function AdvancedFilter({
             />
           </div>
           
-          {filterOptions.types && (
-            <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                {filterOptions.types.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {filterOptions.types && filterOptions.types.length > 0 && (
+            <UnifiedSelector
+              label=""
+              type="type"
+              items={filterOptions.types.map((t) => ({ id: t, name: t }))}
+              selectedId={filters.type || undefined}
+              onSelect={(item) => handleFilterChange('type', item.id === 0 ? '' : String(item.id))}
+              placeholder="Filter by type"
+            />
           )}
-
-          {filterOptions.statuses && (
-            <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                {filterOptions.statuses.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {status}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {filterOptions.statuses && filterOptions.statuses.length > 0 && (
+            <UnifiedSelector
+              label=""
+              type="status"
+              items={filterOptions.statuses.map((s) => ({ id: s, name: s }))}
+              selectedId={filters.status || undefined}
+              onSelect={(item) => handleFilterChange('status', item.id === 0 ? '' : String(item.id))}
+              placeholder="Filter by status"
+            />
           )}
 
           <Button
@@ -164,37 +155,28 @@ export function AdvancedFilter({
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filterOptions.locations && (
               <div>
-                <Label>Location</Label>
-                <Select value={filters.location} onValueChange={(value) => handleFilterChange('location', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select location" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filterOptions.locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id.toString()}>
-                        {location.name} ({location.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <UnifiedSelector
+                  label="Location"
+                  type="location"
+                  items={filterOptions.locations.map((loc) => ({ ...loc, name: `${loc.name} (${loc.code})` }))}
+                  selectedId={filters.location ? parseInt(filters.location) : undefined}
+                  onSelect={(item) => handleFilterChange('location', item.id === 0 ? '' : String(item.id))}
+                  placeholder="Select location"
+                />
               </div>
             )}
 
             {filterOptions.users && (
               <div>
-                <Label>User</Label>
-                <Select value={filters.user} onValueChange={(value) => handleFilterChange('user', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select user" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filterOptions.users.map((user) => (
-                      <SelectItem key={user.id} value={user.id.toString()}>
-                        {user.name} ({user.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <UnifiedSelector
+                  label="User"
+                  type="user"
+                  items={filterOptions.users}
+                  selectedId={filters.user ? parseInt(filters.user) : undefined}
+                  onSelect={(item) => handleFilterChange('user', item.id === 0 ? '' : String(item.id))}
+                  placeholder="Select user"
+                  getDisplayName={(u) => `${(u as { name?: string }).name} (${(u as { email?: string }).email})`}
+                />
               </div>
             )}
 
