@@ -12,7 +12,11 @@ import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 
-export default function SalesContent() {
+interface SalesContentProps {
+  selectedSaleId?: number;
+}
+
+export default function SalesContent({ selectedSaleId }: SalesContentProps) {
   const router = useRouter();
   const { selectedYear } = useYear();
   const [page, setPage] = useState(1);
@@ -173,11 +177,16 @@ export default function SalesContent() {
           data={sales}
           columns={columns}
           loading={isLoading}
-          onRowClick={(sale) => router.push(`/sales/${sale.id}`)}
+          onRowClick={(sale) => {
+            if (sale.id !== selectedSaleId) {
+              router.push(`/sales/${sale.id}`);
+            }
+          }}
           onDelete={handleDelete}
           onBulkDelete={handleBulkDelete}
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
+          activeRowId={selectedSaleId}
           filterColumns={[
             { value: "type", label: "Type" },
           ]}

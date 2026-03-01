@@ -38,6 +38,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@kit/ui/select";
+import { cn } from "./utils";
 
 interface DataTableProps {
   data: any[];
@@ -74,6 +75,7 @@ interface DataTableProps {
   onExpandedRowsChange?: (expandedRows: Set<number>) => void;
   renderExpandedRow?: (row: any) => ReactNode;
   isRowExpandable?: (row: any) => boolean;
+  activeRowId?: number;
 }
 
 export default function DataTable({
@@ -102,7 +104,8 @@ export default function DataTable({
   expandedRows: externalExpandedRows,
   onExpandedRowsChange,
   renderExpandedRow,
-  isRowExpandable
+  isRowExpandable,
+  activeRowId
 }: DataTableProps) {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -424,7 +427,12 @@ export default function DataTable({
                 return (
                   <Fragment key={rowId !== undefined ? `row-${rowId}` : `row-index-${rowIndex}`}>
                     <tr 
-                      className="hover:bg-muted/50 cursor-pointer transition-colors"
+                      className={cn(
+                        "cursor-pointer transition-colors",
+                        rowId === activeRowId
+                          ? "bg-primary/10 hover:bg-primary/15"
+                          : "hover:bg-muted/50"
+                      )}
                       onClick={() => handleRowClick(row)}
                     >
                       {renderExpandedRow && (

@@ -79,6 +79,7 @@ interface DataTablePageProps<T> {
   defaultView?: 'table' | 'grid';
   // Selection props
   selectable?: boolean;
+  activeRowId?: number;
 }
 
 export default function DataTablePage<T>({
@@ -108,7 +109,8 @@ export default function DataTablePage<T>({
   pagination,
   enableGridView = false,
   defaultView = 'table',
-  selectable
+  selectable,
+  activeRowId
 }: DataTablePageProps<T>) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1201,6 +1203,7 @@ export default function DataTablePage<T>({
             pageSize={pagination ? pagination.pageSize : undefined}
             onRowClick={handleRowClick}
             selectedRows={selectedRows}
+            activeRowId={activeRowId}
             onRowSelect={(rowId, selected) => {
               setSelectedRows(prev => {
                 const newSelected = new Set(prev);
