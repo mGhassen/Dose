@@ -151,18 +151,19 @@ export default function SuppliersContent() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Suppliers</h1>
-          <p className="text-muted-foreground mt-2">
-            Manage your coffee shop suppliers and vendors
-          </p>
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex-shrink-0 space-y-4 pb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Suppliers</h1>
+            <p className="text-muted-foreground mt-2">
+              Manage your coffee shop suppliers and vendors
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Summary Cards */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Suppliers</CardTitle>
@@ -215,9 +216,9 @@ export default function SuppliersContent() {
           </CardContent>
         </Card>
       </div>
+      </div>
 
-      {/* Table View */}
-      <div>
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <DataTablePage
           title=""
           description=""

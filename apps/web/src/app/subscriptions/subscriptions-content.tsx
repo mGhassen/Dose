@@ -223,27 +223,28 @@ export default function SubscriptionsContent() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Subscriptions</h1>
-          <p className="text-muted-foreground mt-2">
-            Manage recurring subscriptions and their timelines
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => router.push('/subscriptions/timeline')}
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            View Timeline
-          </Button>
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex-shrink-0 pb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Subscriptions</h1>
+            <p className="text-muted-foreground mt-2">
+              Manage recurring subscriptions and their timelines
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/subscriptions/timeline')}
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              View Timeline
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Table View */}
-      <div>
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <DataTablePage
           title=""
           description=""

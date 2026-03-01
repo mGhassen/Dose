@@ -7,7 +7,10 @@ export async function prefetchVariables(queryClient?: QueryClient) {
   try {
     await qc.prefetchQuery({
       queryKey: ['variables'],
-      queryFn: () => variablesApi.getAll(),
+      queryFn: async () => {
+        const result = await variablesApi.getAll();
+        return result?.data ?? [];
+      },
     });
   } catch {
     // Prefetch failed - client will fetch

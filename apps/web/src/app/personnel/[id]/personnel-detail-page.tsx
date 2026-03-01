@@ -55,7 +55,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   );
 
   const { data: variables } = useVariables();
-  const variablesList = variables || [];
+  const variablesList = Array.isArray(variables) ? variables : (variables?.data ?? []);
   const employeeSocialTaxVariable = useMemo(() =>
     variablesList.find((v: any) => v.name === 'Employee Social Tax Rate'),
     [variablesList]

@@ -27,7 +27,7 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
   
   // Fetch variables to get Social Security Rate
   const { data: variables } = useVariables();
-  const variablesList = variables || [];
+  const variablesList = Array.isArray(variables) ? variables : (variables?.data ?? []);
   const socialSecurityVariable = useMemo(() => 
     variablesList.find((v: any) => v.name === 'Social Security Rate'),
     [variablesList]

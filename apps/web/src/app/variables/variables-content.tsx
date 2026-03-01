@@ -152,7 +152,7 @@ export default function VariablesContent() {
       title="Variables"
       description="Manage financial variables (costs, taxes, inflation, etc.)"
       createHref="/variables/create"
-      data={variables || []}
+      data={Array.isArray(variables) ? variables : (variables?.data ?? [])}
       columns={columns}
       loading={isLoading}
       onRowClick={(variable) => router.push(`/variables/${variable.id}`)}

@@ -164,18 +164,19 @@ export default function LoansOutputContent() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Loan Payments - Money to Pay</h1>
-          <p className="text-muted-foreground mt-2">
-            All loan payment schedules (money going out for loan repayments)
-          </p>
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex-shrink-0 space-y-4 pb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Loan Payments - Money to Pay</h1>
+            <p className="text-muted-foreground mt-2">
+              All loan payment schedules (money going out for loan repayments)
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+        {/* Summary Cards */}
+        <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border bg-card p-6">
           <div className="text-sm font-medium text-muted-foreground">Total Payments</div>
           <div className="mt-2 text-2xl font-bold">{totalCount}</div>
@@ -196,10 +197,10 @@ export default function LoansOutputContent() {
             }).length}
           </div>
         </div>
+        </div>
       </div>
 
-      {/* Table View */}
-      <div>
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <DataTablePage
           title=""
           description=""
@@ -229,7 +230,6 @@ export default function LoansOutputContent() {
         />
       </div>
 
-      {/* Loan Selection Dialog */}
       <Dialog open={isLoanSelectDialogOpen} onOpenChange={setIsLoanSelectDialogOpen}>
         <DialogContent>
           <DialogHeader>

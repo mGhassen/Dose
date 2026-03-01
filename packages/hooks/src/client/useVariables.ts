@@ -9,8 +9,7 @@ export function useVariables() {
     queryKey: ['variables'],
     queryFn: async () => {
       const result = await variablesApi.getAll();
-      // Extract data from paginated response
-      return result?.data || [];
+      return Array.isArray(result?.data) ? result.data : [];
     },
   });
 }
