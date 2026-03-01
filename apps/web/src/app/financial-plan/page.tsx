@@ -160,6 +160,7 @@ export default function FinancialPlanPage() {
 
   return (
     <AppLayout>
+      <div className="flex flex-col flex-1 min-h-0">
       <DataTablePage
         title="Financial Plan"
         description="View and manage your financial plans (Plan de Financement)"
@@ -179,6 +180,7 @@ export default function FinancialPlanPage() {
         localStoragePrefix="financial-plan"
         searchFields={[]}
       />
+      </div>
     </AppLayout>
   );
 }

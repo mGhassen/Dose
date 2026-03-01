@@ -55,7 +55,7 @@ export default async function RootLayout({
   
   return (
     <html suppressHydrationWarning>
-      <body className={`${outfit.variable} antialiased`}>
+      <body className={`${outfit.variable} antialiased h-full overflow-hidden`}>
         {/* Expose migration config to client runtime for MSW */}
         <script
           dangerouslySetInnerHTML={{

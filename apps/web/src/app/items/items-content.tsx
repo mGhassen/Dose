@@ -171,8 +171,8 @@ export default function ItemsContent() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex-shrink-0 flex items-center justify-between pb-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Items</h1>
           <p className="text-muted-foreground mt-2">
@@ -181,8 +181,7 @@ export default function ItemsContent() {
         </div>
       </div>
 
-      {/* Table View */}
-      <div>
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <DataTablePage
           title=""
           description=""

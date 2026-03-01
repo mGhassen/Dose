@@ -15,10 +15,12 @@ export default function UserLayout({
   return (
     <SidebarProvider>
       <UserSidebar />
-      <SidebarInset className="flex flex-col min-h-screen max-w-full overflow-hidden">
+      <SidebarInset className="flex h-[calc(100vh-1rem)] flex-col max-w-full overflow-hidden">
         <Navbar />
-        <main className="flex-1 p-4 max-w-full overflow-hidden">
-          {children}
+        <main className="flex-1 min-h-0 flex flex-col p-4 max-w-full overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            {children}
+          </div>
         </main>
       </SidebarInset>
     </SidebarProvider>

@@ -632,14 +632,16 @@ export default function DataTablePage<T>({
 
   return (
     <>
-    <div className="space-y-0 flex flex-col h-full">
-        <div className="px-4 py-3">
-          <h1 className="text-xl font-semibold text-foreground">{title}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{description}</p>
-        </div>
+    <div className="flex flex-col flex-1 min-h-0">
+        {(title || description) && (
+          <div className="flex-shrink-0 px-4 py-3">
+            <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{description}</p>
+          </div>
+        )}
 
-        <div className="bg-card rounded-lg border border-border overflow-hidden flex-1 flex flex-col">
-          <div className="bg-muted/50 border-b border-border px-4 py-2">
+        <div className="bg-card rounded-lg border border-border overflow-hidden flex-1 min-h-0 flex flex-col">
+          <div className="flex-shrink-0 bg-muted/50 border-b border-border px-4 py-2">
             <div className="flex items-center justify-between">
               {selectedRows.size > 0 ? (
                 <div className="flex items-center gap-2">
@@ -1045,9 +1047,10 @@ export default function DataTablePage<T>({
             />
           )}
 
-          {/* Grid View */}
+          {/* Grid / Table View */}
+          <div className="flex-1 min-h-0 border-t border-border overflow-auto flex flex-col">
           {view === 'grid' && enableGridView ? (
-            <div className="flex-1 border-t border-border" style={{ minHeight: '600px' }}>
+            <div className="flex-1 min-h-0">
               {(() => {
                 // Convert table columns to grid columns
                 const gridColumns: GridColumn[] = columnOrder
@@ -1181,6 +1184,7 @@ export default function DataTablePage<T>({
             </div>
           ) : (
             /* Table View */
+            <div className="flex-1 min-h-0 overflow-auto">
             <DataTable 
             key={pagination ? `server-${pagination.page}-${pagination.pageSize}` : `client-${filteredData.length}`}
             columns={columnOrder
@@ -1227,17 +1231,18 @@ export default function DataTablePage<T>({
             expandedRows={expandedRows}
             onExpandedRowsChange={onExpandedRowsChange}
           />
+            </div>
           )}
+          </div>
 
-          {/* Server-side Pagination - only show when pagination prop is provided and in table view */}
           {pagination && view === 'table' && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-card">
-              <div className="flex items-center gap-4">
-                <div className="text-sm text-muted-foreground">
-                  Showing {pagination.totalCount === 0 ? 0 : ((pagination.page - 1) * pagination.pageSize) + 1} to {Math.min(pagination.page * pagination.pageSize, pagination.totalCount)} of {pagination.totalCount} entries
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Rows per page:</span>
+            <div className="flex-shrink-0 flex items-center justify-between px-3 py-1.5 border-t border-border bg-muted/30 text-xs">
+              <div className="flex items-center gap-3">
+                <span className="text-muted-foreground">
+                  {pagination.totalCount === 0 ? 0 : ((pagination.page - 1) * pagination.pageSize) + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.totalCount)} of {pagination.totalCount}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground">per page</span>
                   <Select 
                     value={String(pagination.pageSize)} 
                     onValueChange={(value) => {
@@ -1245,7 +1250,7 @@ export default function DataTablePage<T>({
                       pagination.onPageSizeChange(newPageSize);
                     }}
                   >
-                    <SelectTrigger className="w-20">
+                    <SelectTrigger className="h-7 w-14 text-xs border-border/60">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1258,17 +1263,18 @@ export default function DataTablePage<T>({
                 </div>
               </div>
               {pagination.totalPages > 1 && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
                     onClick={() => pagination.onPageChange(Math.max(1, pagination.page - 1))}
                     disabled={pagination.page === 1}
+                    aria-label="Previous page"
                   >
-                    <ChevronLeft className="h-4 w-4" />
-                    Previous
+                    <ChevronLeft className="h-3 w-3" />
                   </Button>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
                     {(() => {
                       const pages: (number | string)[] = [];
                       const totalPages = pagination.totalPages;
@@ -1298,7 +1304,7 @@ export default function DataTablePage<T>({
                       return pages.map((page, index) => {
                         if (page === '...') {
                           return (
-                            <span key={`ellipsis-${index}`} className="px-2 text-muted-foreground">
+                            <span key={`ellipsis-${index}`} className="px-1 text-muted-foreground">
                               ...
                             </span>
                           );
@@ -1307,8 +1313,9 @@ export default function DataTablePage<T>({
                         return (
                           <Button
                             key={pageNum}
-                            variant={currentPage === pageNum ? "default" : "outline"}
+                            variant={currentPage === pageNum ? "secondary" : "ghost"}
                             size="sm"
+                            className="h-7 min-w-7 px-2 text-xs"
                             onClick={() => pagination.onPageChange(pageNum)}
                           >
                             {pageNum}
@@ -1318,13 +1325,14 @@ export default function DataTablePage<T>({
                     })()}
                   </div>
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
                     onClick={() => pagination.onPageChange(Math.min(pagination.totalPages, pagination.page + 1))}
                     disabled={pagination.page === pagination.totalPages}
+                    aria-label="Next page"
                   >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-3 w-3" />
                   </Button>
                 </div>
               )}
