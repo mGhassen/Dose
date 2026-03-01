@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useSales, useDeleteSale } from "@kit/hooks";
-import { useYear } from "@/contexts/year-context";
 import type { Sale, SalesType } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
@@ -18,14 +17,12 @@ interface SalesContentProps {
 
 export default function SalesContent({ selectedSaleId }: SalesContentProps) {
   const router = useRouter();
-  const { selectedYear } = useYear();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  
-  const { data: salesResponse, isLoading } = useSales({ 
-    page, 
+
+  const { data: salesResponse, isLoading } = useSales({
+    page,
     limit: pageSize,
-    year: selectedYear // Filter by year on server side
   });
   
   const sales = salesResponse?.data || [];

@@ -650,7 +650,16 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <span className="font-medium">{item?.name || `Item ${itemId}`}</span>
+                                  {itemId ? (
+                                    <Link
+                                      href={`/items/${itemId}`}
+                                      className="font-medium text-primary hover:underline"
+                                    >
+                                      {item?.name || `Item ${itemId}`}
+                                    </Link>
+                                  ) : (
+                                    <span className="font-medium">{item?.name || `Item ${itemId}`}</span>
+                                  )}
                                 </div>
                                 <div className="text-sm text-muted-foreground mb-2">
                                   {ri.quantity} {ri.unit}
@@ -746,7 +755,17 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                             ) : (
                               <AlertTriangle className="h-4 w-4 text-destructive" />
                             )}
-                            <span className="font-medium">{item?.name || `Item ${itemId}`}</span>
+                            {itemId ? (
+                              <Link
+                                href={`/items/${itemId}`}
+                                className="font-medium text-primary hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {item?.name || `Item ${itemId}`}
+                              </Link>
+                            ) : (
+                              <span className="font-medium">{item?.name || `Item ${itemId}`}</span>
+                            )}
                           </div>
                         </div>
                         <div className="mt-1 ml-6 space-y-1">
