@@ -36,7 +36,7 @@ export async function apiRequest<T>(
   const isServer = typeof window === 'undefined';
   if (isServer && url.startsWith('/')) {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || '3000'}`);
     url = `${baseUrl}${url}`;
   }
   
@@ -238,7 +238,7 @@ export async function apiBlobRequest(
   const isServer = typeof window === 'undefined';
   if (isServer && url.startsWith('/')) {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || '3000'}`);
     url = `${baseUrl}${url}`;
   }
   
