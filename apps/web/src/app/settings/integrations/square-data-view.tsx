@@ -21,16 +21,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { formatDateTime } from '@kit/lib/date-format';
-import { Input } from '@kit/ui/input';
-import { Label } from '@kit/ui/label';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@kit/ui/dropdown-menu';
-import DataTable from '@kit/ui/data-table';
+import DataTablePage from '@/components/data-table-page';
 import { ColumnDef } from '@tanstack/react-table';
 
 interface SquareDataViewProps {
@@ -41,10 +32,6 @@ interface SquareDataViewProps {
 
 export default function SquareDataView({ integrationId, onSync, isSyncing }: SquareDataViewProps) {
   const [activeTab, setActiveTab] = useState('locations');
-  const [dateRange, setDateRange] = useState({
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
-  });
 
   // Fetch data automatically when tab is active
   // Always fetch locations first (needed for orders)
@@ -59,16 +46,7 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
     integrationId,
     {
       location_ids: locationIds.length > 0 ? locationIds : undefined,
-      query: {
-        filter: {
-          date_time_filter: {
-            created_at: {
-              start_at: dateRange.start,
-              end_at: dateRange.end,
-            },
-          },
-        },
-      },
+      // No date filter - fetch all data, filtering will be done in the DataTable
     },
     {
       enabled: activeTab === 'orders' && locationIds.length > 0, // Only fetch orders if we have location IDs
@@ -77,8 +55,7 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
   const { data: payments, isLoading: paymentsLoading, refetch: refetchPayments, error: paymentsError } = useSquarePayments(
     integrationId,
     {
-      begin_time: dateRange.start,
-      end_time: dateRange.end,
+      // No date filter - fetch all data, filtering will be done in the DataTable
     },
     {
       enabled: activeTab === 'payments',
@@ -87,12 +64,116 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
   const { data: catalog, isLoading: catalogLoading, error: catalogError } = useSquareCatalog(
     integrationId,
     {
-      types: ['ITEM', 'ITEM_VARIATION', 'CATEGORY'],
+      types: ['ITEM', 'ITEM_VARIATION', 'CATEGORY', 'MODIFIER', 'MODIFIER_LIST', 'TAX'],
     },
     {
       enabled: activeTab === 'catalog',
     }
   );
+
+  // Process catalog data to merge items with their variations, categories, modifiers, etc.
+  const processedCatalogData = useMemo(() => {
+    if (!catalog?.objects || catalog.objects.length === 0) return [];
+
+    const objects = catalog.objects;
+    
+    // Create lookup maps
+    const itemsMap = new Map<string, any>();
+    const variationsMap = new Map<string, any[]>();
+    const categoriesMap = new Map<string, any>();
+    const modifierListsMap = new Map<string, any>();
+    const modifiersMap = new Map<string, any[]>();
+    const taxesMap = new Map<string, any>();
+
+    // First pass: categorize all objects
+    objects.forEach((obj: any) => {
+      switch (obj.type) {
+        case 'ITEM':
+          itemsMap.set(obj.id, obj);
+          // Initialize variations array
+          variationsMap.set(obj.id, []);
+          break;
+        case 'ITEM_VARIATION':
+          const itemId = obj.item_variation_data?.item_id;
+          if (itemId) {
+            if (!variationsMap.has(itemId)) {
+              variationsMap.set(itemId, []);
+            }
+            variationsMap.get(itemId)!.push(obj);
+          }
+          break;
+        case 'CATEGORY':
+          categoriesMap.set(obj.id, obj);
+          break;
+        case 'MODIFIER_LIST':
+          modifierListsMap.set(obj.id, obj);
+          // Initialize modifiers array
+          modifiersMap.set(obj.id, []);
+          break;
+        case 'MODIFIER':
+          const modifierListId = obj.modifier_data?.modifier_list_id;
+          if (modifierListId) {
+            if (!modifiersMap.has(modifierListId)) {
+              modifiersMap.set(modifierListId, []);
+            }
+            modifiersMap.get(modifierListId)!.push(obj);
+          }
+          break;
+        case 'TAX':
+          taxesMap.set(obj.id, obj);
+          break;
+      }
+    });
+
+    // Second pass: build merged items with all related data
+    const mergedItems: any[] = [];
+    
+    itemsMap.forEach((item, itemId) => {
+      // Get category
+      const categoryId = item.item_data?.category_id;
+      const category = categoryId ? categoriesMap.get(categoryId) : null;
+
+      // Get variations
+      const variations = variationsMap.get(itemId) || [];
+
+      // Get modifier lists and their modifiers
+      const modifierListInfos = item.item_data?.modifier_list_info || [];
+      const modifierListsWithModifiers = modifierListInfos.map((modListInfo: any) => {
+        const modListId = modListInfo.modifier_list_id;
+        const modList = modifierListsMap.get(modListId);
+        const modifiers = modifiersMap.get(modListId) || [];
+        return {
+          ...modListInfo,
+          modifierList: modList,
+          modifiers: modifiers,
+        };
+      });
+
+      // Get taxes
+      const taxIds = item.item_data?.tax_ids || [];
+      const taxes = taxIds.map((taxId: string) => taxesMap.get(taxId)).filter(Boolean);
+
+      // Create merged item
+      mergedItems.push({
+        id: itemId,
+        type: 'ITEM',
+        name: item.item_data?.name || 'Unknown',
+        description: item.item_data?.description || '',
+        category: category,
+        categoryName: category?.category_data?.name || '',
+        variations: variations,
+        modifierLists: modifierListsWithModifiers,
+        taxes: taxes,
+        taxIds: taxIds,
+        is_deleted: item.is_deleted || false,
+        updated_at: item.updated_at,
+        // Original item data for reference
+        _original: item,
+      });
+    });
+
+    return mergedItems;
+  }, [catalog]);
 
   const formatMoney = (amount: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('en-US', {
@@ -250,49 +331,131 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
     },
   ], []);
 
-  // Column definitions for Catalog
-  const catalogColumns: ColumnDef<any>[] = useMemo(() => [
+  // Column definitions for Catalog (merged items)
+  const catalogColumns: ColumnDef<any>[] = useMemo(() => {
+    const formatMoney = (amount: number, currency: string = 'USD') => {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency,
+      }).format(amount / 100); // Square amounts are in cents
+    };
+
+    return [
     {
       id: 'name',
       accessorKey: 'name',
-      header: 'Name',
+      header: 'Item Name',
       cell: ({ row }) => {
-        const item = row.original;
-        return item.item_data?.name ||
-          item.category_data?.name ||
-          item.item_variation_data?.name ||
-          'Unknown';
+        return <span className="font-semibold">{row.original.name}</span>;
       },
-    },
-    {
-      id: 'type',
-      accessorKey: 'type',
-      header: 'Type',
     },
     {
       id: 'description',
-      accessorKey: 'item_data.description',
+      accessorKey: 'description',
       header: 'Description',
+      cell: ({ row }) => row.original.description || '-',
     },
     {
-      id: 'price',
-      accessorKey: 'item_variation_data.price_money',
-      header: 'Price',
+      id: 'category',
+      accessorKey: 'categoryName',
+      header: 'Category',
       cell: ({ row }) => {
-        const money = row.original.item_variation_data?.price_money;
-        if (!money) return '-';
-        return formatMoney(money.amount, money.currency);
+        const categoryName = row.original.categoryName;
+        return categoryName ? (
+          <Badge variant="outline">{categoryName}</Badge>
+        ) : '-';
       },
     },
     {
-      id: 'sku',
-      accessorKey: 'item_variation_data.sku',
-      header: 'SKU',
+      id: 'variations',
+      accessorKey: 'variations',
+      header: 'Variations',
+      cell: ({ row }) => {
+        const variations = row.original.variations || [];
+        if (variations.length === 0) return <span className="text-muted-foreground">No variations</span>;
+        return (
+          <div className="space-y-1">
+            {variations.map((variation: any, idx: number) => {
+              const price = variation.item_variation_data?.price_money;
+              return (
+                <div key={variation.id || idx} className="text-sm">
+                  <span className="font-medium">{variation.item_variation_data?.name || 'Unnamed'}</span>
+                  {price && (
+                    <span className="ml-2 text-muted-foreground">
+                      {formatMoney(price.amount, price.currency)}
+                    </span>
+                  )}
+                  {variation.item_variation_data?.sku && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      (SKU: {variation.item_variation_data.sku})
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      },
     },
     {
-      id: 'category_id',
-      accessorKey: 'item_data.category_id',
-      header: 'Category ID',
+      id: 'modifier_lists',
+      accessorKey: 'modifierLists',
+      header: 'Modifier Lists',
+      cell: ({ row }) => {
+        const modifierLists = row.original.modifierLists || [];
+        if (modifierLists.length === 0) return <span className="text-muted-foreground">No modifiers</span>;
+        return (
+          <div className="space-y-2">
+            {modifierLists.map((modListInfo: any, idx: number) => {
+              const modList = modListInfo.modifierList;
+              const modifiers = modListInfo.modifiers || [];
+              return (
+                <div key={modListInfo.modifier_list_id || idx} className="text-sm border-l-2 border-yellow-400 pl-2">
+                  <div className="font-medium text-yellow-700 dark:text-yellow-400">
+                    {modList?.modifier_list_data?.name || 'Unnamed List'}
+                  </div>
+                  {modifiers.length > 0 && (
+                    <div className="mt-1 space-y-0.5 ml-2">
+                      {modifiers.map((modifier: any, modIdx: number) => {
+                        const modPrice = modifier.modifier_data?.price_money;
+                        return (
+                          <div key={modifier.id || modIdx} className="text-xs text-muted-foreground">
+                            • {modifier.modifier_data?.name || 'Unnamed'}
+                            {modPrice && (
+                              <span className="ml-1">
+                                (+{formatMoney(modPrice.amount, modPrice.currency)})
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'taxes',
+      accessorKey: 'taxes',
+      header: 'Taxes',
+      cell: ({ row }) => {
+        const taxes = row.original.taxes || [];
+        if (taxes.length === 0) return <span className="text-muted-foreground">No taxes</span>;
+        return (
+          <div className="space-y-1">
+            {taxes.map((tax: any, idx: number) => (
+              <Badge key={tax.id || idx} variant="outline" className="bg-red-50 text-red-700 dark:bg-red-900 dark:text-red-200">
+                {tax.tax_data?.name || 'Unnamed'}
+                {tax.tax_data?.percentage && ` (${tax.tax_data.percentage}%)`}
+              </Badge>
+            ))}
+          </div>
+        );
+      },
     },
     {
       id: 'is_deleted',
@@ -304,7 +467,8 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
         </Badge>
       ),
     },
-  ], []);
+  ];
+  }, []);
 
   const exportToCsv = (data: any[], filename: string, headers: string[], getRow: (item: any) => string[]) => {
     const csv = [
@@ -393,78 +557,209 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
   };
 
   const handleExportCatalog = () => {
-    if (!catalog?.objects || catalog.objects.length === 0) return;
+    if (processedCatalogData.length === 0) return;
+    
+    // Flatten the merged data for CSV export
+    const flattenedData: any[] = [];
+    
+    processedCatalogData.forEach((item) => {
+      // Export main item row
+      const variations = item.variations || [];
+      const modifierLists = item.modifierLists || [];
+      const taxes = item.taxes || [];
+      
+      if (variations.length === 0) {
+        // Item with no variations - single row
+        flattenedData.push({
+          item_id: item.id,
+          item_name: item.name,
+          description: item.description,
+          category: item.categoryName,
+          variation_name: '',
+          variation_sku: '',
+          variation_price: '',
+          variation_currency: '',
+          modifier_list_name: '',
+          modifier_name: '',
+          modifier_price: '',
+          tax_name: '',
+          tax_percentage: '',
+          status: item.is_deleted ? 'Deleted' : 'Active',
+        });
+      } else {
+        // Item with variations - one row per variation
+        variations.forEach((variation: any) => {
+          const price = variation.item_variation_data?.price_money;
+          
+          if (modifierLists.length === 0 && taxes.length === 0) {
+            // Variation with no modifiers/taxes
+            flattenedData.push({
+              item_id: item.id,
+              item_name: item.name,
+              description: item.description,
+              category: item.categoryName,
+              variation_name: variation.item_variation_data?.name || '',
+              variation_sku: variation.item_variation_data?.sku || variation.item_variation_data?.upc || '',
+              variation_price: price?.amount?.toString() || '',
+              variation_currency: price?.currency || '',
+              modifier_list_name: '',
+              modifier_name: '',
+              modifier_price: '',
+              tax_name: '',
+              tax_percentage: '',
+              status: item.is_deleted ? 'Deleted' : 'Active',
+            });
+          } else {
+            // Variation with modifiers and/or taxes
+            modifierLists.forEach((modListInfo: any) => {
+              const modifiers = modListInfo.modifiers || [];
+              if (modifiers.length === 0) {
+                // Modifier list with no modifiers
+                taxes.forEach((tax: any) => {
+                  flattenedData.push({
+                    item_id: item.id,
+                    item_name: item.name,
+                    description: item.description,
+                    category: item.categoryName,
+                    variation_name: variation.item_variation_data?.name || '',
+                    variation_sku: variation.item_variation_data?.sku || variation.item_variation_data?.upc || '',
+                    variation_price: price?.amount?.toString() || '',
+                    variation_currency: price?.currency || '',
+                    modifier_list_name: modListInfo.modifierList?.modifier_list_data?.name || '',
+                    modifier_name: '',
+                    modifier_price: '',
+                    tax_name: tax.tax_data?.name || '',
+                    tax_percentage: tax.tax_data?.percentage || '',
+                    status: item.is_deleted ? 'Deleted' : 'Active',
+                  });
+                });
+                if (taxes.length === 0) {
+                  flattenedData.push({
+                    item_id: item.id,
+                    item_name: item.name,
+                    description: item.description,
+                    category: item.categoryName,
+                    variation_name: variation.item_variation_data?.name || '',
+                    variation_sku: variation.item_variation_data?.sku || variation.item_variation_data?.upc || '',
+                    variation_price: price?.amount?.toString() || '',
+                    variation_currency: price?.currency || '',
+                    modifier_list_name: modListInfo.modifierList?.modifier_list_data?.name || '',
+                    modifier_name: '',
+                    modifier_price: '',
+                    tax_name: '',
+                    tax_percentage: '',
+                    status: item.is_deleted ? 'Deleted' : 'Active',
+                  });
+                }
+              } else {
+                // Modifier list with modifiers
+                modifiers.forEach((modifier: any) => {
+                  const modPrice = modifier.modifier_data?.price_money;
+                  taxes.forEach((tax: any) => {
+                    flattenedData.push({
+                      item_id: item.id,
+                      item_name: item.name,
+                      description: item.description,
+                      category: item.categoryName,
+                      variation_name: variation.item_variation_data?.name || '',
+                      variation_sku: variation.item_variation_data?.sku || variation.item_variation_data?.upc || '',
+                      variation_price: price?.amount?.toString() || '',
+                      variation_currency: price?.currency || '',
+                      modifier_list_name: modListInfo.modifierList?.modifier_list_data?.name || '',
+                      modifier_name: modifier.modifier_data?.name || '',
+                      modifier_price: modPrice?.amount?.toString() || '',
+                      tax_name: tax.tax_data?.name || '',
+                      tax_percentage: tax.tax_data?.percentage || '',
+                      status: item.is_deleted ? 'Deleted' : 'Active',
+                    });
+                  });
+                  if (taxes.length === 0) {
+                    flattenedData.push({
+                      item_id: item.id,
+                      item_name: item.name,
+                      description: item.description,
+                      category: item.categoryName,
+                      variation_name: variation.item_variation_data?.name || '',
+                      variation_sku: variation.item_variation_data?.sku || variation.item_variation_data?.upc || '',
+                      variation_price: price?.amount?.toString() || '',
+                      variation_currency: price?.currency || '',
+                      modifier_list_name: modListInfo.modifierList?.modifier_list_data?.name || '',
+                      modifier_name: modifier.modifier_data?.name || '',
+                      modifier_price: modPrice?.amount?.toString() || '',
+                      tax_name: '',
+                      tax_percentage: '',
+                      status: item.is_deleted ? 'Deleted' : 'Active',
+                    });
+                  }
+                });
+              }
+            });
+            if (modifierLists.length === 0) {
+              // No modifiers but has taxes
+              taxes.forEach((tax: any) => {
+                flattenedData.push({
+                  item_id: item.id,
+                  item_name: item.name,
+                  description: item.description,
+                  category: item.categoryName,
+                  variation_name: variation.item_variation_data?.name || '',
+                  variation_sku: variation.item_variation_data?.sku || variation.item_variation_data?.upc || '',
+                  variation_price: price?.amount?.toString() || '',
+                  variation_currency: price?.currency || '',
+                  modifier_list_name: '',
+                  modifier_name: '',
+                  modifier_price: '',
+                  tax_name: tax.tax_data?.name || '',
+                  tax_percentage: tax.tax_data?.percentage || '',
+                  status: item.is_deleted ? 'Deleted' : 'Active',
+                });
+              });
+            }
+          }
+        });
+      }
+    });
     
     exportToCsv(
-      catalog.objects,
+      flattenedData,
       `square-catalog-${new Date().toISOString().split('T')[0]}.csv`,
-      ['ID', 'Type', 'Name', 'Description', 'Price', 'Currency', 'SKU', 'Category ID', 'Is Deleted'],
-      (item) => [
-        item.id,
-        item.type || '',
-        item.item_data?.name || item.category_data?.name || item.item_variation_data?.name || '',
-        item.item_data?.description || '',
-        item.item_variation_data?.price_money?.amount?.toString() || '0',
-        item.item_variation_data?.price_money?.currency || 'USD',
-        item.item_variation_data?.sku || '',
-        item.item_data?.category_id || '',
-        item.is_deleted ? 'Yes' : 'No',
+      [
+        'Item ID',
+        'Item Name',
+        'Description',
+        'Category',
+        'Variation Name',
+        'Variation SKU',
+        'Variation Price',
+        'Variation Currency',
+        'Modifier List Name',
+        'Modifier Name',
+        'Modifier Price',
+        'Tax Name',
+        'Tax Percentage',
+        'Status'
+      ],
+      (row) => [
+        row.item_id,
+        row.item_name,
+        row.description,
+        row.category,
+        row.variation_name,
+        row.variation_sku,
+        row.variation_price,
+        row.variation_currency,
+        row.modifier_list_name,
+        row.modifier_name,
+        row.modifier_price,
+        row.tax_name,
+        row.tax_percentage,
+        row.status,
       ]
     );
   };
 
   return (
     <div className="space-y-4">
-      {/* Sync Menu */}
-      {onSync && (
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">Square Data</h3>
-            <p className="text-sm text-muted-foreground">View and manage your Square POS data</p>
-          </div>
-          <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" disabled={isSyncing}>
-                  {isSyncing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Syncing...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Sync Data
-                    </>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => onSync('full')} disabled={isSyncing}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Sync All Data
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onSync('orders')} disabled={isSyncing}>
-                  <ShoppingCart className="w-4 h-4 mr-2" />
-                  Sync Orders
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onSync('payments')} disabled={isSyncing}>
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  Sync Payments
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onSync('catalog')} disabled={isSyncing}>
-                  <Package className="w-4 h-4 mr-2" />
-                  Sync Catalog
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onSync('locations')} disabled={isSyncing}>
-                  <MapPin className="w-4 h-4 mr-2" />
-                  Sync Locations
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
-      )}
-      
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="locations">
@@ -485,42 +780,30 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="locations">
-          <DataTable
+        <TabsContent value="locations" className="-mx-4">
+          <DataTablePage
+            title="Square Locations"
+            description="Your Square business locations"
             data={locations || []}
             columns={locationsColumns}
             loading={locationsLoading}
-            title="Square Locations"
-            description="Your Square business locations"
-            exportButton={locations && locations.length > 0 ? {
-              onClick: handleExportLocations,
-              label: 'Export CSV'
-            } : undefined}
-            searchKey="name"
-            searchPlaceholder="Search locations..."
+            onBulkExport={(data, type) => {
+              const itemsToExport = type === 'selected' ? data : (locations || []);
+              handleExportLocations();
+            }}
+            filterColumns={[
+              { value: 'status', label: 'Status' },
+            ]}
+            sortColumns={[
+              { value: 'name', label: 'Name', type: 'character varying' },
+            ]}
+            localStoragePrefix="square-locations"
+            searchFields={['name', 'address']}
+            selectable={false}
           />
         </TabsContent>
 
-        <TabsContent value="orders" className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Start Date</Label>
-              <Input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>End Date</Label>
-              <Input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-              />
-            </div>
-          </div>
-
+        <TabsContent value="orders" className="-mx-4">
           {activeTab === 'orders' && (!locations || locations.length === 0) ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground mb-2">No locations found. Please sync locations first.</p>
@@ -532,76 +815,96 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
               )}
             </div>
           ) : (
-            <DataTable
+            <DataTablePage
+              title="Square Orders"
+              description="Orders from your Square POS"
               data={orders?.orders || []}
               columns={ordersColumns}
               loading={ordersLoading || (activeTab === 'orders' && locationsLoading)}
-              title="Square Orders"
-              description="Orders from your Square POS"
-              exportButton={orders?.orders && orders.orders.length > 0 ? {
-                onClick: handleExportOrders,
-                label: 'Export CSV'
-              } : undefined}
-              refreshButton={refetchOrders ? {
-                onClick: () => refetchOrders()
-              } : undefined}
-              searchKey="reference_id"
-              searchPlaceholder="Search orders..."
+              onBulkExport={(data, type) => {
+                const itemsToExport = type === 'selected' ? data : (orders?.orders || []);
+                handleExportOrders();
+              }}
+              filterColumns={[
+                { value: 'state', label: 'State' },
+                { value: 'created_at', label: 'Created At' },
+              ]}
+              sortColumns={[
+                { value: 'created_at', label: 'Created At', type: 'timestamp' },
+                { value: 'reference_id', label: 'Reference ID', type: 'character varying' },
+              ]}
+              localStoragePrefix="square-orders"
+              searchFields={['reference_id', 'id', 'location_id']}
+              selectable={false}
+              headerActions={
+                refetchOrders ? (
+                  <Button variant="outline" size="sm" onClick={() => refetchOrders()}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                ) : undefined
+              }
             />
           )}
         </TabsContent>
 
-        <TabsContent value="payments" className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Start Date</Label>
-              <Input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>End Date</Label>
-              <Input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <DataTable
+        <TabsContent value="payments" className="-mx-4">
+          <DataTablePage
+            title="Square Payments"
+            description="Payment transactions from Square"
             data={payments?.payments || []}
             columns={paymentsColumns}
             loading={paymentsLoading}
-            title="Square Payments"
-            description="Payment transactions from Square"
-            exportButton={payments?.payments && payments.payments.length > 0 ? {
-              onClick: handleExportPayments,
-              label: 'Export CSV'
-            } : undefined}
-            refreshButton={refetchPayments ? {
-              onClick: () => refetchPayments()
-            } : undefined}
-            searchKey="id"
-            searchPlaceholder="Search payments..."
+            onBulkExport={(data, type) => {
+              const itemsToExport = type === 'selected' ? data : (payments?.payments || []);
+              handleExportPayments();
+            }}
+            filterColumns={[
+              { value: 'status', label: 'Status' },
+              { value: 'source_type', label: 'Payment Method' },
+              { value: 'created_at', label: 'Created At' },
+            ]}
+            sortColumns={[
+              { value: 'created_at', label: 'Created At', type: 'timestamp' },
+              { value: 'amount_money.amount', label: 'Amount', type: 'numeric' },
+            ]}
+            localStoragePrefix="square-payments"
+            searchFields={['id', 'order_id', 'location_id']}
+            selectable={false}
+            headerActions={
+              refetchPayments ? (
+                <Button variant="outline" size="sm" onClick={() => refetchPayments()}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh
+                </Button>
+              ) : undefined
+            }
           />
         </TabsContent>
 
-        <TabsContent value="catalog">
-          <DataTable
-            data={catalog?.objects || []}
+        <TabsContent value="catalog" className="-mx-4">
+          <DataTablePage
+            title="Square Catalog"
+            description="Items with their variations, modifiers, and taxes"
+            data={processedCatalogData}
             columns={catalogColumns}
             loading={catalogLoading}
-            title="Square Catalog"
-            description="Items, variations, and categories from your Square catalog"
-            exportButton={catalog?.objects && catalog.objects.length > 0 ? {
-              onClick: handleExportCatalog,
-              label: 'Export CSV'
-            } : undefined}
-            searchKey="name"
-            searchPlaceholder="Search catalog..."
+            onBulkExport={(data, type) => {
+              const itemsToExport = type === 'selected' ? data : processedCatalogData;
+              handleExportCatalog();
+            }}
+            filterColumns={[
+              { value: 'categoryName', label: 'Category' },
+              { value: 'is_deleted', label: 'Status' },
+            ]}
+            sortColumns={[
+              { value: 'name', label: 'Name', type: 'character varying' },
+              { value: 'categoryName', label: 'Category', type: 'character varying' },
+            ]}
+            localStoragePrefix="square-catalog"
+            searchFields={['name', 'description', 'categoryName']}
+            defaultHiddenColumns={[]}
+            selectable={false}
           />
         </TabsContent>
       </Tabs>

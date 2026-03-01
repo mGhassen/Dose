@@ -59,7 +59,7 @@
     },
     "packageExtensions": {
       "@remix-run/node": {
-        "bin": {}
+        "bin": null
       }
     }
   }

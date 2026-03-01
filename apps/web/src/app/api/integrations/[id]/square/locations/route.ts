@@ -38,21 +38,7 @@ export async function GET(
     // Trim any whitespace that might have been added
     const cleanToken = accessToken.trim();
     
-    console.log('[Square Locations] Using access token:', {
-      integrationId: id,
-      tokenLength: cleanToken.length,
-      tokenPrefix: cleanToken.substring(0, 15) + '...',
-      tokenSuffix: '...' + cleanToken.substring(cleanToken.length - 10),
-      fullToken: cleanToken, // Log full token for debugging
-      hasWhitespace: cleanToken !== accessToken,
-      sandbox: SQUARE_API_BASE.includes('sandbox'),
-    });
-
     const squareAuthHeader = `Bearer ${cleanToken}`;
-    console.log('[Square Locations] Authorization header:', {
-      headerLength: squareAuthHeader.length,
-      headerPrefix: squareAuthHeader.substring(0, 20) + '...',
-    });
 
     const response = await fetch(`${SQUARE_API_BASE}/v2/locations`, {
       headers: {

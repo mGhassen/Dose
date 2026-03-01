@@ -8,3 +8,4 @@ CREATE INDEX IF NOT EXISTS idx_leasing_timeline_is_fixed_amount ON leasing_timel
 
 
 
+

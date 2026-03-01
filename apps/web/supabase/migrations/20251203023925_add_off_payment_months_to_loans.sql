@@ -8,3 +8,4 @@ COMMENT ON COLUMN loans.off_payment_months IS 'Array of month numbers where only
 
 
 
+

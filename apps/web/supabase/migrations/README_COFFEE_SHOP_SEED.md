@@ -38,3 +38,4 @@ Then edit the generated migration file in `apps/web/supabase/migrations/`.
 
 
 
+

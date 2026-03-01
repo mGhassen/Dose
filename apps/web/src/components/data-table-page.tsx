@@ -77,6 +77,8 @@ interface DataTablePageProps<T> {
   // Grid view props
   enableGridView?: boolean;
   defaultView?: 'table' | 'grid';
+  // Selection props
+  selectable?: boolean;
 }
 
 export default function DataTablePage<T>({
@@ -104,8 +106,9 @@ export default function DataTablePage<T>({
   expandedRows,
   onExpandedRowsChange,
   pagination,
-  enableGridView = true,
-  defaultView = 'table'
+  enableGridView = false,
+  defaultView = 'table',
+  selectable
 }: DataTablePageProps<T>) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1188,7 +1191,7 @@ export default function DataTablePage<T>({
               .filter((col): col is ColumnDef<T> => col !== undefined && visibleColumns.has(col.id || (col as any).accessorKey || ''))} 
             data={Array.isArray(filteredData) ? filteredData : []} 
             loading={loading}
-            selectable={true}
+            selectable={selectable !== undefined ? selectable : !!(onBulkDelete || onBulkCopy || onBulkExport)}
             sortable={false}
             pagination={!pagination}
             pageSize={pagination ? pagination.pageSize : undefined}

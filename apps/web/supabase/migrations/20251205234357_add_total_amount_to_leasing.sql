@@ -8,3 +8,4 @@ COMMENT ON COLUMN leasing_payments.total_amount IS 'Total amount to pay over the
 
 
 
+

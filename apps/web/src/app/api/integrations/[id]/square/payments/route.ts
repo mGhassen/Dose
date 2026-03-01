@@ -25,16 +25,16 @@ export async function GET(
 
     const supabase = createServerSupabaseClient(authHeader);
     
-    const result = await getIntegrationWithValidToken(supabase, id, authHeader);
-    
-    if (result.error) {
+    const integrationResult = await getIntegrationWithValidToken(supabase, id, authHeader);
+
+    if (integrationResult.error) {
       return NextResponse.json(
-        { error: result.error.message },
-        { status: result.error.status }
+        { error: integrationResult.error.message },
+        { status: integrationResult.error.status }
       );
     }
 
-    const { accessToken } = result;
+    const { accessToken } = integrationResult;
 
     console.log('[Square Payments] Using access token:', {
       integrationId: id,
@@ -62,53 +62,74 @@ export async function GET(
       endTime = `${endTime}T23:59:59Z`;
     }
 
-    const queryParams = new URLSearchParams();
-    if (beginTime) queryParams.append('begin_time', beginTime);
-    if (endTime) queryParams.append('end_time', endTime);
-    if (sortOrder) queryParams.append('sort_order', sortOrder);
-    if (cursor) queryParams.append('cursor', cursor);
-    if (locationId) queryParams.append('location_id', locationId);
-    if (total) queryParams.append('total', total);
-    if (last4) queryParams.append('last_4', last4);
-    if (cardBrand) queryParams.append('card_brand', cardBrand);
-    if (limit) queryParams.append('limit', limit);
+    // Fetch all pages of payments using pagination
+    let allPayments: any[] = [];
+    let currentCursor: string | null = cursor || null;
+    let hasMore = true;
 
-    const response = await fetch(
-      `${SQUARE_API_BASE}/v2/payments?${queryParams.toString()}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Square-Version': '2024-01-18',
-        },
-      }
-    );
+    while (hasMore) {
+      const queryParams = new URLSearchParams();
+      if (beginTime) queryParams.append('begin_time', beginTime);
+      if (endTime) queryParams.append('end_time', endTime);
+      if (sortOrder) queryParams.append('sort_order', sortOrder);
+      if (currentCursor) queryParams.append('cursor', currentCursor);
+      if (locationId) queryParams.append('location_id', locationId);
+      if (total) queryParams.append('total', total);
+      if (last4) queryParams.append('last_4', last4);
+      if (cardBrand) queryParams.append('card_brand', cardBrand);
+      if (limit) queryParams.append('limit', limit);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorDetails;
-      try {
-        errorDetails = JSON.parse(errorText);
-      } catch {
-        errorDetails = errorText;
-      }
-      console.error('[Square Payments] API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        details: errorDetails,
-        queryParams: queryParams.toString(),
-        apiBase: SQUARE_API_BASE,
-        hasToken: !!accessToken,
-        tokenLength: accessToken?.length,
-      });
-      return NextResponse.json(
-        { error: `Square API error: ${response.statusText}`, details: errorDetails },
-        { status: response.status }
+      const response = await fetch(
+        `${SQUARE_API_BASE}/v2/payments?${queryParams.toString()}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Square-Version': '2024-01-18',
+          },
+        }
       );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorDetails;
+        try {
+          errorDetails = JSON.parse(errorText);
+        } catch {
+          errorDetails = errorText;
+        }
+        console.error('[Square Payments] API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          details: errorDetails,
+          queryParams: queryParams.toString(),
+          apiBase: SQUARE_API_BASE,
+          hasToken: !!accessToken,
+          tokenLength: accessToken?.length,
+        });
+        return NextResponse.json(
+          { error: `Square API error: ${response.statusText}`, details: errorDetails },
+          { status: response.status }
+        );
+      }
+
+      const data: SquareListPaymentsResponse = await response.json();
+      
+      // Accumulate payments from this page
+      if (data.payments && data.payments.length > 0) {
+        allPayments = [...allPayments, ...data.payments];
+      }
+
+      // Check if there's more data to fetch
+      currentCursor = data.cursor || null;
+      hasMore = !!currentCursor && (!limit || allPayments.length < parseInt(limit, 10));
     }
 
-    const data: SquareListPaymentsResponse = await response.json();
-    
-    return NextResponse.json(data);
+    const paymentsResponse: SquareListPaymentsResponse = {
+      payments: allPayments,
+      cursor: null,
+    };
+
+    return NextResponse.json(paymentsResponse);
   } catch (error: any) {
     console.error('Error fetching Square payments:', error);
     return NextResponse.json(

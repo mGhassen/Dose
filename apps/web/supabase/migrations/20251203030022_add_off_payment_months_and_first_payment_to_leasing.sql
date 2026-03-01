@@ -11,3 +11,4 @@ COMMENT ON COLUMN leasing_payments.first_payment_amount IS 'Optional different a
 
 
 
+

@@ -104,6 +104,63 @@ async function syncSquareIntegration(
       }
     }
 
+    if (syncType === 'catalog' || syncType === 'full') {
+      // Fetch catalog - all types including modifiers and taxes
+      const catalogTypes = ['ITEM', 'ITEM_VARIATION', 'CATEGORY', 'MODIFIER', 'MODIFIER_LIST', 'TAX'];
+      let catalogCursor: string | null = null;
+      let totalCatalogItems = 0;
+
+      do {
+        const catalogResponse = await fetch(`${SQUARE_API_BASE}/v2/catalog/search`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Square-Version': '2024-01-18',
+          },
+          body: JSON.stringify({
+            object_types: catalogTypes,
+            cursor: catalogCursor || undefined,
+          }),
+        });
+
+        if (catalogResponse.ok) {
+          const catalogData = await catalogResponse.json();
+          const objects = catalogData.objects || [];
+          totalCatalogItems += objects.length;
+          catalogCursor = catalogData.cursor || null;
+          console.log('[Sync] Fetched catalog batch:', {
+            count: objects.length,
+            total: totalCatalogItems,
+            hasMore: !!catalogCursor,
+            types: [...new Set(objects.map((o: any) => o.type))],
+          });
+        } else {
+          const errorText = await catalogResponse.text();
+          let errorDetails;
+          try {
+            errorDetails = JSON.parse(errorText);
+          } catch {
+            errorDetails = errorText;
+          }
+          recordsFailed++;
+          const errorMsg = errorDetails?.errors?.[0]?.detail || catalogResponse.statusText || 'Unknown error';
+          error = `Failed to fetch catalog: ${errorMsg}`;
+          console.error('[Sync] Failed to fetch catalog:', {
+            status: catalogResponse.status,
+            statusText: catalogResponse.statusText,
+            details: errorDetails,
+          });
+          break;
+        }
+      } while (catalogCursor);
+
+      if (totalCatalogItems > 0) {
+        recordsSynced += totalCatalogItems;
+        console.log('[Sync] Successfully fetched catalog items:', totalCatalogItems);
+      }
+    }
+
     return { records_synced: recordsSynced, records_failed: recordsFailed, error };
   } catch (err: any) {
     error = err.message || 'Unknown error occurred during sync';

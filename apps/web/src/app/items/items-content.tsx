@@ -76,10 +76,10 @@ export default function ItemsContent() {
       header: "Vendor",
       cell: ({ row }) => {
         const vendorId = row.original.vendorId;
-        if (vendorId && vendorMap.has(vendorId)) {
+        if (vendorId && supplierMap.has(vendorId)) {
           return (
             <Badge variant="outline">
-              {vendorMap.get(vendorId)}
+              {supplierMap.get(vendorId)}
             </Badge>
           );
         }
@@ -100,7 +100,7 @@ export default function ItemsContent() {
       header: "Created",
       cell: ({ row }) => formatDate(row.original.createdAt),
     },
-  ], [vendorMap]);
+  ], [supplierMap]);
 
   const handleDelete = async (id: number) => {
     try {

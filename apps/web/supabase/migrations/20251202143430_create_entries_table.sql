@@ -36,3 +36,4 @@ CREATE TRIGGER update_entries_updated_at BEFORE UPDATE ON entries
 
 
 
+

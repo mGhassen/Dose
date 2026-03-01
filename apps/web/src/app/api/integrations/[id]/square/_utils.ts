@@ -73,12 +73,20 @@ export async function getIntegrationWithValidToken(
 
   if (needsRefresh) {
     if (!integration.refresh_token) {
-      // Manual connections don't have refresh tokens
-      // Check if token is actually expired or just invalid
       const isExpired = expiresAt && expiresAt < now;
-      const errorMsg = isExpired 
+      const errorMsg = isExpired
         ? 'Token expired and no refresh token available. Please reconnect the integration with a fresh token.'
         : 'Token is invalid or expired. Please reconnect the integration with a fresh token from Square Developer Console.';
+
+      await supabase
+        .from('integrations')
+        .update({
+          status: 'error',
+          last_sync_error: errorMsg,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', integration.id);
+
       return { integration: null, accessToken: null, error: { status: 401, message: errorMsg } };
     }
 
@@ -132,17 +140,29 @@ async function refreshSquareToken(
 
     if (!response.ok) {
       const errorText = await response.text();
+      const errorMsg = `Failed to refresh token: ${response.statusText}. Please reconnect the integration.`;
       console.error('[Square Token Refresh] Failed:', {
         status: response.status,
         statusText: response.statusText,
         error: errorText,
       });
+
+      const supabase = createServerSupabaseClient(authHeader);
+      await supabase
+        .from('integrations')
+        .update({
+          status: 'error',
+          last_sync_error: errorMsg,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', integration.id);
+
       return {
         integration: null,
         accessToken: null,
         error: {
           status: response.status,
-          message: `Failed to refresh token: ${response.statusText}. Please reconnect the integration.`,
+          message: errorMsg,
         },
       };
     }

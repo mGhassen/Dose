@@ -8,6 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/
 import { Button } from '@kit/ui/button';
 import { Badge } from '@kit/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@kit/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@kit/ui/dropdown-menu';
 import { 
   Square, 
   RefreshCw, 
@@ -16,13 +23,13 @@ import {
   Clock,
   Loader2,
   ArrowLeft,
-  Settings,
   ShoppingCart,
   CreditCard,
   Package,
   MapPin,
   AlertCircle,
   Trash2,
+  MoreVertical,
 } from 'lucide-react';
 import { useToast } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
@@ -166,11 +173,84 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
               <div className="p-2 bg-primary/10 rounded-lg">
                 <Icon className="h-6 w-6 text-primary" />
               </div>
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">{integration.name}</h1>
-                <p className="text-muted-foreground mt-1">
-                  Manage your {integration.integration_type} integration settings and data
-                </p>
+              <div className="flex items-center gap-3">
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight">{integration.name}</h1>
+                  <p className="text-muted-foreground mt-1">
+                    Manage your {integration.integration_type} integration settings and data
+                  </p>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <MoreVertical className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => handleSync('full')}
+                      disabled={syncIntegration.isPending}
+                    >
+                      {syncIntegration.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Sync All Data
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleSync('orders')}
+                      disabled={syncIntegration.isPending}
+                    >
+                      <ShoppingCart className="w-4 h-4 mr-2" />
+                      Sync Orders
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleSync('payments')}
+                      disabled={syncIntegration.isPending}
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Sync Payments
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleSync('catalog')}
+                      disabled={syncIntegration.isPending}
+                    >
+                      <Package className="w-4 h-4 mr-2" />
+                      Sync Catalog
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleSync('locations')}
+                      disabled={syncIntegration.isPending}
+                    >
+                      <MapPin className="w-4 h-4 mr-2" />
+                      Sync Locations
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={handleDisconnect}
+                      disabled={disconnectIntegration.isPending}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      {disconnectIntegration.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Disconnecting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Disconnect
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>
@@ -183,7 +263,6 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
             {integration.integration_type === 'square' && (
               <TabsTrigger value="data">Data</TabsTrigger>
             )}
-            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -254,19 +333,7 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      <div className="space-y-2">
-                        <p>{integration.last_sync_error}</p>
-                        {integration.last_sync_error.includes('Unauthorized') || integration.last_sync_error.includes('Access token') ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push(`/settings/integrations/${integration.id}?tab=settings`)}
-                            className="mt-2"
-                          >
-                            Reconnect Integration
-                          </Button>
-                        ) : null}
-                      </div>
+                      <p>{integration.last_sync_error}</p>
                     </AlertDescription>
                   </Alert>
                 )}
@@ -303,36 +370,6 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
               />
             </TabsContent>
           )}
-
-          <TabsContent value="settings" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Danger Zone</CardTitle>
-                <CardDescription>
-                  Permanently disconnect this integration. This action cannot be undone.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  variant="destructive"
-                  onClick={handleDisconnect}
-                  disabled={disconnectIntegration.isPending}
-                >
-                  {disconnectIntegration.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Disconnecting...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Disconnect Integration
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
     </AppLayout>

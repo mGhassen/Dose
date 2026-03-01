@@ -95,46 +95,79 @@ export async function GET(
       requestBody.limit = parseInt(limit, 10);
     }
     
-    if (cursor) {
-      requestBody.cursor = cursor;
-    }
+    // Fetch all pages of orders using pagination
+    let allOrders: any[] = [];
+    let currentCursor: string | null = cursor || null;
+    let hasMore = true;
 
-    const response = await fetch(`${SQUARE_API_BASE}/v2/orders/search`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'Square-Version': '2024-01-18',
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorDetails;
-      try {
-        errorDetails = JSON.parse(errorText);
-      } catch {
-        errorDetails = errorText;
+    while (hasMore) {
+      const requestBodyPage: any = { ...requestBody };
+      
+      if (currentCursor) {
+        requestBodyPage.cursor = currentCursor;
       }
-      console.error('[Square Orders] API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        details: JSON.stringify(errorDetails, null, 2),
-        requestBody: JSON.stringify(requestBody, null, 2),
-        apiBase: SQUARE_API_BASE,
-        hasToken: !!accessToken,
-        tokenLength: accessToken?.length,
+      
+      if (limit) {
+        requestBodyPage.limit = parseInt(limit, 10);
+      }
+
+      const response = await fetch(`${SQUARE_API_BASE}/v2/orders/search`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Square-Version': '2024-01-18',
+        },
+        body: JSON.stringify(requestBodyPage),
       });
-      return NextResponse.json(
-        { error: `Square API error: ${response.statusText}`, details: errorDetails },
-        { status: response.status }
-      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorDetails;
+        try {
+          errorDetails = JSON.parse(errorText);
+        } catch {
+          errorDetails = errorText;
+        }
+        console.error('[Square Orders] API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          details: JSON.stringify(errorDetails, null, 2),
+          requestBody: JSON.stringify(requestBodyPage, null, 2),
+          apiBase: SQUARE_API_BASE,
+          hasToken: !!accessToken,
+          tokenLength: accessToken?.length,
+        });
+        return NextResponse.json(
+          { error: `Square API error: ${response.statusText}`, details: errorDetails },
+          { status: response.status }
+        );
+      }
+
+      const data: SquareListOrdersResponse = await response.json();
+      
+      // Accumulate orders from this page
+      if (data.orders && data.orders.length > 0) {
+        allOrders = [...allOrders, ...data.orders];
+      }
+
+      // Check if there's more data to fetch
+      currentCursor = data.cursor || null;
+      hasMore = !!currentCursor && (!limit || allOrders.length < parseInt(limit, 10));
     }
 
-    const data: SquareListOrdersResponse = await response.json();
+    // Return all orders in the same format as Square API
+    const result: SquareListOrdersResponse = {
+      orders: allOrders,
+      cursor: null, // No more pages
+    };
     
-    return NextResponse.json(data);
+    console.log('[Square Orders] Fetched all orders:', {
+      total: allOrders.length,
+      integrationId: id,
+    });
+    
+    return NextResponse.json(result);
   } catch (error: any) {
     console.error('Error fetching Square orders:', error);
     return NextResponse.json(
