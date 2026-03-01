@@ -1,41 +1,58 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { usePersonnel, useDeletePersonnel } from "@kit/hooks";
-import { useYear } from "@/contexts/year-context";
+import { getDateRangeForPreset } from "@kit/lib/date-periods";
+import { safeLocalStorage } from "@kit/lib/localStorage";
 import type { Personnel, PersonnelType } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
+import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
+
+const PERSONNEL_PERIOD_KEY = "personnel-period";
+
+function getInitialDateRange() {
+  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
+  try {
+    const saved = safeLocalStorage.getItem(PERSONNEL_PERIOD_KEY);
+    if (saved) {
+      const { startDate, endDate } = JSON.parse(saved);
+      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return { startDate, endDate };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return getDateRangeForPreset("this_year");
+}
 
 export default function PersonnelContent() {
   const router = useRouter();
-  const { selectedYear } = useYear();
+  const [dateRange, setDateRange] = useState(getInitialDateRange);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  
-  const { data: personnelResponse, isLoading } = usePersonnel({ 
-    page, 
-    limit: 1000 // Fetch all for year filtering, then paginate client-side
-  });
-  
-  // Filter by year (personnel active in the selected year) and paginate client-side
+
+  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange(range);
+    safeLocalStorage.setItem(PERSONNEL_PERIOD_KEY, JSON.stringify(range));
+  }, []);
+
+  const { data: personnelResponse, isLoading } = usePersonnel({ page: 1, limit: 1000 });
+
   const filteredPersonnel = useMemo(() => {
     if (!personnelResponse?.data) return [];
     return personnelResponse.data.filter(person => {
-      const startDate = person.startDate;
-      const endDate = person.endDate;
-      const yearStart = `${selectedYear}-01-01`;
-      const yearEnd = `${selectedYear}-12-31`;
-      
-      // Include if started before or during the year and (no end date or ended after year start)
-      return startDate <= yearEnd && (!endDate || endDate >= yearStart);
+      const start = person.startDate;
+      const end = person.endDate;
+      return start <= dateRange.endDate && (!end || end >= dateRange.startDate);
     });
-  }, [personnelResponse?.data, selectedYear]);
+  }, [personnelResponse?.data, dateRange]);
   
   const paginatedPersonnel = useMemo(() => {
     const startIndex = (page - 1) * pageSize;
@@ -196,6 +213,7 @@ export default function PersonnelContent() {
             Manage and analyze your team costs and headcount
           </p>
         </div>
+        <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">

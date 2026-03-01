@@ -157,17 +157,17 @@ export async function GET(
     }
 
     // Return all orders in the same format as Square API
-    const result: SquareListOrdersResponse = {
+    const listResult: SquareListOrdersResponse = {
       orders: allOrders,
       cursor: null, // No more pages
     };
-    
+
     console.log('[Square Orders] Fetched all orders:', {
       total: allOrders.length,
       integrationId: id,
     });
-    
-    return NextResponse.json(result);
+
+    return NextResponse.json(listResult);
   } catch (error: any) {
     console.error('Error fetching Square orders:', error);
     return NextResponse.json(

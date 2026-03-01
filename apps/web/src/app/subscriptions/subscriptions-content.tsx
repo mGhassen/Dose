@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useSubscriptions, useDeleteSubscription, useInventorySuppliers } from "@kit/hooks";
 import Link from "next/link";
-import { useYear } from "@/contexts/year-context";
+import { getDateRangeForPreset } from "@kit/lib/date-periods";
+import { safeLocalStorage } from "@kit/lib/localStorage";
 import type { Subscription, ExpenseCategory, ExpenseRecurrence } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Button } from "@kit/ui/button";
@@ -14,33 +15,49 @@ import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 import { Calendar } from "lucide-react";
+import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
+
+const SUBSCRIPTIONS_PERIOD_KEY = "subscriptions-period";
+
+function getInitialDateRange() {
+  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
+  try {
+    const saved = safeLocalStorage.getItem(SUBSCRIPTIONS_PERIOD_KEY);
+    if (saved) {
+      const { startDate, endDate } = JSON.parse(saved);
+      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return { startDate, endDate };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return getDateRangeForPreset("this_year");
+}
 
 export default function SubscriptionsContent() {
   const router = useRouter();
-  const { selectedYear } = useYear();
+  const [dateRange, setDateRange] = useState(getInitialDateRange);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  
-  const { data: subscriptionsResponse, isLoading } = useSubscriptions({ 
-    page, 
-    limit: 1000 // Fetch all for year filtering, then paginate client-side
-  });
+
+  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange(range);
+    safeLocalStorage.setItem(SUBSCRIPTIONS_PERIOD_KEY, JSON.stringify(range));
+  }, []);
+
+  const { data: subscriptionsResponse, isLoading } = useSubscriptions({ page: 1, limit: 1000 });
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const suppliers = suppliersResponse?.data || [];
-  
-  // Filter by year (subscriptions active in the selected year) and paginate client-side
+
   const filteredSubscriptions = useMemo(() => {
     if (!subscriptionsResponse?.data) return [];
     return subscriptionsResponse.data.filter(sub => {
-      const startDate = sub.startDate;
-      const endDate = sub.endDate;
-      const yearStart = `${selectedYear}-01-01`;
-      const yearEnd = `${selectedYear}-12-31`;
-      
-      // Include if started before or during the year and (no end date or ended after year start)
-      return startDate <= yearEnd && (!endDate || endDate >= yearStart);
+      const start = sub.startDate;
+      const end = sub.endDate;
+      return start <= dateRange.endDate && (!end || end >= dateRange.startDate);
     });
-  }, [subscriptionsResponse?.data, selectedYear]);
+  }, [subscriptionsResponse?.data, dateRange]);
   
   const paginatedSubscriptions = useMemo(() => {
     const startIndex = (page - 1) * pageSize;
@@ -232,7 +249,8 @@ export default function SubscriptionsContent() {
               Manage recurring subscriptions and their timelines
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
             <Button
               variant="outline"
               onClick={() => router.push('/subscriptions/timeline')}

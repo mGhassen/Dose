@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
-import { useYear } from "@/contexts/year-context";
+import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { getDateRangeForPreset } from "@kit/lib/date-periods";
+import { safeLocalStorage } from "@kit/lib/localStorage";
+import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useProfitLoss, useDeleteProfitLoss } from "@kit/hooks";
@@ -31,28 +33,45 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, Percent, Target, BarChart3 } from "lucide-react";
 
+const PROFIT_LOSS_PERIOD_KEY = "profit-loss-period";
+
+function getInitialDateRange() {
+  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
+  try {
+    const saved = safeLocalStorage.getItem(PROFIT_LOSS_PERIOD_KEY);
+    if (saved) {
+      const { startDate, endDate } = JSON.parse(saved);
+      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return { startDate, endDate };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return getDateRangeForPreset("this_year");
+}
+
 export default function ProfitLossContent() {
   const router = useRouter();
-  const { selectedYear } = useYear();
+  const [dateRange, setDateRange] = useState(getInitialDateRange);
   const profitLossQuery = useProfitLoss();
   const { data: profitLoss, isLoading, error, isError, dataUpdatedAt } = profitLossQuery;
   const deleteMutation = useDeleteProfitLoss();
 
-  // Filter and sort profit loss data
+  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange(range);
+    safeLocalStorage.setItem(PROFIT_LOSS_PERIOD_KEY, JSON.stringify(range));
+  }, []);
+
+  const startMonth = dateRange.startDate.slice(0, 7);
+  const endMonth = dateRange.endDate.slice(0, 7);
+
   const filteredProfitLoss = useMemo(() => {
-    if (!profitLoss) {
-      return [];
-    }
-    
-    const filtered = profitLoss
-      .filter(pl => {
-        const matches = pl.month.startsWith(selectedYear);
-        return matches;
-      })
+    if (!profitLoss) return [];
+    return profitLoss
+      .filter(pl => pl.month >= startMonth && pl.month <= endMonth)
       .sort((a, b) => a.month.localeCompare(b.month));
-    
-    return filtered;
-  }, [profitLoss, selectedYear]);
+  }, [profitLoss, startMonth, endMonth]);
 
   // Calculate summary stats
   const summary = useMemo(() => {
@@ -222,6 +241,7 @@ export default function ProfitLossContent() {
             Analyze your profitability and financial performance
           </p>
         </div>
+        <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
       </div>
 
       {/* Summary Cards */}
@@ -439,7 +459,7 @@ export default function ProfitLossContent() {
           <Card>
             <CardHeader>
               <CardTitle>Profitability Trend</CardTitle>
-              <CardDescription>Revenue, expenses, and profit evolution over {selectedYear}</CardDescription>
+              <CardDescription>Revenue, expenses, and profit evolution</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (

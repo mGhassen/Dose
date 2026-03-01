@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useTranslations } from 'next-intl';
-import { useYear } from "@/contexts/year-context";
+import { getDateRangeForPreset } from "@kit/lib/date-periods";
+import { safeLocalStorage } from "@kit/lib/localStorage";
+import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import { Button } from "@kit/ui/button";
@@ -48,15 +50,38 @@ interface IncomeStatementRow {
   isSectionHeader?: boolean;
 }
 
+const FINANCIAL_STATEMENT_PERIOD_KEY = "financial-statement-period";
+
+function getInitialDateRange() {
+  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
+  try {
+    const saved = safeLocalStorage.getItem(FINANCIAL_STATEMENT_PERIOD_KEY);
+    if (saved) {
+      const { startDate, endDate } = JSON.parse(saved);
+      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return { startDate, endDate };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return getDateRangeForPreset("this_year");
+}
+
 export default function FinancialStatementContent() {
   const t = useTranslations('financialStatement');
   const tCommon = useTranslations('common');
-  const { selectedYear } = useYear();
+  const [dateRange, setDateRange] = useState(getInitialDateRange);
+  const selectedYear = dateRange.startDate.slice(0, 4);
   const [selectedPeriod, setSelectedPeriod] = useState<'year' | 'quarter' | 'month'>('year');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [viewMode, setViewMode] = useState<'detailed' | 'summary'>('summary');
 
-  // Build API params
+  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange(range);
+    safeLocalStorage.setItem(FINANCIAL_STATEMENT_PERIOD_KEY, JSON.stringify(range));
+  }, []);
+
   const apiParams = useMemo(() => {
     if (selectedPeriod === 'month' && selectedMonth) {
       return { month: selectedMonth };
@@ -394,8 +419,8 @@ export default function FinancialStatementContent() {
     };
   }, [incomeStatementData, combinedData]);
 
-  // Get date range for display
-  const dateRange = useMemo(() => {
+  // Get date range label for display
+  const dateRangeLabel = useMemo(() => {
     if (selectedPeriod === 'year') {
       return `${tCommon('date.from')} 01/01/${selectedYear} ${tCommon('date.to')} 31/12/${selectedYear}`;
     } else if (selectedPeriod === 'quarter' && selectedMonth) {
@@ -546,6 +571,7 @@ export default function FinancialStatementContent() {
             </p>
           </div>
           <div className="flex items-center gap-4">
+            <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
             <UnifiedSelector
               label=""
               type="period"
@@ -680,7 +706,7 @@ export default function FinancialStatementContent() {
                 <h2 className="text-2xl font-bold">{t('header.companyName')}</h2>
                 <p className="text-lg font-semibold">{t('header.reportTitle')}</p>
                 <p className="text-sm text-muted-foreground">{t('header.accountingBasis')}</p>
-                <p className="text-sm font-medium">{dateRange}</p>
+                <p className="text-sm font-medium">{dateRangeLabel}</p>
               </div>
               <div className="flex gap-2">
                 <Button 

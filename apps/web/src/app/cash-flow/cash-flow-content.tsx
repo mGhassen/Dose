@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
@@ -29,21 +29,48 @@ import {
   ComposedChart
 } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, ArrowUpRight, ArrowDownRight, Wallet } from "lucide-react";
-import { useYear } from "@/contexts/year-context";
+import { getDateRangeForPreset } from "@kit/lib/date-periods";
+import { safeLocalStorage } from "@kit/lib/localStorage";
+import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
+
+const CASH_FLOW_PERIOD_KEY = "cash-flow-period";
+
+function getInitialDateRange() {
+  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
+  try {
+    const saved = safeLocalStorage.getItem(CASH_FLOW_PERIOD_KEY);
+    if (saved) {
+      const { startDate, endDate } = JSON.parse(saved);
+      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return { startDate, endDate };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return getDateRangeForPreset("this_year");
+}
 
 export default function CashFlowContent() {
   const router = useRouter();
-  const { selectedYear } = useYear();
+  const [dateRange, setDateRange] = useState(getInitialDateRange);
   const { data: cashFlow, isLoading } = useCashFlow();
   const deleteMutation = useDeleteCashFlow();
 
-  // Filter and sort cash flow data
+  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange(range);
+    safeLocalStorage.setItem(CASH_FLOW_PERIOD_KEY, JSON.stringify(range));
+  }, []);
+
+  const startMonth = dateRange.startDate.slice(0, 7);
+  const endMonth = dateRange.endDate.slice(0, 7);
+
   const filteredCashFlow = useMemo(() => {
     if (!cashFlow) return [];
     return cashFlow
-      .filter(entry => entry.month.startsWith(selectedYear))
+      .filter(entry => entry.month >= startMonth && entry.month <= endMonth)
       .sort((a, b) => a.month.localeCompare(b.month));
-  }, [cashFlow, selectedYear]);
+  }, [cashFlow, startMonth, endMonth]);
 
   // Calculate summary stats
   const summary = useMemo(() => {
@@ -201,6 +228,7 @@ export default function CashFlowContent() {
             Monitor and analyze your cash flow and treasury position
           </p>
         </div>
+        <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
       </div>
 
       {/* Summary Cards */}
@@ -258,7 +286,7 @@ export default function CashFlowContent() {
               <div className={`text-2xl font-bold ${summary.netFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {formatCurrency(summary.netFlow)}
               </div>
-              <p className="text-xs text-muted-foreground">For {selectedYear}</p>
+              <p className="text-xs text-muted-foreground">Selected period</p>
             </CardContent>
           </Card>
         </div>
@@ -386,7 +414,7 @@ export default function CashFlowContent() {
           <Card>
             <CardHeader>
               <CardTitle>Cash Flow Trend</CardTitle>
-              <CardDescription>Inflows, outflows, and net flow over {selectedYear}</CardDescription>
+              <CardDescription>Inflows, outflows, and net flow</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -439,7 +467,7 @@ export default function CashFlowContent() {
           <Card>
             <CardHeader>
               <CardTitle>Closing Balance Trend</CardTitle>
-              <CardDescription>Evolution of closing balance over {selectedYear}</CardDescription>
+              <CardDescription>Evolution of closing balance</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (

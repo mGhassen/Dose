@@ -1,6 +1,9 @@
 "use client";
 
-import { useYear } from "@/contexts/year-context";
+import { useState, useCallback } from "react";
+import { getDateRangeForPreset } from "@kit/lib/date-periods";
+import { safeLocalStorage } from "@kit/lib/localStorage";
+import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
 import AppLayout from "@/components/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
@@ -27,16 +30,43 @@ import { usePersonnelAnalytics } from "@kit/hooks";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
+const PERSONNEL_ANALYTICS_PERIOD_KEY = "personnel-analytics-period";
+
+function getInitialDateRange() {
+  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
+  try {
+    const saved = safeLocalStorage.getItem(PERSONNEL_ANALYTICS_PERIOD_KEY);
+    if (saved) {
+      const { startDate, endDate } = JSON.parse(saved);
+      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return { startDate, endDate };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return getDateRangeForPreset("this_year");
+}
+
 export default function PersonnelAnalyticsPage() {
-  const { selectedYear } = useYear();
-  const personnelAnalytics = usePersonnelAnalytics({ year: selectedYear });
+  const [dateRange, setDateRange] = useState(getInitialDateRange);
+  const selectedYear = dateRange.startDate.slice(0, 4);
+  const personnelAnalytics = usePersonnelAnalytics(selectedYear);
+
+  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange(range);
+    safeLocalStorage.setItem(PERSONNEL_ANALYTICS_PERIOD_KEY, JSON.stringify(range));
+  }, []);
 
   return (
     <AppLayout>
       <div className="container mx-auto py-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Personnel Analytics</h1>
-          <p className="text-muted-foreground">Comprehensive analytics for personnel</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Personnel Analytics</h1>
+            <p className="text-muted-foreground">Comprehensive analytics for personnel</p>
+          </div>
+          <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
         </div>
 
         <Tabs defaultValue="overview" className="space-y-4">

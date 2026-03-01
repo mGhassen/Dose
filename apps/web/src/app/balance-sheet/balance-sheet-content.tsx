@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
-import { useYear } from "@/contexts/year-context";
+import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { getDateRangeForPreset } from "@kit/lib/date-periods";
+import { safeLocalStorage } from "@kit/lib/localStorage";
+import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useBalanceSheet, useDeleteBalanceSheet } from "@kit/hooks";
@@ -35,19 +37,44 @@ import { TrendingUp, Building2, Scale, Wallet, Landmark } from "lucide-react";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
+const BALANCE_SHEET_PERIOD_KEY = "balance-sheet-period";
+
+function getInitialDateRange() {
+  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
+  try {
+    const saved = safeLocalStorage.getItem(BALANCE_SHEET_PERIOD_KEY);
+    if (saved) {
+      const { startDate, endDate } = JSON.parse(saved);
+      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return { startDate, endDate };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return getDateRangeForPreset("this_year");
+}
+
 export default function BalanceSheetContent() {
   const router = useRouter();
-  const { selectedYear } = useYear();
+  const [dateRange, setDateRange] = useState(getInitialDateRange);
   const { data: balanceSheets, isLoading } = useBalanceSheet();
   const deleteMutation = useDeleteBalanceSheet();
 
-  // Filter and sort balance sheet data
+  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange(range);
+    safeLocalStorage.setItem(BALANCE_SHEET_PERIOD_KEY, JSON.stringify(range));
+  }, []);
+
+  const startMonth = dateRange.startDate.slice(0, 7);
+  const endMonth = dateRange.endDate.slice(0, 7);
+
   const filteredBalanceSheets = useMemo(() => {
     if (!balanceSheets) return [];
     return balanceSheets
-      .filter(bs => bs.month.startsWith(selectedYear))
+      .filter(bs => bs.month >= startMonth && bs.month <= endMonth)
       .sort((a, b) => a.month.localeCompare(b.month));
-  }, [balanceSheets, selectedYear]);
+  }, [balanceSheets, startMonth, endMonth]);
 
   // Calculate summary stats
   const summary = useMemo(() => {
@@ -211,6 +238,7 @@ export default function BalanceSheetContent() {
             Track your assets, liabilities, and equity position
           </p>
         </div>
+        <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
       </div>
 
       {/* Summary Cards */}
@@ -399,7 +427,7 @@ export default function BalanceSheetContent() {
           <Card>
             <CardHeader>
               <CardTitle>Assets Trend</CardTitle>
-              <CardDescription>Evolution of assets over {selectedYear}</CardDescription>
+              <CardDescription>Evolution of assets</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (

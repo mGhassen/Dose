@@ -45,6 +45,8 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const month = searchParams.get('month');
     const year = searchParams.get('year');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
     const { page, limit, offset } = getPaginationParams(searchParams);
 
     const supabase = createServerSupabaseClient();
@@ -60,17 +62,14 @@ export async function GET(request: NextRequest) {
       .select('*')
       .order('created_at', { ascending: false });
 
-    // Apply filters
-    if (year) {
-      const startDate = `${year}-01-01`;
-      const endDate = `${year}-12-31`;
-      
-      query = query
-        .gte('expense_date', startDate)
-        .lte('expense_date', endDate);
-      countQuery = countQuery
-        .gte('expense_date', startDate)
-        .lte('expense_date', endDate);
+    if (startDate && endDate) {
+      query = query.gte('expense_date', startDate).lte('expense_date', endDate);
+      countQuery = countQuery.gte('expense_date', startDate).lte('expense_date', endDate);
+    } else if (year) {
+      const yStart = `${year}-01-01`;
+      const yEnd = `${year}-12-31`;
+      query = query.gte('expense_date', yStart).lte('expense_date', yEnd);
+      countQuery = countQuery.gte('expense_date', yStart).lte('expense_date', yEnd);
     }
 
     if (category) {

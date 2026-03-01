@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useExpenses, useDeleteExpense, useSubscriptions, useInventorySuppliers } from "@kit/hooks";
 import Link from "next/link";
-import { useYear } from "@/contexts/year-context";
+import { getDateRangeForPreset } from "@kit/lib/date-periods";
+import { safeLocalStorage } from "@kit/lib/localStorage";
 import type { Expense, ExpenseCategory } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
@@ -14,17 +15,42 @@ import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 import { DollarSign, Receipt } from "lucide-react";
+import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
+
+const EXPENSES_PERIOD_KEY = "expenses-period";
+
+function getInitialDateRange() {
+  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
+  try {
+    const saved = safeLocalStorage.getItem(EXPENSES_PERIOD_KEY);
+    if (saved) {
+      const { startDate, endDate } = JSON.parse(saved);
+      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return { startDate, endDate };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return getDateRangeForPreset("this_year");
+}
 
 export default function ExpensesContent() {
   const router = useRouter();
-  const { selectedYear } = useYear();
+  const [dateRange, setDateRange] = useState(getInitialDateRange);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  
-  const { data: expensesResponse, isLoading } = useExpenses({ 
-    page, 
+
+  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange(range);
+    safeLocalStorage.setItem(EXPENSES_PERIOD_KEY, JSON.stringify(range));
+  }, []);
+
+  const { data: expensesResponse, isLoading } = useExpenses({
+    page,
     limit: pageSize,
-    year: selectedYear // Filter by year on server side
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
   });
   
   const { data: subscriptionsResponse } = useSubscriptions();
@@ -214,6 +240,7 @@ export default function ExpensesContent() {
             Manage and analyze your business expenses and charges
           </p>
         </div>
+        <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
       </div>
 
       {/* Summary Cards */}
@@ -226,7 +253,7 @@ export default function ExpensesContent() {
           <CardContent>
             <div className="text-2xl font-bold">{totalCount}</div>
             <p className="text-xs text-muted-foreground">
-              Total expenses for {selectedYear}
+              Period: {dateRange.startDate} – {dateRange.endDate}
             </p>
           </CardContent>
         </Card>
@@ -239,7 +266,7 @@ export default function ExpensesContent() {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
             <p className="text-xs text-muted-foreground">
-              All expenses for {selectedYear}
+              Amount in selected period
             </p>
           </CardContent>
         </Card>
