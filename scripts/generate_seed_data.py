@@ -246,7 +246,7 @@ def generate_loan_schedules(loans_data):
         remaining_balance = principal
         start = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
         
-        for month in range(1, min(duration + 1, 25)):  # Up to 24 months
+        for month in range(1, duration + 1):
             payment_date = start + datetime.timedelta(days=30 * (month - 1))
             interest_payment = remaining_balance * monthly_rate
             principal_payment = monthly_payment - interest_payment

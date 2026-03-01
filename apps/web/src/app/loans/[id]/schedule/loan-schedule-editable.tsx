@@ -29,9 +29,11 @@ interface EditableScheduleRowProps {
   onUpdate: () => void;
   allEntries?: Entry[];
   offPaymentMonths?: number[];
+  showLoanName?: boolean;
+  loanName?: string;
 }
 
-export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], offPaymentMonths = [] }: EditableScheduleRowProps) {
+export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], offPaymentMonths = [], showLoanName, loanName }: EditableScheduleRowProps) {
   const isOffPaymentMonth = offPaymentMonths.includes(entry.month);
   const [isEditing, setIsEditing] = useState(false);
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
@@ -177,10 +179,12 @@ export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], 
     }
   };
 
+  const firstColumnContent = showLoanName && loanName ? loanName : entry.month;
+
   if (isEditing) {
     return (
       <TableRow className="bg-muted/50">
-        <TableCell className="font-medium">{entry.month}</TableCell>
+        <TableCell className="font-medium">{firstColumnContent}</TableCell>
         <TableCell>
           <Input
             type="date"
@@ -269,7 +273,7 @@ export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], 
       <TableRow className={`${isPastDue ? "bg-destructive/10" : ""} ${isOffPaymentMonth ? "bg-amber-50 dark:bg-amber-950/20" : ""}`}>
         <TableCell className="font-medium">
           <div className="flex items-center gap-2">
-            {entry.month}
+            {firstColumnContent}
             {isOffPaymentMonth && (
               <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700 text-xs">
                 Interest Only

@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { dateToYYYYMMDD } from '@kit/lib';
 import type { SupplierOrder, CreateSupplierOrderData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
@@ -25,7 +26,7 @@ function transformToSnakeCase(data: CreateSupplierOrderData): any {
   return {
     supplier_id: data.supplierId,
     order_number: data.orderNumber,
-    order_date: data.orderDate || (await import('@kit/lib')).dateToYYYYMMDD(new Date()),
+    order_date: data.orderDate || dateToYYYYMMDD(new Date()),
     expected_delivery_date: data.expectedDeliveryDate,
     status: data.status || 'pending',
     notes: data.notes,
@@ -40,21 +41,26 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
 
     const supabase = createServerSupabaseClient();
-    
-    let query = supabase
+
+    let countQuery = supabase
+      .from('supplier_orders')
+      .select('*', { count: 'exact', head: true });
+
+    let dataQuery = supabase
       .from('supplier_orders')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (supplierId) {
-      query = query.eq('supplier_id', supplierId);
+      countQuery = countQuery.eq('supplier_id', supplierId);
+      dataQuery = dataQuery.eq('supplier_id', supplierId);
     }
     if (status) {
-      query = query.eq('status', status);
+      countQuery = countQuery.eq('status', status);
+      dataQuery = dataQuery.eq('status', status);
     }
 
-    const countQuery = query.select('*', { count: 'exact', head: true });
-    const dataQuery = query.range(offset, offset + limit - 1);
+    dataQuery = dataQuery.range(offset, offset + limit - 1);
 
     const [{ data, error }, { count, error: countError }] = await Promise.all([
       dataQuery,

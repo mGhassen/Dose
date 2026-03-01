@@ -11,13 +11,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@kit/ui/breadcrumb";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
-import { Save, X, Trash2, MoreVertical, Edit2, Calendar } from "lucide-react";
+import { Avatar, AvatarFallback } from "@kit/ui/avatar";
+import { Skeleton } from "@kit/ui/skeleton";
+import { Separator } from "@kit/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { Save, X, Trash2, MoreVertical, Edit2, Calendar, ChevronLeft, User, Briefcase, Wallet, Mail, FileText } from "lucide-react";
 import Link from "next/link";
 import AppLayout from "@/components/app-layout";
 import { usePersonnelById, useUpdatePersonnel, useDeletePersonnel, usePersonnelSalaryProjections, useVariables } from "@kit/hooks";
@@ -36,6 +49,30 @@ import {
   TableRow,
 } from "@kit/ui/table";
 
+function DetailRow({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: React.ElementType;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          {label}
+        </p>
+        <div className="text-sm font-medium">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 interface PersonnelDetailPageProps {
   params: Promise<{ id: string }>;
 }
@@ -44,6 +81,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: personnel, isLoading } = usePersonnelById(resolvedParams?.id || "");
   const updatePersonnel = useUpdatePersonnel();
   const deleteMutation = useDeletePersonnel();
@@ -202,14 +240,10 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
 
   const handleDelete = async () => {
     if (!resolvedParams?.id) return;
-
-    if (!confirm("Are you sure you want to delete this personnel record? This action cannot be undone.")) {
-      return;
-    }
-
     try {
       await deleteMutation.mutateAsync(Number(resolvedParams.id));
       toast.success("Personnel record deleted successfully");
+      setIsDeleteDialogOpen(false);
       router.push('/personnel');
     } catch (error) {
       toast.error("Failed to delete personnel record");
@@ -224,8 +258,35 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   if (isLoading || !resolvedParams) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <div className="space-y-6">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem><BreadcrumbLink asChild><Link href="/personnel">Personnel</Link></BreadcrumbLink></BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem><BreadcrumbPage><Skeleton className="h-4 w-24" /></BreadcrumbPage></BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-14 w-14 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          </div>
+          <Card>
+            <CardHeader><Skeleton className="h-6 w-40" /><Skeleton className="h-4 w-64 mt-2" /></CardHeader>
+            <CardContent className="space-y-4">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="flex gap-3">
+                  <Skeleton className="h-9 w-9 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-4 w-full" />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </div>
       </AppLayout>
     );
@@ -234,12 +295,20 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   if (!personnel) {
     return (
       <AppLayout>
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold">Personnel Not Found</h1>
-            <p className="text-muted-foreground">The personnel record you're looking for doesn't exist.</p>
+        <div className="flex flex-col items-center justify-center gap-6 py-16 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+            <User className="h-8 w-8 text-muted-foreground" />
           </div>
-          <Button onClick={() => router.push('/personnel')}>Back to Personnel</Button>
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">Personnel not found</h2>
+            <p className="text-sm text-muted-foreground">
+              This record may have been deleted or doesn't exist.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => router.push('/personnel')}>
+            <ChevronLeft className="mr-2 h-4 w-4" />
+            Back to Personnel
+          </Button>
         </div>
       </AppLayout>
     );
@@ -253,54 +322,93 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   };
 
   const totalCost = personnel.baseSalary + (personnel.baseSalary * employeeSocialTaxRate);
+  const initials = `${personnel.firstName.charAt(0)}${personnel.lastName.charAt(0)}`.toUpperCase();
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">
-              {isEditing ? "Edit Personnel" : `${personnel.firstName} ${personnel.lastName}`}
-            </h1>
-            <p className="text-muted-foreground">
-              {isEditing ? "Update personnel information" : "Personnel details and information"}
-            </p>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/personnel">Personnel</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{personnel.firstName} {personnel.lastName}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" asChild className="-ml-2 shrink-0">
+              <Link href="/personnel"><ChevronLeft className="h-4 w-4" /></Link>
+            </Button>
+            <div className="flex items-center gap-4">
+              <Avatar className="h-14 w-14">
+                <AvatarFallback className="text-lg font-medium bg-primary/10 text-primary">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">
+                  {isEditing ? "Edit Personnel" : `${personnel.firstName} ${personnel.lastName}`}
+                </h1>
+                <p className="text-muted-foreground">
+                  {isEditing ? "Update personnel information" : personnel.position}
+                </p>
+                {!isEditing && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    <Badge variant="outline">{typeLabels[personnel.type]}</Badge>
+                    <Badge variant={personnel.isActive ? "default" : "secondary"}>
+                      {personnel.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           {!isEditing && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                  <Edit2 className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleDelete}
-                  disabled={deleteMutation.isPending}
-                  className="text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {deleteMutation.isPending ? "Deleting..." : "Delete"}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                <Edit2 className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                    <Edit2 className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    disabled={deleteMutation.isPending}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )}
         </div>
 
+        {isEditing ? (
         <Card>
           <CardHeader>
-            <CardTitle>{isEditing ? "Edit Personnel" : "Personnel Information"}</CardTitle>
-            <CardDescription>
-              {isEditing ? "Update the details for this personnel" : "View and manage personnel details"}
-            </CardDescription>
+            <CardTitle>Edit Personnel</CardTitle>
+            <CardDescription>Update the details for this personnel</CardDescription>
           </CardHeader>
           <CardContent>
-            {isEditing ? (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -355,56 +463,160 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                   <Button type="submit" disabled={updatePersonnel.isPending}><Save className="mr-2 h-4 w-4" />{updatePersonnel.isPending ? "Updating..." : "Update Personnel"}</Button>
                 </div>
               </form>
+          </CardContent>
+        </Card>
+        ) : (
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="timeline">Salary Timeline</TabsTrigger>
+          </TabsList>
+          <TabsContent value="overview">
+        <Card>
+          <CardHeader>
+            <CardTitle>Personnel Information</CardTitle>
+            <CardDescription>View and manage personnel details</CardDescription>
+          </CardHeader>
+          <CardContent>
+              <div className="space-y-6">
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      Personal
+                    </h3>
+                    <div className="space-y-0">
+                      <DetailRow icon={User} label="Name">
+                        {personnel.firstName} {personnel.lastName}
+                      </DetailRow>
+                      <DetailRow icon={Mail} label="Email">
+                        {personnel.email || <span className="text-muted-foreground">—</span>}
+                      </DetailRow>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-muted-foreground" />
+                      Employment
+                    </h3>
+                    <div className="space-y-0">
+                      <DetailRow icon={Briefcase} label="Position">{personnel.position}</DetailRow>
+                      <DetailRow icon={Calendar} label="Start Date">{formatDate(personnel.startDate)}</DetailRow>
+                      <DetailRow icon={Calendar} label="End Date">
+                        {personnel.endDate ? formatDate(personnel.endDate) : <span className="text-muted-foreground">Ongoing</span>}
+                      </DetailRow>
+                    </div>
+                  </div>
+                </div>
+                <Separator />
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-muted-foreground" />
+                    Compensation
+                  </h3>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <DetailRow icon={Wallet} label="Base Salary">
+                      {formatCurrency(personnel.baseSalary)} <span className="text-muted-foreground font-normal">/ month</span>
+                    </DetailRow>
+                    <DetailRow icon={Wallet} label="Frequency">
+                      <Badge variant="outline">{personnel.salaryFrequency === 'yearly' ? 'Yearly' : personnel.salaryFrequency === 'weekly' ? 'Weekly' : 'Monthly'}</Badge>
+                    </DetailRow>
+                    <DetailRow icon={Wallet} label="Total Monthly Cost">
+                      <span className="text-primary font-semibold">{formatCurrency(totalCost)}</span>
+                    </DetailRow>
+                  </div>
+                </div>
+                {personnel.notes && (
+                  <>
+                    <Separator />
+                    <DetailRow icon={FileText} label="Notes">
+                      <span className="whitespace-pre-wrap font-normal">{personnel.notes}</span>
+                    </DetailRow>
+                  </>
+                )}
+                <Separator />
+                <div className="flex flex-wrap gap-6 text-xs text-muted-foreground">
+                  <span>Created {formatDate(personnel.createdAt)}</span>
+                  <span>Updated {formatDate(personnel.updatedAt)}</span>
+                </div>
+              </div>
+          </CardContent>
+        </Card>
+          </TabsContent>
+          <TabsContent value="timeline">
+        <Card>
+          <CardHeader>
+            <CardTitle>Salary Timeline</CardTitle>
+            <CardDescription>
+              Monthly projections from {formatDate(personnel.startDate)} to {personnel.endDate ? formatDate(personnel.endDate) : "ongoing"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {mergedProjections.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-4">
+                  <Calendar className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium">No salary projections</p>
+                <p className="text-xs text-muted-foreground mt-1">Projections will appear based on start and end dates</p>
+              </div>
             ) : (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div><label className="text-sm font-medium text-muted-foreground">Name</label><p className="text-base font-semibold mt-1">{personnel.firstName} {personnel.lastName}</p></div>
-                  <div><label className="text-sm font-medium text-muted-foreground">Email</label><p className="text-base mt-1">{personnel.email || <span className="text-muted-foreground">—</span>}</p></div>
-                  <div><label className="text-sm font-medium text-muted-foreground">Position</label><p className="text-base font-semibold mt-1">{personnel.position}</p></div>
-                  <div><label className="text-sm font-medium text-muted-foreground">Type</label><div className="mt-1"><Badge variant="outline">{typeLabels[personnel.type] || personnel.type}</Badge></div></div>
-                  <div><label className="text-sm font-medium text-muted-foreground">Base Salary (Monthly)</label><p className="text-base font-semibold mt-1">{formatCurrency(personnel.baseSalary)}</p></div>
-                  <div><label className="text-sm font-medium text-muted-foreground">Salary Package Frequency</label><div className="text-base mt-1"><Badge variant="outline">{personnel.salaryFrequency === 'yearly' ? 'Yearly' : personnel.salaryFrequency === 'weekly' ? 'Weekly' : 'Monthly'}</Badge></div></div>
-                  <div><label className="text-sm font-medium text-muted-foreground">Total Monthly Cost</label><p className="text-base font-semibold mt-1 text-primary">{formatCurrency(totalCost)}</p></div>
-                  <div><label className="text-sm font-medium text-muted-foreground">Start Date</label><p className="text-base mt-1">{formatDate(personnel.startDate)}</p></div>
-                  <div><label className="text-sm font-medium text-muted-foreground">End Date</label><p className="text-base mt-1">{personnel.endDate ? formatDate(personnel.endDate) : <span className="text-muted-foreground">—</span>}</p></div>
-                  <div><label className="text-sm font-medium text-muted-foreground">Status</label><div className="mt-1"><Badge variant={personnel.isActive ? "default" : "secondary"}>{personnel.isActive ? "Active" : "Inactive"}</Badge></div></div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Months</p>
+                    <p className="text-2xl font-bold mt-1">{mergedProjections.length}</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Net Salary</p>
+                    <p className="text-2xl font-bold mt-1 text-primary">{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualNetAmount || p.netSalary), 0))}</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Taxes</p>
+                    <p className="text-2xl font-bold mt-1">{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualTaxesAmount || (p.socialTaxes + p.employerTaxes)), 0))}</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Cost</p>
+                    <p className="text-2xl font-bold mt-1">{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualNetAmount || p.netSalary) + (p.actualTaxesAmount || (p.socialTaxes + p.employerTaxes)), 0))}</p>
+                  </div>
                 </div>
-                {personnel.notes && <div><label className="text-sm font-medium text-muted-foreground">Notes</label><p className="text-base mt-1 whitespace-pre-wrap">{personnel.notes}</p></div>}
-                <div className="pt-4 border-t"><div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-muted-foreground"><div><span className="font-medium">Created:</span> {formatDate(personnel.createdAt)}</div><div><span className="font-medium">Last Updated:</span> {formatDate(personnel.updatedAt)}</div></div></div>
+                <div className="rounded-lg border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Month</TableHead>
+                        <TableHead>Net Salary</TableHead>
+                        <TableHead>Taxes</TableHead>
+                        <TableHead>Payment Status</TableHead>
+                        <TableHead>Payment Dates</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {mergedProjections.map((projection: any, index: number) => (
+                        <EditablePersonnelTimelineRow key={`personnel-${personnel.id}-month-${projection.month}-${projection.id || 'calc'}-idx-${index}`} projection={projection} personnelId={personnel.id} onUpdate={handleTimelineUpdate} employeeSocialTaxRate={employeeSocialTaxRate} socialSecurityRate={socialSecurityRate} />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
-
-        {!isEditing && personnel && (
-          <Card>
-            <CardHeader><div><CardTitle>Salary Timeline</CardTitle><CardDescription>Monthly salary projections from {formatDate(personnel.startDate)} to {personnel.endDate ? formatDate(personnel.endDate) : 'ongoing'}</CardDescription></div></CardHeader>
-            <CardContent>
-              {mergedProjections.length === 0 ? (
-                <div className="text-center py-10"><Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" /><p className="text-muted-foreground">No salary projections for this personnel</p></div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-4 border rounded-lg"><div className="text-sm text-muted-foreground">Total Months</div><div className="text-2xl font-bold mt-1">{mergedProjections.length}</div></div>
-                    <div className="p-4 border rounded-lg"><div className="text-sm text-muted-foreground">Total Net Salary</div><div className="text-2xl font-bold mt-1 text-primary">{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualNetAmount || p.netSalary), 0))}</div></div>
-                    <div className="p-4 border rounded-lg"><div className="text-sm text-muted-foreground">Total Taxes</div><div className="text-2xl font-bold mt-1 text-primary">{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualTaxesAmount || (p.socialTaxes + p.employerTaxes)), 0))}</div></div>
-                    <div className="p-4 border rounded-lg"><div className="text-sm text-muted-foreground">Total Cost</div><div className="text-2xl font-bold mt-1 text-primary">{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualNetAmount || p.netSalary) + (p.actualTaxesAmount || (p.socialTaxes + p.employerTaxes)), 0))}</div></div>
-                  </div>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader><TableRow><TableHead>Month</TableHead><TableHead>Net Salary</TableHead><TableHead>Taxes</TableHead><TableHead>Payment Status</TableHead><TableHead>Payment Dates</TableHead></TableRow></TableHeader>
-                      <TableBody>
-                        {mergedProjections.map((projection: any, index: number) => (
-                          <EditablePersonnelTimelineRow key={`personnel-${personnel.id}-month-${projection.month}-${projection.id || 'calc'}-idx-${index}`} projection={projection} personnelId={personnel.id} onUpdate={handleTimelineUpdate} employeeSocialTaxRate={employeeSocialTaxRate} socialSecurityRate={socialSecurityRate} />
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          </TabsContent>
+        </Tabs>
         )}
+
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleDelete}
+          title="Delete personnel record"
+          description="Are you sure you want to delete this personnel record? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteMutation.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );

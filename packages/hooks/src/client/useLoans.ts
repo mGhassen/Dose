@@ -31,6 +31,17 @@ export function useLoanSchedule(loanId: string) {
   });
 }
 
+export function useAllLoanSchedules(startMonth: string, endMonth: string) {
+  return useQuery({
+    queryKey: ['loans', 'schedules', startMonth, endMonth],
+    queryFn: async () => {
+      const result = await loansApi.getAllSchedules(startMonth, endMonth);
+      return result?.schedules || [];
+    },
+    enabled: !!startMonth && !!endMonth,
+  });
+}
+
 export function useCreateLoan() {
   const queryClient = useQueryClient();
   
@@ -74,6 +85,7 @@ export function useGenerateLoanSchedule() {
     mutationFn: loansApi.generateSchedule,
     onSuccess: (_, loanId) => {
       queryClient.invalidateQueries({ queryKey: ['loans', loanId, 'schedule'] });
+      queryClient.invalidateQueries({ queryKey: ['loans', 'schedules'] });
     },
   });
 }
@@ -87,6 +99,7 @@ export function useUpdateLoanScheduleEntry() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['loans', variables.loanId, 'schedule'] });
       queryClient.invalidateQueries({ queryKey: ['loans', variables.loanId] });
+      queryClient.invalidateQueries({ queryKey: ['loans', 'schedules'] });
     },
   });
 }

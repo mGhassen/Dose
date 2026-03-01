@@ -14,6 +14,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
+import { Calendar } from "lucide-react";
 
 export default function LoansOutputContent() {
   const router = useRouter();
@@ -170,8 +171,17 @@ export default function LoansOutputContent() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Loan Payments - Money to Pay</h1>
             <p className="text-muted-foreground mt-2">
-              All loan payment schedules (money going out for loan repayments)
+              Manage loan repayments and their timelines
             </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/loans/output/timeline')}
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              View Timeline
+            </Button>
           </div>
         </div>
 

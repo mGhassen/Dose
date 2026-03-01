@@ -86,6 +86,7 @@ export function useCreatePayment() {
         const entry = await entriesApi.entriesApi.getById(data.entryId.toString());
         if (entry && entry.entryType === 'loan_payment' && entry.referenceId) {
           queryClient.invalidateQueries({ queryKey: ['loans', entry.referenceId.toString(), 'schedule'] });
+          queryClient.invalidateQueries({ queryKey: ['loans', 'schedules'] });
         }
       } catch (error) {
         // Ignore errors when fetching entry for invalidation
@@ -131,6 +132,7 @@ export function useDeletePayment() {
           const entry = await entriesApi.entriesApi.getById(payment.entryId.toString());
           if (entry && entry.entryType === 'loan_payment' && entry.referenceId) {
             queryClient.invalidateQueries({ queryKey: ['loans', entry.referenceId.toString(), 'schedule'] });
+            queryClient.invalidateQueries({ queryKey: ['loans', 'schedules'] });
           }
         } catch (error) {
           // Ignore errors when fetching entry for invalidation

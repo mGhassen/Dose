@@ -27,5 +27,9 @@ export const loansApi = {
   generateSchedule: (loanId: string) => apiRequest<LoanScheduleEntry[]>('POST', `/api/loans/${loanId}/generate-schedule`),
   updateScheduleEntry: (loanId: string, scheduleId: string, data: UpdateLoanScheduleEntryData) => 
     apiRequest<LoanScheduleEntry>('PUT', `/api/loans/${loanId}/schedule/${scheduleId}`, data),
+  getAllSchedules: (startMonth: string, endMonth: string) => {
+    const params = new URLSearchParams({ startMonth, endMonth });
+    return apiRequest<{ schedules: LoanScheduleEntry[] }>(`GET`, `/api/loans/schedules?${params}`);
+  },
 };
 
