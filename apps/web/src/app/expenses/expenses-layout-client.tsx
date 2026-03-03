@@ -2,10 +2,10 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import AppLayout from "@/components/app-layout";
-import SalesContent from "./sales-content";
-import { SaleDetailContent } from "./sale-detail-content";
+import ExpensesContent from "./expenses-content";
+import { ExpenseDetailContent } from "./[id]/expense-details-content";
 
-export default function SalesLayoutClient({
+export default function ExpensesLayoutClient({
   children,
 }: {
   children: React.ReactNode;
@@ -13,27 +13,27 @@ export default function SalesLayoutClient({
   const pathname = usePathname();
   const router = useRouter();
   const isListOrDetail =
-    pathname === "/sales" || /^\/sales\/\d+$/.test(pathname);
-  const saleIdMatch = pathname.match(/^\/sales\/(\d+)$/);
-  const saleId = saleIdMatch ? saleIdMatch[1] : null;
+    pathname === "/expenses" || /^\/expenses\/\d+$/.test(pathname);
+  const expenseIdMatch = pathname.match(/^\/expenses\/(\d+)$/);
+  const expenseId = expenseIdMatch ? expenseIdMatch[1] : null;
 
-  const handleDeleted = () => router.push("/sales");
+  const handleDeleted = () => router.push("/expenses");
 
   if (isListOrDetail) {
     return (
       <AppLayout>
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <div
-            className={`flex flex-1 min-w-0 flex-col overflow-hidden pt-4 ${saleId ? "pr-6" : ""}`}
+            className={`flex flex-1 min-w-0 flex-col overflow-hidden pt-4 ${expenseId ? "pr-6" : ""}`}
           >
-            <SalesContent selectedSaleId={saleId ? Number(saleId) : undefined} />
+            <ExpensesContent selectedExpenseId={expenseId ? Number(expenseId) : undefined} />
           </div>
-          {saleId && (
+          {expenseId && (
             <div className="flex h-full w-[420px] min-w-[320px] max-w-[min(480px,40vw)] flex-shrink-0 flex-col overflow-hidden border-l border-border bg-card lg:w-[480px]">
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 py-6">
-                <SaleDetailContent
-                  saleId={saleId}
-                  onClose={() => router.push("/sales")}
+                <ExpenseDetailContent
+                  expenseId={expenseId}
+                  onClose={() => router.push("/expenses")}
                   onDeleted={handleDeleted}
                 />
               </div>

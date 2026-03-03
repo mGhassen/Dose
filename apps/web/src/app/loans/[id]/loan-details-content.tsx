@@ -40,13 +40,14 @@ import { formatDate } from "@kit/lib/date-format";
 import { DatePicker } from "@kit/ui/date-picker";
 import type { LoanStatus } from "@kit/types";
 import {
-  Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@kit/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import { EditableScheduleRow } from "./schedule/loan-schedule-editable";
 
 interface LoanDetailsContentProps {
@@ -278,9 +279,9 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="flex flex-col max-h-[calc(100vh-5rem)] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between shrink-0 py-2">
           <div>
             <h1 className="text-2xl font-bold">
               {isEditing ? "Edit Loan" : loan.name}
@@ -315,7 +316,14 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
           )}
         </div>
 
-        {/* Form/Details Card */}
+        <Tabs defaultValue="overview" className="flex flex-col flex-1 min-h-0 mt-2">
+          <TabsList className="grid w-full max-w-md grid-cols-3 shrink-0">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="schedule">Schedule</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="flex-1 min-h-0 overflow-auto mt-4 space-y-4 data-[state=inactive]:hidden">
         <Card>
           <CardHeader>
             <CardTitle>{isEditing ? "Edit Loan" : "Loan Information"}</CardTitle>
@@ -610,7 +618,136 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
           </CardContent>
         </Card>
 
-        {/* Input Payments Card */}
+            {!isEditing && (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription>Principal paid</CardDescription>
+                    <CardTitle className="text-2xl">{formatCurrency(totalPaid)}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription>Remaining (principal)</CardDescription>
+                    <CardTitle className="text-2xl">{formatCurrency(remainingToPay)}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardDescription>Next schedule payment</CardDescription>
+                    <CardTitle className="text-lg">
+                      {schedule?.length
+                        ? (() => {
+                            const next = schedule.find((e) => !e.isPaid && new Date(e.paymentDate) >= new Date());
+                            return next
+                              ? `${formatCurrency(next.totalPayment)} · ${formatDate(next.paymentDate)}`
+                              : "—";
+                          })()
+                        : "—"}
+                    </CardTitle>
+                  </CardHeader>
+                </Card>
+                {(loan.supplierId && supplier) || loan.lender ? (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardDescription>Lender</CardDescription>
+                      <CardTitle className="text-lg">
+                        {loan.supplierId && supplier ? (
+                          <Link
+                            href={`/inventory-suppliers/${loan.supplierId}`}
+                            className="text-primary hover:underline"
+                          >
+                            {supplier.name}
+                          </Link>
+                        ) : (
+                          loan.lender
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                  </Card>
+                ) : null}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="schedule" className="flex flex-col flex-1 min-h-0 mt-4 data-[state=inactive]:hidden">
+        {!isEditing ? (
+          schedule && schedule.length > 0 ? (
+            <div className="flex flex-col flex-1 min-h-0">
+              <div className="flex items-center justify-between shrink-0 mb-2">
+                <p className="text-sm text-muted-foreground">
+                  {schedule.length} payment(s) scheduled
+                  {loan.offPaymentMonths && loan.offPaymentMonths.length > 0 && (
+                    <span className="ml-2">
+                      • {loan.offPaymentMonths.length} interest-only month{loan.offPaymentMonths.length > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </p>
+                <div className="flex space-x-2">
+                  <Button variant="outline" size="sm" onClick={handleExportSchedule}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export CSV
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 min-h-0 rounded-md border overflow-y-auto overflow-x-auto">
+                <table className="w-full caption-bottom text-sm">
+                  <TableHeader className="sticky top-0 z-20 bg-background [&_tr]:border-b shadow-sm">
+                    <TableRow>
+                      <TableHead>Month</TableHead>
+                      <TableHead>Payment Date</TableHead>
+                      <TableHead className="text-right">Principal</TableHead>
+                      <TableHead className="text-right">Interest</TableHead>
+                      <TableHead className="text-right">Total Payment</TableHead>
+                      <TableHead className="text-right">Remaining Balance</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {schedule.map((entry, index) => (
+                      <EditableScheduleRow
+                        key={entry.id || index}
+                        entry={entry}
+                        loanId={loanId}
+                        onUpdate={handleScheduleUpdate}
+                        allEntries={allEntriesData?.data || []}
+                        offPaymentMonths={loan.offPaymentMonths || []}
+                      />
+                    ))}
+                  </TableBody>
+                  <TableFooter className="sticky bottom-0 z-20 bg-muted [&>tr]:border-t-0">
+                    <TableRow className="bg-muted font-semibold hover:bg-muted">
+                      <TableCell colSpan={2}>Total</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(schedule.reduce((sum, e) => sum + e.principalPayment, 0))}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(schedule.reduce((sum, e) => sum + e.interestPayment, 0))}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(schedule.reduce((sum, e) => sum + e.totalPayment, 0))}
+                      </TableCell>
+                      <TableCell colSpan={2} />
+                    </TableRow>
+                  </TableFooter>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center flex-1 min-h-0 py-10">
+              <p className="text-muted-foreground mb-4">No schedule generated yet.</p>
+              <Button onClick={handleGenerateSchedule} disabled={generateSchedule.isPending}>
+                {generateSchedule.isPending ? "Generating..." : "Generate Amortization Schedule"}
+              </Button>
+            </div>
+          )
+        ) : (
+          <p className="text-muted-foreground text-sm py-8">Save changes to see schedule.</p>
+        )}
+          </TabsContent>
+
+          <TabsContent value="payments" className="flex-1 min-h-0 overflow-auto mt-4 space-y-4 data-[state=inactive]:hidden">
         {!isEditing && loanEntry && (
           <Card>
             <CardHeader>
@@ -618,8 +755,8 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                 <div>
                   <CardTitle>Loan Principal Payments</CardTitle>
                   <CardDescription>
-                    Total due: {formatCurrency(loanEntry.amount)} | 
-                    Already paid: {formatCurrency(totalPaid)} | 
+                    Total due: {formatCurrency(loanEntry.amount)} |
+                    Already paid: {formatCurrency(totalPaid)} |
                     Remaining: {formatCurrency(remainingToPay)}
                   </CardDescription>
                 </div>
@@ -660,9 +797,9 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                 ) : (
                   <div className="text-center py-4 text-muted-foreground">
                     <p className="text-sm">No payments recorded yet.</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="mt-2"
                       onClick={() => setIsPaymentDialogOpen(true)}
                     >
@@ -675,101 +812,14 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
             </CardContent>
           </Card>
         )}
-
-        {/* Amortization Schedule Card */}
-        {!isEditing && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Amortization Schedule</CardTitle>
-                  <CardDescription>
-                    {schedule && schedule.length > 0 ? (
-                      <>
-                        {schedule.length} payment(s) scheduled
-                        {loan.offPaymentMonths && loan.offPaymentMonths.length > 0 && (
-                          <span className="ml-2">
-                            • {loan.offPaymentMonths.length} interest-only month{loan.offPaymentMonths.length > 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      "No schedule generated yet"
-                    )}
-                  </CardDescription>
-                </div>
-                <div className="flex space-x-2">
-                  {(!schedule || schedule.length === 0) && (
-                    <Button
-                      onClick={handleGenerateSchedule}
-                      disabled={generateSchedule.isPending}
-                    >
-                      {generateSchedule.isPending ? "Generating..." : "Generate Schedule"}
-                    </Button>
-                  )}
-                  {schedule && schedule.length > 0 && (
-                    <Button variant="outline" onClick={handleExportSchedule}>
-                      <Download className="mr-2 h-4 w-4" />
-                      Export CSV
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {schedule && schedule.length > 0 ? (
-                <div className="rounded-md border overflow-x-auto max-h-[600px] overflow-y-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 bg-background z-10">
-                      <TableRow>
-                        <TableHead>Month</TableHead>
-                        <TableHead>Payment Date</TableHead>
-                        <TableHead className="text-right">Principal</TableHead>
-                        <TableHead className="text-right">Interest</TableHead>
-                        <TableHead className="text-right">Total Payment</TableHead>
-                        <TableHead className="text-right">Remaining Balance</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {schedule.map((entry, index) => (
-                        <EditableScheduleRow
-                          key={entry.id || index}
-                          entry={entry}
-                          loanId={loanId}
-                          onUpdate={handleScheduleUpdate}
-                          allEntries={allEntriesData?.data || []}
-                          offPaymentMonths={loan.offPaymentMonths || []}
-                        />
-                      ))}
-                      <TableRow className="font-semibold bg-muted sticky bottom-0">
-                        <TableCell colSpan={2}>Total</TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(schedule.reduce((sum, e) => sum + e.principalPayment, 0))}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(schedule.reduce((sum, e) => sum + e.interestPayment, 0))}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(schedule.reduce((sum, e) => sum + e.totalPayment, 0))}
-                        </TableCell>
-                        <TableCell colSpan={2}></TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="text-center py-10">
-                  <p className="text-muted-foreground mb-4">No schedule generated yet.</p>
-                  <Button onClick={handleGenerateSchedule} disabled={generateSchedule.isPending}>
-                    {generateSchedule.isPending ? "Generating..." : "Generate Amortization Schedule"}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {!isEditing && !loanEntry && (
+          <p className="text-muted-foreground text-sm py-8">No loan entry for principal payments.</p>
         )}
+        {isEditing && (
+          <p className="text-muted-foreground text-sm py-8">Save changes to see payments.</p>
+        )}
+          </TabsContent>
+        </Tabs>
 
         {/* Payment Management Dialog */}
         <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>

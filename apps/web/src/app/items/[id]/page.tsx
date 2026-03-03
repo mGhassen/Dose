@@ -211,20 +211,20 @@ function PriceCostHistorySection({
           </CardHeader>
           <CardContent className="space-y-4">
             {adding === 'sell' && (
-              <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-6">
+                <div className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="sell-date">Effective date</Label>
+                    <Label htmlFor="sell-date" className="text-muted-foreground font-normal">Effective date</Label>
                     <DatePicker value={addDate ? new Date(addDate) : undefined} onChange={(d) => setAddDate(d ? dateToYYYYMMDD(d) : "")} placeholder="Pick a date" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sell-price">Price</Label>
+                    <Label htmlFor="sell-price" className="text-muted-foreground font-normal">Price</Label>
                     <Input id="sell-price" type="number" step="0.01" min="0" placeholder="0.00" value={addValue} onChange={(e) => setAddValue(e.target.value)} />
                   </div>
                 </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); }}>Cancel</Button>
-                  <Button size="sm" onClick={() => handleAdd('sell')}>Save</Button>
+                <div className="flex justify-end gap-3 pt-1">
+                  <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); }}>Cancel</button>
+                  <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => handleAdd('sell')}>Save</Button>
                 </div>
               </div>
             )}
@@ -278,20 +278,20 @@ function PriceCostHistorySection({
           </CardHeader>
           <CardContent className="space-y-4">
             {adding === 'cost' && (
-              <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-6">
+                <div className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="cost-date">Effective date</Label>
+                    <Label htmlFor="cost-date" className="text-muted-foreground font-normal">Effective date</Label>
                     <DatePicker value={addDate ? new Date(addDate) : undefined} onChange={(d) => setAddDate(d ? dateToYYYYMMDD(d) : "")} placeholder="Pick a date" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="cost-value">Cost</Label>
+                    <Label htmlFor="cost-value" className="text-muted-foreground font-normal">Cost</Label>
                     <Input id="cost-value" type="number" step="0.01" min="0" placeholder="0.00" value={addValue} onChange={(e) => setAddValue(e.target.value)} />
                   </div>
                 </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); }}>Cancel</Button>
-                  <Button size="sm" onClick={() => handleAdd('cost')}>Save</Button>
+                <div className="flex justify-end gap-3 pt-1">
+                  <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); }}>Cancel</button>
+                  <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => handleAdd('cost')}>Save</Button>
                 </div>
               </div>
             )}

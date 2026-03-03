@@ -36,10 +36,12 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@kit/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 
 interface LeasingDetailPageProps {
   params: Promise<{ id: string }>;
@@ -473,9 +475,9 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="flex flex-col max-h-[calc(100vh-5rem)] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between shrink-0 py-2">
           <div>
             <h1 className="text-2xl font-bold">
               {isEditing ? "Edit Leasing Payment" : leasing.name}
@@ -510,7 +512,13 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
           )}
         </div>
 
-        {/* Form/Details Card */}
+        <Tabs defaultValue="overview" className="flex flex-col flex-1 min-h-0 mt-2">
+          <TabsList className="grid w-full max-w-md grid-cols-2 shrink-0">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="flex-1 min-h-0 overflow-auto mt-4 space-y-4 data-[state=inactive]:hidden">
         <Card>
           <CardHeader>
             <CardTitle>{isEditing ? "Edit Leasing Payment" : "Leasing Payment Information"}</CardTitle>
@@ -914,92 +922,151 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
           </CardContent>
         </Card>
 
-        {/* Timeline Card */}
-        {!isEditing && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Payment Timeline</CardTitle>
-                  <CardDescription>
-                    {timeline.length > 0 ? (
-                      <>
-                        {timeline.length} payment(s) scheduled
-                        {leasing.offPaymentMonths && leasing.offPaymentMonths.length > 0 && (
-                          <span className="ml-2">
-                            • {leasing.offPaymentMonths.length} off-payment month{leasing.offPaymentMonths.length > 1 ? 's' : ''}
+            {!isEditing && (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {(() => {
+                  const totalPaid = timeline
+                    .filter((e) => e.isPaid)
+                    .reduce((sum, e) => sum + (e.actualAmount ?? e.amount ?? 0), 0);
+                  const totalProjected = timeline
+                    .filter((e) => !e.isPaid && (e.amount ?? 0) > 0)
+                    .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+                  const nextPayment = timeline.find(
+                    (e) => !e.isPaid && (e.amount ?? 0) > 0 && new Date(e.paymentDate) >= new Date()
+                  );
+                  return (
+                    <>
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardDescription>Total paid</CardDescription>
+                          <CardTitle className="text-2xl">{formatCurrency(totalPaid)}</CardTitle>
+                        </CardHeader>
+                      </Card>
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardDescription>Remaining (projected)</CardDescription>
+                          <CardTitle className="text-2xl">{formatCurrency(totalProjected)}</CardTitle>
+                        </CardHeader>
+                      </Card>
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardDescription>Next payment</CardDescription>
+                          <CardTitle className="text-lg">
+                            {nextPayment
+                              ? `${formatCurrency(nextPayment.amount)} · ${formatDate(nextPayment.paymentDate)}`
+                              : "—"}
+                          </CardTitle>
+                        </CardHeader>
+                      </Card>
+                      {leasing.supplierId && supplier && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardDescription>Supplier</CardDescription>
+                            <CardTitle className="text-lg">
+                              <Link
+                                href={`/inventory-suppliers/${leasing.supplierId}`}
+                                className="text-primary hover:underline"
+                              >
+                                {supplier.name}
+                              </Link>
+                            </CardTitle>
+                          </CardHeader>
+                        </Card>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="timeline" className="flex flex-col flex-1 min-h-0 mt-4 data-[state=inactive]:hidden">
+        {!isEditing ? (
+          <>
+            <div className="flex items-center justify-between shrink-0 mb-2">
+              <p className="text-sm text-muted-foreground">
+                {timeline.length > 0 ? (
+                  <>
+                    {timeline.length} payment(s) scheduled
+                    {leasing.offPaymentMonths && leasing.offPaymentMonths.length > 0 && (
+                      <span className="ml-2">
+                        • {leasing.offPaymentMonths.length} off-payment month{leasing.offPaymentMonths.length > 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  "No timeline data available"
+                )}
+              </p>
+              {timeline.length > 0 && (
+                <Button variant="outline" size="sm" onClick={handleExportTimeline}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export CSV
+                </Button>
+              )}
+            </div>
+            {isLoadingTimeline ? (
+              <div className="flex items-center justify-center flex-1 min-h-0">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+              </div>
+            ) : timeline.length > 0 ? (
+              <div className="flex-1 min-h-0 rounded-md border overflow-y-auto overflow-x-auto">
+                <table className="w-full caption-bottom text-sm">
+                  <TableHeader className="sticky top-0 z-20 bg-background [&_tr]:border-b shadow-sm">
+                    <TableRow>
+                      <TableHead>Month</TableHead>
+                      <TableHead>Payment Date</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {timeline.map((entry, index) => (
+                      <EditableLeasingTimelineRow
+                        key={entry.id ? `entry-${entry.id}` : `${entry.month}-${index}`}
+                        entry={entry}
+                        leasingId={Number(resolvedParams?.id || 0)}
+                        leasingEndDate={leasing.endDate}
+                        allActualPayments={allActualPayments || []}
+                        onUpdate={handleTimelineUpdate}
+                      />
+                    ))}
+                  </TableBody>
+                  <TableFooter className="sticky bottom-0 z-20 bg-muted [&>tr]:border-t-0">
+                    <TableRow className="bg-muted font-semibold hover:bg-muted">
+                      <TableCell colSpan={2}>Total</TableCell>
+                      <TableCell>
+                        {formatCurrency(timeline.reduce((sum, e) => sum + (e.amount > 0 ? e.amount : 0), 0))}
+                        {leasing.totalAmount && (
+                          <span className="text-xs text-muted-foreground font-normal ml-2">
+                            (Expected: {formatCurrency(leasing.totalAmount)})
                           </span>
                         )}
-                      </>
-                    ) : (
-                      "No timeline data available"
-                    )}
-                  </CardDescription>
-                </div>
-                {timeline.length > 0 && (
-                  <Button variant="outline" onClick={handleExportTimeline}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export CSV
-                  </Button>
-                )}
+                      </TableCell>
+                      <TableCell colSpan={3} />
+                    </TableRow>
+                  </TableFooter>
+                </table>
               </div>
-            </CardHeader>
-            <CardContent>
-              {isLoadingTimeline ? (
-                <div className="flex items-center justify-center py-10">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                </div>
-              ) : timeline.length > 0 ? (
-                <div className="rounded-md border overflow-x-auto max-h-[600px] overflow-y-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 bg-background z-10">
-                      <TableRow>
-                        <TableHead>Month</TableHead>
-                        <TableHead>Payment Date</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Notes</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {timeline.map((entry, index) => (
-                        <EditableLeasingTimelineRow
-                          key={entry.id ? `entry-${entry.id}` : `${entry.month}-${index}`}
-                          entry={entry}
-                          leasingId={Number(resolvedParams?.id || 0)}
-                          leasingEndDate={leasing.endDate}
-                          allActualPayments={allActualPayments || []}
-                          onUpdate={handleTimelineUpdate}
-                        />
-                      ))}
-                      <TableRow className="font-semibold bg-muted sticky bottom-0">
-                        <TableCell colSpan={2}>Total</TableCell>
-                        <TableCell>
-                          {formatCurrency(timeline.reduce((sum, e) => sum + (e.amount > 0 ? e.amount : 0), 0))}
-                          {leasing.totalAmount && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              (Expected: {formatCurrency(leasing.totalAmount)})
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell colSpan={3}></TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="text-center py-10">
-                  <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">
+            ) : (
+              <div className="flex items-center justify-center flex-1 min-h-0 text-muted-foreground">
+                <div className="text-center">
+                  <Calendar className="mx-auto h-12 w-12 mb-4" />
+                  <p>
                     No timeline data available.
                     {!leasing.isActive && " This leasing payment is inactive."}
                   </p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-muted-foreground text-sm py-8">Save changes to see timeline.</p>
         )}
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );

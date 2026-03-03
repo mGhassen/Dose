@@ -11,9 +11,9 @@ import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import {
-  Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -121,9 +121,8 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+      <div className="flex flex-col max-h-[calc(100vh-5rem)] overflow-hidden">
+        <div className="flex items-center justify-between shrink-0 py-2">
           <div>
             <h1 className="text-2xl font-bold">Loan Amortization Schedule</h1>
             <p className="text-muted-foreground">
@@ -152,8 +151,7 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
           </div>
         </div>
 
-        {/* Loan Summary */}
-        <Card>
+        <Card className="shrink-0">
           <CardHeader>
             <CardTitle>Loan Summary</CardTitle>
           </CardHeader>
@@ -208,84 +206,76 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
               <div className="mt-4 pt-4 border-t">
                 <label className="text-sm font-medium text-muted-foreground">Off-Payment Months (Interest Only)</label>
                 <p className="text-sm mt-1 text-muted-foreground">
-                  Months {loan.offPaymentMonths.join(', ')} - Only interest will be paid (no principal)
+                  Months {loan.offPaymentMonths.join(", ")} - Only interest will be paid (no principal)
                 </p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Schedule Table */}
         {scheduleLoading ? (
-          <Card>
-            <CardContent className="py-10">
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-center flex-1 min-h-0 py-10">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+          </div>
         ) : schedule && schedule.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Amortization Schedule</CardTitle>
-              <CardDescription>
+          <div className="flex flex-col flex-1 min-h-0 mt-4">
+            <div className="flex items-center justify-between shrink-0 mb-2">
+              <p className="text-sm text-muted-foreground">
                 {schedule.length} payment(s) scheduled
                 {loan.offPaymentMonths && loan.offPaymentMonths.length > 0 && (
                   <span className="ml-2">
-                    • {loan.offPaymentMonths.length} interest-only month{loan.offPaymentMonths.length > 1 ? 's' : ''}
+                    • {loan.offPaymentMonths.length} interest-only month{loan.offPaymentMonths.length > 1 ? "s" : ""}
                   </span>
                 )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Month</TableHead>
-                      <TableHead>Payment Date</TableHead>
-                      <TableHead className="text-right">Principal</TableHead>
-                      <TableHead className="text-right">Interest</TableHead>
-                      <TableHead className="text-right">Total Payment</TableHead>
-                      <TableHead className="text-right">Remaining Balance</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {schedule.map((entry, index) => (
-                      <EditableScheduleRow
-                        key={entry.id || index}
-                        entry={entry}
-                        loanId={resolvedParams?.id || ""}
-                        onUpdate={handleScheduleUpdate}
-                        allEntries={allEntriesData?.data || []}
-                        offPaymentMonths={loan.offPaymentMonths || []}
-                      />
-                    ))}
-                    <TableRow className="font-semibold bg-muted">
-                      <TableCell colSpan={2}>Total</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totalPrincipal)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totalInterest)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totalPayments)}</TableCell>
-                      <TableCell colSpan={2}></TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+              </p>
+            </div>
+            <div className="flex-1 min-h-0 rounded-md border overflow-y-auto overflow-x-auto">
+              <table className="w-full caption-bottom text-sm">
+                <TableHeader className="sticky top-0 z-20 bg-background [&_tr]:border-b shadow-sm">
+                  <TableRow>
+                    <TableHead>Month</TableHead>
+                    <TableHead>Payment Date</TableHead>
+                    <TableHead className="text-right">Principal</TableHead>
+                    <TableHead className="text-right">Interest</TableHead>
+                    <TableHead className="text-right">Total Payment</TableHead>
+                    <TableHead className="text-right">Remaining Balance</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {schedule.map((entry, index) => (
+                    <EditableScheduleRow
+                      key={entry.id || index}
+                      entry={entry}
+                      loanId={resolvedParams?.id || ""}
+                      onUpdate={handleScheduleUpdate}
+                      allEntries={allEntriesData?.data || []}
+                      offPaymentMonths={loan.offPaymentMonths || []}
+                    />
+                  ))}
+                </TableBody>
+                <TableFooter className="sticky bottom-0 z-20 bg-muted [&>tr]:border-t-0">
+                  <TableRow className="bg-muted font-semibold hover:bg-muted">
+                    <TableCell colSpan={2}>Total</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totalPrincipal)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totalInterest)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totalPayments)}</TableCell>
+                    <TableCell colSpan={2} />
+                  </TableRow>
+                </TableFooter>
+              </table>
+            </div>
+          </div>
         ) : (
-          <Card>
-            <CardContent className="py-10">
-              <div className="text-center">
-                <p className="text-muted-foreground mb-4">No schedule generated yet.</p>
-                <Button onClick={handleGenerateSchedule} disabled={generateSchedule.isPending}>
-                  {generateSchedule.isPending ? "Generating..." : "Generate Amortization Schedule"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-center flex-1 min-h-0 py-10">
+            <div className="text-center">
+              <p className="text-muted-foreground mb-4">No schedule generated yet.</p>
+              <Button onClick={handleGenerateSchedule} disabled={generateSchedule.isPending}>
+                {generateSchedule.isPending ? "Generating..." : "Generate Amortization Schedule"}
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </AppLayout>

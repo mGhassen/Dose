@@ -35,7 +35,11 @@ function getInitialDateRange() {
   return getDateRangeForPreset("this_year");
 }
 
-export default function ExpensesContent() {
+interface ExpensesContentProps {
+  selectedExpenseId?: number;
+}
+
+export default function ExpensesContent({ selectedExpenseId }: ExpensesContentProps) {
   const router = useRouter();
   const [dateRange, setDateRange] = useState(getInitialDateRange);
   const [page, setPage] = useState(1);
@@ -309,7 +313,12 @@ export default function ExpensesContent() {
               data={expenses}
               columns={columns}
               loading={isLoading}
-              onRowClick={(expense) => router.push(`/expenses/${expense.id}`)}
+              onRowClick={(expense) => {
+              if (expense.id !== selectedExpenseId) {
+                router.push(`/expenses/${expense.id}`);
+              }
+            }}
+              activeRowId={selectedExpenseId}
               onDelete={handleDelete}
               onBulkDelete={handleBulkDelete}
               onBulkCopy={handleBulkCopy}

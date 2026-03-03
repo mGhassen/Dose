@@ -30,9 +30,9 @@ import type { ExpenseCategory, ExpenseRecurrence, SubscriptionProjection } from 
 import { EditableSubscriptionTimelineRow } from "../../subscriptions/timeline/subscription-timeline-editable";
 import { projectSubscription } from "@/lib/calculations/subscription-projections";
 import {
-  Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -41,6 +41,9 @@ import {
 interface SubscriptionDetailsContentProps {
   subscriptionId: string;
 }
+
+type CategoryLabelsMap = Record<ExpenseCategory, string>;
+type RecurrenceLabelsMap = Record<ExpenseRecurrence, string>;
 
 export default function SubscriptionDetailsContent({ subscriptionId }: SubscriptionDetailsContentProps) {
   const router = useRouter();
@@ -189,7 +192,7 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
     );
   }
 
-  const categoryLabels: Record<ExpenseCategory, string> = {
+  const categoryLabels: CategoryLabelsMap = {
     rent: "Rent",
     utilities: "Utilities",
     supplies: "Supplies",
@@ -200,7 +203,7 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
     other: "Other",
   };
 
-  const recurrenceLabels: Record<ExpenseRecurrence, string> = {
+  const recurrenceLabels: RecurrenceLabelsMap = {
     one_time: "One Time",
     monthly: "Monthly",
     quarterly: "Quarterly",
@@ -212,7 +215,7 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between shrink-0 py-2">
           <div>
             <h1 className="text-2xl font-bold">
               {isEditing ? "Edit Subscription" : subscription.name}
@@ -248,15 +251,14 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
         </div>
 
         {/* Form/Details Card */}
+        {isEditing ? (
+        <div className="flex-1 min-h-0 overflow-auto">
         <Card>
           <CardHeader>
-            <CardTitle>{isEditing ? "Edit Subscription" : "Subscription Information"}</CardTitle>
-            <CardDescription>
-              {isEditing ? "Update the details for this subscription" : "View and manage subscription details"}
-            </CardDescription>
+            <CardTitle>Edit Subscription</CardTitle>
+            <CardDescription>Update the details for this subscription</CardDescription>
           </CardHeader>
           <CardContent>
-            {isEditing ? (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Name */}
@@ -389,7 +391,17 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                   </Button>
                 </div>
               </form>
-            ) : (
+          </CardContent>
+        </Card>
+        </div>
+        ) : (
+        <>
+        <Card className="shrink-0">
+          <CardHeader>
+            <CardTitle>Subscription Information</CardTitle>
+            <CardDescription>View and manage subscription details</CardDescription>
+          </CardHeader>
+          <CardContent>
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Name */}
@@ -484,88 +496,82 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                   </div>
                 </div>
               </div>
-            )}
           </CardContent>
         </Card>
 
-        {/* Timeline Card - Only show when not editing */}
-        {!isEditing && subscription && (
-          <Card>
-            <CardHeader>
-              <div>
-                <CardTitle>Subscription Timeline</CardTitle>
-                <CardDescription>
-                  Payment schedule from {formatDate(subscription.startDate)} to {subscription.endDate ? formatDate(subscription.endDate) : 'today'} ({recurrenceLabels[subscription.recurrence]})
-                </CardDescription>
+        {subscription && (mergedProjections.length === 0 ? (
+          <div className="flex flex-col items-center justify-center flex-1 min-h-0 py-10 text-center">
+            <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">No payment schedule for this subscription</p>
+          </div>
+        ) : (
+          <div className="flex flex-col flex-1 min-h-0 mt-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0 mb-4">
+              <div className="p-4 border rounded-lg">
+                <div className="text-sm text-muted-foreground">Total Entries</div>
+                <div className="text-2xl font-bold mt-1">{mergedProjections.length}</div>
               </div>
-            </CardHeader>
-            <CardContent>
-              {mergedProjections.length === 0 ? (
-                <div className="text-center py-10">
-                  <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No payment schedule for this subscription</p>
+              <div className="p-4 border rounded-lg">
+                <div className="text-sm text-muted-foreground">Total Amount</div>
+                <div className="text-2xl font-bold mt-1 text-primary">
+                  {formatCurrency(mergedProjections.reduce((sum, p) => sum + ((p as any).actualAmount ?? p.amount), 0))}
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Summary Stats */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-4 border rounded-lg">
-                      <div className="text-sm text-muted-foreground">Total Entries</div>
-                      <div className="text-2xl font-bold mt-1">{mergedProjections.length}</div>
-                    </div>
-                    <div className="p-4 border rounded-lg">
-                      <div className="text-sm text-muted-foreground">Total Amount</div>
-                      <div className="text-2xl font-bold mt-1 text-primary">
-                        {formatCurrency(mergedProjections.reduce((sum, p) => sum + ((p as any).actualAmount || p.amount), 0))}
-                      </div>
-                    </div>
-                    <div className="p-4 border rounded-lg">
-                      <div className="text-sm text-muted-foreground">Paid Entries</div>
-                      <div className="text-2xl font-bold mt-1 text-green-600">
-                        {mergedProjections.filter((p: any) => p.isPaid).length}
-                      </div>
-                    </div>
-                    <div className="p-4 border rounded-lg">
-                      <div className="text-sm text-muted-foreground">Unpaid Entries</div>
-                      <div className="text-2xl font-bold mt-1 text-orange-600">
-                        {mergedProjections.filter((p: any) => !p.isPaid).length}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Timeline Table */}
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Month</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {mergedProjections.map((projection: any, index: number) => {
-                          // Use month + subscriptionId + index for uniqueness (month is unique per subscription)
-                          // Include stored ID in key if available, but month is the primary unique identifier
-                          const uniqueKey = `sub-${subscription.id}-month-${projection.month}-${projection.id || 'calc'}-idx-${index}`;
-                          
-                          return (
-                            <EditableSubscriptionTimelineRow
-                              key={uniqueKey}
-                              projection={projection}
-                              subscriptionId={subscription.id}
-                              onUpdate={handleTimelineUpdate}
-                            />
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <div className="text-sm text-muted-foreground">Paid Entries</div>
+                <div className="text-2xl font-bold mt-1 text-green-600">
+                  {mergedProjections.filter((p: any) => p.isPaid).length}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <div className="text-sm text-muted-foreground">Unpaid Entries</div>
+                <div className="text-2xl font-bold mt-1 text-orange-600">
+                  {mergedProjections.filter((p: any) => !p.isPaid).length}
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0 mb-2">
+              <p className="text-sm text-muted-foreground">
+                Payment schedule from {formatDate(subscription.startDate)} to {subscription.endDate ? formatDate(subscription.endDate) : "today"} ({recurrenceLabels[subscription.recurrence]})
+              </p>
+            </div>
+            <div className="flex-1 min-h-0 rounded-md border overflow-y-auto overflow-x-auto">
+              <table className="w-full caption-bottom text-sm">
+                <TableHeader className="sticky top-0 z-20 bg-background [&_tr]:border-b shadow-sm">
+                  <TableRow>
+                    <TableHead>Month</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {mergedProjections.map((projection: any, index: number) => {
+                    const uniqueKey = `sub-${subscription.id}-month-${projection.month}-${projection.id || "calc"}-idx-${index}`;
+                    return (
+                      <EditableSubscriptionTimelineRow
+                        key={uniqueKey}
+                        projection={projection}
+                        subscriptionId={subscription.id}
+                        onUpdate={handleTimelineUpdate}
+                      />
+                    );
+                  })}
+                </TableBody>
+                <TableFooter className="sticky bottom-0 z-20 bg-muted [&>tr]:border-t-0">
+                  <TableRow className="bg-muted font-semibold hover:bg-muted">
+                    <TableCell>Total</TableCell>
+                    <TableCell>
+                      {formatCurrency(mergedProjections.reduce((sum, p) => sum + ((p as any).actualAmount ?? p.amount), 0))}
+                    </TableCell>
+                    <TableCell colSpan={2} />
+                  </TableRow>
+                </TableFooter>
+              </table>
+            </div>
+          </div>
+        ))}
+        </>
         )}
       </div>
     </AppLayout>

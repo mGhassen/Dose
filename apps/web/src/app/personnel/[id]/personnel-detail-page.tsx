@@ -43,9 +43,9 @@ import type { PersonnelType } from "@kit/types";
 import { projectPersonnelSalary } from "@/lib/calculations/personnel-projections";
 import { EditablePersonnelTimelineRow } from "../personnel-timeline-editable";
 import {
-  Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -328,8 +328,8 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
 
   return (
     <AppLayout>
-      <div className="space-y-6">
-        <Breadcrumb>
+      <div className="flex flex-col max-h-[calc(100vh-5rem)] overflow-hidden">
+        <Breadcrumb className="shrink-0">
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
@@ -343,7 +343,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
           </BreadcrumbList>
         </Breadcrumb>
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between shrink-0 mt-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" asChild className="-ml-2 shrink-0">
               <Link href="/personnel"><ChevronLeft className="h-4 w-4" /></Link>
@@ -405,6 +405,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
         </div>
 
         {isEditing ? (
+        <div className="flex-1 min-h-0 overflow-auto">
         <Card>
           <CardHeader>
             <CardTitle>Edit Personnel</CardTitle>
@@ -477,13 +478,14 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
               </form>
           </CardContent>
         </Card>
+        </div>
         ) : (
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList>
+        <Tabs defaultValue="overview" className="flex flex-col flex-1 min-h-0 w-full mt-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2 shrink-0">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="timeline">Salary Timeline</TabsTrigger>
           </TabsList>
-          <TabsContent value="overview">
+          <TabsContent value="overview" className="flex-1 min-h-0 overflow-auto mt-4 data-[state=inactive]:hidden">
         <Card>
           <CardHeader>
             <CardTitle>Personnel Information</CardTitle>
@@ -555,17 +557,9 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
           </CardContent>
         </Card>
           </TabsContent>
-          <TabsContent value="timeline">
-        <Card>
-          <CardHeader>
-            <CardTitle>Salary Timeline</CardTitle>
-            <CardDescription>
-              Monthly projections from {formatDate(personnel.startDate)} to {personnel.endDate ? formatDate(personnel.endDate) : "ongoing"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          <TabsContent value="timeline" className="flex flex-col flex-1 min-h-0 mt-4 data-[state=inactive]:hidden">
             {mergedProjections.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+              <div className="flex flex-col items-center justify-center flex-1 min-h-0 rounded-lg border border-dashed py-16 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-4">
                   <Calendar className="h-6 w-6 text-muted-foreground" />
                 </div>
@@ -573,8 +567,8 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                 <p className="text-xs text-muted-foreground mt-1">Projections will appear based on start and end dates</p>
               </div>
             ) : (
-              <div className="space-y-6">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 shrink-0 mb-4">
                   <div className="rounded-lg border bg-muted/30 p-4">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Months</p>
                     <p className="text-2xl font-bold mt-1">{mergedProjections.length}</p>
@@ -592,28 +586,39 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                     <p className="text-2xl font-bold mt-1">{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualNetAmount || p.netSalary) + (p.actualTaxesAmount || (p.socialTaxes + p.employerTaxes)), 0))}</p>
                   </div>
                 </div>
-                <div className="rounded-lg border overflow-hidden">
-                  <Table>
-                    <TableHeader>
+                <div className="flex items-center justify-between shrink-0 mb-2">
+                  <p className="text-sm text-muted-foreground">
+                    Monthly projections from {formatDate(personnel.startDate)} to {personnel.endDate ? formatDate(personnel.endDate) : "ongoing"}
+                  </p>
+                </div>
+                <div className="flex-1 min-h-0 rounded-md border overflow-y-auto overflow-x-auto">
+                  <table className="w-full caption-bottom text-sm">
+                    <TableHeader className="sticky top-0 z-20 bg-background [&_tr]:border-b shadow-sm">
                       <TableRow>
                         <TableHead>Month</TableHead>
                         <TableHead>Net Salary</TableHead>
                         <TableHead>Taxes</TableHead>
-                        <TableHead>Payment Status</TableHead>
-                        <TableHead>Payment Dates</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {mergedProjections.map((projection: any, index: number) => (
-                        <EditablePersonnelTimelineRow key={`personnel-${personnel.id}-month-${projection.month}-${projection.id || 'calc'}-idx-${index}`} projection={projection} personnelId={personnel.id} onUpdate={handleTimelineUpdate} employeeSocialTaxRate={employeeSocialTaxRate} socialSecurityRate={socialSecurityRate} />
+                        <EditablePersonnelTimelineRow key={`personnel-${personnel.id}-month-${projection.month}-${projection.id || "calc"}-idx-${index}`} projection={projection} personnelId={personnel.id} onUpdate={handleTimelineUpdate} employeeSocialTaxRate={employeeSocialTaxRate} socialSecurityRate={socialSecurityRate} />
                       ))}
                     </TableBody>
-                  </Table>
+                    <TableFooter className="sticky bottom-0 z-20 bg-muted [&>tr]:border-t-0">
+                      <TableRow className="bg-muted font-semibold hover:bg-muted">
+                        <TableCell>Total</TableCell>
+                        <TableCell>{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualNetAmount || p.netSalary), 0))}</TableCell>
+                        <TableCell>{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualTaxesAmount || (p.socialTaxes + p.employerTaxes)), 0))}</TableCell>
+                        <TableCell colSpan={2} />
+                      </TableRow>
+                    </TableFooter>
+                  </table>
                 </div>
-              </div>
+              </>
             )}
-          </CardContent>
-        </Card>
           </TabsContent>
         </Tabs>
         )}

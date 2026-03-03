@@ -1,6 +1,5 @@
-import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
-import { prefetchExpense } from '@kit/hooks';
-import ExpenseDetailsContent from './expense-details-content';
+import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
+import { prefetchExpense } from "@kit/hooks";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -8,28 +7,11 @@ interface PageProps {
 
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
-
-  // Validate ID
-  if (!id || id.trim() === '') {
-    return (
-      <div className="container py-6">
-        <div className="text-center py-8">
-          <h3 className="text-lg font-medium mb-2">Invalid Expense ID</h3>
-          <p className="text-muted-foreground mb-4">
-            The expense ID is invalid.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Prefetch data on server
+  if (!id || id.trim() === "") return null;
   const queryClient = await prefetchExpense(id);
-
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <ExpenseDetailsContent expenseId={id} />
+      {null}
     </HydrationBoundary>
   );
 }
-

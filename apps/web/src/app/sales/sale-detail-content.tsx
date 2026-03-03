@@ -218,10 +218,10 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
     return (
       <form
         onSubmit={handleSubmit}
-        className="flex h-full flex-col"
+        className="flex min-h-0 flex-1 flex-col h-full"
       >
-        <ScrollArea className="flex-1 pr-2">
-          <div className="space-y-6 pb-6">
+        <ScrollArea className="min-h-0 flex-1 pr-2">
+          <div className="space-y-6 pb-6 pr-1">
             <div>
               <h2 className="text-lg font-semibold">Edit sale</h2>
               <p className="text-sm text-muted-foreground">
@@ -333,7 +333,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
             </div>
           </div>
         </ScrollArea>
-        <div className="sticky bottom-0 -mx-6 mt-auto flex gap-3 border-t bg-background p-4">
+        <div className="mt-auto flex shrink-0 gap-3 border-t bg-background p-4 -mx-6">
           <Button
             type="button"
             variant="outline"
