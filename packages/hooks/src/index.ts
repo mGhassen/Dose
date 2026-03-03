@@ -34,6 +34,7 @@ export * from './client/useDashboard';
 export * from './client/useBudgetProjections';
 export * from './client/useBudgets';
 export * from './client/useMetadataEnums';
+export * from './client/useUnits';
 export * from './client/useActualPayments';
 export * from './client/useEntries';
 export * from './client/usePayments';
@@ -66,6 +67,7 @@ export * from './server/prefetchBalanceSheet';
 export * from './server/prefetchFinancialPlan';
 export * from './server/prefetchDashboard';
 export * from './server/prefetchMetadataEnums';
+export * from './server/prefetchUnits';
 
 // Platform-specific hooks (may need adapters for mobile)
 // use-auth.ts - uses Next.js router

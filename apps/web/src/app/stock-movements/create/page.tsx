@@ -10,7 +10,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateStockMovement, useItems } from "@kit/hooks";
+import { useCreateStockMovement, useItems, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 import { StockMovementType } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
@@ -21,12 +21,13 @@ export default function CreateStockMovementPage() {
   const { data: itemsResponse } = useItems({ limit: 1000 });
   
   const items = itemsResponse?.data || [];
-  
+  const { data: unitsData } = useUnits();
+  const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const [formData, setFormData] = useState({
     itemId: "",
     movementType: StockMovementType.IN,
     quantity: "",
-    unit: "",
+    unitId: null as number | null,
     location: "",
     notes: "",
     movementDate: dateToYYYYMMDD(new Date()),
@@ -35,7 +36,7 @@ export default function CreateStockMovementPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.itemId || !formData.quantity || !formData.unit) {
+    if (!formData.itemId || !formData.quantity || formData.unitId == null) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -50,7 +51,8 @@ export default function CreateStockMovementPage() {
         itemId: parseInt(formData.itemId),
         movementType: formData.movementType,
         quantity: parseFloat(formData.quantity),
-        unit: formData.unit,
+        unitId: formData.unitId,
+        unit: (unitsData || []).find((u) => u.id === formData.unitId)?.symbol,
         location: formData.location || undefined,
         notes: formData.notes || undefined,
         movementDate: formData.movementDate,
@@ -68,8 +70,8 @@ export default function CreateStockMovementPage() {
     // Auto-fill unit when item is selected
     if (field === 'itemId' && value) {
       const selectedItem = items.find(i => i.id === parseInt(value));
-      if (selectedItem) {
-        setFormData(prev => ({ ...prev, unit: selectedItem.unit || '' }));
+      if (selectedItem?.unitId != null) {
+        setFormData(prev => ({ ...prev, unitId: selectedItem.unitId }));
       }
     }
   };
@@ -141,13 +143,14 @@ export default function CreateStockMovementPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="unit">Unit *</Label>
-                  <Input
-                    id="unit"
-                    value={formData.unit}
-                    onChange={(e) => handleInputChange('unit', e.target.value)}
-                    placeholder="kg, L, piece, etc."
-                    required
+                  <UnifiedSelector
+                    label="Unit *"
+                    type="unit"
+                    items={unitItems}
+                    selectedId={formData.unitId ?? undefined}
+                    onSelect={(item) => handleInputChange('unitId', item.id === 0 ? null : (item.id as number))}
+                    placeholder="Select unit"
+                    manageLink={{ href: '/settings/units', text: 'Manage units' }}
                   />
                 </div>
 

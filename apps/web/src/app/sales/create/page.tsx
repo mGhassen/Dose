@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
@@ -10,37 +10,29 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateSale, useItems } from "@kit/hooks";
+import { useCreateSale, useItems, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 import type { SalesType } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
 
-const COMMON_UNITS = ['g', 'kg', 'L', 'ml', 'serving', 'piece', 'portion', 'box', 'unit'];
-
 export default function CreateSalePage() {
   const router = useRouter();
   const createSale = useCreateSale();
-  const { data: itemsResponse } = useItems({ limit: 1000, includeRecipes: true });
-  const items = (itemsResponse?.data ?? []).filter(i => i.itemType === 'item' || i.itemType === 'recipe');
+  const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
+  const items = itemsResponse?.data ?? [];
   const [formData, setFormData] = useState({
     date: dateToYYYYMMDD(new Date()),
     type: "" as SalesType | "",
     amount: "",
     quantity: "",
-    unit: "",
+    unitId: null as number | null,
     description: "",
     itemId: "",
   });
 
   const selectedItem = formData.itemId ? items.find(i => i.id === parseInt(formData.itemId)) : undefined;
-  const unitItems = useMemo(() => {
-    const units = [...COMMON_UNITS];
-    const itemUnit = selectedItem?.unit;
-    if (itemUnit && !units.includes(itemUnit)) {
-      units.unshift(itemUnit);
-    }
-    return units.map((u) => ({ id: u, name: u }));
-  }, [selectedItem?.unit]);
+  const { data: unitsData } = useUnits();
+  const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
 
   const hasItemSelected = !!formData.itemId;
   const quantityUnitRequired = hasItemSelected;
@@ -52,7 +44,7 @@ export default function CreateSalePage() {
       toast.error("Please fill in all required fields");
       return;
     }
-    if (quantityUnitRequired && (!formData.quantity || !formData.unit)) {
+    if (quantityUnitRequired && (!formData.quantity || formData.unitId == null)) {
       toast.error("Quantity and unit are required when an item or recipe is selected");
       return;
     }
@@ -63,7 +55,8 @@ export default function CreateSalePage() {
         type: formData.type as SalesType,
         amount: parseFloat(formData.amount),
         quantity: formData.quantity ? parseFloat(formData.quantity) : undefined,
-        unit: formData.unit || undefined,
+        unitId: formData.unitId ?? undefined,
+        unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
         description: formData.description || undefined,
         itemId: formData.itemId ? parseInt(formData.itemId) : undefined,
       });
@@ -78,10 +71,10 @@ export default function CreateSalePage() {
     const updates: Record<string, any> = { [field]: value };
     if (field === 'itemId') {
       const item = value ? items.find(i => i.id === parseInt(value)) : undefined;
-      updates.unit = item?.unit || '';
+      updates.unitId = item?.unitId ?? null;
       if (!value) {
         updates.quantity = '';
-        updates.unit = '';
+        updates.unitId = null;
       }
     }
     setFormData(prev => ({ ...prev, ...updates }));
@@ -106,16 +99,16 @@ export default function CreateSalePage() {
                 {/* Item/Recipe - first so we can pre-fill unit */}
                 <div className="space-y-2 md:col-span-2">
                   <UnifiedSelector
-                    label="Item/Recipe"
+                    label="Item"
                     type="item"
                     items={items}
                     selectedId={formData.itemId ? parseInt(formData.itemId) : undefined}
                     onSelect={(item) => handleInputChange('itemId', item.id === 0 ? '' : String(item.id))}
-                    placeholder="Select item or recipe (optional)"
-                    getDisplayName={(i) => (i as { itemType?: string }).itemType === 'recipe' ? `${i.name} (Recipe)` : `${i.name} ${(i as { category?: string }).category ? `(${(i as { category?: string }).category})` : ''}`}
+                    placeholder="Select produced item (optional)"
+                    getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}${(i as { category?: string }).category ? ` (${(i as { category?: string }).category})` : ''}`}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Link this sale to a specific item or recipe. When selected, quantity and unit are required.
+                    Only produced items (from recipes) are shown. When selected, quantity and unit are required.
                   </p>
                 </div>
 
@@ -141,9 +134,10 @@ export default function CreateSalePage() {
                         required={quantityUnitRequired}
                         type="unit"
                         items={unitItems}
-                        selectedId={formData.unit || undefined}
-                        onSelect={(item) => handleInputChange('unit', String(item.id))}
+                        selectedId={formData.unitId ?? undefined}
+                        onSelect={(item) => handleInputChange('unitId', item.id === 0 ? null : (item.id as number))}
                         placeholder="Select unit"
+                        manageLink={{ href: '/settings/units', text: 'Manage units' }}
                       />
                     </div>
                   </>

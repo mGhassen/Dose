@@ -59,6 +59,9 @@ export * from './api/expiry-dates';
 // Export metadata enums API
 export * from './api/metadata-enums';
 
+// Export units API
+export * from './api/units';
+
 // Export integrations API
 export * from './api/integrations';
 

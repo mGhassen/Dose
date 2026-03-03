@@ -252,6 +252,11 @@ export const pathsConfig: NavigationConfig = {
           url: "/settings/integrations",
           translationKey: "integrations"
         },
+        {
+          title: "units",
+          url: "/settings/units",
+          translationKey: "units"
+        },
       ]
     },
   ],

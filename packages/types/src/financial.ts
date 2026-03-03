@@ -441,6 +441,7 @@ export interface Sale {
   amount: number;
   quantity?: number;
   unit?: string;
+  unitId?: number;
   description?: string;
   itemId?: number;
   createdAt: string;
@@ -465,6 +466,7 @@ export interface CreateSaleData {
   amount: number;
   quantity?: number;
   unit?: string;
+  unitId?: number;
   description?: string;
   itemId?: number;
 }
@@ -803,6 +805,7 @@ export interface Item {
   name: string;
   description?: string;
   unit: string;
+  unitId?: number;
   category?: string;
   itemType: ItemType;
   isActive: boolean;
@@ -824,7 +827,8 @@ export interface Item {
 export interface CreateItemData {
   name: string;
   description?: string;
-  unit: string;
+  unit?: string;
+  unitId?: number;
   category?: string;
   sku?: string;
   unitPrice?: number;
@@ -835,7 +839,9 @@ export interface CreateItemData {
   // Items table only stores regular inventory items
 }
 
-export interface UpdateItemData extends Partial<CreateItemData> {}
+export interface UpdateItemData extends Partial<CreateItemData> {
+  producedFromRecipeId?: number | null;
+}
 
 // Legacy aliases for backward compatibility during migration
 export type Ingredient = Item;
@@ -847,7 +853,10 @@ export type UpdateIngredientData = UpdateItemData;
 // ============================================================================
 
 // Recipe is now just an Item with itemType='recipe'
-export type Recipe = Item & { itemType: 'recipe' };
+export type Recipe = Item & {
+  itemType: 'recipe';
+  producedItemId?: number | null;
+};
 
 export interface RecipeItem {
   id: number;
@@ -855,6 +864,7 @@ export interface RecipeItem {
   itemId: number; // Can reference either items or recipes (nested recipes)
   quantity: number;
   unit: string;
+  unitId?: number;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -870,6 +880,7 @@ export interface CreateRecipeData {
   name: string;
   description?: string;
   unit?: string;
+  unitId?: number;
   category?: string;
   servingSize?: number;
   preparationTime?: number;
@@ -877,10 +888,12 @@ export interface CreateRecipeData {
   instructions?: string;
   notes?: string;
   isActive?: boolean;
+  producedItemId?: number | null;
   items?: Array<{
     itemId: number; // Can be item or recipe ID
     quantity: number;
     unit: string;
+    unitId?: number;
     notes?: string;
   }>;
 }
@@ -960,6 +973,7 @@ export interface SupplierOrderItem {
   itemId: number;
   quantity: number;
   unit: string;
+  unitId?: number;
   unitPrice: number;
   totalPrice: number;
   receivedQuantity?: number;
@@ -998,6 +1012,7 @@ export interface CreateSupplierOrderData {
     itemId: number;
     quantity: number;
     unit: string;
+    unitId?: number;
     unitPrice: number;
     notes?: string;
   }>;
@@ -1009,6 +1024,7 @@ export interface UpdateSupplierOrderData extends Partial<Omit<CreateSupplierOrde
     itemId: number;
     quantity: number;
     unit: string;
+    unitId?: number;
     unitPrice: number;
     notes?: string;
   }>;
@@ -1019,6 +1035,7 @@ export interface CreateSupplierOrderItemData {
   itemId: number;
   quantity: number;
   unit: string;
+  unitId?: number;
   unitPrice: number;
   notes?: string;
 }
@@ -1034,6 +1051,7 @@ export interface StockLevel {
   itemId: number;
   quantity: number;
   unit: string;
+  unitId?: number;
   location?: string;
   minimumStockLevel?: number;
   maximumStockLevel?: number;
@@ -1048,6 +1066,7 @@ export interface CreateStockLevelData {
   itemId: number;
   quantity: number;
   unit: string;
+  unitId?: number;
   location?: string;
   minimumStockLevel?: number;
   maximumStockLevel?: number;
@@ -1083,6 +1102,7 @@ export interface StockMovement {
   movementType: StockMovementType;
   quantity: number;
   unit: string;
+  unitId?: number;
   referenceType?: StockMovementReferenceType;
   referenceId?: number;
   location?: string;
@@ -1099,6 +1119,7 @@ export interface CreateStockMovementData {
   movementType: StockMovementType;
   quantity: number;
   unit: string;
+  unitId?: number;
   referenceType?: StockMovementReferenceType;
   referenceId?: number;
   location?: string;
@@ -1118,6 +1139,7 @@ export interface ExpiryDate {
   stockMovementId?: number;
   quantity: number;
   unit: string;
+  unitId?: number;
   expiryDate: string;
   location?: string;
   isExpired: boolean;
@@ -1134,6 +1156,7 @@ export interface CreateExpiryDateData {
   stockMovementId?: number;
   quantity: number;
   unit: string;
+  unitId?: number;
   expiryDate: string;
   location?: string;
   notes?: string;

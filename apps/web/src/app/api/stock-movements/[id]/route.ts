@@ -7,10 +7,11 @@ import type { StockMovement, UpdateStockMovementData } from '@kit/types';
 function transformStockMovement(row: any): StockMovement {
   return {
     id: row.id,
-    ingredientId: row.ingredient_id,
+    itemId: row.item_id,
     movementType: row.movement_type,
     quantity: parseFloat(row.quantity),
     unit: row.unit,
+    unitId: row.unit_id,
     referenceType: row.reference_type,
     referenceId: row.reference_id,
     location: row.location,
@@ -23,10 +24,11 @@ function transformStockMovement(row: any): StockMovement {
 
 function transformToSnakeCase(data: UpdateStockMovementData): any {
   const result: any = {};
-  if (data.ingredientId !== undefined) result.ingredient_id = data.ingredientId;
+  if (data.itemId !== undefined) result.item_id = data.itemId;
   if (data.movementType !== undefined) result.movement_type = data.movementType;
   if (data.quantity !== undefined) result.quantity = data.quantity;
   if (data.unit !== undefined) result.unit = data.unit;
+  if (data.unitId !== undefined) result.unit_id = data.unitId;
   if (data.referenceType !== undefined) result.reference_type = data.referenceType;
   if (data.referenceId !== undefined) result.reference_id = data.referenceId;
   if (data.location !== undefined) result.location = data.location;

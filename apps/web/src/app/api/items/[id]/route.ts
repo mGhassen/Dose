@@ -5,18 +5,17 @@ import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Item, UpdateItemData } from '@kit/types';
 
 function transformItem(row: any): Item {
-  // Transform regular item from items table (not recipes)
   return {
     id: row.id,
     name: row.name,
     description: row.description,
     unit: row.unit || '',
+    unitId: row.unit_id,
     category: row.category,
-    itemType: 'item' as const, // Items from items table are always 'item'
+    itemType: 'item' as const,
     isActive: row.is_active ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    // Item-specific fields
     sku: row.sku,
     unitPrice: row.unit_price ? parseFloat(row.unit_price) : undefined,
     vendorId: row.vendor_id,
@@ -32,13 +31,14 @@ function transformToSnakeCase(data: UpdateItemData): any {
   if (data.name !== undefined) result.name = data.name;
   if (data.description !== undefined) result.description = data.description;
   if (data.unit !== undefined) result.unit = data.unit;
+  if (data.unitId !== undefined) result.unit_id = data.unitId;
   if (data.category !== undefined) result.category = data.category;
   if (data.sku !== undefined) result.sku = data.sku;
   if (data.unitPrice !== undefined) result.unit_price = data.unitPrice;
   if (data.vendorId !== undefined) result.vendor_id = data.vendorId;
   if (data.notes !== undefined) result.notes = data.notes;
   if (data.isActive !== undefined) result.is_active = data.isActive;
-  
+  if (data.producedFromRecipeId !== undefined) result.produced_from_recipe_id = data.producedFromRecipeId;
   return result;
 }
 
@@ -93,6 +93,7 @@ export async function GET(
           name: recipeData.name,
           description: recipeData.description,
           unit: recipeData.unit || 'serving',
+          unit_id: recipeData.unit_id,
           category: recipeData.category,
           item_type: 'recipe',
           serving_size: recipeData.serving_size,
@@ -123,6 +124,7 @@ export async function GET(
         name: itemData.name,
         description: itemData.description,
         unit: itemData.unit || 'serving',
+        unitId: itemData.unit_id,
         category: itemData.category,
         itemType: 'recipe' as const,
         isActive: itemData.is_active,

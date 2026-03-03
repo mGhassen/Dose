@@ -7,9 +7,10 @@ import type { StockLevel, UpdateStockLevelData } from '@kit/types';
 function transformStockLevel(row: any): StockLevel {
   return {
     id: row.id,
-    itemId: row.item_id || row.ingredient_id, // Support both for backward compat
+    itemId: row.item_id || row.ingredient_id,
     quantity: parseFloat(row.quantity),
     unit: row.unit,
+    unitId: row.unit_id,
     location: row.location,
     minimumStockLevel: row.minimum_stock_level ? parseFloat(row.minimum_stock_level) : undefined,
     maximumStockLevel: row.maximum_stock_level ? parseFloat(row.maximum_stock_level) : undefined,
@@ -36,6 +37,7 @@ function transformToSnakeCase(data: UpdateStockLevelData): any {
   if (data.ingredientId !== undefined) result.item_id = data.ingredientId; // Backward compat
   if (data.quantity !== undefined) result.quantity = data.quantity;
   if (data.unit !== undefined) result.unit = data.unit;
+  if (data.unitId !== undefined) result.unit_id = data.unitId;
   if (data.location !== undefined) result.location = data.location;
   if (data.minimumStockLevel !== undefined) result.minimum_stock_level = data.minimumStockLevel;
   if (data.maximumStockLevel !== undefined) result.maximum_stock_level = data.maximumStockLevel;

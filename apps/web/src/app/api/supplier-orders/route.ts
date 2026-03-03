@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
       item_id: item.itemId,
       quantity: item.quantity,
       unit: item.unit,
+      unit_id: item.unitId,
       unit_price: item.unitPrice,
       total_price: item.quantity * item.unitPrice,
       notes: item.notes,

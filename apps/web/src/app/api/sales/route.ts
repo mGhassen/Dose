@@ -16,6 +16,7 @@ function transformSale(row: any): Sale {
     amount: parseFloat(row.amount),
     quantity: row.quantity,
     unit: row.unit,
+    unitId: row.unit_id,
     description: row.description,
     itemId: row.item_id,
     createdAt: row.created_at,
@@ -34,6 +35,7 @@ function transformToSnakeCase(data: CreateSaleData): Record<string, unknown> {
   };
   if (data.quantity != null) result.quantity = data.quantity;
   if (data.unit != null && data.unit !== '') result.unit = data.unit;
+  if (data.unitId != null) result.unit_id = data.unitId;
   return result;
 }
 

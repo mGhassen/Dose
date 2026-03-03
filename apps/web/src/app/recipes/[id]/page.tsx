@@ -10,9 +10,9 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { UnifiedSelector } from "@/components/unified-selector";
-import { Save, X, Trash2, Plus, ChefHat, MoreVertical, Edit2, AlertTriangle, CheckCircle } from "lucide-react";
+import { Save, X, Trash2, Plus, ChefHat, MoreVertical, Edit2, AlertTriangle, CheckCircle, Package, Link2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useItems, useProduceRecipe, useRecipeCost, useStockLevels } from "@kit/hooks";
+import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useCreateProducedItem, useItems, useUnits, useUpdateItem, useProduceRecipe, useRecipeCost, useStockLevels } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
 import { formatCurrency } from "@kit/lib/config";
@@ -55,12 +55,19 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const [produceQuantity, setProduceQuantity] = useState("1");
   const [produceLocation, setProduceLocation] = useState("");
   const [produceNotes, setProduceNotes] = useState("");
-  const { data: recipe, isLoading } = useRecipeById(resolvedParams?.id || "");
+  const { data: recipe, isLoading, refetch: refetchRecipe } = useRecipeById(resolvedParams?.id || "");
   const { data: itemsResponse } = useItems({ limit: 1000 });
+  const { data: units = [] } = useUnits();
   const { data: costData } = useRecipeCost(resolvedParams?.id || "");
   const updateRecipe = useUpdateRecipe();
   const deleteMutation = useDeleteRecipe();
+  const createProducedItem = useCreateProducedItem();
+  const updateItemMutation = useUpdateItem();
   const produceRecipe = useProduceRecipe();
+  const [linkItemDialogOpen, setLinkItemDialogOpen] = useState(false);
+  const [linkItemId, setLinkItemId] = useState<number | null>(null);
+  const { data: allItemsResponse } = useItems({ limit: 1000 });
+  const allItems = allItemsResponse?.data ?? [];
   
   // Fetch stock levels for all recipe items when dialog is open
   const recipeItemIds = recipe?.items?.map(ri => ri.itemId?.toString()).filter(Boolean) || 
@@ -90,6 +97,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     description: "",
     category: "",
     unit: "",
+    unitId: null as number | null,
+    producedItemId: null as number | null,
     servingSize: "",
     preparationTime: "",
     cookingTime: "",
@@ -97,7 +106,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     notes: "",
     isActive: true,
   });
-  const [items, setItems] = useState<Array<{ itemId: number; quantity: number; unit: string; notes?: string }>>([]);
+  const [items, setItems] = useState<Array<{ itemId: number; quantity: number; unit: string; unitId?: number; notes?: string }>>([]);
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -110,6 +119,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
         description: recipe.description || "",
         category: recipe.category || "",
         unit: recipe.unit || "",
+        unitId: recipe.unitId ?? null,
+        producedItemId: (recipe as any).producedItemId ?? null,
         servingSize: recipe.servingSize?.toString() || "",
         preparationTime: recipe.preparationTime?.toString() || "",
         cookingTime: recipe.cookingTime?.toString() || "",
@@ -123,6 +134,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           itemId: ri.itemId || ri.ingredientId,
           quantity: ri.quantity,
           unit: ri.unit,
+          unitId: ri.unitId,
           notes: ri.notes,
         })));
       }
@@ -147,13 +159,15 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           description: formData.description || undefined,
           category: formData.category || undefined,
           unit: formData.unit || undefined,
+          unitId: formData.unitId ?? undefined,
+          producedItemId: formData.producedItemId ?? undefined,
           servingSize: formData.servingSize ? parseInt(formData.servingSize) : undefined,
           preparationTime: formData.preparationTime ? parseInt(formData.preparationTime) : undefined,
           cookingTime: formData.cookingTime ? parseInt(formData.cookingTime) : undefined,
           instructions: formData.instructions || undefined,
           notes: formData.notes || undefined,
           isActive: formData.isActive,
-          items: items.length > 0 ? items.map(i => ({ itemId: i.itemId, quantity: i.quantity, unit: i.unit, notes: i.notes })) : undefined,
+          items: items.length > 0 ? items.map(i => ({ itemId: i.itemId, quantity: i.quantity, unit: i.unit, unitId: i.unitId, notes: i.notes })) : undefined,
         },
       });
       toast.success("Recipe updated successfully");
@@ -181,7 +195,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   };
 
   const addItem = () => {
-    setItems([...items, { itemId: 0, quantity: 0, unit: "" }]);
+    setItems([...items, { itemId: 0, quantity: 0, unit: "", unitId: undefined }]);
   };
 
   const removeItem = (index: number) => {
@@ -197,6 +211,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
       const selectedItem = itemsResponse?.data?.find(i => i.id === parseInt(value));
       if (selectedItem) {
         item.unit = selectedItem.unit || '';
+        item.unitId = selectedItem.unitId;
       }
     }
     
@@ -334,38 +349,42 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="category">Category</Label>
-                        <Input
-                          id="category"
-                          value={formData.category}
-                          onChange={(e) => handleInputChange('category', e.target.value)}
-                          placeholder="e.g., Beverages, Food"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="unit">Unit</Label>
-                        <Input
-                          id="unit"
-                          value={formData.unit}
-                          onChange={(e) => handleInputChange('unit', e.target.value)}
-                          placeholder="e.g., serving, piece"
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Category</Label>
+                      <Input
+                        id="category"
+                        value={formData.category}
+                        onChange={(e) => handleInputChange('category', e.target.value)}
+                        placeholder="e.g., Beverages, Food"
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="servingSize">Serving Size</Label>
-                        <Input
-                          id="servingSize"
-                          type="number"
-                          value={formData.servingSize}
-                          onChange={(e) => handleInputChange('servingSize', e.target.value)}
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            id="servingSize"
+                            type="number"
+                            min={1}
+                            value={formData.servingSize}
+                            onChange={(e) => handleInputChange('servingSize', e.target.value)}
+                            className="w-24"
+                          />
+                          <UnifiedSelector
+                            type="unit"
+                            items={units.map(u => ({ id: u.id, name: u.name, symbol: u.symbol, ...u }))}
+                            selectedId={formData.unitId ?? undefined}
+                            onSelect={(sel) => {
+                              const u = units.find(x => x.id === sel.id);
+                              setFormData(prev => ({ ...prev, unitId: u?.id ?? null, unit: u?.symbol ?? '' }));
+                            }}
+                            placeholder="Unit"
+                            manageLink={{ href: '/settings/units', text: 'Manage units' }}
+                            getDisplayName={(item) => (item as any).symbol ?? item.name ?? String(item.id)}
+                          />
+                        </div>
                       </div>
-
                       <div className="space-y-2">
                         <Label htmlFor="preparationTime">Preparation Time (minutes)</Label>
                         <Input
@@ -375,6 +394,18 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                           onChange={(e) => handleInputChange('preparationTime', e.target.value)}
                         />
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Item produced (optional)</Label>
+                      <UnifiedSelector
+                        type="item"
+                        items={itemsResponse?.data?.filter(i => i.itemType === 'item') ?? []}
+                        selectedId={formData.producedItemId ?? undefined}
+                        onSelect={(sel) => setFormData(prev => ({ ...prev, producedItemId: sel.id === 0 ? null : Number(sel.id) }))}
+                        placeholder="Link to existing item (or leave empty to create when produced)"
+                      />
+                      <p className="text-xs text-muted-foreground">If empty, an item will be created when you first produce this recipe.</p>
                     </div>
 
                     <div className="space-y-2">
@@ -470,9 +501,19 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                               </div>
                               <div className="space-y-2">
                                 <Label>Unit</Label>
-                                <Input
-                                  value={item.unit}
-                                  onChange={(e) => updateItem(index, 'unit', e.target.value)}
+                                <UnifiedSelector
+                                  type="unit"
+                                  items={units.map(u => ({ id: u.id, name: u.name, symbol: u.symbol, ...u }))}
+                                  selectedId={item.unitId ?? undefined}
+                                  onSelect={(sel) => {
+                                    const u = units.find(x => x.id === sel.id);
+                                    const updated = [...items];
+                                    updated[index] = { ...updated[index], unitId: u?.id, unit: u?.symbol ?? '' };
+                                    setItems(updated);
+                                  }}
+                                  placeholder="Unit"
+                                  manageLink={{ href: '/settings/units', text: 'Units' }}
+                                  getDisplayName={(x) => (x as any).symbol ?? x.name ?? String(x.id)}
                                 />
                               </div>
                             </div>
@@ -521,7 +562,11 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Serving Size</label>
-                      <p className="text-base mt-1">{recipe.servingSize ? `${recipe.servingSize} servings` : "—"}</p>
+                      <p className="text-base mt-1">
+                        {recipe.servingSize
+                          ? `${recipe.servingSize} ${recipe.unit || 'serving'}${recipe.servingSize !== 1 ? 's' : ''}`
+                          : "—"}
+                      </p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Status</label>
@@ -557,41 +602,125 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                   {/* Item Information (produced item) */}
                   <div className="pt-4 border-t">
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <label className="text-sm font-medium">Produced Item Information</label>
-                        {(recipe as any).producedItem ? (
-                          <Link href={`/items/${(recipe as any).producedItem.id}`}>
-                            <Button variant="outline" size="sm">
-                              View Item
-                            </Button>
-                          </Link>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Item will be created when recipe is produced</span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {(recipe as any).producedItem ? (
+                            <Link href={`/items/${(recipe as any).producedItem.id}`}>
+                              <Button variant="outline" size="sm">
+                                View Item
+                              </Button>
+                            </Link>
+                          ) : null}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {(recipe as any).producedItem ? (
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/items/${(recipe as any).producedItem.id}`}>
+                                    View Item
+                                  </Link>
+                                </DropdownMenuItem>
+                              ) : (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={async () => {
+                                      if (!resolvedParams?.id) return;
+                                      try {
+                                        await createProducedItem.mutateAsync(resolvedParams.id);
+                                        await refetchRecipe();
+                                        toast.success("Produced item created");
+                                      } catch (e: any) {
+                                        toast.error(e?.message || "Failed to create produced item");
+                                      }
+                                    }}
+                                    disabled={createProducedItem.isPending}
+                                  >
+                                    <Package className="mr-2 h-4 w-4" />
+                                    Create produced item
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setLinkItemDialogOpen(true)}>
+                                    <Link2 className="mr-2 h-4 w-4" />
+                                    Link to existing item
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
+                      {!(recipe as any).producedItem && (
+                        <p className="text-xs text-muted-foreground">
+                          Create an item now or link an existing item as this recipe&apos;s output. Otherwise an item will be created when you first produce the recipe.
+                        </p>
+                      )}
                       {(recipe as any).producedItem ? (
-                        <>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="text-sm font-medium text-muted-foreground">Category</label>
-                              <p className="text-base mt-1">{(recipe as any).producedItem.category || recipe.category || "—"}</p>
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium text-muted-foreground">Unit</label>
-                              <p className="text-base mt-1">{(recipe as any).producedItem.unit || recipe.unit || "—"}</p>
-                            </div>
-                          </div>
-                          <div className="p-3 bg-muted rounded-lg">
-                            <p className="text-sm text-muted-foreground mb-2">
-                              This recipe produces an item that can be:
-                            </p>
-                            <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                              <li>Sold in sales transactions</li>
-                              <li>Used as an ingredient in other recipes</li>
-                              <li>Tracked in inventory and stock levels</li>
-                            </ul>
-                          </div>
-                        </>
+                        (() => {
+                          const pi = (recipe as any).producedItem;
+                          return (
+                            <>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                <div>
+                                  <label className="text-sm font-medium text-muted-foreground">Name</label>
+                                  <p className="text-base mt-1 font-medium">{pi.name || "—"}</p>
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium text-muted-foreground">Category</label>
+                                  <p className="text-base mt-1">{pi.category || recipe.category || "—"}</p>
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium text-muted-foreground">Unit</label>
+                                  <p className="text-base mt-1">{pi.unit || recipe.unit || "—"}</p>
+                                </div>
+                                {pi.sku != null && pi.sku !== "" && (
+                                  <div>
+                                    <label className="text-sm font-medium text-muted-foreground">SKU</label>
+                                    <p className="text-sm mt-1 font-mono">{pi.sku}</p>
+                                  </div>
+                                )}
+                                {pi.unitPrice != null && (
+                                  <div>
+                                    <label className="text-sm font-medium text-muted-foreground">Unit price</label>
+                                    <p className="text-base mt-1">{formatCurrency(pi.unitPrice)}</p>
+                                  </div>
+                                )}
+                                <div>
+                                  <label className="text-sm font-medium text-muted-foreground">Status</label>
+                                  <p className="text-base mt-1">{pi.isActive ? "Active" : "Inactive"}</p>
+                                </div>
+                              </div>
+                              {pi.description && (
+                                <div>
+                                  <label className="text-sm font-medium text-muted-foreground">Description</label>
+                                  <p className="text-base mt-1 text-muted-foreground whitespace-pre-wrap">{pi.description}</p>
+                                </div>
+                              )}
+                              {pi.notes && (
+                                <div>
+                                  <label className="text-sm font-medium text-muted-foreground">Notes</label>
+                                  <p className="text-base mt-1 text-muted-foreground whitespace-pre-wrap">{pi.notes}</p>
+                                </div>
+                              )}
+                              <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                                <div>
+                                  <span className="font-medium">Item created:</span> {formatDate(pi.createdAt)}
+                                </div>
+                                <div>
+                                  <span className="font-medium">Item updated:</span> {formatDate(pi.updatedAt)}
+                                </div>
+                              </div>
+                              <div className="p-3 bg-muted rounded-lg">
+                                <p className="text-sm text-muted-foreground mb-2">
+                                  This item can be sold in sales, used as an ingredient in other recipes, and tracked in inventory.
+                                </p>
+                              </div>
+                            </>
+                          );
+                        })()
                       ) : (
                         <div className="p-3 bg-muted rounded-lg">
                           <p className="text-sm text-muted-foreground">
@@ -845,6 +974,51 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
               {produceRecipe.isPending ? "Producing..." : "Produce Recipe"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={linkItemDialogOpen} onOpenChange={(open) => { setLinkItemDialogOpen(open); if (!open) setLinkItemId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link to existing item</DialogTitle>
+            <DialogDescription>
+              Select an item to use as this recipe&apos;s output. The item will be marked as produced by this recipe and used when you produce it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <UnifiedSelector
+              label="Item"
+              type="item"
+              items={allItems.filter(i => i.itemType === 'item')}
+              selectedId={linkItemId ?? undefined}
+              onSelect={(sel) => setLinkItemId(sel.id === 0 ? null : Number(sel.id))}
+              placeholder="Select item"
+              getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}${(i as { category?: string }).category ? ` (${(i as { category?: string }).category})` : ''}`}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setLinkItemDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={!linkItemId || updateRecipe.isPending || updateItemMutation.isPending}
+                onClick={async () => {
+                  if (!resolvedParams?.id || !linkItemId) return;
+                  try {
+                    await updateRecipe.mutateAsync({ id: resolvedParams.id, data: { producedItemId: linkItemId } });
+                    await updateItemMutation.mutateAsync({ id: String(linkItemId), data: { producedFromRecipeId: Number(resolvedParams.id) } });
+                    await refetchRecipe();
+                    setLinkItemDialogOpen(false);
+                    setLinkItemId(null);
+                    toast.success("Item linked as produced item");
+                  } catch (e: any) {
+                    toast.error(e?.message || "Failed to link item");
+                  }
+                }}
+              >
+                Link
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

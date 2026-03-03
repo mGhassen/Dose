@@ -76,6 +76,18 @@ export function useUpdateRecipe() {
   });
 }
 
+export function useCreateProducedItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (recipeId: string) => recipesApi.createProducedItem(recipeId),
+    onSuccess: (_, recipeId) => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['recipes', recipeId] });
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+    },
+  });
+}
+
 export function useDeleteRecipe() {
   const queryClient = useQueryClient();
   

@@ -11,7 +11,7 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X, Info } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateIngredient } from "@kit/hooks";
+import { useCreateIngredient, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 import {
   Tooltip,
@@ -19,19 +19,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@kit/ui/tooltip";
-
-const COMMON_UNITS = [
-  { value: 'kg', label: 'Kilogram (kg)' },
-  { value: 'g', label: 'Gram (g)' },
-  { value: 'L', label: 'Liter (L)' },
-  { value: 'mL', label: 'Milliliter (mL)' },
-  { value: 'piece', label: 'Piece' },
-  { value: 'box', label: 'Box' },
-  { value: 'can', label: 'Can' },
-  { value: 'bottle', label: 'Bottle' },
-  { value: 'pack', label: 'Pack' },
-  { value: 'bag', label: 'Bag' },
-];
 
 const COMMON_CATEGORIES = [
   'Coffee',
@@ -52,10 +39,12 @@ const COMMON_CATEGORIES = [
 export default function CreateIngredientPage() {
   const router = useRouter();
   const createIngredient = useCreateIngredient();
+  const { data: unitsData } = useUnits();
+  const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    unit: "",
+    unitId: null as number | null,
     category: "",
     isActive: true,
   });
@@ -63,16 +52,16 @@ export default function CreateIngredientPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.unit) {
+    if (!formData.name || formData.unitId == null) {
       toast.error("Please fill in the name and unit");
       return;
     }
-
+    const unitSymbol = (unitsData || []).find((u) => u.id === formData.unitId)?.symbol;
     try {
       await createIngredient.mutateAsync({
         name: formData.name,
         description: formData.description || undefined,
-        unit: formData.unit,
+        unit: unitSymbol ?? '',
         category: formData.category || undefined,
         isActive: formData.isActive,
       });
@@ -131,17 +120,11 @@ export default function CreateIngredientPage() {
                   <UnifiedSelector
                     label=""
                     type="unit"
-                    items={COMMON_UNITS.map((u) => ({ id: u.value, name: u.label }))}
-                    selectedId={formData.unit || undefined}
-                    onSelect={(item) => handleInputChange('unit', item.id === 0 ? '' : String(item.id))}
+                    items={unitItems}
+                    selectedId={formData.unitId ?? undefined}
+                    onSelect={(item) => handleInputChange('unitId', item.id === 0 ? null : (item.id as number))}
                     placeholder="Select unit"
-                  />
-                  <Input
-                    value={formData.unit}
-                    onChange={(e) => handleInputChange('unit', e.target.value)}
-                    placeholder="Or type custom unit (kg, L, piece, etc.)"
-                    className="mt-2"
-                    required
+                    manageLink={{ href: '/settings/units', text: 'Manage units' }}
                   />
                 </div>
 

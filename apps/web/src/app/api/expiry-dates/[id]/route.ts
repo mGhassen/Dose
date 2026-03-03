@@ -7,10 +7,11 @@ import type { ExpiryDate, UpdateExpiryDateData } from '@kit/types';
 function transformExpiryDate(row: any): ExpiryDate {
   return {
     id: row.id,
-    ingredientId: row.ingredient_id,
+    itemId: row.item_id,
     stockMovementId: row.stock_movement_id,
     quantity: parseFloat(row.quantity),
     unit: row.unit,
+    unitId: row.unit_id,
     expiryDate: row.expiry_date,
     location: row.location,
     isExpired: row.is_expired,
@@ -23,10 +24,11 @@ function transformExpiryDate(row: any): ExpiryDate {
 
 function transformToSnakeCase(data: UpdateExpiryDateData): any {
   const result: any = {};
-  if (data.ingredientId !== undefined) result.ingredient_id = data.ingredientId;
+  if (data.itemId !== undefined) result.item_id = data.itemId;
   if (data.stockMovementId !== undefined) result.stock_movement_id = data.stockMovementId;
   if (data.quantity !== undefined) result.quantity = data.quantity;
   if (data.unit !== undefined) result.unit = data.unit;
+  if (data.unitId !== undefined) result.unit_id = data.unitId;
   if (data.expiryDate !== undefined) result.expiry_date = data.expiryDate;
   if (data.location !== undefined) result.location = data.location;
   if (data.disposedDate !== undefined) result.disposed_date = data.disposedDate;

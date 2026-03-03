@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
@@ -10,11 +10,9 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useSaleById, useUpdateSale, useItems } from "@kit/hooks";
+import { useSaleById, useUpdateSale, useItems, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 import type { SalesType } from "@kit/types";
-
-const COMMON_UNITS = ['g', 'kg', 'L', 'ml', 'serving', 'piece', 'portion', 'box', 'unit'];
 
 interface EditSalePageProps {
   params: Promise<{ id: string }>;
@@ -24,8 +22,10 @@ export default function EditSalePage({ params }: EditSalePageProps) {
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: sale, isLoading } = useSaleById(resolvedParams?.id || "");
-  const { data: itemsResponse } = useItems({ limit: 1000, includeRecipes: true });
-  const items = (itemsResponse?.data ?? []).filter(i => i.itemType === 'item' || i.itemType === 'recipe');
+  const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
+  const items = itemsResponse?.data ?? [];
+  const { data: unitsData } = useUnits();
+  const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const updateSale = useUpdateSale();
   
   const [formData, setFormData] = useState({
@@ -33,20 +33,10 @@ export default function EditSalePage({ params }: EditSalePageProps) {
     type: "" as SalesType | "",
     amount: "",
     quantity: "",
-    unit: "",
+    unitId: null as number | null,
     description: "",
     itemId: "",
   });
-
-  const selectedItem = formData.itemId ? items.find(i => i.id === parseInt(formData.itemId)) : undefined;
-  const unitItems = useMemo(() => {
-    const units = [...COMMON_UNITS];
-    const itemUnit = selectedItem?.unit || formData.unit;
-    if (itemUnit && !units.includes(itemUnit)) {
-      units.unshift(itemUnit);
-    }
-    return units.map((u) => ({ id: u, name: u }));
-  }, [selectedItem?.unit, formData.unit]);
 
   const hasItemSelected = !!formData.itemId;
   const quantityUnitRequired = hasItemSelected;
@@ -62,7 +52,7 @@ export default function EditSalePage({ params }: EditSalePageProps) {
         type: sale.type,
         amount: sale.amount.toString(),
         quantity: sale.quantity?.toString() || "",
-        unit: sale.unit || "",
+        unitId: sale.unitId ?? null,
         description: sale.description || "",
         itemId: sale.itemId?.toString() || "",
       });
@@ -76,7 +66,7 @@ export default function EditSalePage({ params }: EditSalePageProps) {
       toast.error("Please fill in all required fields");
       return;
     }
-    if (quantityUnitRequired && (!formData.quantity || !formData.unit)) {
+    if (quantityUnitRequired && (!formData.quantity || formData.unitId == null)) {
       toast.error("Quantity and unit are required when an item or recipe is selected");
       return;
     }
@@ -91,7 +81,8 @@ export default function EditSalePage({ params }: EditSalePageProps) {
           type: formData.type as SalesType,
           amount: parseFloat(formData.amount),
           quantity: formData.quantity ? parseFloat(formData.quantity) : undefined,
-          unit: formData.unit || undefined,
+          unitId: formData.unitId ?? undefined,
+          unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
           description: formData.description || undefined,
           itemId: formData.itemId ? parseInt(formData.itemId) : undefined,
         },
@@ -107,10 +98,10 @@ export default function EditSalePage({ params }: EditSalePageProps) {
     const updates: Record<string, any> = { [field]: value };
     if (field === 'itemId') {
       const item = value ? items.find(i => i.id === parseInt(value)) : undefined;
-      updates.unit = item?.unit || '';
+      updates.unitId = item?.unitId ?? null;
       if (!value) {
         updates.quantity = '';
-        updates.unit = '';
+        updates.unitId = null;
       }
     }
     setFormData(prev => ({ ...prev, ...updates }));
@@ -156,19 +147,18 @@ export default function EditSalePage({ params }: EditSalePageProps) {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Item/Recipe - first */}
                 <div className="space-y-2 md:col-span-2">
                   <UnifiedSelector
-                    label="Item/Recipe"
+                    label="Item"
                     type="item"
                     items={items}
                     selectedId={formData.itemId ? parseInt(formData.itemId) : undefined}
                     onSelect={(item) => handleInputChange('itemId', item.id === 0 ? '' : String(item.id))}
-                    placeholder="Select item or recipe (optional)"
-                    getDisplayName={(i) => (i as { itemType?: string }).itemType === 'recipe' ? `${i.name} (Recipe)` : `${i.name} ${(i as { category?: string }).category ? `(${(i as { category?: string }).category})` : ''}`}
+                    placeholder="Select produced item (optional)"
+                    getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}${(i as { category?: string }).category ? ` (${(i as { category?: string }).category})` : ''}`}
                   />
                   <p className="text-xs text-muted-foreground">
-                    When selected, quantity and unit are required.
+                    Only produced items are shown. When selected, quantity and unit are required.
                   </p>
                 </div>
 
@@ -194,8 +184,9 @@ export default function EditSalePage({ params }: EditSalePageProps) {
                         required={quantityUnitRequired}
                         type="unit"
                         items={unitItems}
-                        selectedId={formData.unit || undefined}
-                        onSelect={(item) => handleInputChange('unit', String(item.id))}
+                        selectedId={formData.unitId ?? undefined}
+                        onSelect={(item) => handleInputChange('unitId', item.id === 0 ? null : (item.id as number))}
+                        manageLink={{ href: '/settings/units', text: 'Manage units' }}
                         placeholder="Select unit"
                       />
                     </div>

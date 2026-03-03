@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { StockMovementType, StockMovementReferenceType } from '@kit/types';
+import { convertQuantity, buildFactorMap } from '@/lib/units/convert';
 
 export interface ProduceRecipeOptions {
   quantity: number;
@@ -13,6 +14,10 @@ export async function produceRecipe(
   options: ProduceRecipeOptions
 ): Promise<{ producedItemId: number }> {
   const { quantity, location = null, notes } = options;
+
+  const { data: unitsData } = await supabase.from('units').select('id, factor_to_base');
+  const factorMap = buildFactorMap((unitsData || []).map((u: any) => ({ id: u.id, factorToBase: parseFloat(u.factor_to_base ?? 1) })));
+  const getFactor = (unitId: number) => factorMap.get(unitId);
 
   const { data: recipeData, error: recipeError } = await supabase
     .from('recipes')
@@ -36,13 +41,20 @@ export async function produceRecipe(
     const item = recipeItem.item;
     if (!item) continue;
 
-    const quantityToDeduct = recipeItem.quantity * multiplier;
+    let quantityToDeduct = recipeItem.quantity * multiplier;
+    const recipeUnitId = recipeItem.unit_id;
+    const itemUnitId = item.unit_id;
+    if (recipeUnitId != null && itemUnitId != null && getFactor(recipeUnitId) != null && getFactor(itemUnitId) != null) {
+      quantityToDeduct = convertQuantity(quantityToDeduct, recipeUnitId, itemUnitId, (id) => getFactor(id));
+    }
 
+    const movementUnit = item.unit || recipeItem.unit;
     const { error: movementError } = await supabase.from('stock_movements').insert({
       item_id: item.id,
       movement_type: StockMovementType.OUT,
       quantity: quantityToDeduct,
-      unit: recipeItem.unit,
+      unit: movementUnit,
+      unit_id: item.unit_id ?? recipeItem.unit_id,
       reference_type: StockMovementReferenceType.RECIPE,
       reference_id: Number(recipeId),
       location,
@@ -53,32 +65,46 @@ export async function produceRecipe(
     if (movementError) throw movementError;
   }
 
-  let { data: producedItem, error: itemCheckError } = await supabase
-    .from('items')
-    .select('*')
-    .eq('produced_from_recipe_id', Number(recipeId))
-    .single();
-
-  if (itemCheckError && itemCheckError.code === 'PGRST116') {
-    const { data: newItem, error: itemCreateError } = await supabase
+  let producedItem: any = null;
+  if (recipeData.produced_item_id) {
+    const { data, error } = await supabase
       .from('items')
-      .insert({
-        name: recipeData.name,
-        description: recipeData.description || `Produced from recipe: ${recipeData.name}`,
-        category: recipeData.category,
-        unit: recipeData.unit || 'serving',
-        produced_from_recipe_id: Number(recipeId),
-        item_type: 'item',
-        is_active: true,
-      })
-      .select()
+      .select('*')
+      .eq('id', recipeData.produced_item_id)
+      .single();
+    if (!error) producedItem = data;
+  }
+  if (!producedItem) {
+    const { data: existingItem, error: itemCheckError } = await supabase
+      .from('items')
+      .select('*')
+      .eq('produced_from_recipe_id', Number(recipeId))
       .single();
 
-    if (itemCreateError) throw itemCreateError;
-    if (!newItem) throw new Error('Failed to create produced item');
-    producedItem = newItem;
-  } else if (itemCheckError) {
-    throw itemCheckError;
+    if (itemCheckError && itemCheckError.code === 'PGRST116') {
+      const { data: newItem, error: itemCreateError } = await supabase
+        .from('items')
+        .insert({
+          name: recipeData.name,
+          description: recipeData.description || `Produced from recipe: ${recipeData.name}`,
+          category: recipeData.category,
+          unit: recipeData.unit || 'serving',
+          unit_id: recipeData.unit_id,
+          produced_from_recipe_id: Number(recipeId),
+          item_type: 'item',
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (itemCreateError) throw itemCreateError;
+      if (!newItem) throw new Error('Failed to create produced item');
+      producedItem = newItem;
+    } else if (itemCheckError) {
+      throw itemCheckError;
+    } else {
+      producedItem = existingItem;
+    }
   }
 
   if (!producedItem) throw new Error('Produced item not found');
@@ -88,6 +114,7 @@ export async function produceRecipe(
     movement_type: StockMovementType.IN,
     quantity,
     unit: recipeData.unit || 'serving',
+    unit_id: recipeData.unit_id,
     reference_type: StockMovementReferenceType.RECIPE,
     reference_id: Number(recipeId),
     location,

@@ -37,7 +37,7 @@ import {
   Area,
 } from 'recharts';
 import AppLayout from "@/components/app-layout";
-import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements } from "@kit/hooks";
+import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -145,12 +145,14 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     description: "",
     category: "",
     sku: "",
-    unit: "",
+    unitId: null as number | null,
     unitPrice: "",
     vendorId: "",
     notes: "",
     isActive: true,
   });
+  const { data: unitsData } = useUnits();
+  const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -163,7 +165,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         description: item.description || "",
         category: item.category || "",
         sku: item.sku || "",
-        unit: item.unit || "",
+        unitId: item.unitId ?? null,
         unitPrice: item.unitPrice?.toString() || "",
         vendorId: item.vendorId?.toString() || "",
         notes: item.notes || "",
@@ -190,7 +192,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           description: formData.description || undefined,
           category: formData.category || undefined,
           sku: formData.sku || undefined,
-          unit: formData.unit || undefined,
+          unitId: formData.unitId ?? undefined,
+          unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
           unitPrice: formData.unitPrice ? parseFloat(formData.unitPrice) : undefined,
           vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
           notes: formData.notes || undefined,
@@ -332,11 +335,14 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
                   {/* Unit */}
                   <div className="space-y-2">
-                    <Label htmlFor="unit">Unit</Label>
-                    <Input
-                      id="unit"
-                      value={formData.unit}
-                      onChange={(e) => handleInputChange('unit', e.target.value)}
+                    <UnifiedSelector
+                      label="Unit"
+                      type="unit"
+                      items={unitItems}
+                      selectedId={formData.unitId ?? undefined}
+                      onSelect={(item) => handleInputChange('unitId', item.id === 0 ? null : (item.id as number))}
+                      placeholder="Select unit"
+                      manageLink={{ href: '/settings/units', text: 'Manage units' }}
                     />
                   </div>
 

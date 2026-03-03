@@ -11,19 +11,21 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateItem, useInventorySuppliers } from "@kit/hooks";
+import { useCreateItem, useInventorySuppliers, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 
 export default function CreateItemPage() {
   const router = useRouter();
   const createItem = useCreateItem();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
+  const { data: unitsData } = useUnits();
+  const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     category: "",
     sku: "",
-    unit: "",
+    unitId: null as number | null,
     unitPrice: "",
     vendorId: "",
     notes: "",
@@ -44,7 +46,8 @@ export default function CreateItemPage() {
         description: formData.description || undefined,
         category: formData.category || undefined,
         sku: formData.sku || undefined,
-        unit: formData.unit || undefined,
+        unitId: formData.unitId ?? undefined,
+        unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
         unitPrice: formData.unitPrice ? parseFloat(formData.unitPrice) : undefined,
         vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
         notes: formData.notes || undefined,
@@ -113,12 +116,14 @@ export default function CreateItemPage() {
 
                 {/* Unit */}
                 <div className="space-y-2">
-                  <Label htmlFor="unit">Unit</Label>
-                  <Input
-                    id="unit"
-                    value={formData.unit}
-                    onChange={(e) => handleInputChange('unit', e.target.value)}
-                    placeholder="e.g., piece, kg, liter"
+                  <UnifiedSelector
+                    label="Unit"
+                    type="unit"
+                    items={unitItems}
+                    selectedId={formData.unitId ?? undefined}
+                    onSelect={(item) => handleInputChange('unitId', item.id === 0 ? null : (item.id as number))}
+                    placeholder="Select unit"
+                    manageLink={{ href: '/settings/units', text: 'Manage units' }}
                   />
                 </div>
 

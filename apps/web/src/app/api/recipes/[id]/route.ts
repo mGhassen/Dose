@@ -10,6 +10,7 @@ function transformRecipe(row: any): Recipe {
     name: row.name,
     description: row.description,
     unit: row.unit,
+    unitId: row.unit_id,
     category: row.category,
     itemType: 'recipe' as const,
     servingSize: row.serving_size,
@@ -20,6 +21,7 @@ function transformRecipe(row: any): Recipe {
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    producedItemId: row.produced_item_id ?? undefined,
   };
 }
 
@@ -30,6 +32,7 @@ function transformRecipeItem(row: any): RecipeItem {
     itemId: row.item_id,
     quantity: parseFloat(row.quantity),
     unit: row.unit,
+    unitId: row.unit_id,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -41,6 +44,7 @@ function transformToSnakeCase(data: UpdateRecipeData): any {
   if (data.name !== undefined) result.name = data.name;
   if (data.description !== undefined) result.description = data.description;
   if (data.unit !== undefined) result.unit = data.unit;
+  if (data.unitId !== undefined) result.unit_id = data.unitId;
   if (data.category !== undefined) result.category = data.category;
   if (data.servingSize !== undefined) result.serving_size = data.servingSize;
   if (data.preparationTime !== undefined) result.preparation_time = data.preparationTime;
@@ -48,6 +52,7 @@ function transformToSnakeCase(data: UpdateRecipeData): any {
   if (data.instructions !== undefined) result.instructions = data.instructions;
   if (data.notes !== undefined) result.notes = data.notes;
   if (data.isActive !== undefined) result.is_active = data.isActive;
+  if (data.producedItemId !== undefined) result.produced_item_id = data.producedItemId;
   return result;
 }
 
@@ -85,16 +90,23 @@ export async function GET(
 
     if (itemsError) throw itemsError;
 
-    // Get the produced item for this recipe (if it exists)
-    const { data: producedItemData, error: producedItemError } = await supabase
-      .from('items')
-      .select('*')
-      .eq('produced_from_recipe_id', id)
-      .single();
-
-    // Ignore error if no produced item exists (PGRST116 = no rows found)
-    if (producedItemError && producedItemError.code !== 'PGRST116') {
-      throw producedItemError;
+    // Get the produced item: by produced_item_id if set, else by produced_from_recipe_id
+    let producedItemData: any = null;
+    if (recipeData.produced_item_id) {
+      const { data, error } = await supabase
+        .from('items')
+        .select('*')
+        .eq('id', recipeData.produced_item_id)
+        .single();
+      if (!error) producedItemData = data;
+    }
+    if (!producedItemData) {
+      const { data, error: producedItemError } = await supabase
+        .from('items')
+        .select('*')
+        .eq('produced_from_recipe_id', id)
+        .single();
+      if (!producedItemError) producedItemData = data;
     }
 
     const recipe: RecipeWithItems = {
@@ -106,6 +118,7 @@ export async function GET(
           name: ri.item.name,
           description: ri.item.description,
           unit: ri.item.unit,
+          unitId: ri.item.unit_id,
           category: ri.item.category,
           itemType: ri.item.item_type || 'item',
           isActive: ri.item.is_active,
@@ -129,12 +142,16 @@ export async function GET(
         name: producedItemData.name,
         description: producedItemData.description,
         unit: producedItemData.unit,
+        unitId: producedItemData.unit_id,
         category: producedItemData.category,
         itemType: producedItemData.item_type || 'item',
         isActive: producedItemData.is_active,
         createdAt: producedItemData.created_at,
         updatedAt: producedItemData.updated_at,
         producedFromRecipeId: producedItemData.produced_from_recipe_id,
+        sku: producedItemData.sku,
+        unitPrice: producedItemData.unit_price != null ? parseFloat(producedItemData.unit_price) : undefined,
+        notes: producedItemData.notes,
       };
     }
 
@@ -191,6 +208,7 @@ export async function PUT(
           item_id: item.itemId || (item as any).ingredientId,
           quantity: item.quantity,
           unit: item.unit,
+          unit_id: item.unitId,
           notes: item.notes,
         }));
 

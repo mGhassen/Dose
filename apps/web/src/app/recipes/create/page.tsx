@@ -11,24 +11,28 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X, Plus, Trash2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateRecipe, useItems } from "@kit/hooks";
+import { useCreateRecipe, useItems, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 
 export default function CreateRecipePage() {
   const router = useRouter();
   const createRecipe = useCreateRecipe();
   const { data: itemsResponse } = useItems({ limit: 1000, includeRecipes: true });
+  const { data: units = [] } = useUnits();
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     servingSize: "",
+    unitId: null as number | null,
+    unit: "",
+    producedItemId: null as number | null,
     preparationTime: "",
     cookingTime: "",
     instructions: "",
     notes: "",
     isActive: true,
   });
-  const [items, setItems] = useState<Array<{ itemId: number; quantity: number; unit: string; notes?: string }>>([]);
+  const [items, setItems] = useState<Array<{ itemId: number; quantity: number; unit: string; unitId?: number; notes?: string }>>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,12 +47,15 @@ export default function CreateRecipePage() {
         name: formData.name,
         description: formData.description || undefined,
         servingSize: formData.servingSize ? parseInt(formData.servingSize) : undefined,
+        unitId: formData.unitId ?? undefined,
+        unit: formData.unit || undefined,
+        producedItemId: formData.producedItemId ?? undefined,
         preparationTime: formData.preparationTime ? parseInt(formData.preparationTime) : undefined,
         cookingTime: formData.cookingTime ? parseInt(formData.cookingTime) : undefined,
         instructions: formData.instructions || undefined,
         notes: formData.notes || undefined,
         isActive: formData.isActive,
-        items: items.length > 0 ? items.map(i => ({ itemId: i.itemId, quantity: i.quantity, unit: i.unit, notes: i.notes })) : undefined,
+        items: items.length > 0 ? items.map(i => ({ itemId: i.itemId, quantity: i.quantity, unit: i.unit, unitId: i.unitId, notes: i.notes })) : undefined,
       });
       toast.success("Recipe created successfully");
       router.push('/recipes');
@@ -62,7 +69,7 @@ export default function CreateRecipePage() {
   };
 
   const addItem = () => {
-    setItems([...items, { itemId: 0, quantity: 0, unit: "" }]);
+    setItems([...items, { itemId: 0, quantity: 0, unit: "", unitId: undefined }]);
   };
 
   const removeItem = (index: number) => {
@@ -73,11 +80,11 @@ export default function CreateRecipePage() {
     const updated = [...items];
     const item = updated[index];
     
-    // Auto-fill unit when item is selected
     if (field === 'itemId' && value) {
       const selectedItem = itemsResponse?.data?.find(i => i.id === parseInt(value));
       if (selectedItem) {
         item.unit = selectedItem.unit || '';
+        item.unitId = selectedItem.unitId;
       }
     }
     
@@ -117,13 +124,29 @@ export default function CreateRecipePage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="servingSize">Serving Size</Label>
-                      <Input
-                        id="servingSize"
-                        type="number"
-                        value={formData.servingSize}
-                        onChange={(e) => handleInputChange('servingSize', e.target.value)}
-                        placeholder="4"
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          id="servingSize"
+                          type="number"
+                          min={1}
+                          value={formData.servingSize}
+                          onChange={(e) => handleInputChange('servingSize', e.target.value)}
+                          placeholder="4"
+                          className="w-24"
+                        />
+                        <UnifiedSelector
+                          type="unit"
+                          items={units.map(u => ({ id: u.id, name: u.name, symbol: u.symbol, ...u }))}
+                          selectedId={formData.unitId ?? undefined}
+                          onSelect={(sel) => {
+                            const u = units.find(x => x.id === sel.id);
+                            setFormData(prev => ({ ...prev, unitId: u?.id ?? null, unit: u?.symbol ?? '' }));
+                          }}
+                          placeholder="Unit"
+                          manageLink={{ href: '/settings/units', text: 'Manage units' }}
+                          getDisplayName={(item) => (item as any).symbol ?? item.name ?? String(item.id)}
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -136,6 +159,18 @@ export default function CreateRecipePage() {
                         placeholder="30"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Item produced (optional)</Label>
+                    <UnifiedSelector
+                      type="item"
+                      items={itemsResponse?.data?.filter(i => i.itemType === 'item') ?? []}
+                      selectedId={formData.producedItemId ?? undefined}
+                      onSelect={(sel) => setFormData(prev => ({ ...prev, producedItemId: sel.id === 0 ? null : Number(sel.id) }))}
+                      placeholder="Link to existing item (or leave empty to create when produced)"
+                    />
+                    <p className="text-xs text-muted-foreground">If empty, an item will be created automatically when you first produce this recipe.</p>
                   </div>
 
                   <div className="space-y-2">
@@ -223,7 +258,7 @@ export default function CreateRecipePage() {
                               placeholder="Select item"
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-2">
                               <Label>Quantity</Label>
                               <Input
@@ -236,10 +271,19 @@ export default function CreateRecipePage() {
                             </div>
                             <div className="space-y-2">
                               <Label>Unit</Label>
-                              <Input
-                                value={item.unit}
-                                onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                                placeholder="kg, L, etc."
+                              <UnifiedSelector
+                                type="unit"
+                                items={units.map(u => ({ id: u.id, name: u.name, symbol: u.symbol, ...u }))}
+                                selectedId={item.unitId ?? undefined}
+                                onSelect={(sel) => {
+                                  const u = units.find(x => x.id === sel.id);
+                                  const updated = [...items];
+                                  updated[index] = { ...updated[index], unitId: u?.id, unit: u?.symbol ?? '' };
+                                  setItems(updated);
+                                }}
+                                placeholder="Unit"
+                                manageLink={{ href: '/settings/units', text: 'Units' }}
+                                getDisplayName={(x) => (x as any).symbol ?? x.name ?? String(x.id)}
                               />
                             </div>
                           </div>

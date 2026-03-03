@@ -9,7 +9,7 @@ import { Label } from "@kit/ui/label";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateStockLevel, useItems } from "@kit/hooks";
+import { useCreateStockLevel, useItems, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 
 export default function CreateStockLevelPage() {
@@ -18,11 +18,12 @@ export default function CreateStockLevelPage() {
   const { data: itemsResponse } = useItems({ limit: 1000 });
   
   const items = itemsResponse?.data || [];
-  
+  const { data: unitsData } = useUnits();
+  const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const [formData, setFormData] = useState({
     itemId: "",
     quantity: "",
-    unit: "",
+    unitId: null as number | null,
     location: "",
     minimumStockLevel: "",
     maximumStockLevel: "",
@@ -31,7 +32,7 @@ export default function CreateStockLevelPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.itemId || !formData.quantity || !formData.unit) {
+    if (!formData.itemId || !formData.quantity || formData.unitId == null) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -45,7 +46,8 @@ export default function CreateStockLevelPage() {
       await createStockLevel.mutateAsync({
         itemId: parseInt(formData.itemId),
         quantity: parseFloat(formData.quantity),
-        unit: formData.unit,
+        unitId: formData.unitId,
+        unit: (unitsData || []).find((u) => u.id === formData.unitId)?.symbol,
         location: formData.location || undefined,
         minimumStockLevel: formData.minimumStockLevel ? parseFloat(formData.minimumStockLevel) : undefined,
         maximumStockLevel: formData.maximumStockLevel ? parseFloat(formData.maximumStockLevel) : undefined,
@@ -63,8 +65,8 @@ export default function CreateStockLevelPage() {
     // Auto-fill unit when item is selected
     if (field === 'itemId' && value) {
       const selectedItem = items.find(i => i.id === parseInt(value));
-      if (selectedItem) {
-        setFormData(prev => ({ ...prev, unit: selectedItem.unit || '' }));
+      if (selectedItem?.unitId != null) {
+        setFormData(prev => ({ ...prev, unitId: selectedItem.unitId }));
       }
     }
   };
@@ -126,13 +128,14 @@ export default function CreateStockLevelPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="unit">Unit *</Label>
-                  <Input
-                    id="unit"
-                    value={formData.unit}
-                    onChange={(e) => handleInputChange('unit', e.target.value)}
-                    placeholder="kg, L, piece, etc."
-                    required
+                  <UnifiedSelector
+                    label="Unit *"
+                    type="unit"
+                    items={unitItems}
+                    selectedId={formData.unitId ?? undefined}
+                    onSelect={(item) => handleInputChange('unitId', item.id === 0 ? null : (item.id as number))}
+                    placeholder="Select unit"
+                    manageLink={{ href: '/settings/units', text: 'Manage units' }}
                   />
                 </div>
 

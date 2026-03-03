@@ -80,7 +80,7 @@ function DetailRow({
 export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailContentProps) {
   const [isEditing, setIsEditing] = useState(false);
   const { data: sale, isLoading } = useSaleById(saleId);
-  const { data: itemsResponse } = useItems({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
   const updateSale = useUpdateSale();
   const deleteMutation = useDeleteSale();
 
@@ -269,9 +269,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                 <Label>Item / Recipe</Label>
                 <UnifiedSelector
                   type="item"
-                  items={(itemsResponse?.data ?? []).filter(
-                    (i) => i.itemType === "item" || i.itemType === "recipe"
-                  )}
+                  items={itemsResponse?.data ?? []}
                   selectedId={formData.itemId ? parseInt(formData.itemId) : undefined}
                   onSelect={(item) =>
                     handleInputChange("itemId", item.id === 0 ? "" : String(item.id))

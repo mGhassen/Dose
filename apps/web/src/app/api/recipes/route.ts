@@ -11,6 +11,7 @@ function transformRecipe(row: any): Recipe {
     name: row.name,
     description: row.description,
     unit: row.unit,
+    unitId: row.unit_id,
     category: row.category,
     itemType: 'recipe' as const,
     servingSize: row.serving_size,
@@ -25,7 +26,7 @@ function transformRecipe(row: any): Recipe {
 }
 
 function transformToSnakeCase(data: CreateRecipeData): any {
-  return {
+  const result: any = {
     name: data.name,
     description: data.description,
     unit: data.unit || 'serving',
@@ -38,6 +39,9 @@ function transformToSnakeCase(data: CreateRecipeData): any {
     notes: data.notes,
     is_active: data.isActive ?? true,
   };
+  if (data.unitId != null) result.unit_id = data.unitId;
+  if (data.producedItemId !== undefined) result.produced_item_id = data.producedItemId;
+  return result;
 }
 
 export async function GET(request: NextRequest) {
@@ -117,6 +121,7 @@ export async function POST(request: NextRequest) {
         item_id: item.itemId,
         quantity: item.quantity,
         unit: item.unit,
+        unit_id: item.unitId,
         notes: item.notes,
       }));
 
@@ -138,6 +143,7 @@ export async function POST(request: NextRequest) {
         item_id: ing.ingredientId,
         quantity: ing.quantity,
         unit: ing.unit,
+        unit_id: (ing as any).unitId,
         notes: ing.notes,
       }));
 

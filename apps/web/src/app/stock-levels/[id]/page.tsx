@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Input } from "@kit/ui/input";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Label } from "@kit/ui/label";
 import { Badge } from "@kit/ui/badge";
 import { Save, X, Trash2, AlertTriangle, TrendingUp, TrendingDown, MoreVertical, Edit2, Plus } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useStockLevelById, useUpdateStockLevel, useDeleteStockLevel, useStockMovements } from "@kit/hooks";
+import { useStockLevelById, useUpdateStockLevel, useDeleteStockLevel, useStockMovements, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
 import Link from "next/link";
@@ -50,11 +51,13 @@ export default function StockLevelDetailPage({ params }: StockLevelDetailPagePro
   
   const [formData, setFormData] = useState({
     quantity: "",
-    unit: "",
+    unitId: null as number | null,
     location: "",
     minimumStockLevel: "",
     maximumStockLevel: "",
   });
+  const { data: unitsData } = useUnits();
+  const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -64,7 +67,7 @@ export default function StockLevelDetailPage({ params }: StockLevelDetailPagePro
     if (stockLevel) {
       setFormData({
         quantity: stockLevel.quantity.toString(),
-        unit: stockLevel.unit,
+        unitId: stockLevel.unitId ?? null,
         location: stockLevel.location || "",
         minimumStockLevel: stockLevel.minimumStockLevel?.toString() || "",
         maximumStockLevel: stockLevel.maximumStockLevel?.toString() || "",
@@ -75,7 +78,7 @@ export default function StockLevelDetailPage({ params }: StockLevelDetailPagePro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.quantity || !formData.unit) {
+    if (!formData.quantity || formData.unitId == null) {
       toast.error("Please fill in quantity and unit");
       return;
     }
@@ -87,7 +90,8 @@ export default function StockLevelDetailPage({ params }: StockLevelDetailPagePro
         id: resolvedParams.id,
         data: {
           quantity: parseFloat(formData.quantity),
-          unit: formData.unit,
+          unitId: formData.unitId,
+          unit: (unitsData || []).find((u) => u.id === formData.unitId)?.symbol,
           location: formData.location || undefined,
           minimumStockLevel: formData.minimumStockLevel ? parseFloat(formData.minimumStockLevel) : undefined,
           maximumStockLevel: formData.maximumStockLevel ? parseFloat(formData.maximumStockLevel) : undefined,
@@ -212,12 +216,14 @@ export default function StockLevelDetailPage({ params }: StockLevelDetailPagePro
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="unit">Unit *</Label>
-                      <Input
-                        id="unit"
-                        value={formData.unit}
-                        onChange={(e) => handleInputChange('unit', e.target.value)}
-                        required
+                      <UnifiedSelector
+                        label="Unit *"
+                        type="unit"
+                        items={unitItems}
+                        selectedId={formData.unitId ?? undefined}
+                        onSelect={(item) => handleInputChange('unitId', item.id === 0 ? null : (item.id as number))}
+                        placeholder="Select unit"
+                        manageLink={{ href: '/settings/units', text: 'Manage units' }}
                       />
                     </div>
                     <div className="space-y-2">

@@ -8,18 +8,17 @@ import type { Item, CreateItemData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
 function transformItem(row: any): Item {
-  // Transform regular item from items table (not recipes)
   return {
     id: row.id,
     name: row.name,
     description: row.description,
     unit: row.unit || '',
+    unitId: row.unit_id,
     category: row.category,
-    itemType: 'item' as const, // Items from items table are always 'item'
+    itemType: 'item' as const,
     isActive: row.is_active ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    // Item-specific fields
     sku: row.sku,
     unitPrice: row.unit_price ? parseFloat(row.unit_price) : undefined,
     vendorId: row.vendor_id,
@@ -29,51 +28,61 @@ function transformItem(row: any): Item {
 }
 
 function transformToSnakeCase(data: CreateItemData): any {
-  // Items should only have item fields, recipes are created via recipes API
-  return {
+  const result: any = {
     name: data.name,
     description: data.description,
-    unit: data.unit,
     category: data.category,
-    item_type: 'item', // Always 'item' for items table
+    item_type: 'item',
     sku: data.sku,
     unit_price: data.unitPrice,
     vendor_id: data.vendorId,
     notes: data.notes,
     is_active: data.isActive ?? true,
   };
+  if (data.unitId != null) result.unit_id = data.unitId;
+  if (data.unit != null) result.unit = data.unit;
+  return result;
 }
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const { page, limit, offset } = getPaginationParams(searchParams);
-    const itemType = searchParams.get('itemType'); // Filter by item type
-    const includeRecipes = searchParams.get('includeRecipes') === 'true'; // For selection purposes
+    const itemType = searchParams.get('itemType');
+    const includeRecipes = searchParams.get('includeRecipes') === 'true';
+    const producedOnly = searchParams.get('producedOnly') === 'true';
 
     const supabase = createServerSupabaseClient();
-    
-    // Fetch items from items table
-    // Items can be: raw ingredients OR produced items (with produced_from_recipe_id)
+
     let itemsQuery = supabase
       .from('items')
       .select('*');
-    
+
     if (itemType) {
       itemsQuery = itemsQuery.eq('item_type', itemType);
     } else {
-      // Default: only get items (not recipes)
       itemsQuery = itemsQuery.eq('item_type', 'item');
     }
 
-    // Execute items query
+    if (producedOnly) {
+      const { data: recipeLinks } = await supabase
+        .from('recipes')
+        .select('produced_item_id')
+        .not('produced_item_id', 'is', null);
+      const linkedIds = [...new Set((recipeLinks || []).map((r: any) => r.produced_item_id).filter(Boolean))];
+      if (linkedIds.length > 0) {
+        itemsQuery = itemsQuery.or(`produced_from_recipe_id.not.is.null,id.in.(${linkedIds.join(',')})`);
+      } else {
+        itemsQuery = itemsQuery.not('produced_from_recipe_id', 'is', null);
+      }
+    }
+
     const { data: itemsData, error: itemsError } = await itemsQuery;
     if (itemsError) throw itemsError;
 
     let allData: any[] = [...(itemsData || [])];
 
-    // If includeRecipes=true, also fetch recipes (for selection in sales/recipes)
-    if (includeRecipes) {
+    if (includeRecipes && !producedOnly) {
       // Get produced item recipe IDs to exclude those recipes (avoid duplicates)
       const producedRecipeIds = new Set(
         (itemsData || [])
@@ -137,6 +146,7 @@ export async function GET(request: NextRequest) {
           name: row.name,
           description: row.description,
           unit: row.unit || 'serving',
+          unitId: row.unit_id,
           category: row.category,
           itemType: 'recipe' as const,
           isActive: row.is_active,
@@ -175,9 +185,15 @@ export async function POST(request: NextRequest) {
   try {
     const body: CreateItemData = await request.json();
     
-    if (!body.name || !body.unit) {
+    if (!body.name) {
       return NextResponse.json(
-        { error: 'Missing required fields: name, unit' },
+        { error: 'Missing required field: name' },
+        { status: 400 }
+      );
+    }
+    if (body.unitId == null && body.unit == null) {
+      return NextResponse.json(
+        { error: 'Provide either unit or unitId' },
         { status: 400 }
       );
     }

@@ -8,10 +8,11 @@ import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 function transformExpiryDate(row: any): ExpiryDate {
   return {
     id: row.id,
-    ingredientId: row.ingredient_id,
+    itemId: row.item_id,
     stockMovementId: row.stock_movement_id,
     quantity: parseFloat(row.quantity),
     unit: row.unit,
+    unitId: row.unit_id,
     expiryDate: row.expiry_date,
     location: row.location,
     isExpired: row.is_expired,
@@ -23,8 +24,8 @@ function transformExpiryDate(row: any): ExpiryDate {
 }
 
 function transformToSnakeCase(data: CreateExpiryDateData): any {
-  return {
-    ingredient_id: data.ingredientId,
+  const result: any = {
+    item_id: data.itemId,
     stock_movement_id: data.stockMovementId,
     quantity: data.quantity,
     unit: data.unit,
@@ -32,6 +33,8 @@ function transformToSnakeCase(data: CreateExpiryDateData): any {
     location: data.location,
     notes: data.notes,
   };
+  if (data.unitId != null) result.unit_id = data.unitId;
+  return result;
 }
 
 export async function GET(request: NextRequest) {
@@ -83,7 +86,7 @@ export async function POST(request: NextRequest) {
   try {
     const body: CreateExpiryDateData = await request.json();
     
-    if (!body.itemId || body.quantity === undefined || !body.unit || !body.expiryDate) {
+    if (!body.itemId || body.quantity === undefined || (body.unit == null && body.unitId == null) || !body.expiryDate) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

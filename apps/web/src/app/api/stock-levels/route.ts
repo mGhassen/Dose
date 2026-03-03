@@ -11,6 +11,7 @@ function transformStockLevel(row: any): StockLevel {
     itemId: row.item_id,
     quantity: parseFloat(row.quantity),
     unit: row.unit,
+    unitId: row.unit_id,
     location: row.location,
     minimumStockLevel: row.minimum_stock_level ? parseFloat(row.minimum_stock_level) : undefined,
     maximumStockLevel: row.maximum_stock_level ? parseFloat(row.maximum_stock_level) : undefined,
@@ -21,7 +22,7 @@ function transformStockLevel(row: any): StockLevel {
 }
 
 function transformToSnakeCase(data: CreateStockLevelData): any {
-  return {
+  const result: any = {
     item_id: data.itemId,
     quantity: data.quantity,
     unit: data.unit,
@@ -29,6 +30,8 @@ function transformToSnakeCase(data: CreateStockLevelData): any {
     minimum_stock_level: data.minimumStockLevel,
     maximum_stock_level: data.maximumStockLevel,
   };
+  if (data.unitId != null) result.unit_id = data.unitId;
+  return result;
 }
 
 export async function GET(request: NextRequest) {
@@ -80,7 +83,7 @@ export async function POST(request: NextRequest) {
   try {
     const body: CreateStockLevelData = await request.json();
     
-    if (!body.itemId || body.quantity === undefined || !body.unit) {
+    if (!body.itemId || body.quantity === undefined || (body.unit == null && body.unitId == null)) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

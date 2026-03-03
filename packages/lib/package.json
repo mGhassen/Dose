@@ -50,6 +50,7 @@
     "./api/locomotives": "./src/api/locomotives.ts",
     "./api/locomotive-models": "./src/api/locomotive-models.ts",
     "./api/metadata-enums": "./src/api/metadata-enums.ts",
+    "./api/units": "./src/api/units.ts",
     "./api/operation-types": "./src/api/operation-types.ts",
     "./api/operations": "./src/api/operations.ts",
     "./api/procedures": "./src/api/procedures.ts",

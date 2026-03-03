@@ -12,6 +12,7 @@ function transformStockMovement(row: any): StockMovement {
     movementType: row.movement_type,
     quantity: parseFloat(row.quantity),
     unit: row.unit,
+    unitId: row.unit_id,
     referenceType: row.reference_type,
     referenceId: row.reference_id,
     location: row.location,
@@ -23,7 +24,7 @@ function transformStockMovement(row: any): StockMovement {
 }
 
 function transformToSnakeCase(data: CreateStockMovementData): any {
-  return {
+  const result: any = {
     item_id: data.itemId,
     movement_type: data.movementType,
     quantity: data.quantity,
@@ -34,6 +35,8 @@ function transformToSnakeCase(data: CreateStockMovementData): any {
     notes: data.notes,
     movement_date: data.movementDate || new Date().toISOString(),
   };
+  if (data.unitId != null) result.unit_id = data.unitId;
+  return result;
 }
 
 export async function GET(request: NextRequest) {
@@ -85,7 +88,7 @@ export async function POST(request: NextRequest) {
   try {
     const body: CreateStockMovementData = await request.json();
     
-    if (!body.itemId || !body.movementType || body.quantity === undefined || !body.unit) {
+    if (!body.itemId || !body.movementType || body.quantity === undefined || (body.unit == null && body.unitId == null)) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
