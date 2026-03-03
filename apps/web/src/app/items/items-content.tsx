@@ -61,14 +61,21 @@ export default function ItemsContent() {
       cell: ({ row }) => row.original.unit || <span className="text-muted-foreground">—</span>,
     },
     {
-      accessorKey: "unitPrice",
-      header: "Unit Price / Serving",
+      accessorKey: "unitCost",
+      header: "Unit cost",
       cell: ({ row }) => {
-        // Recipes don't have unitPrice, show serving size instead
+        if (row.original.itemType === 'recipe') return <span className="text-muted-foreground">—</span>;
+        return row.original.unitCost != null ? formatCurrency(row.original.unitCost) : <span className="text-muted-foreground">—</span>;
+      },
+    },
+    {
+      accessorKey: "unitPrice",
+      header: "Selling price",
+      cell: ({ row }) => {
         if (row.original.itemType === 'recipe') {
           return row.original.servingSize ? `${row.original.servingSize} servings` : <span className="text-muted-foreground">—</span>;
         }
-        return row.original.unitPrice ? formatCurrency(row.original.unitPrice) : <span className="text-muted-foreground">—</span>;
+        return row.original.unitPrice != null ? formatCurrency(row.original.unitPrice) : <span className="text-muted-foreground">—</span>;
       },
     },
     {
@@ -200,7 +207,8 @@ export default function ItemsContent() {
           ]}
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
-            { value: "unitPrice", label: "Unit Price", type: "numeric" },
+            { value: "unitCost", label: "Unit cost", type: "numeric" },
+            { value: "unitPrice", label: "Selling price", type: "numeric" },
             { value: "createdAt", label: "Created", type: "timestamp" },
           ]}
           localStoragePrefix="items"

@@ -36,10 +36,29 @@ export default function EditSalePage({ params }: EditSalePageProps) {
     unitId: null as number | null,
     description: "",
     itemId: "",
+    unitPrice: "",
+    unitCost: "",
   });
 
   const hasItemSelected = !!formData.itemId;
   const quantityUnitRequired = hasItemSelected;
+
+  const [priceOnDate, setPriceOnDate] = useState<{ unitPrice: number | null; unitCost: number | null } | null>(null);
+  useEffect(() => {
+    if (!formData.itemId || !formData.date) {
+      setPriceOnDate(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/items/${formData.itemId}/resolved-price?date=${formData.date}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (!cancelled && d) setPriceOnDate({ unitPrice: d.unitPrice ?? null, unitCost: d.unitCost ?? null });
+        else if (!cancelled) setPriceOnDate(null);
+      })
+      .catch(() => { if (!cancelled) setPriceOnDate(null); });
+    return () => { cancelled = true; };
+  }, [formData.itemId, formData.date]);
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -55,6 +74,8 @@ export default function EditSalePage({ params }: EditSalePageProps) {
         unitId: sale.unitId ?? null,
         description: sale.description || "",
         itemId: sale.itemId?.toString() || "",
+        unitPrice: sale.unitPrice != null ? sale.unitPrice.toString() : "",
+        unitCost: sale.unitCost != null ? sale.unitCost.toString() : "",
       });
     }
   }, [sale]);
@@ -85,6 +106,8 @@ export default function EditSalePage({ params }: EditSalePageProps) {
           unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
           description: formData.description || undefined,
           itemId: formData.itemId ? parseInt(formData.itemId) : undefined,
+          unitPrice: formData.unitPrice ? parseFloat(formData.unitPrice) : undefined,
+          unitCost: formData.unitCost ? parseFloat(formData.unitCost) : undefined,
         },
       });
       toast.success("Sale updated successfully");
@@ -99,9 +122,13 @@ export default function EditSalePage({ params }: EditSalePageProps) {
     if (field === 'itemId') {
       const item = value ? items.find(i => i.id === parseInt(value)) : undefined;
       updates.unitId = item?.unitId ?? null;
+      updates.unitPrice = item?.unitPrice != null ? String(item.unitPrice) : '';
+      updates.unitCost = item?.unitCost != null ? String(item.unitCost) : '';
       if (!value) {
         updates.quantity = '';
         updates.unitId = null;
+        updates.unitPrice = '';
+        updates.unitCost = '';
       }
     }
     setFormData(prev => ({ ...prev, ...updates }));
@@ -190,6 +217,33 @@ export default function EditSalePage({ params }: EditSalePageProps) {
                         placeholder="Select unit"
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="unitPrice">Sell price</Label>
+                      <Input
+                        id="unitPrice"
+                        type="number"
+                        step="0.01"
+                        value={formData.unitPrice}
+                        onChange={(e) => handleInputChange('unitPrice', e.target.value)}
+                        placeholder="Unit selling price"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="unitCost">Cost price</Label>
+                      <Input
+                        id="unitCost"
+                        type="number"
+                        step="0.01"
+                        value={formData.unitCost}
+                        onChange={(e) => handleInputChange('unitCost', e.target.value)}
+                        placeholder="Unit cost price"
+                      />
+                    </div>
+                    {priceOnDate && (
+                      <p className="text-xs text-muted-foreground md:col-span-2">
+                        Price on {formData.date}: selling {priceOnDate.unitPrice != null ? ` ${priceOnDate.unitPrice.toFixed(2)}` : '—'}, cost {priceOnDate.unitCost != null ? ` ${priceOnDate.unitCost.toFixed(2)}` : '—'} (from history or default)
+                      </p>
+                    )}
                   </>
                 )}
 

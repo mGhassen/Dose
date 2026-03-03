@@ -444,9 +444,10 @@ export interface Sale {
   unitId?: number;
   description?: string;
   itemId?: number;
+  unitPrice?: number;
+  unitCost?: number;
   createdAt: string;
   updatedAt: string;
-  // Populated fields
   item?: Item;
 }
 
@@ -469,6 +470,8 @@ export interface CreateSaleData {
   unitId?: number;
   description?: string;
   itemId?: number;
+  unitPrice?: number;
+  unitCost?: number;
 }
 
 export interface UpdateSaleData extends Partial<CreateSaleData> {}
@@ -813,7 +816,8 @@ export interface Item {
   updatedAt: string;
   // Item-specific fields (only when itemType === 'item')
   sku?: string;
-  unitPrice?: number;
+  unitPrice?: number;   // Selling price
+  unitCost?: number;    // Buying/cost price (for recipe cost, etc.)
   vendorId?: number;
   notes?: string;
   producedFromRecipeId?: number; // ID of recipe that produced this item
@@ -832,6 +836,7 @@ export interface CreateItemData {
   category?: string;
   sku?: string;
   unitPrice?: number;
+  unitCost?: number;
   vendorId?: number;
   notes?: string;
   isActive?: boolean;

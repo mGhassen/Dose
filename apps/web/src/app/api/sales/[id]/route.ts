@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Sale, UpdateSaleData } from '@kit/types';
+import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
 
 function transformSale(row: any): Sale {
   return {
@@ -15,6 +16,8 @@ function transformSale(row: any): Sale {
     unitId: row.unit_id,
     description: row.description,
     itemId: row.item_id,
+    unitPrice: row.unit_price != null ? parseFloat(row.unit_price) : undefined,
+    unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     item: undefined,
@@ -31,6 +34,8 @@ function transformToSnakeCase(data: UpdateSaleData): any {
   if (data.unitId !== undefined) result.unit_id = data.unitId;
   if (data.description !== undefined) result.description = data.description;
   if (data.itemId !== undefined) result.item_id = data.itemId;
+  if (data.unitPrice !== undefined) result.unit_price = data.unitPrice;
+  if (data.unitCost !== undefined) result.unit_cost = data.unitCost;
   result.updated_at = new Date().toISOString();
   return result;
 }
@@ -68,6 +73,8 @@ export async function GET(
         .single();
       
       if (itemData) {
+        const sellPrice = sale.unitPrice != null ? sale.unitPrice : (itemData.unit_price ? parseFloat(itemData.unit_price) : undefined);
+        const costPrice = sale.unitCost != null ? sale.unitCost : (itemData.unit_cost != null ? parseFloat(itemData.unit_cost) : undefined);
         sale.item = {
           id: itemData.id,
           name: itemData.name,
@@ -75,14 +82,14 @@ export async function GET(
           category: itemData.category,
           sku: itemData.sku,
           unit: itemData.unit,
-          unitPrice: itemData.unit_price ? parseFloat(itemData.unit_price) : undefined,
+          unitPrice: sellPrice,
+          unitCost: costPrice,
           itemType: itemData.item_type,
           isActive: itemData.is_active,
           createdAt: itemData.created_at,
           updatedAt: itemData.updated_at,
         };
       } else {
-        // Try recipes table
         const { data: recipeData } = await supabase
           .from('recipes')
           .select('*')
@@ -97,7 +104,8 @@ export async function GET(
             category: recipeData.category,
             sku: undefined,
             unit: recipeData.unit || 'serving',
-            unitPrice: undefined,
+            unitPrice: sale.unitPrice,
+            unitCost: sale.unitCost,
             itemType: 'recipe',
             isActive: recipeData.is_active,
             createdAt: recipeData.created_at,
@@ -142,6 +150,26 @@ export async function PUT(
             { error: `Item or recipe with id ${body.itemId} not found` },
             { status: 400 }
           );
+        }
+      }
+    }
+    const dateStr = body.date ? body.date.split('T')[0] : undefined;
+    if (body.itemId && dateStr && (body.unitPrice === undefined || body.unitCost === undefined)) {
+      let priceLookupItemId: number | null = null;
+      const { data: itemRow } = await supabase.from('items').select('id').eq('id', body.itemId).single();
+      if (itemRow) priceLookupItemId = itemRow.id;
+      else {
+        const { data: produced } = await supabase.from('items').select('id').eq('produced_from_recipe_id', body.itemId).single();
+        if (produced) priceLookupItemId = produced.id;
+      }
+      if (priceLookupItemId) {
+        if (body.unitPrice === undefined) {
+          const resolved = await getItemSellingPriceAsOf(supabase, priceLookupItemId, dateStr);
+          if (resolved != null) body.unitPrice = resolved;
+        }
+        if (body.unitCost === undefined) {
+          const resolved = await getItemCostAsOf(supabase, priceLookupItemId, dateStr);
+          if (resolved != null) body.unitCost = resolved;
         }
       }
     }

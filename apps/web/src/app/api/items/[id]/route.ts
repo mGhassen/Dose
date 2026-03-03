@@ -18,6 +18,7 @@ function transformItem(row: any): Item {
     updatedAt: row.updated_at,
     sku: row.sku,
     unitPrice: row.unit_price ? parseFloat(row.unit_price) : undefined,
+    unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
     vendorId: row.vendor_id,
     notes: row.notes,
     producedFromRecipeId: row.produced_from_recipe_id,
@@ -35,6 +36,7 @@ function transformToSnakeCase(data: UpdateItemData): any {
   if (data.category !== undefined) result.category = data.category;
   if (data.sku !== undefined) result.sku = data.sku;
   if (data.unitPrice !== undefined) result.unit_price = data.unitPrice;
+  if (data.unitCost !== undefined) result.unit_cost = data.unitCost;
   if (data.vendorId !== undefined) result.vendor_id = data.vendorId;
   if (data.notes !== undefined) result.notes = data.notes;
   if (data.isActive !== undefined) result.is_active = data.isActive;

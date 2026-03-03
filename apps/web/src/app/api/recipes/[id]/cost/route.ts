@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import { buildFactorMap, convertQuantity } from '@/lib/units/convert';
+import { getItemCostAsOf } from '@/lib/items/price-resolve';
 
 export async function GET(
   request: NextRequest,
@@ -85,6 +86,22 @@ export async function GET(
           avgPricePerRecipeUnit = totalQuantity > 0 ? totalValue / totalQuantity : 0;
         }
 
+        let priceSource: 'order' | 'item' = 'order';
+        if (avgPricePerRecipeUnit === 0 && ri.item) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const itemUnitCostResolved = await getItemCostAsOf(supabase, itemId, todayStr);
+          const itemUnitCost = itemUnitCostResolved ?? (ri.item.unit_cost != null ? parseFloat(ri.item.unit_cost) : 0);
+          if (itemUnitCost > 0) {
+            const itemUnitId = ri.item.unit_id;
+            if (recipeUnitId != null && itemUnitId != null && getFactor(recipeUnitId) != null && getFactor(itemUnitId) != null) {
+              avgPricePerRecipeUnit = itemUnitCost * (getFactor(itemUnitId)! / getFactor(recipeUnitId)!);
+            } else {
+              avgPricePerRecipeUnit = itemUnitCost;
+            }
+            priceSource = 'item';
+          }
+        }
+
         const itemCost = recipeQty * avgPricePerRecipeUnit;
 
         return {
@@ -97,6 +114,7 @@ export async function GET(
           unitPrice: avgPricePerRecipeUnit,
           totalCost: itemCost,
           hasPrice: avgPricePerRecipeUnit > 0,
+          priceSource,
         };
       })
     );

@@ -91,6 +91,8 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
     quantity: "",
     description: "",
     itemId: "",
+    unitPrice: "",
+    unitCost: "",
   });
 
   useEffect(() => {
@@ -102,6 +104,8 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
         quantity: sale.quantity?.toString() || "",
         description: sale.description || "",
         itemId: sale.itemId?.toString() || "",
+        unitPrice: sale.unitPrice != null ? sale.unitPrice.toString() : "",
+        unitCost: sale.unitCost != null ? sale.unitCost.toString() : "",
       });
     }
   }, [sale]);
@@ -122,6 +126,8 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
           quantity: formData.quantity ? parseInt(formData.quantity) : undefined,
           description: formData.description || undefined,
           itemId: formData.itemId ? parseInt(formData.itemId) : undefined,
+          unitPrice: formData.unitPrice ? parseFloat(formData.unitPrice) : undefined,
+          unitCost: formData.unitCost ? parseFloat(formData.unitCost) : undefined,
         },
       });
       toast.success("Sale updated successfully");
@@ -148,7 +154,15 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
   };
 
   const handleInputChange = (field: string, value: string | number) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    const updates: Record<string, string | number> = { [field]: value };
+    if (field === "itemId" && itemsResponse?.data) {
+      const item = value ? itemsResponse.data.find((i: { id: number }) => i.id === (typeof value === "string" ? parseInt(value, 10) : value)) : undefined;
+      if (item) {
+        updates.unitPrice = (item as { unitPrice?: number }).unitPrice?.toString() ?? "";
+        updates.unitCost = (item as { unitCost?: number }).unitCost?.toString() ?? "";
+      }
+    }
+    setFormData((prev) => ({ ...prev, ...updates }));
   };
 
   if (isLoading) {
@@ -262,6 +276,28 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                   type="number"
                   value={formData.quantity}
                   onChange={(e) => handleInputChange("quantity", e.target.value)}
+                  placeholder="—"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="unitPrice">Sell price</Label>
+                <Input
+                  id="unitPrice"
+                  type="number"
+                  step="0.01"
+                  value={formData.unitPrice}
+                  onChange={(e) => handleInputChange("unitPrice", e.target.value)}
+                  placeholder="—"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="unitCost">Cost price</Label>
+                <Input
+                  id="unitCost"
+                  type="number"
+                  step="0.01"
+                  value={formData.unitCost}
+                  onChange={(e) => handleInputChange("unitCost", e.target.value)}
                   placeholder="—"
                 />
               </div>
@@ -396,6 +432,14 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
             <Separator />
             <DetailRow icon={Hash} label="Quantity">
               {sale.quantity ?? <span className="text-muted-foreground">—</span>}
+            </DetailRow>
+            <Separator />
+            <DetailRow icon={DollarSign} label="Selling price (at time of sale)">
+              {sale.unitPrice != null ? formatCurrency(sale.unitPrice) : <span className="text-muted-foreground">—</span>}
+            </DetailRow>
+            <Separator />
+            <DetailRow icon={DollarSign} label="Cost price (at time of sale)">
+              {sale.unitCost != null ? formatCurrency(sale.unitCost) : <span className="text-muted-foreground">—</span>}
             </DetailRow>
             <Separator />
             <DetailRow icon={Package} label="Item / Recipe">

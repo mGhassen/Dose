@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@kit/ui/button";
@@ -44,6 +44,163 @@ import { formatDate } from "@kit/lib/date-format";
 
 interface ItemDetailPageProps {
   params: Promise<{ id: string }>;
+}
+
+interface PriceHistoryEntry {
+  id: number;
+  effectiveDate: string;
+  value: number | null;
+}
+
+function PriceCostHistoryCard({
+  itemId,
+  sellHistory,
+  costHistory,
+  loading,
+  onRefetch,
+  formatCurrency,
+  formatDate,
+}: {
+  itemId: string;
+  sellHistory: PriceHistoryEntry[];
+  costHistory: PriceHistoryEntry[];
+  loading: boolean;
+  onRefetch: () => void;
+  formatCurrency: (n: number) => string;
+  formatDate: (d: string) => string;
+}) {
+  const [adding, setAdding] = useState<'sell' | 'cost' | null>(null);
+  const [addDate, setAddDate] = useState('');
+  const [addValue, setAddValue] = useState('');
+  const [deleting, setDeleting] = useState<number | null>(null);
+
+  const handleAdd = async (type: 'sell' | 'cost') => {
+    if (!addDate || addValue === '' || Number.isNaN(parseFloat(addValue))) return;
+    try {
+      const res = await fetch(`/api/items/${itemId}/price-history`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, effectiveDate: addDate, value: parseFloat(addValue) }),
+      });
+      if (res.ok) {
+        setAdding(null);
+        setAddDate('');
+        setAddValue('');
+        onRefetch();
+        toast.success('Added');
+      } else {
+        const err = await res.json();
+        toast.error(err?.error || 'Failed to add');
+      }
+    } catch {
+      toast.error('Failed to add');
+    }
+  };
+
+  const handleDelete = async (type: 'sell' | 'cost', entryId: number) => {
+    setDeleting(entryId);
+    try {
+      const res = await fetch(`/api/items/${itemId}/price-history/${entryId}?type=${type}`, { method: 'DELETE' });
+      if (res.ok) onRefetch();
+      else toast.error('Failed to delete');
+    } catch {
+      toast.error('Failed to delete');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  if (loading) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Price & cost history</CardTitle>
+        <CardDescription>Effective-date history for selling price and cost</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div>
+          <div className="text-sm font-medium mb-2">Selling price history</div>
+          <div className="space-y-2">
+            {sellHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No history. Add an effective date and value.</p>
+            ) : (
+              <div className="rounded-md border divide-y">
+                {sellHistory.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                    <span>{formatDate(e.effectiveDate)}</span>
+                    <span className="font-medium">{e.value != null ? formatCurrency(e.value) : '—'}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive h-8 w-8 p-0"
+                      disabled={deleting === e.id}
+                      onClick={() => handleDelete('sell', e.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {adding === 'sell' ? (
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                <Input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} className="w-36" />
+                <Input type="number" step="0.01" placeholder="Value" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="w-24" />
+                <Button size="sm" onClick={() => handleAdd('sell')}>Save</Button>
+                <Button size="sm" variant="outline" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); }}>Cancel</Button>
+              </div>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setAdding('sell')}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add selling price
+              </Button>
+            )}
+          </div>
+        </div>
+        <Separator />
+        <div>
+          <div className="text-sm font-medium mb-2">Cost history</div>
+          <div className="space-y-2">
+            {costHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No history. Add an effective date and value.</p>
+            ) : (
+              <div className="rounded-md border divide-y">
+                {costHistory.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                    <span>{formatDate(e.effectiveDate)}</span>
+                    <span className="font-medium">{e.value != null ? formatCurrency(e.value) : '—'}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive h-8 w-8 p-0"
+                      disabled={deleting === e.id}
+                      onClick={() => handleDelete('cost', e.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {adding === 'cost' ? (
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                <Input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} className="w-36" />
+                <Input type="number" step="0.01" placeholder="Value" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="w-24" />
+                <Button size="sm" onClick={() => handleAdd('cost')}>Save</Button>
+                <Button size="sm" variant="outline" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); }}>Cancel</Button>
+              </div>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setAdding('cost')}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add cost
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function ItemDetailPage({ params }: ItemDetailPageProps) {
@@ -146,6 +303,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     category: "",
     sku: "",
     unitId: null as number | null,
+    unitCost: "",
     unitPrice: "",
     vendorId: "",
     notes: "",
@@ -154,9 +312,42 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
 
+  const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null } | null>(null);
+  const [sellHistory, setSellHistory] = useState<{ id: number; effectiveDate: string; value: number | null }[]>([]);
+  const [costHistory, setCostHistory] = useState<{ id: number; effectiveDate: string; value: number | null }[]>([]);
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
+  const fetchPriceHistory = useCallback(async (itemId: string) => {
+    setPriceHistoryLoading(true);
+    try {
+      const [res, sell, cost] = await Promise.all([
+        fetch(`/api/items/${itemId}/resolved-price`),
+        fetch(`/api/items/${itemId}/price-history?type=sell`),
+        fetch(`/api/items/${itemId}/price-history?type=cost`),
+      ]);
+      if (res.ok) {
+        const d = await res.json();
+        setResolvedPrice({ unitPrice: d.unitPrice ?? null, unitCost: d.unitCost ?? null });
+      } else setResolvedPrice(null);
+      if (sell.ok) setSellHistory(await sell.json());
+      else setSellHistory([]);
+      if (cost.ok) setCostHistory(await cost.json());
+      else setCostHistory([]);
+    } catch {
+      setResolvedPrice(null);
+      setSellHistory([]);
+      setCostHistory([]);
+    } finally {
+      setPriceHistoryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     params.then(setResolvedParams);
   }, [params]);
+
+  useEffect(() => {
+    if (resolvedParams?.id && !isEditing) fetchPriceHistory(resolvedParams.id);
+  }, [resolvedParams?.id, isEditing, fetchPriceHistory]);
 
   useEffect(() => {
     if (item) {
@@ -166,6 +357,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         category: item.category || "",
         sku: item.sku || "",
         unitId: item.unitId ?? null,
+        unitCost: item.unitCost?.toString() || "",
         unitPrice: item.unitPrice?.toString() || "",
         vendorId: item.vendorId?.toString() || "",
         notes: item.notes || "",
@@ -194,6 +386,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           sku: formData.sku || undefined,
           unitId: formData.unitId ?? undefined,
           unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
+          unitCost: formData.unitCost ? parseFloat(formData.unitCost) : undefined,
           unitPrice: formData.unitPrice ? parseFloat(formData.unitPrice) : undefined,
           vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
           notes: formData.notes || undefined,
@@ -346,13 +539,27 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     />
                   </div>
 
-                  {/* Unit Price */}
+                  {/* Unit cost (buying) */}
                   <div className="space-y-2">
-                    <Label htmlFor="unitPrice">Unit Price</Label>
+                    <Label htmlFor="unitCost">Unit cost (buying)</Label>
+                    <Input
+                      id="unitCost"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.unitCost}
+                      onChange={(e) => handleInputChange('unitCost', e.target.value)}
+                    />
+                  </div>
+
+                  {/* Unit price (selling) */}
+                  <div className="space-y-2">
+                    <Label htmlFor="unitPrice">Unit price (selling)</Label>
                     <Input
                       id="unitPrice"
                       type="number"
                       step="0.01"
+                      min="0"
                       value={formData.unitPrice}
                       onChange={(e) => handleInputChange('unitPrice', e.target.value)}
                     />
@@ -735,13 +942,23 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     </>
                   )}
 
-                  {/* Unit Price */}
-                  {item.unitPrice !== undefined && (
+                  {/* Unit cost & Unit price (selling) */}
+                  {(item.unitCost != null || item.unitPrice != null) && (
                     <>
                       <Separator />
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Unit Price</label>
-                        <p className="text-base font-semibold mt-1">{formatCurrency(item.unitPrice)}</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {item.unitCost != null && (
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">Unit cost (buying)</label>
+                            <p className="text-base font-semibold mt-1">{formatCurrency(item.unitCost)}</p>
+                          </div>
+                        )}
+                        {item.unitPrice != null && (
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">Unit price (selling)</label>
+                            <p className="text-base font-semibold mt-1">{formatCurrency(item.unitPrice)}</p>
+                          </div>
+                        )}
                       </div>
                     </>
                   )}
@@ -778,6 +995,27 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
                   <Separator />
 
+                  {/* Current price/cost resolved as of today (Phase 2) */}
+                  {(resolvedPrice?.unitPrice != null || resolvedPrice?.unitCost != null || item.unitPrice != null || item.unitCost != null) && (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">Current selling price</label>
+                          <p className="text-base font-semibold mt-1">
+                            {(resolvedPrice?.unitPrice ?? item.unitPrice) != null ? formatCurrency(resolvedPrice?.unitPrice ?? item.unitPrice!) : '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">Current cost</label>
+                          <p className="text-base font-semibold mt-1">
+                            {(resolvedPrice?.unitCost ?? item.unitCost) != null ? formatCurrency(resolvedPrice?.unitCost ?? item.unitCost!) : '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <Separator />
+                    </>
+                  )}
+
                   {/* Metadata */}
                   <div className="space-y-2 text-xs text-muted-foreground">
                     <div>
@@ -789,6 +1027,19 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Price & cost history (Phase 2) */}
+              {!isEditing && resolvedParams?.id && (
+                <PriceCostHistoryCard
+                  itemId={resolvedParams.id}
+                  sellHistory={sellHistory}
+                  costHistory={costHistory}
+                  loading={priceHistoryLoading}
+                  onRefetch={() => fetchPriceHistory(resolvedParams.id)}
+                  formatCurrency={formatCurrency}
+                  formatDate={formatDate}
+                />
+              )}
 
               {/* Description & Notes */}
               {(item.description || item.notes) && (

@@ -84,6 +84,26 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
       },
     },
     {
+      accessorKey: "unitPrice",
+      header: "Sell price",
+      cell: ({ row }) =>
+        row.original.unitPrice != null ? (
+          formatCurrency(row.original.unitPrice)
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      accessorKey: "unitCost",
+      header: "Cost price",
+      cell: ({ row }) =>
+        row.original.unitCost != null ? (
+          formatCurrency(row.original.unitCost)
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
       accessorKey: "description",
       header: "Description",
       cell: ({ row }) => row.original.description || <span className="text-muted-foreground">—</span>,

@@ -7,6 +7,7 @@ import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { StockMovementType, StockMovementReferenceType } from '@kit/types';
 import { getItemStock } from '@/lib/stock/get-item-stock';
 import { produceRecipe } from '@/lib/stock/produce-recipe';
+import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
 
 function transformSale(row: any): Sale {
   return {
@@ -19,6 +20,8 @@ function transformSale(row: any): Sale {
     unitId: row.unit_id,
     description: row.description,
     itemId: row.item_id,
+    unitPrice: row.unit_price != null ? parseFloat(row.unit_price) : undefined,
+    unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     item: undefined,
@@ -36,6 +39,8 @@ function transformToSnakeCase(data: CreateSaleData): Record<string, unknown> {
   if (data.quantity != null) result.quantity = data.quantity;
   if (data.unit != null && data.unit !== '') result.unit = data.unit;
   if (data.unitId != null) result.unit_id = data.unitId;
+  if (data.unitPrice != null) result.unit_price = data.unitPrice;
+  if (data.unitCost != null) result.unit_cost = data.unitCost;
   return result;
 }
 
@@ -145,6 +150,8 @@ export async function GET(request: NextRequest) {
       
       if (sale.itemId && itemsMap.has(sale.itemId)) {
         const itemData = itemsMap.get(sale.itemId);
+        const sellPrice = sale.unitPrice != null ? sale.unitPrice : (itemData.unit_price ? parseFloat(itemData.unit_price) : undefined);
+        const costPrice = sale.unitCost != null ? sale.unitCost : (itemData.unit_cost != null ? parseFloat(itemData.unit_cost) : undefined);
         if (itemData.item_type === 'recipe') {
           sale.item = {
             id: itemData.id,
@@ -153,7 +160,8 @@ export async function GET(request: NextRequest) {
             category: itemData.category,
             sku: undefined,
             unit: itemData.unit || 'serving',
-            unitPrice: undefined,
+            unitPrice: sellPrice,
+            unitCost: costPrice,
             itemType: 'recipe',
             isActive: itemData.is_active,
             createdAt: itemData.created_at,
@@ -167,7 +175,8 @@ export async function GET(request: NextRequest) {
             category: itemData.category,
             sku: itemData.sku,
             unit: itemData.unit,
-            unitPrice: itemData.unit_price ? parseFloat(itemData.unit_price) : undefined,
+            unitPrice: sellPrice,
+            unitCost: costPrice,
             itemType: itemData.item_type,
             isActive: itemData.is_active,
             createdAt: itemData.created_at,
@@ -230,6 +239,24 @@ export async function POST(request: NextRequest) {
           { error: 'Quantity is required and must be greater than 0 when an item or recipe is selected' },
           { status: 400 }
         );
+      }
+      const dateStr = body.date.split('T')[0] || body.date;
+      let priceLookupItemId: number | null = null;
+      const { data: itemRow } = await supabase.from('items').select('id').eq('id', body.itemId).single();
+      if (itemRow) priceLookupItemId = itemRow.id;
+      else {
+        const { data: produced } = await supabase.from('items').select('id').eq('produced_from_recipe_id', body.itemId).single();
+        if (produced) priceLookupItemId = produced.id;
+      }
+      if (priceLookupItemId && dateStr) {
+        if (body.unitPrice == null) {
+          const resolved = await getItemSellingPriceAsOf(supabase, priceLookupItemId, dateStr);
+          if (resolved != null) body.unitPrice = resolved;
+        }
+        if (body.unitCost == null) {
+          const resolved = await getItemCostAsOf(supabase, priceLookupItemId, dateStr);
+          if (resolved != null) body.unitCost = resolved;
+        }
       }
     }
     

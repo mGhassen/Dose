@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { getItemCostAsOf } from '@/lib/items/price-resolve';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,6 +43,11 @@ export async function GET(request: NextRequest) {
           const totalQuantity = orderItems.reduce((sum, item) => 
             sum + parseFloat(item.quantity), 0);
           avgUnitPrice = totalQuantity > 0 ? totalValue / totalQuantity : 0;
+        }
+        if (avgUnitPrice === 0) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const resolved = await getItemCostAsOf(supabase, itemId, todayStr);
+          if (resolved != null) avgUnitPrice = resolved;
         }
 
         const quantity = parseFloat(sl.quantity);
