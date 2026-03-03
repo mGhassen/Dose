@@ -11,6 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
+import { dateToYYYYMMDD } from "@kit/lib";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -251,12 +253,11 @@ export default function InvestmentDetailsContent({ investmentId }: InvestmentDet
                   {/* Purchase Date */}
                   <div className="space-y-2">
                     <Label htmlFor="purchaseDate">Purchase Date *</Label>
-                    <Input
+                    <DatePicker
                       id="purchaseDate"
-                      type="date"
-                      value={formData.purchaseDate}
-                      onChange={(e) => handleInputChange('purchaseDate', e.target.value)}
-                      required
+                      value={formData.purchaseDate ? new Date(formData.purchaseDate) : undefined}
+                      onChange={(d) => handleInputChange("purchaseDate", d ? dateToYYYYMMDD(d) : "")}
+                      placeholder="Pick a date"
                     />
                   </div>
 

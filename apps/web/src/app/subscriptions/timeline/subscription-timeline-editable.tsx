@@ -17,7 +17,9 @@ import { Trash2, MoreVertical, Calendar } from "lucide-react";
 import { useUpdateSubscriptionProjectionEntry, useCreateOrUpdateSubscriptionProjectionEntry, useSubscriptionProjections, usePaymentsByEntry, useCreatePayment, useDeletePayment } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
+import { DatePicker } from "@kit/ui/date-picker";
 import type { SubscriptionProjection } from "@kit/types";
 import { UnifiedSelector } from "@/components/unified-selector";
 import {
@@ -47,6 +49,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
   const [showPayments, setShowPayments] = useState(false);
   const [entryId, setEntryId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
+  const [dialogPaymentDate, setDialogPaymentDate] = useState<Date>(() => new Date());
   const [dialogExpectedAmount, setDialogExpectedAmount] = useState<number>(0);
 
   const expectedAmount = projection.amount;
@@ -505,10 +508,11 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                 <Label className="text-base font-semibold">Add New Payment</Label>
                 <div className="space-y-2">
                   <Label htmlFor="paidDate">Payment Date</Label>
-                  <Input
+                  <DatePicker
                     id="paidDate"
-                    type="date"
-                    defaultValue={new Date().toISOString().split('T')[0]}
+                    value={dialogPaymentDate}
+                    onChange={(d) => setDialogPaymentDate(d ?? new Date())}
+                    placeholder="Pick a date"
                   />
                 </div>
                 <div className="space-y-2">
@@ -568,7 +572,6 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
             {remainingInDialog > 0 && (
               <Button
                 onClick={() => {
-                  const dateInput = document.getElementById('paidDate') as HTMLInputElement;
                   const amountInput = document.getElementById('paymentAmount') as HTMLInputElement;
                   const notesInput = document.getElementById('paymentNotes') as HTMLInputElement;
                   const amount = parseFloat(amountInput?.value || '0');
@@ -584,7 +587,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                   }
                   
                   handleAddPayment(
-                    dateInput?.value || new Date().toISOString().split('T')[0],
+                    dateToYYYYMMDD(dialogPaymentDate),
                     amount,
                     paymentMethod || undefined,
                     notesInput?.value || undefined,

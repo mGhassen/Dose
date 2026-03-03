@@ -12,7 +12,9 @@ import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useLeasingById, useUpdateLeasing, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
+import { dateToYYYYMMDD } from "@kit/lib";
 import type { LeasingType, ExpenseRecurrence } from "@kit/types";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Checkbox } from "@kit/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@kit/ui/radio-group";
 import Link from "next/link";
@@ -360,24 +362,22 @@ export default function EditLeasingPage({ params }: EditLeasingPageProps) {
                 {/* Start Date */}
                 <div className="space-y-2">
                   <Label htmlFor="startDate">Start Date *</Label>
-                  <Input
+                  <DatePicker
                     id="startDate"
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => handleInputChange('startDate', e.target.value)}
-                    required
+                    value={formData.startDate ? new Date(formData.startDate) : undefined}
+                    onChange={(d) => handleInputChange("startDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 
                 {/* End Date */}
                 <div className="space-y-2">
                   <Label htmlFor="endDate">End Date {amountMode === "total" && "*"}</Label>
-                  <Input
+                  <DatePicker
                     id="endDate"
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => handleInputChange('endDate', e.target.value)}
-                    required={amountMode === "total"}
+                    value={formData.endDate ? new Date(formData.endDate) : undefined}
+                    onChange={(d) => handleInputChange("endDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                   {amountMode === "total" && (
                     <p className="text-xs text-muted-foreground">

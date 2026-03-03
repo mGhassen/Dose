@@ -12,7 +12,9 @@ import { Calendar, CheckCircle2, XCircle } from "lucide-react";
 import { useUpdatePersonnelSalaryProjectionEntry, useCreateOrUpdatePersonnelSalaryProjectionEntry, usePersonnelSalaryProjections } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
+import { DatePicker } from "@kit/ui/date-picker";
 import type { PersonnelSalaryProjection } from "@kit/types";
 
 interface EditablePersonnelTimelineRowProps {
@@ -325,12 +327,11 @@ export function EditablePersonnelTimelineRow({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="netPaidDate">Payment Date *</Label>
-              <Input
+              <DatePicker
                 id="netPaidDate"
-                type="date"
-                value={netPaidDate}
-                onChange={(e) => setNetPaidDate(e.target.value)}
-                required
+                value={netPaidDate ? new Date(netPaidDate) : undefined}
+                onChange={(d) => setNetPaidDate(d ? dateToYYYYMMDD(d) : "")}
+                placeholder="Pick a date"
               />
             </div>
             <div className="space-y-2">
@@ -390,12 +391,11 @@ export function EditablePersonnelTimelineRow({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="taxesPaidDate">Payment Date *</Label>
-              <Input
+              <DatePicker
                 id="taxesPaidDate"
-                type="date"
-                value={taxesPaidDate}
-                onChange={(e) => setTaxesPaidDate(e.target.value)}
-                required
+                value={taxesPaidDate ? new Date(taxesPaidDate) : undefined}
+                onChange={(d) => setTaxesPaidDate(d ? dateToYYYYMMDD(d) : "")}
+                placeholder="Pick a date"
               />
             </div>
             <div className="space-y-2">

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -13,6 +14,7 @@ import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { usePersonnelById, useUpdatePersonnel, useVariables } from "@kit/hooks";
 import { toast } from "sonner";
+import { dateToYYYYMMDD } from "@kit/lib";
 import type { PersonnelType } from "@kit/types";
 
 interface EditPersonnelPageProps {
@@ -264,23 +266,22 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
                 {/* Start Date */}
                 <div className="space-y-2">
                   <Label htmlFor="startDate">Start Date *</Label>
-                  <Input
+                  <DatePicker
                     id="startDate"
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => handleInputChange('startDate', e.target.value)}
-                    required
+                    value={formData.startDate ? new Date(formData.startDate) : undefined}
+                    onChange={(d) => handleInputChange("startDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 
                 {/* End Date */}
                 <div className="space-y-2">
                   <Label htmlFor="endDate">End Date</Label>
-                  <Input
+                  <DatePicker
                     id="endDate"
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => handleInputChange('endDate', e.target.value)}
+                    value={formData.endDate ? new Date(formData.endDate) : undefined}
+                    onChange={(d) => handleInputChange("endDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 

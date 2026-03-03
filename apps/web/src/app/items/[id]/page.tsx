@@ -19,7 +19,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
 import { StockMovementType } from "@kit/types";
-import { Save, X, Trash2, MoreVertical, Edit2, Package, TrendingUp, TrendingDown, AlertTriangle, Plus } from "lucide-react";
+import { Save, X, Trash2, MoreVertical, Edit2, Package, TrendingUp, TrendingDown, Plus, DollarSign, History } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import { Separator } from "@kit/ui/separator";
 import {
@@ -39,8 +39,10 @@ import {
 import AppLayout from "@/components/app-layout";
 import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
+import { DatePicker } from "@kit/ui/date-picker";
 
 interface ItemDetailPageProps {
   params: Promise<{ id: string }>;
@@ -52,10 +54,23 @@ interface PriceHistoryEntry {
   value: number | null;
 }
 
-function PriceCostHistoryCard({
+interface SupplierOrderPriceRow {
+  id: number;
+  unitPrice: number | null;
+  quantity: number | null;
+  unit: string;
+  orderDate: string | null;
+  orderNumber: string | null;
+}
+
+function PriceCostHistorySection({
   itemId,
   sellHistory,
   costHistory,
+  supplierOrderPrices = [],
+  resolvedPrice,
+  itemUnitPrice,
+  itemUnitCost,
   loading,
   onRefetch,
   formatCurrency,
@@ -64,6 +79,10 @@ function PriceCostHistoryCard({
   itemId: string;
   sellHistory: PriceHistoryEntry[];
   costHistory: PriceHistoryEntry[];
+  supplierOrderPrices?: SupplierOrderPriceRow[];
+  resolvedPrice: { unitPrice: number | null; unitCost: number | null } | null;
+  itemUnitPrice?: number;
+  itemUnitCost?: number;
   loading: boolean;
   onRefetch: () => void;
   formatCurrency: (n: number) => string;
@@ -110,96 +129,228 @@ function PriceCostHistoryCard({
     }
   };
 
-  if (loading) return null;
+  const currentSell = resolvedPrice?.unitPrice ?? itemUnitPrice;
+  const currentCost = resolvedPrice?.unitCost ?? itemUnitCost;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Price & cost history</CardTitle>
-        <CardDescription>Effective-date history for selling price and cost</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div>
-          <div className="text-sm font-medium mb-2">Selling price history</div>
-          <div className="space-y-2">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-muted/30 p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground">Current (today)</span>
+          <span className="text-base font-semibold tabular-nums">
+            {currentSell != null ? formatCurrency(currentSell) : '—'} <span className="text-muted-foreground font-normal text-sm">selling</span>
+          </span>
+        </div>
+        <span className="text-muted-foreground">·</span>
+        <div className="flex items-center gap-2">
+          <span className="text-base font-semibold tabular-nums">
+            {currentCost != null ? formatCurrency(currentCost) : '—'}{' '}
+            <span className="text-muted-foreground font-normal text-sm" title="Weighted average of current stock; updated when supplier orders are received">
+              cost
+            </span>
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold">Cost from supplier orders</h4>
+        <p className="text-xs text-muted-foreground">
+          Cost above is the weighted average of current stock and is updated when orders are received. Recipe cost and valuation use it first; otherwise cost history or item default.
+        </p>
+        <div className="rounded-md border">
+          {supplierOrderPrices.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">No supplier order lines for this item yet</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left font-medium p-3">Order date</th>
+                  <th className="text-right font-medium p-3">Unit price</th>
+                  <th className="text-right font-medium p-3">Quantity</th>
+                  <th className="text-left font-medium p-3">Order #</th>
+                </tr>
+              </thead>
+              <tbody>
+                {supplierOrderPrices.map((r) => (
+                  <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="p-3">{r.orderDate ? formatDate(r.orderDate) : '—'}</td>
+                    <td className="p-3 text-right font-medium tabular-nums">{r.unitPrice != null ? formatCurrency(r.unitPrice) : '—'}</td>
+                    <td className="p-3 text-right tabular-nums">{r.quantity != null ? `${r.quantity} ${r.unit}` : '—'}</td>
+                    <td className="p-3 text-muted-foreground">{r.orderNumber ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-base">Selling price history</CardTitle>
+              </div>
+              {adding !== 'sell' && (
+                <Button variant="outline" size="sm" onClick={() => setAdding('sell')}>
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {adding === 'sell' && (
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="sell-date">Effective date</Label>
+                    <DatePicker value={addDate ? new Date(addDate) : undefined} onChange={(d) => setAddDate(d ? dateToYYYYMMDD(d) : "")} placeholder="Pick a date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sell-price">Price</Label>
+                    <Input id="sell-price" type="number" step="0.01" min="0" placeholder="0.00" value={addValue} onChange={(e) => setAddValue(e.target.value)} />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); }}>Cancel</Button>
+                  <Button size="sm" onClick={() => handleAdd('sell')}>Save</Button>
+                </div>
+              </div>
+            )}
             {sellHistory.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No history. Add an effective date and value.</p>
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-10 px-4 text-center">
+                <DollarSign className="h-10 w-10 text-muted-foreground/60 mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">No selling price history</p>
+                <p className="text-xs text-muted-foreground mt-1">Add dates and prices to track changes over time.</p>
+                {adding !== 'sell' && (
+                  <Button variant="outline" size="sm" className="mt-4" onClick={() => setAdding('sell')}>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Add first entry
+                  </Button>
+                )}
+              </div>
             ) : (
-              <div className="rounded-md border divide-y">
+              <div className="rounded-lg border divide-y">
                 {sellHistory.map((e) => (
-                  <div key={e.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                    <span>{formatDate(e.effectiveDate)}</span>
-                    <span className="font-medium">{e.value != null ? formatCurrency(e.value) : '—'}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive h-8 w-8 p-0"
-                      disabled={deleting === e.id}
-                      onClick={() => handleDelete('sell', e.id)}
-                    >
+                  <div key={e.id} className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <History className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium tabular-nums">{e.value != null ? formatCurrency(e.value) : '—'}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(e.effectiveDate)}</p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" disabled={deleting === e.id} onClick={() => handleDelete('sell', e.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
               </div>
             )}
-            {adding === 'sell' ? (
-              <div className="flex flex-wrap items-center gap-2 pt-2">
-                <Input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} className="w-36" />
-                <Input type="number" step="0.01" placeholder="Value" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="w-24" />
-                <Button size="sm" onClick={() => handleAdd('sell')}>Save</Button>
-                <Button size="sm" variant="outline" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); }}>Cancel</Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-base">Cost history</CardTitle>
               </div>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => setAdding('sell')}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add selling price
-              </Button>
+              {adding !== 'cost' && (
+                <Button variant="outline" size="sm" onClick={() => setAdding('cost')}>
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {adding === 'cost' && (
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="cost-date">Effective date</Label>
+                    <DatePicker value={addDate ? new Date(addDate) : undefined} onChange={(d) => setAddDate(d ? dateToYYYYMMDD(d) : "")} placeholder="Pick a date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cost-value">Cost</Label>
+                    <Input id="cost-value" type="number" step="0.01" min="0" placeholder="0.00" value={addValue} onChange={(e) => setAddValue(e.target.value)} />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); }}>Cancel</Button>
+                  <Button size="sm" onClick={() => handleAdd('cost')}>Save</Button>
+                </div>
+              </div>
             )}
-          </div>
-        </div>
-        <Separator />
-        <div>
-          <div className="text-sm font-medium mb-2">Cost history</div>
-          <div className="space-y-2">
             {costHistory.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No history. Add an effective date and value.</p>
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-10 px-4 text-center">
+                <DollarSign className="h-10 w-10 text-muted-foreground/60 mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">No cost history</p>
+                <p className="text-xs text-muted-foreground mt-1">Add dates and costs for valuation and recipes.</p>
+                {adding !== 'cost' && (
+                  <Button variant="outline" size="sm" className="mt-4" onClick={() => setAdding('cost')}>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Add first entry
+                  </Button>
+                )}
+              </div>
             ) : (
-              <div className="rounded-md border divide-y">
+              <div className="rounded-lg border divide-y">
                 {costHistory.map((e) => (
-                  <div key={e.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                    <span>{formatDate(e.effectiveDate)}</span>
-                    <span className="font-medium">{e.value != null ? formatCurrency(e.value) : '—'}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive h-8 w-8 p-0"
-                      disabled={deleting === e.id}
-                      onClick={() => handleDelete('cost', e.id)}
-                    >
+                  <div key={e.id} className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <History className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium tabular-nums">{e.value != null ? formatCurrency(e.value) : '—'}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(e.effectiveDate)}</p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" disabled={deleting === e.id} onClick={() => handleDelete('cost', e.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
               </div>
             )}
-            {adding === 'cost' ? (
-              <div className="flex flex-wrap items-center gap-2 pt-2">
-                <Input type="date" value={addDate} onChange={(e) => setAddDate(e.target.value)} className="w-36" />
-                <Input type="number" step="0.01" placeholder="Value" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="w-24" />
-                <Button size="sm" onClick={() => handleAdd('cost')}>Save</Button>
-                <Button size="sm" variant="outline" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); }}>Cancel</Button>
-              </div>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => setAdding('cost')}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add cost
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function PriceCostHistoryCard(
+  props: {
+    itemId: string;
+    sellHistory: PriceHistoryEntry[];
+    costHistory: PriceHistoryEntry[];
+    loading: boolean;
+    onRefetch: () => void;
+    formatCurrency: (n: number) => string;
+    formatDate: (d: string) => string;
+  }
+) {
+  return (
+    <PriceCostHistorySection
+      {...props}
+      supplierOrderPrices={[]}
+      resolvedPrice={null}
+      itemUnitPrice={undefined}
+      itemUnitCost={undefined}
+    />
   );
 }
 
@@ -315,14 +466,16 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null } | null>(null);
   const [sellHistory, setSellHistory] = useState<{ id: number; effectiveDate: string; value: number | null }[]>([]);
   const [costHistory, setCostHistory] = useState<{ id: number; effectiveDate: string; value: number | null }[]>([]);
+  const [supplierOrderPrices, setSupplierOrderPrices] = useState<{ id: number; unitPrice: number | null; quantity: number | null; unit: string; orderDate: string | null; orderNumber: string | null }[]>([]);
   const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
   const fetchPriceHistory = useCallback(async (itemId: string) => {
     setPriceHistoryLoading(true);
     try {
-      const [res, sell, cost] = await Promise.all([
+      const [res, sell, cost, orders] = await Promise.all([
         fetch(`/api/items/${itemId}/resolved-price`),
         fetch(`/api/items/${itemId}/price-history?type=sell`),
         fetch(`/api/items/${itemId}/price-history?type=cost`),
+        fetch(`/api/items/${itemId}/supplier-order-prices`),
       ]);
       if (res.ok) {
         const d = await res.json();
@@ -332,10 +485,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       else setSellHistory([]);
       if (cost.ok) setCostHistory(await cost.json());
       else setCostHistory([]);
+      if (orders.ok) setSupplierOrderPrices(await orders.json());
+      else setSupplierOrderPrices([]);
     } catch {
       setResolvedPrice(null);
       setSellHistory([]);
       setCostHistory([]);
+      setSupplierOrderPrices([]);
     } finally {
       setPriceHistoryLoading(false);
     }
@@ -724,6 +880,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 </Card>
               </div>
 
+              <Tabs defaultValue="movements" className="w-full">
+                <TabsList className="grid w-full max-w-md grid-cols-2">
+                  <TabsTrigger value="movements">Movements</TabsTrigger>
+                  <TabsTrigger value="price-cost">Price & cost</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="movements" className="mt-4 space-y-4">
               {/* Charts Grid */}
               {stockMovementsResponse?.data && stockMovementsResponse.data.length > 0 && (
                 <div className="grid gap-4 md:grid-cols-2">
@@ -880,6 +1043,34 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   </CardContent>
                 </Card>
               )}
+                </TabsContent>
+
+                <TabsContent value="price-cost" className="mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Price & cost history</CardTitle>
+                      <CardDescription>Cost is the weighted average of current stock (updated when supplier orders are received). Selling price uses price history or item default.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {resolvedParams?.id && (
+                        <PriceCostHistorySection
+                          itemId={resolvedParams.id}
+                          sellHistory={sellHistory}
+                          costHistory={costHistory}
+                          supplierOrderPrices={supplierOrderPrices}
+                          resolvedPrice={resolvedPrice}
+                          itemUnitPrice={item.unitPrice}
+                          itemUnitCost={item.unitCost}
+                          loading={priceHistoryLoading}
+                          onRefetch={() => fetchPriceHistory(resolvedParams.id)}
+                          formatCurrency={formatCurrency}
+                          formatDate={formatDate}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             </div>
 
             {/* Right Column - Sidebar (4 columns) */}
@@ -995,27 +1186,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
                   <Separator />
 
-                  {/* Current price/cost resolved as of today (Phase 2) */}
-                  {(resolvedPrice?.unitPrice != null || resolvedPrice?.unitCost != null || item.unitPrice != null || item.unitCost != null) && (
-                    <>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground">Current selling price</label>
-                          <p className="text-base font-semibold mt-1">
-                            {(resolvedPrice?.unitPrice ?? item.unitPrice) != null ? formatCurrency(resolvedPrice?.unitPrice ?? item.unitPrice!) : '—'}
-                          </p>
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground">Current cost</label>
-                          <p className="text-base font-semibold mt-1">
-                            {(resolvedPrice?.unitCost ?? item.unitCost) != null ? formatCurrency(resolvedPrice?.unitCost ?? item.unitCost!) : '—'}
-                          </p>
-                        </div>
-                      </div>
-                      <Separator />
-                    </>
-                  )}
-
                   {/* Metadata */}
                   <div className="space-y-2 text-xs text-muted-foreground">
                     <div>
@@ -1027,19 +1197,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Price & cost history (Phase 2) */}
-              {!isEditing && resolvedParams?.id && (
-                <PriceCostHistoryCard
-                  itemId={resolvedParams.id}
-                  sellHistory={sellHistory}
-                  costHistory={costHistory}
-                  loading={priceHistoryLoading}
-                  onRefetch={() => fetchPriceHistory(resolvedParams.id)}
-                  formatCurrency={formatCurrency}
-                  formatDate={formatDate}
-                />
-              )}
 
               {/* Description & Notes */}
               {(item.description || item.notes) && (

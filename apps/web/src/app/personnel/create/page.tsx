@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -22,7 +23,7 @@ export default function CreatePersonnelPage() {
   
   // Fetch variables to get Social Security Rate
   const { data: variables } = useVariables();
-  const variablesList = Array.isArray(variables) ? variables : (variables?.data ?? []);
+  const variablesList = Array.isArray(variables) ? variables : [];
   const socialSecurityVariable = useMemo(() => 
     variablesList.find((v: any) => v.name === 'Social Security Rate'),
     [variablesList]
@@ -211,23 +212,22 @@ export default function CreatePersonnelPage() {
                 {/* Start Date */}
                 <div className="space-y-2">
                   <Label htmlFor="startDate">Start Date *</Label>
-                  <Input
+                  <DatePicker
                     id="startDate"
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => handleInputChange('startDate', e.target.value)}
-                    required
+                    value={formData.startDate ? new Date(formData.startDate) : undefined}
+                    onChange={(d) => handleInputChange("startDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 
                 {/* End Date */}
                 <div className="space-y-2">
                   <Label htmlFor="endDate">End Date</Label>
-                  <Input
+                  <DatePicker
                     id="endDate"
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => handleInputChange('endDate', e.target.value)}
+                    value={formData.endDate ? new Date(formData.endDate) : undefined}
+                    onChange={(d) => handleInputChange("endDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 

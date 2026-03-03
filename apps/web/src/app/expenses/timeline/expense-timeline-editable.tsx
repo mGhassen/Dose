@@ -18,7 +18,9 @@ import { Plus, Trash2, MoreVertical } from "lucide-react";
 import { useCreateActualPayment, useDeleteActualPayment, useActualPayments } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
+import { DatePicker } from "@kit/ui/date-picker";
 import type { ExpenseProjection } from "@kit/types";
 
 interface EditableExpenseTimelineRowProps {
@@ -29,6 +31,7 @@ interface EditableExpenseTimelineRowProps {
 export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExpenseTimelineRowProps) {
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
+  const [dialogPaymentDate, setDialogPaymentDate] = useState<Date>(() => new Date());
   
   const { data: actualPayments } = useActualPayments({
     paymentType: 'expense',
@@ -176,10 +179,11 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="paidDate">Payment Date</Label>
-              <Input
+              <DatePicker
                 id="paidDate"
-                type="date"
-                defaultValue={new Date().toISOString().split('T')[0]}
+                value={dialogPaymentDate}
+                onChange={(d) => setDialogPaymentDate(d ?? new Date())}
+                placeholder="Pick a date"
               />
             </div>
             <div className="space-y-2">
@@ -215,11 +219,10 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
             </Button>
             <Button
               onClick={() => {
-                const dateInput = document.getElementById('paidDate') as HTMLInputElement;
                 const amountInput = document.getElementById('paymentAmount') as HTMLInputElement;
                 const notesInput = document.getElementById('paymentNotes') as HTMLInputElement;
                 handleAddPayment(
-                  dateInput?.value || new Date().toISOString().split('T')[0],
+                  dateToYYYYMMDD(dialogPaymentDate),
                   parseFloat(amountInput?.value || '0'),
                   notesInput?.value || undefined
                 );

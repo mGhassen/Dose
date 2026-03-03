@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -166,12 +167,11 @@ export default function CreateStockMovementPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="movementDate">Movement Date *</Label>
-                  <Input
+                  <DatePicker
                     id="movementDate"
-                    type="date"
-                    value={formData.movementDate}
-                    onChange={(e) => handleInputChange('movementDate', e.target.value)}
-                    required
+                    value={formData.movementDate ? new Date(formData.movementDate) : undefined}
+                    onChange={(d) => handleInputChange("movementDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 

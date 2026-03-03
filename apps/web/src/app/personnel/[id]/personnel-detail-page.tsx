@@ -36,7 +36,9 @@ import AppLayout from "@/components/app-layout";
 import { usePersonnelById, useUpdatePersonnel, useDeletePersonnel, usePersonnelSalaryProjections, useVariables } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate } from "@kit/lib/date-format";
+import { DatePicker } from "@kit/ui/date-picker";
 import type { PersonnelType } from "@kit/types";
 import { projectPersonnelSalary } from "@/lib/calculations/personnel-projections";
 import { EditablePersonnelTimelineRow } from "../personnel-timeline-editable";
@@ -93,7 +95,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   );
 
   const { data: variables } = useVariables();
-  const variablesList = Array.isArray(variables) ? variables : (variables?.data ?? []);
+  const variablesList = Array.isArray(variables) ? variables : [];
   const employeeSocialTaxVariable = useMemo(() =>
     variablesList.find((v: any) => v.name === 'Employee Social Tax Rate'),
     [variablesList]
@@ -241,7 +243,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   const handleDelete = async () => {
     if (!resolvedParams?.id) return;
     try {
-      await deleteMutation.mutateAsync(Number(resolvedParams.id));
+      await deleteMutation.mutateAsync(resolvedParams.id);
       toast.success("Personnel record deleted successfully");
       setIsDeleteDialogOpen(false);
       router.push('/personnel');
@@ -443,11 +445,21 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="startDate">Start Date *</Label>
-                    <Input id="startDate" type="date" value={formData.startDate} onChange={(e) => handleInputChange('startDate', e.target.value)} required />
+                    <DatePicker
+                      id="startDate"
+                      value={formData.startDate ? new Date(formData.startDate) : undefined}
+                      onChange={(d) => handleInputChange("startDate", d ? dateToYYYYMMDD(d) : "")}
+                      placeholder="Pick a date"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="endDate">End Date</Label>
-                    <Input id="endDate" type="date" value={formData.endDate} onChange={(e) => handleInputChange('endDate', e.target.value)} />
+                    <DatePicker
+                      id="endDate"
+                      value={formData.endDate ? new Date(formData.endDate) : undefined}
+                      onChange={(d) => handleInputChange("endDate", d ? dateToYYYYMMDD(d) : "")}
+                      placeholder="Pick a date"
+                    />
                   </div>
                   <div className="space-y-2 flex items-center space-x-2 pt-6">
                     <Checkbox id="isActive" checked={formData.isActive} onCheckedChange={(checked) => handleInputChange('isActive', checked)} />

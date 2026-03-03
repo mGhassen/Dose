@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -135,23 +136,22 @@ export default function CreateVariablePage() {
                 {/* Effective Date */}
                 <div className="space-y-2">
                   <Label htmlFor="effectiveDate">Effective Date *</Label>
-                  <Input
+                  <DatePicker
                     id="effectiveDate"
-                    type="date"
-                    value={formData.effectiveDate}
-                    onChange={(e) => handleInputChange('effectiveDate', e.target.value)}
-                    required
+                    value={formData.effectiveDate ? new Date(formData.effectiveDate) : undefined}
+                    onChange={(d) => handleInputChange("effectiveDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 
                 {/* End Date */}
                 <div className="space-y-2">
                   <Label htmlFor="endDate">End Date</Label>
-                  <Input
+                  <DatePicker
                     id="endDate"
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => handleInputChange('endDate', e.target.value)}
+                    value={formData.endDate ? new Date(formData.endDate) : undefined}
+                    onChange={(d) => handleInputChange("endDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                   <p className="text-xs text-muted-foreground">
                     Leave empty for ongoing variables

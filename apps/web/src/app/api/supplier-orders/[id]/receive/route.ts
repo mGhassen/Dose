@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import { SupplierOrderStatus, StockMovementType, StockMovementReferenceType } from '@kit/types';
+import { getItemTotalStock } from '@/lib/stock/get-item-stock';
 
 interface ReceiveOrderData {
   actualDeliveryDate?: string;
@@ -56,9 +57,25 @@ export async function POST(
 
     if (updateError) throw updateError;
 
-    // Update received quantities and create stock movements
+    const effectiveDate =
+      body.actualDeliveryDate ?? (await import('@kit/lib')).dateToYYYYMMDD(new Date());
+
     for (const receiveItem of body.items) {
-      // Update received quantity
+      const orderItem = orderData.items.find((item: any) => item.id === receiveItem.itemId);
+      if (!orderItem) continue;
+
+      const itemId = orderItem.item_id;
+      const receivedQty = parseFloat(String(receiveItem.receivedQuantity)) || 0;
+      const unitPrice = parseFloat(String(orderItem.unit_price)) || 0;
+
+      const currentStock = await getItemTotalStock(supabase, itemId);
+      const { data: itemRow } = await supabase
+        .from('items')
+        .select('unit_cost')
+        .eq('id', itemId)
+        .single();
+      const currentCost = itemRow?.unit_cost != null ? parseFloat(String(itemRow.unit_cost)) : 0;
+
       const { error: itemUpdateError } = await supabase
         .from('supplier_order_items')
         .update({ received_quantity: receiveItem.receivedQuantity })
@@ -66,11 +83,6 @@ export async function POST(
 
       if (itemUpdateError) throw itemUpdateError;
 
-      // Find the order item to get ingredient details
-      const orderItem = orderData.items.find((item: any) => item.id === receiveItem.itemId);
-      if (!orderItem) continue;
-
-      // Create stock movement for received items
       const { error: movementError } = await supabase
         .from('stock_movements')
         .insert({
@@ -86,6 +98,25 @@ export async function POST(
         });
 
       if (movementError) throw movementError;
+
+      if (receivedQty > 0) {
+        const totalQty = currentStock + receivedQty;
+        const newAvg =
+          totalQty > 0
+            ? (currentStock * currentCost + receivedQty * unitPrice) / totalQty
+            : unitPrice;
+
+        await supabase.from('items').update({ unit_cost: newAvg }).eq('id', itemId);
+
+        await supabase.from('item_cost_history').upsert(
+          {
+            item_id: itemId,
+            effective_date: effectiveDate,
+            unit_cost: newAvg,
+          },
+          { onConflict: 'item_id,effective_date' }
+        );
+      }
     }
 
     // Get updated order

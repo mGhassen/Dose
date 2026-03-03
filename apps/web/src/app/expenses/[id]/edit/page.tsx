@@ -14,6 +14,7 @@ import { useExpenseById, useUpdateExpense, useSubscriptions, useInventorySupplie
 import { toast } from "sonner";
 import type { ExpenseCategory } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
+import { DatePicker } from "@kit/ui/date-picker";
 import { UnifiedSelector } from "@/components/unified-selector";
 import Link from "next/link";
 
@@ -212,12 +213,11 @@ export default function EditExpensePage({ params }: EditExpensePageProps) {
                 {/* Expense Date */}
                 <div className="space-y-2">
                   <Label htmlFor="expenseDate">Expense Date *</Label>
-                  <Input
+                  <DatePicker
                     id="expenseDate"
-                    type="date"
-                    value={formData.expenseDate}
-                    onChange={(e) => handleInputChange('expenseDate', e.target.value)}
-                    required
+                    value={formData.expenseDate ? new Date(formData.expenseDate) : undefined}
+                    onChange={(d) => handleInputChange("expenseDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 

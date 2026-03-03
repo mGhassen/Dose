@@ -45,58 +45,88 @@ export async function GET(
       });
     }
 
-    // Get average prices from recent supplier orders for each item (with unit conversion)
     const itemCosts = await Promise.all(
       recipeData.items.map(async (ri: any) => {
         const itemId = ri.item_id;
         const recipeQty = parseFloat(ri.quantity);
         const recipeUnitId = ri.unit_id;
-        
-        const threeMonthsAgo = new Date();
-        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-        
-        const { data: orderItems, error: itemsError } = await supabase
-          .from('supplier_order_items')
-          .select('unit_price, unit, quantity, unit_id')
-          .eq('item_id', itemId)
-          .gte('created_at', threeMonthsAgo.toISOString())
-          .order('created_at', { ascending: false })
-          .limit(10);
+        const itemUnitCost =
+          ri.item?.unit_cost != null ? parseFloat(String(ri.item.unit_cost)) : 0;
 
         let avgPricePerRecipeUnit = 0;
-        if (orderItems && orderItems.length > 0 && recipeUnitId != null && getFactor(recipeUnitId) != null) {
-          let totalValueInRecipeUnit = 0;
-          let totalQtyInRecipeUnit = 0;
-          for (const oi of orderItems) {
-            const orderQty = parseFloat(oi.quantity);
-            const orderUnitId = oi.unit_id;
-            const qtyInRecipeUnit = orderUnitId != null && getFactor(orderUnitId) != null
-              ? convertQuantity(orderQty, orderUnitId, recipeUnitId, getFactor)
-              : orderQty;
-            const pricePerRecipeUnit = orderUnitId != null && getFactor(orderUnitId) != null
-              ? parseFloat(oi.unit_price) * (getFactor(orderUnitId)! / getFactor(recipeUnitId)!)
-              : parseFloat(oi.unit_price);
-            totalValueInRecipeUnit += qtyInRecipeUnit * pricePerRecipeUnit;
-            totalQtyInRecipeUnit += qtyInRecipeUnit;
+        let priceSource: 'order' | 'item' = 'order';
+
+        if (itemUnitCost > 0 && ri.item) {
+          const itemUnitId = ri.item.unit_id;
+          if (
+            recipeUnitId != null &&
+            itemUnitId != null &&
+            getFactor(recipeUnitId) != null &&
+            getFactor(itemUnitId) != null
+          ) {
+            avgPricePerRecipeUnit =
+              itemUnitCost * (getFactor(itemUnitId)! / getFactor(recipeUnitId)!);
+          } else {
+            avgPricePerRecipeUnit = itemUnitCost;
           }
-          avgPricePerRecipeUnit = totalQtyInRecipeUnit > 0 ? totalValueInRecipeUnit / totalQtyInRecipeUnit : 0;
-        } else if (orderItems && orderItems.length > 0) {
-          const totalValue = orderItems.reduce((sum, item) => sum + (parseFloat(item.unit_price) * parseFloat(item.quantity)), 0);
-          const totalQuantity = orderItems.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
-          avgPricePerRecipeUnit = totalQuantity > 0 ? totalValue / totalQuantity : 0;
+          priceSource = 'item';
         }
 
-        let priceSource: 'order' | 'item' = 'order';
+        if (avgPricePerRecipeUnit === 0) {
+          const threeMonthsAgo = new Date();
+          threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+          const { data: orderItems } = await supabase
+            .from('supplier_order_items')
+            .select('unit_price, unit, quantity, unit_id')
+            .eq('item_id', itemId)
+            .gte('created_at', threeMonthsAgo.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          if (orderItems && orderItems.length > 0 && recipeUnitId != null && getFactor(recipeUnitId) != null) {
+            let totalValueInRecipeUnit = 0;
+            let totalQtyInRecipeUnit = 0;
+            for (const oi of orderItems) {
+              const orderQty = parseFloat(oi.quantity);
+              const orderUnitId = oi.unit_id;
+              const qtyInRecipeUnit =
+                orderUnitId != null && getFactor(orderUnitId) != null
+                  ? convertQuantity(orderQty, orderUnitId, recipeUnitId, getFactor)
+                  : orderQty;
+              const pricePerRecipeUnit =
+                orderUnitId != null && getFactor(orderUnitId) != null
+                  ? parseFloat(oi.unit_price) * (getFactor(orderUnitId)! / getFactor(recipeUnitId)!)
+                  : parseFloat(oi.unit_price);
+              totalValueInRecipeUnit += qtyInRecipeUnit * pricePerRecipeUnit;
+              totalQtyInRecipeUnit += qtyInRecipeUnit;
+            }
+            avgPricePerRecipeUnit =
+              totalQtyInRecipeUnit > 0 ? totalValueInRecipeUnit / totalQtyInRecipeUnit : 0;
+          } else if (orderItems && orderItems.length > 0) {
+            const totalValue = orderItems.reduce(
+              (sum, item) => sum + parseFloat(item.unit_price) * parseFloat(item.quantity),
+              0
+            );
+            const totalQuantity = orderItems.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
+            avgPricePerRecipeUnit = totalQuantity > 0 ? totalValue / totalQuantity : 0;
+          }
+        }
+
         if (avgPricePerRecipeUnit === 0 && ri.item) {
           const todayStr = new Date().toISOString().split('T')[0];
-          const itemUnitCostResolved = await getItemCostAsOf(supabase, itemId, todayStr);
-          const itemUnitCost = itemUnitCostResolved ?? (ri.item.unit_cost != null ? parseFloat(ri.item.unit_cost) : 0);
-          if (itemUnitCost > 0) {
+          const resolved = await getItemCostAsOf(supabase, itemId, todayStr);
+          const fallbackCost = resolved ?? (ri.item.unit_cost != null ? parseFloat(ri.item.unit_cost) : 0);
+          if (fallbackCost > 0) {
             const itemUnitId = ri.item.unit_id;
-            if (recipeUnitId != null && itemUnitId != null && getFactor(recipeUnitId) != null && getFactor(itemUnitId) != null) {
-              avgPricePerRecipeUnit = itemUnitCost * (getFactor(itemUnitId)! / getFactor(recipeUnitId)!);
+            if (
+              recipeUnitId != null &&
+              itemUnitId != null &&
+              getFactor(recipeUnitId) != null &&
+              getFactor(itemUnitId) != null
+            ) {
+              avgPricePerRecipeUnit = fallbackCost * (getFactor(itemUnitId)! / getFactor(recipeUnitId)!);
             } else {
-              avgPricePerRecipeUnit = itemUnitCost;
+              avgPricePerRecipeUnit = fallbackCost;
             }
             priceSource = 'item';
           }

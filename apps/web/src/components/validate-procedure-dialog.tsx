@@ -11,6 +11,8 @@ import {
   AlertDialogTitle,
 } from "@kit/ui/alert-dialog";
 import { Label } from "@kit/ui/label";
+import { dateToYYYYMMDD } from "@kit/lib";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
@@ -97,30 +99,20 @@ export function ValidateProcedureDialog({
             <Label htmlFor="validFrom">
               Valid From <span className="text-destructive">*</span>
             </Label>
-            <Input
+            <DatePicker
               id="validFrom"
-              type="date"
-              value={validFrom}
-              onChange={(e) => {
-                setValidFrom(e.target.value);
-                // Clear validTo if the new validFrom would make it invalid
-                if (validTo) {
-                  const newFromDate = new Date(e.target.value);
-                  const dayAfterNewFrom = new Date(newFromDate);
-                  dayAfterNewFrom.setDate(dayAfterNewFrom.getDate() + 1);
-                  const toDate = new Date(validTo);
-                  if (toDate < dayAfterNewFrom) {
-                    setValidTo("");
-                  }
+              value={validFrom ? new Date(validFrom) : undefined}
+              onChange={(d) => {
+                const next = d ? dateToYYYYMMDD(d) : "";
+                setValidFrom(next);
+                if (d && validTo) {
+                  const dayAfter = new Date(d);
+                  dayAfter.setDate(dayAfter.getDate() + 1);
+                  if (new Date(validTo) < dayAfter) setValidTo("");
                 }
                 setError("");
               }}
-              min={(() => {
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                return tomorrow.toISOString().split('T')[0];
-              })()}
-              required
+              placeholder="Pick a date"
               className={error ? "border-destructive" : ""}
             />
             {error && (
@@ -129,20 +121,15 @@ export function ValidateProcedureDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="validTo">Valid To (Optional)</Label>
-            <Input
+            <DatePicker
               id="validTo"
-              type="date"
-              value={validTo}
-              onChange={(e) => {
-                setValidTo(e.target.value);
+              value={validTo ? new Date(validTo) : undefined}
+              onChange={(d) => {
+                setValidTo(d ? dateToYYYYMMDD(d) : "");
                 setError("");
               }}
               disabled={!validFrom}
-              min={validFrom ? (() => {
-                const dayAfterFrom = new Date(validFrom);
-                dayAfterFrom.setDate(dayAfterFrom.getDate() + 1);
-                return dayAfterFrom.toISOString().split('T')[0];
-              })() : undefined}
+              placeholder="Pick a date"
             />
           </div>
         </div>

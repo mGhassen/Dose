@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "@kit/ui/button";
+import { dateToYYYYMMDD } from "@kit/lib";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
@@ -678,10 +680,10 @@ export default function DataTable({
                       placeholder={`Select ${filter.label}`}
                     />
                   ) : filter.type === 'date' ? (
-                    <Input
-                      type="date"
-                      value={filters[filter.key] || ''}
-                      onChange={(e) => setFilters(prev => ({ ...prev, [filter.key]: e.target.value }))}
+                    <DatePicker
+                      value={filters[filter.key] ? new Date(filters[filter.key]) : undefined}
+                      onChange={(d) => setFilters(prev => ({ ...prev, [filter.key]: d ? dateToYYYYMMDD(d) : '' }))}
+                      placeholder="Pick a date"
                     />
                   ) : (
                     <Input

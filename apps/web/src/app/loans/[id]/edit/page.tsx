@@ -12,7 +12,9 @@ import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useLoanById, useUpdateLoan, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
+import { dateToYYYYMMDD } from "@kit/lib";
 import type { LoanStatus } from "@kit/types";
+import { DatePicker } from "@kit/ui/date-picker";
 import Link from "next/link";
 
 interface EditLoanPageProps {
@@ -207,12 +209,11 @@ export default function EditLoanPage({ params }: EditLoanPageProps) {
                 {/* Start Date */}
                 <div className="space-y-2">
                   <Label htmlFor="startDate">Start Date *</Label>
-                  <Input
+                  <DatePicker
                     id="startDate"
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => handleInputChange('startDate', e.target.value)}
-                    required
+                    value={formData.startDate ? new Date(formData.startDate) : undefined}
+                    onChange={(d) => handleInputChange("startDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 

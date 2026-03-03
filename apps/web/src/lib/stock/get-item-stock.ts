@@ -26,3 +26,17 @@ export async function getItemStock(
   }
   return parseFloat(data?.quantity ?? 0);
 }
+
+export async function getItemTotalStock(
+  supabase: SupabaseClient,
+  itemId: number
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('stock_levels')
+    .select('quantity')
+    .eq('item_id', itemId);
+
+  if (error) throw error;
+  const total = (data ?? []).reduce((sum, row) => sum + parseFloat(row.quantity ?? 0), 0);
+  return total;
+}

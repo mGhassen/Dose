@@ -12,7 +12,9 @@ import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useSaleById, useUpdateSale, useItems, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
+import { dateToYYYYMMDD } from "@kit/lib";
 import type { SalesType } from "@kit/types";
+import { DatePicker } from "@kit/ui/date-picker";
 
 interface EditSalePageProps {
   params: Promise<{ id: string }>;
@@ -250,12 +252,11 @@ export default function EditSalePage({ params }: EditSalePageProps) {
                 {/* Date */}
                 <div className="space-y-2">
                   <Label htmlFor="date">Date *</Label>
-                  <Input
+                  <DatePicker
                     id="date"
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => handleInputChange('date', e.target.value)}
-                    required
+                    value={formData.date ? new Date(formData.date) : undefined}
+                    onChange={(d) => handleInputChange("date", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 

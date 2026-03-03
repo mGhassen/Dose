@@ -19,7 +19,9 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { useCreateActualPayment, useDeleteActualPayment } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
+import { DatePicker } from "@kit/ui/date-picker";
 import type { ActualPayment } from "@kit/lib";
 import type { LeasingTimelineEntry } from "@/lib/calculations/leasing-timeline";
 
@@ -35,6 +37,7 @@ export function EditableLeasingTimelineRow({ entry, leasingId, leasingEndDate, a
   const [isEditing, setIsEditing] = useState(false);
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
+  const [dialogPaymentDate, setDialogPaymentDate] = useState<Date>(() => new Date());
   const [editData, setEditData] = useState({
     paymentDate: entry.paymentDate.split('T')[0],
     amount: entry.amount.toString(),
@@ -207,11 +210,11 @@ export function EditableLeasingTimelineRow({ entry, leasingId, leasingEndDate, a
           {formatMonthYear(date)}
         </TableCell>
         <TableCell>
-          <Input
-            type="date"
-            value={editData.paymentDate}
-            onChange={(e) => setEditData(prev => ({ ...prev, paymentDate: e.target.value }))}
+          <DatePicker
+            value={editData.paymentDate ? new Date(editData.paymentDate) : undefined}
+            onChange={(d) => setEditData(prev => ({ ...prev, paymentDate: d ? dateToYYYYMMDD(d) : "" }))}
             className="w-40"
+            placeholder="Pick a date"
           />
         </TableCell>
         <TableCell>
@@ -407,10 +410,11 @@ export function EditableLeasingTimelineRow({ entry, leasingId, leasingEndDate, a
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="paidDate">Payment Date</Label>
-              <Input
+              <DatePicker
                 id="paidDate"
-                type="date"
-                defaultValue={new Date().toISOString().split('T')[0]}
+                value={dialogPaymentDate}
+                onChange={(d) => setDialogPaymentDate(d ?? new Date())}
+                placeholder="Pick a date"
               />
             </div>
             <div className="space-y-2">
@@ -446,11 +450,10 @@ export function EditableLeasingTimelineRow({ entry, leasingId, leasingEndDate, a
             </Button>
             <Button
               onClick={() => {
-                const dateInput = document.getElementById('paidDate') as HTMLInputElement;
                 const amountInput = document.getElementById('paymentAmount') as HTMLInputElement;
                 const notesInput = document.getElementById('paymentNotes') as HTMLInputElement;
                 handleAddPayment(
-                  dateInput?.value || new Date().toISOString().split('T')[0],
+                  dateToYYYYMMDD(dialogPaymentDate),
                   parseFloat(amountInput?.value || '0'),
                   notesInput?.value || undefined
                 );

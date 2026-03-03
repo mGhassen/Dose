@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -124,12 +125,11 @@ export default function CreateExpensePage() {
                 {/* Expense Date */}
                 <div className="space-y-2">
                   <Label htmlFor="expenseDate">Expense Date *</Label>
-                  <Input
+                  <DatePicker
                     id="expenseDate"
-                    type="date"
-                    value={formData.expenseDate}
-                    onChange={(e) => handleInputChange('expenseDate', e.target.value)}
-                    required
+                    value={formData.expenseDate ? new Date(formData.expenseDate) : undefined}
+                    onChange={(d) => handleInputChange("expenseDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 

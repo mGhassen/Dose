@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { UnifiedSelector } from "@/components/unified-selector";
@@ -379,12 +380,11 @@ export default function CreateLoanPaymentPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="payment-date">Payment Date *</Label>
-                        <Input
+                        <DatePicker
                           id="payment-date"
-                          type="date"
-                          value={paymentDate}
-                          onChange={(e) => setPaymentDate(e.target.value)}
-                          required
+                          value={paymentDate ? new Date(paymentDate) : undefined}
+                          onChange={(d) => setPaymentDate(d ? dateToYYYYMMDD(d) : "")}
+                          placeholder="Pick a date"
                         />
                       </div>
                       <div className="space-y-2">

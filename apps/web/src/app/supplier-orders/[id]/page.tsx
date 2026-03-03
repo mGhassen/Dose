@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { dateToYYYYMMDD } from "@kit/lib";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -14,7 +16,6 @@ import AppLayout from "@/components/app-layout";
 import { useSupplierOrderById, useUpdateSupplierOrder, useDeleteSupplierOrder, useReceiveSupplierOrder } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
-import { dateToYYYYMMDD } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
 import { SupplierOrderStatus } from "@kit/types";
 import {
@@ -289,12 +290,11 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="actualDeliveryDate">Actual Delivery Date *</Label>
-                <Input
+                <DatePicker
                   id="actualDeliveryDate"
-                  type="date"
-                  value={actualDeliveryDate}
-                  onChange={(e) => setActualDeliveryDate(e.target.value)}
-                  required
+                  value={actualDeliveryDate ? new Date(actualDeliveryDate) : undefined}
+                  onChange={(d) => setActualDeliveryDate(d ? dateToYYYYMMDD(d) : "")}
+                  placeholder="Pick a date"
                 />
               </div>
               

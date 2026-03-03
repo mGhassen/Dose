@@ -11,6 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
+import { dateToYYYYMMDD } from "@kit/lib";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -318,23 +320,22 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                   {/* Start Date */}
                   <div className="space-y-2">
                     <Label htmlFor="startDate">Start Date *</Label>
-                    <Input
+                    <DatePicker
                       id="startDate"
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(e) => handleInputChange('startDate', e.target.value)}
-                      required
+                      value={formData.startDate ? new Date(formData.startDate) : undefined}
+                      onChange={(d) => handleInputChange("startDate", d ? dateToYYYYMMDD(d) : "")}
+                      placeholder="Pick a date"
                     />
                   </div>
 
                   {/* End Date */}
                   <div className="space-y-2">
                     <Label htmlFor="endDate">End Date (Optional)</Label>
-                    <Input
+                    <DatePicker
                       id="endDate"
-                      type="date"
-                      value={formData.endDate}
-                      onChange={(e) => handleInputChange('endDate', e.target.value)}
+                      value={formData.endDate ? new Date(formData.endDate) : undefined}
+                      onChange={(d) => handleInputChange("endDate", d ? dateToYYYYMMDD(d) : "")}
+                      placeholder="Pick a date"
                     />
                   </div>
 

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -159,22 +160,21 @@ export default function CreateSupplierOrderPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="orderDate">Order Date *</Label>
-                  <Input
+                  <DatePicker
                     id="orderDate"
-                    type="date"
-                    value={formData.orderDate}
-                    onChange={(e) => handleInputChange('orderDate', e.target.value)}
-                    required
+                    value={formData.orderDate ? new Date(formData.orderDate) : undefined}
+                    onChange={(d) => handleInputChange("orderDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="expectedDeliveryDate">Expected Delivery Date</Label>
-                  <Input
+                  <DatePicker
                     id="expectedDeliveryDate"
-                    type="date"
-                    value={formData.expectedDeliveryDate}
-                    onChange={(e) => handleInputChange('expectedDeliveryDate', e.target.value)}
+                    value={formData.expectedDeliveryDate ? new Date(formData.expectedDeliveryDate) : undefined}
+                    onChange={(d) => handleInputChange("expectedDeliveryDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 

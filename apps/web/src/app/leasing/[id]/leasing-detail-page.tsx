@@ -24,7 +24,9 @@ import { useLeasingById, useUpdateLeasing, useDeleteLeasing, useActualPayments, 
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
+import { DatePicker } from "@kit/ui/date-picker";
 import type { LeasingType, ExpenseRecurrence } from "@kit/types";
 import { projectLeasingPayment } from "@/lib/calculations/leasing-timeline";
 import type { LeasingTimelineEntry } from "@/lib/calculations/leasing-timeline";
@@ -633,24 +635,22 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
                 {/* Start Date */}
                   <div className="space-y-2">
                     <Label htmlFor="startDate">Start Date *</Label>
-                    <Input
+                    <DatePicker
                       id="startDate"
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(e) => handleInputChange('startDate', e.target.value)}
-                      required
+                      value={formData.startDate ? new Date(formData.startDate) : undefined}
+                      onChange={(d) => handleInputChange("startDate", d ? dateToYYYYMMDD(d) : "")}
+                      placeholder="Pick a date"
                     />
                   </div>
 
                   {/* End Date */}
                   <div className="space-y-2">
                     <Label htmlFor="endDate">End Date {amountMode === "total" && "*"}</Label>
-                    <Input
+                    <DatePicker
                       id="endDate"
-                      type="date"
-                      value={formData.endDate}
-                      onChange={(e) => handleInputChange('endDate', e.target.value)}
-                      required={amountMode === "total"}
+                      value={formData.endDate ? new Date(formData.endDate) : undefined}
+                      onChange={(d) => handleInputChange("endDate", d ? dateToYYYYMMDD(d) : "")}
+                      placeholder="Pick a date"
                     />
                     {amountMode === "total" && (
                       <p className="text-xs text-muted-foreground">

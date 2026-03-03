@@ -31,7 +31,9 @@ import {
   AlertDialogTitle,
 } from "@kit/ui/alert-dialog";
 import { formatCurrency } from "@kit/lib/config";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate } from "@kit/lib/date-format";
+import { DatePicker } from "@kit/ui/date-picker";
 import { toast } from "sonner";
 
 export default function LoansInputContent() {
@@ -42,6 +44,7 @@ export default function LoansInputContent() {
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
+  const [newPaymentDate, setNewPaymentDate] = useState<Date>(() => new Date());
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   const [isDeletePaymentDialogOpen, setIsDeletePaymentDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -368,10 +371,11 @@ export default function LoansInputContent() {
                 <Label className="text-base font-semibold">Add New Payment</Label>
                 <div className="space-y-2">
                   <Label htmlFor="paidDate">Payment Date</Label>
-                  <Input
+                  <DatePicker
                     id="paidDate"
-                    type="date"
-                    defaultValue={new Date().toISOString().split('T')[0]}
+                    value={newPaymentDate}
+                    onChange={(d) => setNewPaymentDate(d ?? new Date())}
+                    placeholder="Pick a date"
                   />
                 </div>
                 <div className="space-y-2">
@@ -422,7 +426,6 @@ export default function LoansInputContent() {
             {remainingToPay > 0 && (
               <Button
                 onClick={() => {
-                  const dateInput = document.getElementById('paidDate') as HTMLInputElement;
                   const amountInput = document.getElementById('paymentAmount') as HTMLInputElement;
                   const notesInput = document.getElementById('paymentNotes') as HTMLInputElement;
                   const amount = parseFloat(amountInput?.value || '0');
@@ -438,7 +441,7 @@ export default function LoansInputContent() {
                   }
                   
                   handleAddPayment(
-                    dateInput?.value || new Date().toISOString().split('T')[0],
+                    dateToYYYYMMDD(newPaymentDate),
                     amount,
                     notesInput?.value || undefined
                   );

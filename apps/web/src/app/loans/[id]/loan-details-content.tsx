@@ -35,7 +35,9 @@ import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate } from "@kit/lib/date-format";
+import { DatePicker } from "@kit/ui/date-picker";
 import type { LoanStatus } from "@kit/types";
 import {
   Table,
@@ -57,6 +59,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
   const [isEditing, setIsEditing] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
+  const [newPaymentDate, setNewPaymentDate] = useState<Date>(() => new Date());
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   const [isDeletePaymentDialogOpen, setIsDeletePaymentDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -387,12 +390,11 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                   {/* Start Date */}
                   <div className="space-y-2">
                     <Label htmlFor="startDate">Start Date *</Label>
-                    <Input
+                    <DatePicker
                       id="startDate"
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(e) => handleInputChange('startDate', e.target.value)}
-                      required
+                      value={formData.startDate ? new Date(formData.startDate) : undefined}
+                      onChange={(d) => handleInputChange("startDate", d ? dateToYYYYMMDD(d) : "")}
+                      placeholder="Pick a date"
                     />
                   </div>
 
@@ -828,10 +830,11 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                   <Label className="text-base font-semibold">Add New Payment</Label>
                   <div className="space-y-2">
                     <Label htmlFor="dialog-paidDate">Payment Date</Label>
-                    <Input
+                    <DatePicker
                       id="dialog-paidDate"
-                      type="date"
-                      defaultValue={new Date().toISOString().split('T')[0]}
+                      value={newPaymentDate}
+                      onChange={(d) => setNewPaymentDate(d ?? new Date())}
+                      placeholder="Pick a date"
                     />
                   </div>
                   <div className="space-y-2">
@@ -882,10 +885,10 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
               {remainingToPay > 0 && (
                 <Button
                   onClick={() => {
-                    const dateInput = document.getElementById('dialog-paidDate') as HTMLInputElement;
                     const amountInput = document.getElementById('dialog-paymentAmount') as HTMLInputElement;
                     const notesInput = document.getElementById('dialog-paymentNotes') as HTMLInputElement;
                     const amount = parseFloat(amountInput?.value || '0');
+                    const paidDateStr = dateToYYYYMMDD(newPaymentDate);
                     
                     if (amount <= 0) {
                       toast.error("Payment amount must be greater than 0");
@@ -904,10 +907,10 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                     
                     createPayment.mutateAsync({
                       entryId: loanEntry.id,
-                      paymentDate: dateInput?.value || new Date().toISOString().split('T')[0],
+                      paymentDate: paidDateStr,
                       amount: amount,
                       isPaid: true,
-                      paidDate: dateInput?.value || new Date().toISOString().split('T')[0],
+                      paidDate: paidDateStr,
                       paymentMethod: paymentMethod || undefined,
                       notes: notesInput?.value || undefined,
                     }).then(() => {

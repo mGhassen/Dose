@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -12,6 +13,7 @@ import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useInvestmentById, useUpdateInvestment } from "@kit/hooks";
 import { toast } from "sonner";
+import { dateToYYYYMMDD } from "@kit/lib";
 import type { InvestmentType, DepreciationMethod } from "@kit/types";
 
 interface EditInvestmentPageProps {
@@ -175,12 +177,11 @@ export default function EditInvestmentPage({ params }: EditInvestmentPageProps) 
                 {/* Purchase Date */}
                 <div className="space-y-2">
                   <Label htmlFor="purchaseDate">Purchase Date *</Label>
-                  <Input
+                  <DatePicker
                     id="purchaseDate"
-                    type="date"
-                    value={formData.purchaseDate}
-                    onChange={(e) => handleInputChange('purchaseDate', e.target.value)}
-                    required
+                    value={formData.purchaseDate ? new Date(formData.purchaseDate) : undefined}
+                    onChange={(d) => handleInputChange("purchaseDate", d ? dateToYYYYMMDD(d) : "")}
+                    placeholder="Pick a date"
                   />
                 </div>
 
