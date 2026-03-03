@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Recipe, RecipeWithItems, UpdateRecipeData, RecipeItem } from '@kit/types';
+import { getItemSellingPriceAsOf } from '@/lib/items/price-resolve';
 
 function transformRecipe(row: any): Recipe {
   return {
@@ -137,6 +138,8 @@ export async function GET(
 
     // Include produced item information if it exists
     if (producedItemData) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const resolvedPrice = await getItemSellingPriceAsOf(supabase, producedItemData.id, todayStr);
       (recipe as any).producedItem = {
         id: producedItemData.id,
         name: producedItemData.name,
@@ -150,7 +153,7 @@ export async function GET(
         updatedAt: producedItemData.updated_at,
         producedFromRecipeId: producedItemData.produced_from_recipe_id,
         sku: producedItemData.sku,
-        unitPrice: producedItemData.unit_price != null ? parseFloat(producedItemData.unit_price) : undefined,
+        unitPrice: resolvedPrice ?? undefined,
         notes: producedItemData.notes,
       };
     }

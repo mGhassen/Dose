@@ -142,24 +142,6 @@ function PriceCostHistorySection({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-muted/30 p-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Current (today)</span>
-          <span className="text-base font-semibold tabular-nums">
-            {currentSell != null ? formatCurrency(currentSell) : '—'} <span className="text-muted-foreground font-normal text-sm">selling</span>
-          </span>
-        </div>
-        <span className="text-muted-foreground">·</span>
-        <div className="flex items-center gap-2">
-          <span className="text-base font-semibold tabular-nums">
-            {currentCost != null ? formatCurrency(currentCost) : '—'}{' '}
-            <span className="text-muted-foreground font-normal text-sm" title="Weighted average of current stock; updated when supplier orders are received">
-              cost
-            </span>
-          </span>
-        </div>
-      </div>
-
       <div className="space-y-3">
         <h4 className="text-sm font-semibold">Cost from supplier orders</h4>
         <p className="text-xs text-muted-foreground">
@@ -455,7 +437,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     sku: "",
     unitId: null as number | null,
     unitCost: "",
-    unitPrice: "",
     vendorId: "",
     notes: "",
     isActive: true,
@@ -514,7 +495,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         sku: item.sku || "",
         unitId: item.unitId ?? null,
         unitCost: item.unitCost?.toString() || "",
-        unitPrice: item.unitPrice?.toString() || "",
         vendorId: item.vendorId?.toString() || "",
         notes: item.notes || "",
         isActive: item.isActive,
@@ -543,7 +523,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           unitId: formData.unitId ?? undefined,
           unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
           unitCost: formData.unitCost ? parseFloat(formData.unitCost) : undefined,
-          unitPrice: formData.unitPrice ? parseFloat(formData.unitPrice) : undefined,
           vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
           notes: formData.notes || undefined,
           isActive: formData.isActive,
@@ -705,19 +684,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       min="0"
                       value={formData.unitCost}
                       onChange={(e) => handleInputChange('unitCost', e.target.value)}
-                    />
-                  </div>
-
-                  {/* Unit price (selling) */}
-                  <div className="space-y-2">
-                    <Label htmlFor="unitPrice">Unit price (selling)</Label>
-                    <Input
-                      id="unitPrice"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.unitPrice}
-                      onChange={(e) => handleInputChange('unitPrice', e.target.value)}
                     />
                   </div>
 
@@ -1133,27 +1099,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     </>
                   )}
 
-                  {/* Unit cost & Unit price (selling) */}
-                  {(item.unitCost != null || item.unitPrice != null) && (
-                    <>
-                      <Separator />
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {item.unitCost != null && (
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground">Unit cost (buying)</label>
-                            <p className="text-base font-semibold mt-1">{formatCurrency(item.unitCost)}</p>
-                          </div>
-                        )}
-                        {item.unitPrice != null && (
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground">Unit price (selling)</label>
-                            <p className="text-base font-semibold mt-1">{formatCurrency(item.unitPrice)}</p>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-
                   {/* Vendor */}
                   {supplierName && (
                     <>
@@ -1197,6 +1142,31 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   </div>
                 </CardContent>
               </Card>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Selling price (today)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold tabular-nums">
+                      {(resolvedPrice?.unitPrice ?? item.unitPrice) != null ? formatCurrency((resolvedPrice?.unitPrice ?? item.unitPrice)!) : '—'}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground" title="Weighted average of current stock; updated when supplier orders are received">
+                      Buying price (today)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold tabular-nums">
+                      {(resolvedPrice?.unitCost ?? item.unitCost) != null ? formatCurrency((resolvedPrice?.unitCost ?? item.unitCost)!) : '—'}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
 
               {/* Description & Notes */}
               {(item.description || item.notes) && (

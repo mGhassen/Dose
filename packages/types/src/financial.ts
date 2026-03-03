@@ -181,6 +181,15 @@ export interface SubscriptionProjection {
   isProjected: boolean; // true if subscription payment hasn't occurred yet
 }
 
+/** Stored projection entry from API (includes payment fields) */
+export interface SubscriptionProjectionEntry extends SubscriptionProjection {
+  id?: string;
+  isPaid?: boolean;
+  paidDate?: string | null;
+  actualAmount?: number | null;
+  notes?: string | null;
+}
+
 export interface ExpenseProjection {
   month: string; // YYYY-MM
   expenseId: number;

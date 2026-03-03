@@ -87,6 +87,11 @@ export async function POST(
       }
       throw error;
     }
+
+    if (type === 'cost') {
+      await supabase.from('items').update({ unit_cost: null }).eq('id', itemId);
+    }
+
     return NextResponse.json({
       id: data.id,
       effectiveDate: data.effective_date,

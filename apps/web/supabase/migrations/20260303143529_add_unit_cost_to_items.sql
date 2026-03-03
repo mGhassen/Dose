@@ -26,3 +26,14 @@ CREATE TABLE IF NOT EXISTS item_cost_history (
   UNIQUE(item_id, effective_date)
 );
 CREATE INDEX IF NOT EXISTS idx_item_cost_history_item_date ON item_cost_history(item_id, effective_date DESC);
+
+-- Phase 3: Migrate existing unit_price to item_selling_price_history, then drop the column.
+-- Effective date = item created_at date so "current" resolution still returns this value until newer history exists.
+INSERT INTO item_selling_price_history (item_id, effective_date, unit_price)
+SELECT i.id, COALESCE(i.created_at::date, '2000-01-01'), i.unit_price
+FROM items i
+WHERE i.unit_price IS NOT NULL
+ON CONFLICT (item_id, effective_date) DO UPDATE SET unit_price = EXCLUDED.unit_price;
+
+ALTER TABLE items DROP COLUMN IF EXISTS unit_price;
+

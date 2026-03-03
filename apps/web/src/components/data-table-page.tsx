@@ -1012,30 +1012,26 @@ export default function DataTablePage<T>({
                   </Popover>
                 </div>
               )}
-              {headerActions}
-              {enableGridView && (
-                <ViewToggle view={view} onViewChange={setView} />
-              )}
-              {onInsert && (
-                <Button
-                  className="bg-primary hover:bg-green-700 text-white"
-                  onClick={onInsert}
-                >
-                  <Plus className="w-4 h-4 mr-1" />
-                  {t('insert')}
-                </Button>
-              )}
-              {createHref && !onInsert && (
-                <Button
-                  className="bg-primary hover:bg-green-700 text-white"
-                  asChild
-                >
-                  <Link href={createHref}>
+              <div className="flex items-center gap-2 ml-auto">
+                {headerActions}
+                {enableGridView && (
+                  <ViewToggle view={view} onViewChange={setView} />
+                )}
+                {onInsert && (
+                  <Button onClick={onInsert}>
                     <Plus className="w-4 h-4 mr-1" />
                     {t('insert')}
-                  </Link>
-                </Button>
-              )}
+                  </Button>
+                )}
+                {createHref && !onInsert && (
+                  <Button asChild>
+                    <Link href={createHref}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      {t('insert')}
+                    </Link>
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1168,7 +1164,7 @@ export default function DataTablePage<T>({
                   <GridView
                     columns={gridColumns}
                     rows={gridRows}
-                    onCellChange={(rowId, columnId, value) => {
+                    onCellChange={(rowId: string, columnId: string, value: unknown) => {
                       // Find the row and update it
                       const row = filteredData.find((r: any) => (r.id?.toString() || '') === rowId);
                       if (row && onRowClick) {
@@ -1204,27 +1200,13 @@ export default function DataTablePage<T>({
             onRowClick={handleRowClick}
             selectedRows={selectedRows}
             activeRowId={activeRowId}
-            onRowSelect={(rowId, selected) => {
+            onRowSelect={(rowId: number, selected) => {
               setSelectedRows(prev => {
                 const newSelected = new Set(prev);
                 if (selected) {
                   newSelected.add(rowId);
                 } else {
                   newSelected.delete(rowId);
-                }
-                return newSelected;
-              });
-            }}
-            onSelectAll={(selectedIds, selected) => {
-              // Batch update for select all
-              setSelectedRows(prev => {
-                const newSelected = new Set(prev);
-                if (selected) {
-                  // Select all: add all IDs
-                  selectedIds.forEach(id => newSelected.add(id));
-                } else {
-                  // Deselect all: remove all selected IDs
-                  selectedIds.forEach(id => newSelected.delete(id));
                 }
                 return newSelected;
               });

@@ -146,7 +146,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
       return;
     }
     try {
-      await deleteMutation.mutateAsync(Number(saleId));
+      await deleteMutation.mutateAsync(String(saleId));
       toast.success("Sale deleted successfully");
       onDeleted();
     } catch (error) {

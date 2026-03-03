@@ -1,6 +1,6 @@
 /**
  * Resolve item selling price or cost as of a given date from history tables.
- * Falls back to items.unit_price / items.unit_cost when no history row exists.
+ * Selling price: history only (items.unit_price removed). Cost: history then items.unit_cost fallback.
  */
 
 export async function getItemSellingPriceAsOf(
@@ -18,14 +18,6 @@ export async function getItemSellingPriceAsOf(
     .maybeSingle();
 
   if (historyRow?.unit_price != null) return parseFloat(historyRow.unit_price);
-
-  const { data: item } = await supabase
-    .from('items')
-    .select('unit_price')
-    .eq('id', itemId)
-    .single();
-
-  if (item?.unit_price != null) return parseFloat(item.unit_price);
   return null;
 }
 

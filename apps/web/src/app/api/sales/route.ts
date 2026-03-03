@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
       
       if (sale.itemId && itemsMap.has(sale.itemId)) {
         const itemData = itemsMap.get(sale.itemId);
-        const sellPrice = sale.unitPrice != null ? sale.unitPrice : (itemData.unit_price ? parseFloat(itemData.unit_price) : undefined);
+        const sellPrice = sale.unitPrice ?? undefined;
         const costPrice = sale.unitCost != null ? sale.unitCost : (itemData.unit_cost != null ? parseFloat(itemData.unit_cost) : undefined);
         if (itemData.item_type === 'recipe') {
           sale.item = {

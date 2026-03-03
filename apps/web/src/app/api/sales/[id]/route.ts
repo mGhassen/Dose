@@ -73,7 +73,8 @@ export async function GET(
         .single();
       
       if (itemData) {
-        const sellPrice = sale.unitPrice != null ? sale.unitPrice : (itemData.unit_price ? parseFloat(itemData.unit_price) : undefined);
+        const dateStr = sale.date ? sale.date.split('T')[0] : undefined;
+        const sellPrice = sale.unitPrice != null ? sale.unitPrice : (dateStr ? await getItemSellingPriceAsOf(supabase, itemData.id, dateStr) : undefined);
         const costPrice = sale.unitCost != null ? sale.unitCost : (itemData.unit_cost != null ? parseFloat(itemData.unit_cost) : undefined);
         sale.item = {
           id: itemData.id,
@@ -82,8 +83,8 @@ export async function GET(
           category: itemData.category,
           sku: itemData.sku,
           unit: itemData.unit,
-          unitPrice: sellPrice,
-          unitCost: costPrice,
+          unitPrice: sellPrice ?? undefined,
+          unitCost: costPrice ?? undefined,
           itemType: itemData.item_type,
           isActive: itemData.is_active,
           createdAt: itemData.created_at,
@@ -104,8 +105,8 @@ export async function GET(
             category: recipeData.category,
             sku: undefined,
             unit: recipeData.unit || 'serving',
-            unitPrice: sale.unitPrice,
-            unitCost: sale.unitCost,
+            unitPrice: sale.unitPrice ?? undefined,
+            unitCost: sale.unitCost ?? undefined,
             itemType: 'recipe',
             isActive: recipeData.is_active,
             createdAt: recipeData.created_at,

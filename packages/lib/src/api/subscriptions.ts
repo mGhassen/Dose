@@ -4,6 +4,7 @@ import type {
   CreateSubscriptionData, 
   UpdateSubscriptionData,
   SubscriptionProjection,
+  SubscriptionProjectionEntry,
   PaginatedResponse,
   PaginationParams
 } from '@kit/types';
@@ -41,7 +42,7 @@ export const subscriptionsApi = {
     if (startMonth) searchParams.append('startMonth', startMonth);
     if (endMonth) searchParams.append('endMonth', endMonth);
     const query = searchParams.toString();
-    return apiRequest<SubscriptionProjection[]>(`GET`, `/api/subscriptions/${id}/projections${query ? `?${query}` : ''}`);
+    return apiRequest<SubscriptionProjectionEntry[]>(`GET`, `/api/subscriptions/${id}/projections${query ? `?${query}` : ''}`);
   },
   generateProjections: (id: string, startMonth?: string, endMonth?: string) => {
     const searchParams = new URLSearchParams();
