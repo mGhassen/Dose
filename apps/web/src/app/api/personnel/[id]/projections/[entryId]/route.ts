@@ -33,8 +33,23 @@ export async function PUT(
 ) {
   try {
     const { id, entryId } = await params;
-    const body = await request.json();
-    
+    let body: any = {};
+    try {
+      const text = await request.text();
+      if (text?.trim()) body = JSON.parse(text);
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid or empty request body' },
+        { status: 400 }
+      );
+    }
+    if (Object.keys(body).length === 0) {
+      return NextResponse.json(
+        { error: 'Request body is required' },
+        { status: 400 }
+      );
+    }
+
     const supabase = createServerSupabaseClient();
     
     // Verify the entry belongs to this personnel

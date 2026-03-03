@@ -598,7 +598,6 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                         <TableHead>Month</TableHead>
                         <TableHead>Net Salary</TableHead>
                         <TableHead>Taxes</TableHead>
-                        <TableHead>Status</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -610,9 +609,9 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                     <TableFooter className="sticky bottom-0 z-20 bg-muted [&>tr]:border-t-0">
                       <TableRow className="bg-muted font-semibold hover:bg-muted">
                         <TableCell>Total</TableCell>
-                        <TableCell>{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualNetAmount || p.netSalary), 0))}</TableCell>
-                        <TableCell>{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualTaxesAmount || (p.socialTaxes + p.employerTaxes)), 0))}</TableCell>
-                        <TableCell colSpan={2} />
+                        <TableCell className="tabular-nums">{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualNetAmount || p.netSalary), 0))}</TableCell>
+                        <TableCell className="tabular-nums">{formatCurrency(mergedProjections.reduce((sum, p) => sum + (p.actualTaxesAmount || (p.socialTaxes + p.employerTaxes)), 0))}</TableCell>
+                        <TableCell />
                       </TableRow>
                     </TableFooter>
                   </table>

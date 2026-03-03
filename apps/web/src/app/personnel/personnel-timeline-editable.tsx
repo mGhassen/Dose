@@ -6,7 +6,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 import { TableRow, TableCell } from "@kit/ui/table";
-import { Badge } from "@kit/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@kit/ui/tooltip";
 import { Checkbox } from "@kit/ui/checkbox";
 import { useUpdatePersonnelSalaryProjectionEntry, useCreateOrUpdatePersonnelSalaryProjectionEntry, usePersonnelSalaryProjections } from "@kit/hooks";
 import { toast } from "sonner";
@@ -122,141 +122,114 @@ export function EditablePersonnelTimelineRow({
   const isNetPaid = projectionEntry?.isNetPaid || false;
   const isTaxesPaid = projectionEntry?.isTaxesPaid || false;
   const isFullyPaid = isNetPaid && isTaxesPaid;
+  const today = new Date().toISOString().slice(0, 10);
+  const netDuePassed = !isNetPaid && (projection.netPaymentDate || "") < today;
+  const taxesDuePassed = !isTaxesPaid && (projection.taxesPaymentDate || "") < today;
 
   return (
     <>
       <TableRow>
         <TableCell className="font-medium">{formatMonthYear(projection.month)}</TableCell>
-        <TableCell>
-          <div className="space-y-0.5">
-            <div className="text-sm text-muted-foreground">Brute: {formatCurrency(projection.bruteSalary)}</div>
-            <div className="font-semibold">Net: {formatCurrency(projection.netSalary)}</div>
-          </div>
+        <TableCell className={`font-semibold tabular-nums ${isNetPaid ? "text-green-600" : netDuePassed ? "text-orange-500" : ""}`}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help underline decoration-dotted underline-offset-2">{formatCurrency(projection.netSalary)}</span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              <p>Brute: {formatCurrency(projection.bruteSalary)}</p>
+              <p>Net: {formatCurrency(projection.netSalary)}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TableCell>
+        <TableCell className={`tabular-nums ${isTaxesPaid ? "text-green-600" : taxesDuePassed ? "text-orange-500" : ""}`}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help underline decoration-dotted underline-offset-2">{formatCurrency(totalTaxes)}</span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              <p>Social: {formatCurrency(projection.socialTaxes)}</p>
+              <p>Employer: {formatCurrency(projection.employerTaxes)}</p>
+              <p className="font-semibold mt-0.5">Total: {formatCurrency(totalTaxes)}</p>
+            </TooltipContent>
+          </Tooltip>
         </TableCell>
         <TableCell>
-          <div className="space-y-0.5">
-            <div className="text-sm">
-              Social: {formatCurrency(projection.socialTaxes)}
-              {socialSecurityRate !== undefined && (
-                <span className="text-xs text-muted-foreground ml-1">({Math.round(socialSecurityRate * 100)}%)</span>
-              )}
-            </div>
-            <div className="text-sm">
-              Employer: {formatCurrency(projection.employerTaxes)}
-              {employeeSocialTaxRate !== undefined && (
-                <span className="text-xs text-muted-foreground ml-1">({Math.round(employeeSocialTaxRate * 100)}%)</span>
-              )}
-            </div>
-            <div className="font-semibold">Total: {formatCurrency(totalTaxes)}</div>
-          </div>
-        </TableCell>
-        <TableCell>
-          {isFullyPaid ? (
-            <Badge variant="default" className="bg-green-600 hover:bg-green-600">Paid</Badge>
-          ) : (
-            <Badge variant="secondary">Pending</Badge>
-          )}
-        </TableCell>
-        <TableCell>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleOpenDialog} className="h-8">
-              {isFullyPaid ? "Edit payment" : "Record payment"}
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              Net: {formatDate(projection.netPaymentDate || "")} · Taxes: {formatDate(projection.taxesPaymentDate || "")}
-            </span>
-          </div>
+          <Button variant="outline" size="sm" onClick={handleOpenDialog}>
+            {isFullyPaid ? "Edit" : "Record payment"}
+          </Button>
         </TableCell>
       </TableRow>
 
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader>
+          <DialogHeader className="pb-2">
             <DialogTitle>Record payment</DialogTitle>
-            <DialogDescription>
-              {formatMonthYear(projection.month)} — Net salary and taxes
+            <DialogDescription className="text-xs">
+              {formatMonthYear(projection.month)} — due net {formatDate(projection.netPaymentDate || "")}, taxes {formatDate(projection.taxesPaymentDate || "")}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-6 py-4">
-            <div className="space-y-3 rounded-lg border p-3">
-              <Label className="text-sm font-semibold">Net salary</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label htmlFor="netPaidDate" className="text-xs">Date</Label>
-                  <DatePicker
-                    id="netPaidDate"
-                    value={netPaidDate ? new Date(netPaidDate) : undefined}
-                    onChange={(d) => setNetPaidDate(d ? dateToYYYYMMDD(d) : "")}
-                    placeholder="Date"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="actualNetAmount" className="text-xs">Amount</Label>
-                  <Input
-                    id="actualNetAmount"
-                    type="number"
-                    step="0.01"
-                    value={actualNetAmount}
-                    onChange={(e) => setActualNetAmount(e.target.value)}
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">Projected: {formatCurrency(projection.netSalary)}</p>
-              <div className="flex items-center space-x-2">
+          <div className="space-y-3 py-2">
+            <div className="grid grid-cols-[72px_1fr_1fr_auto] gap-2 items-center">
+              <span className="text-sm font-medium">Net</span>
+              <DatePicker
+                id="netPaidDate"
+                value={netPaidDate ? new Date(netPaidDate) : undefined}
+                onChange={(d) => setNetPaidDate(d ? dateToYYYYMMDD(d) : "")}
+                placeholder="Date"
+              />
+              <Input
+                id="actualNetAmount"
+                type="number"
+                step="0.01"
+                value={actualNetAmount}
+                onChange={(e) => setActualNetAmount(e.target.value)}
+                placeholder={formatCurrency(projection.netSalary)}
+                className="tabular-nums"
+              />
+              <div className="flex items-center gap-1.5">
                 <Checkbox
                   id="isNetPaid"
                   checked={isNetPaidChecked}
                   onCheckedChange={(c) => setIsNetPaidChecked(c === true)}
                 />
-                <Label htmlFor="isNetPaid" className="cursor-pointer text-sm">Mark net as paid</Label>
+                <Label htmlFor="isNetPaid" className="cursor-pointer text-xs whitespace-nowrap">Paid</Label>
               </div>
             </div>
-
-            <div className="space-y-3 rounded-lg border p-3">
-              <Label className="text-sm font-semibold">Taxes</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label htmlFor="taxesPaidDate" className="text-xs">Date</Label>
-                  <DatePicker
-                    id="taxesPaidDate"
-                    value={taxesPaidDate ? new Date(taxesPaidDate) : undefined}
-                    onChange={(d) => setTaxesPaidDate(d ? dateToYYYYMMDD(d) : "")}
-                    placeholder="Date"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="actualTaxesAmount" className="text-xs">Amount</Label>
-                  <Input
-                    id="actualTaxesAmount"
-                    type="number"
-                    step="0.01"
-                    value={actualTaxesAmount}
-                    onChange={(e) => setActualTaxesAmount(e.target.value)}
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">Projected: {formatCurrency(totalTaxes)}</p>
-              <div className="flex items-center space-x-2">
+            <div className="grid grid-cols-[72px_1fr_1fr_auto] gap-2 items-center">
+              <span className="text-sm font-medium">Taxes</span>
+              <DatePicker
+                id="taxesPaidDate"
+                value={taxesPaidDate ? new Date(taxesPaidDate) : undefined}
+                onChange={(d) => setTaxesPaidDate(d ? dateToYYYYMMDD(d) : "")}
+                placeholder="Date"
+              />
+              <Input
+                id="actualTaxesAmount"
+                type="number"
+                step="0.01"
+                value={actualTaxesAmount}
+                onChange={(e) => setActualTaxesAmount(e.target.value)}
+                placeholder={formatCurrency(totalTaxes)}
+                className="tabular-nums"
+              />
+              <div className="flex items-center gap-1.5">
                 <Checkbox
                   id="isTaxesPaid"
                   checked={isTaxesPaidChecked}
                   onCheckedChange={(c) => setIsTaxesPaidChecked(c === true)}
                 />
-                <Label htmlFor="isTaxesPaid" className="cursor-pointer text-sm">Mark taxes as paid</Label>
+                <Label htmlFor="isTaxesPaid" className="cursor-pointer text-xs whitespace-nowrap">Paid</Label>
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Input
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Optional notes..."
-              />
-            </div>
+            <Input
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Notes (optional)"
+              className="mt-1"
+            />
           </div>
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)}>
               Cancel
             </Button>
