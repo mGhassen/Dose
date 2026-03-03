@@ -440,6 +440,7 @@ export interface Sale {
   type: SalesType;
   amount: number;
   quantity?: number;
+  unit?: string;
   description?: string;
   itemId?: number;
   createdAt: string;
@@ -463,6 +464,7 @@ export interface CreateSaleData {
   type: SalesType;
   amount: number;
   quantity?: number;
+  unit?: string;
   description?: string;
   itemId?: number;
 }
@@ -1071,7 +1073,8 @@ export enum StockMovementReferenceType {
   RECIPE = 'recipe',
   MANUAL = 'manual',
   WASTE = 'waste',
-  EXPIRY = 'expiry'
+  EXPIRY = 'expiry',
+  SALE = 'sale'
 }
 
 export interface StockMovement {

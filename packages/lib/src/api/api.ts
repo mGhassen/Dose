@@ -35,7 +35,9 @@ async function getServerBaseUrl(): Promise<string> {
       return `${proto}://${host}`;
     }
   } catch {}
-  return `http://localhost:${process.env.PORT || '3000'}`;
+  const port = process.env.PORT ?? process.env.NEXT_PUBLIC_PORT ?? '3000';
+  const host = process.env.NODE_ENV === 'development' ? 'localhost' : '127.0.0.1';
+  return `http://${host}:${port}`;
 }
 
 export async function apiRequest<T>(
@@ -203,13 +205,17 @@ export async function apiRequest<T>(
       
       return result;
     } catch (error) {
-      // Don't log AbortError as it's expected when queries are cancelled
-      // This happens when React Query cancels queries (e.g., component unmount, query invalidation)
       if (error instanceof Error && (error.name === 'AbortError' || (error as any).isAbortError)) {
-        // Create a proper AbortError that React Query can handle silently
         const abortError = new DOMException('The operation was aborted.', 'AbortError');
         (abortError as any).isAbortError = true;
         throw abortError;
+      }
+      const isFetchFailed =
+        error instanceof TypeError && error.message === 'fetch failed';
+      if (isFetchFailed && typeof window === 'undefined') {
+        console.warn(
+          '[API] Server-side fetch failed (e.g. ECONNREFUSED). Set NEXT_PUBLIC_SITE_URL in .env to your app URL (e.g. http://localhost:3000).'
+        );
       }
       console.error('API request error:', error);
       throw error;

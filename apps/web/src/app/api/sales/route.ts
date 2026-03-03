@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Sale, CreateSaleData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
+import { StockMovementType, StockMovementReferenceType } from '@kit/types';
+import { getItemStock } from '@/lib/stock/get-item-stock';
+import { produceRecipe } from '@/lib/stock/produce-recipe';
 
 function transformSale(row: any): Sale {
   return {
@@ -12,23 +15,26 @@ function transformSale(row: any): Sale {
     type: row.type,
     amount: parseFloat(row.amount),
     quantity: row.quantity,
+    unit: row.unit,
     description: row.description,
     itemId: row.item_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    item: undefined, // Will be populated separately
+    item: undefined,
   };
 }
 
-function transformToSnakeCase(data: CreateSaleData): any {
-  return {
+function transformToSnakeCase(data: CreateSaleData): Record<string, unknown> {
+  const result: Record<string, unknown> = {
     date: data.date,
     type: data.type,
     amount: data.amount,
-    quantity: data.quantity,
-    description: data.description,
-    item_id: data.itemId,
+    description: data.description ?? null,
+    item_id: data.itemId ?? null,
   };
+  if (data.quantity != null) result.quantity = data.quantity;
+  if (data.unit != null && data.unit !== '') result.unit = data.unit;
+  return result;
 }
 
 export async function GET(request: NextRequest) {
@@ -209,10 +215,17 @@ export async function POST(request: NextRequest) {
         supabase.from('items').select('id').eq('id', body.itemId).single(),
         supabase.from('recipes').select('id').eq('id', body.itemId).single(),
       ]);
-      
+
       if (itemCheck.error && recipeCheck.error) {
         return NextResponse.json(
           { error: `Item or recipe with id ${body.itemId} not found` },
+          { status: 400 }
+        );
+      }
+
+      if (!body.quantity || body.quantity <= 0) {
+        return NextResponse.json(
+          { error: 'Quantity is required and must be greater than 0 when an item or recipe is selected' },
           { status: 400 }
         );
       }
@@ -242,14 +255,102 @@ export async function POST(request: NextRequest) {
 
     if (entryError) {
       console.error('Error creating entry for sale:', entryError);
-      // Don't fail the sale creation if entry creation fails, but log it
+    }
+
+    if (body.itemId && (body.quantity != null && body.quantity > 0)) {
+      const quantity = typeof body.quantity === 'number' ? body.quantity : parseFloat(String(body.quantity));
+      const unit = body.unit || 'unit';
+      const location = null;
+
+      const [itemResult, recipeResult] = await Promise.all([
+        supabase.from('items').select('id, unit, produced_from_recipe_id').eq('id', body.itemId).single(),
+        supabase.from('recipes').select('id, unit').eq('id', body.itemId).single(),
+      ]);
+
+      if (itemResult.data) {
+        const targetItemId = itemResult.data.id;
+        const itemUnit = itemResult.data.unit || unit;
+
+        const { error: outError } = await supabase.from('stock_movements').insert({
+          item_id: targetItemId,
+          movement_type: StockMovementType.OUT,
+          quantity,
+          unit: itemUnit,
+          reference_type: StockMovementReferenceType.SALE,
+          reference_id: data.id,
+          location,
+          movement_date: body.date,
+          notes: `Sale #${data.id}`,
+        });
+
+        if (outError) {
+          console.error('Error creating stock movement for sale:', outError);
+          return NextResponse.json(
+            { error: 'Failed to create stock movement', details: outError.message },
+            { status: 500 }
+          );
+        }
+      } else if (recipeResult.data) {
+        let producedItemId: number;
+        let producedItemUnit: string;
+
+        const { data: producedItem } = await supabase
+          .from('items')
+          .select('id, unit')
+          .eq('produced_from_recipe_id', body.itemId)
+          .single();
+
+        if (!producedItem) {
+          const result = await produceRecipe(supabase, String(body.itemId), {
+            quantity,
+            location,
+            notes: `Sale #${data.id}`,
+          });
+          producedItemId = result.producedItemId;
+          producedItemUnit = recipeResult.data.unit || unit;
+        } else {
+          producedItemId = producedItem.id;
+          producedItemUnit = producedItem.unit || unit;
+          const stock = await getItemStock(supabase, producedItem.id, location);
+          if (stock < quantity) {
+            const toProduce = quantity - stock;
+            await produceRecipe(supabase, String(body.itemId), {
+              quantity: toProduce,
+              location,
+              notes: `Sale #${data.id} - auto-produced`,
+            });
+          }
+        }
+
+        const { error: outError } = await supabase.from('stock_movements').insert({
+          item_id: producedItemId,
+          movement_type: StockMovementType.OUT,
+          quantity,
+          unit: producedItemUnit,
+          reference_type: StockMovementReferenceType.SALE,
+          reference_id: data.id,
+          location,
+          movement_date: body.date,
+          notes: `Sale #${data.id}`,
+        });
+
+        if (outError) {
+          console.error('Error creating stock movement for sale:', outError);
+          return NextResponse.json(
+            { error: 'Failed to create stock movement', details: outError.message },
+            { status: 500 }
+          );
+        }
+      }
     }
 
     return NextResponse.json(transformSale(data), { status: 201 });
   } catch (error: any) {
     console.error('Error creating sale:', error);
+    const details = error?.message || String(error);
+    const hint = error?.hint || error?.details || '';
     return NextResponse.json(
-      { error: 'Failed to create sale', details: error.message },
+      { error: 'Failed to create sale', details: `${details}${hint ? ` (${hint})` : ''}` },
       { status: 500 }
     );
   }

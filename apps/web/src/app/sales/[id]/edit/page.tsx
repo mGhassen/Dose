@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
@@ -14,6 +14,8 @@ import { useSaleById, useUpdateSale, useItems } from "@kit/hooks";
 import { toast } from "sonner";
 import type { SalesType } from "@kit/types";
 
+const COMMON_UNITS = ['g', 'kg', 'L', 'ml', 'serving', 'piece', 'portion', 'box', 'unit'];
+
 interface EditSalePageProps {
   params: Promise<{ id: string }>;
 }
@@ -22,7 +24,8 @@ export default function EditSalePage({ params }: EditSalePageProps) {
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: sale, isLoading } = useSaleById(resolvedParams?.id || "");
-  const { data: itemsResponse } = useItems({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 1000, includeRecipes: true });
+  const items = (itemsResponse?.data ?? []).filter(i => i.itemType === 'item' || i.itemType === 'recipe');
   const updateSale = useUpdateSale();
   
   const [formData, setFormData] = useState({
@@ -30,9 +33,23 @@ export default function EditSalePage({ params }: EditSalePageProps) {
     type: "" as SalesType | "",
     amount: "",
     quantity: "",
+    unit: "",
     description: "",
     itemId: "",
   });
+
+  const selectedItem = formData.itemId ? items.find(i => i.id === parseInt(formData.itemId)) : undefined;
+  const unitItems = useMemo(() => {
+    const units = [...COMMON_UNITS];
+    const itemUnit = selectedItem?.unit || formData.unit;
+    if (itemUnit && !units.includes(itemUnit)) {
+      units.unshift(itemUnit);
+    }
+    return units.map((u) => ({ id: u, name: u }));
+  }, [selectedItem?.unit, formData.unit]);
+
+  const hasItemSelected = !!formData.itemId;
+  const quantityUnitRequired = hasItemSelected;
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -45,6 +62,7 @@ export default function EditSalePage({ params }: EditSalePageProps) {
         type: sale.type,
         amount: sale.amount.toString(),
         quantity: sale.quantity?.toString() || "",
+        unit: sale.unit || "",
         description: sale.description || "",
         itemId: sale.itemId?.toString() || "",
       });
@@ -58,6 +76,10 @@ export default function EditSalePage({ params }: EditSalePageProps) {
       toast.error("Please fill in all required fields");
       return;
     }
+    if (quantityUnitRequired && (!formData.quantity || !formData.unit)) {
+      toast.error("Quantity and unit are required when an item or recipe is selected");
+      return;
+    }
 
     if (!resolvedParams?.id) return;
 
@@ -68,7 +90,8 @@ export default function EditSalePage({ params }: EditSalePageProps) {
           date: formData.date,
           type: formData.type as SalesType,
           amount: parseFloat(formData.amount),
-          quantity: formData.quantity ? parseInt(formData.quantity) : undefined,
+          quantity: formData.quantity ? parseFloat(formData.quantity) : undefined,
+          unit: formData.unit || undefined,
           description: formData.description || undefined,
           itemId: formData.itemId ? parseInt(formData.itemId) : undefined,
         },
@@ -81,7 +104,16 @@ export default function EditSalePage({ params }: EditSalePageProps) {
   };
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    const updates: Record<string, any> = { [field]: value };
+    if (field === 'itemId') {
+      const item = value ? items.find(i => i.id === parseInt(value)) : undefined;
+      updates.unit = item?.unit || '';
+      if (!value) {
+        updates.quantity = '';
+        updates.unit = '';
+      }
+    }
+    setFormData(prev => ({ ...prev, ...updates }));
   };
 
   if (isLoading || !resolvedParams) {
@@ -124,6 +156,52 @@ export default function EditSalePage({ params }: EditSalePageProps) {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Item/Recipe - first */}
+                <div className="space-y-2 md:col-span-2">
+                  <UnifiedSelector
+                    label="Item/Recipe"
+                    type="item"
+                    items={items}
+                    selectedId={formData.itemId ? parseInt(formData.itemId) : undefined}
+                    onSelect={(item) => handleInputChange('itemId', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select item or recipe (optional)"
+                    getDisplayName={(i) => (i as { itemType?: string }).itemType === 'recipe' ? `${i.name} (Recipe)` : `${i.name} ${(i as { category?: string }).category ? `(${(i as { category?: string }).category})` : ''}`}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    When selected, quantity and unit are required.
+                  </p>
+                </div>
+
+                {/* Quantity + Unit - when item selected */}
+                {hasItemSelected && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="quantity">Quantity *</Label>
+                      <Input
+                        id="quantity"
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        value={formData.quantity}
+                        onChange={(e) => handleInputChange('quantity', e.target.value)}
+                        placeholder="e.g. 2"
+                        required={quantityUnitRequired}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <UnifiedSelector
+                        label="Unit"
+                        required={quantityUnitRequired}
+                        type="unit"
+                        items={unitItems}
+                        selectedId={formData.unit || undefined}
+                        onSelect={(item) => handleInputChange('unit', String(item.id))}
+                        placeholder="Select unit"
+                      />
+                    </div>
+                  </>
+                )}
+
                 {/* Date */}
                 <div className="space-y-2">
                   <Label htmlFor="date">Date *</Label>
@@ -164,34 +242,6 @@ export default function EditSalePage({ params }: EditSalePageProps) {
                     placeholder="0.00"
                     required
                   />
-                </div>
-
-                {/* Quantity */}
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Quantity</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    value={formData.quantity}
-                    onChange={(e) => handleInputChange('quantity', e.target.value)}
-                    placeholder="Optional"
-                  />
-                </div>
-
-                {/* Item/Recipe */}
-                <div className="space-y-2 md:col-span-2">
-                  <UnifiedSelector
-                    label="Item/Recipe"
-                    type="item"
-                    items={(itemsResponse?.data ?? []).filter(i => i.itemType === 'item' || i.itemType === 'recipe')}
-                    selectedId={formData.itemId ? parseInt(formData.itemId) : undefined}
-                    onSelect={(item) => handleInputChange('itemId', item.id === 0 ? '' : String(item.id))}
-                    placeholder="Select item or recipe (optional)"
-                    getDisplayName={(i) => (i as { itemType?: string }).itemType === 'recipe' ? `${i.name} (Recipe)` : `${i.name} ${(i as { category?: string }).category ? `(${(i as { category?: string }).category})` : ''}`}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Link this sale to a specific item or recipe
-                  </p>
                 </div>
               </div>
 

@@ -11,11 +11,12 @@ function transformSale(row: any): Sale {
     type: row.type,
     amount: parseFloat(row.amount),
     quantity: row.quantity,
+    unit: row.unit,
     description: row.description,
     itemId: row.item_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    item: undefined, // Will be populated separately
+    item: undefined,
   };
 }
 
@@ -25,6 +26,7 @@ function transformToSnakeCase(data: UpdateSaleData): any {
   if (data.type !== undefined) result.type = data.type;
   if (data.amount !== undefined) result.amount = data.amount;
   if (data.quantity !== undefined) result.quantity = data.quantity;
+  if (data.unit !== undefined) result.unit = data.unit;
   if (data.description !== undefined) result.description = data.description;
   if (data.itemId !== undefined) result.item_id = data.itemId;
   result.updated_at = new Date().toISOString();
