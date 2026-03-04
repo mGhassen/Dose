@@ -358,7 +358,7 @@ export default function DataTable({
     <div className="w-full h-full flex flex-col min-h-0">
       <div className="flex-1 min-h-0 overflow-auto">
         <table className="w-full min-w-max">
-          <thead className="sticky top-0 z-10 bg-muted/50 backdrop-blur-md border-b border-border">
+          <thead className="sticky top-0 z-[1] bg-muted/50 backdrop-blur-md border-b border-border">
             <tr>
               {renderExpandedRow && (
                 <th className="px-2 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider w-10">
