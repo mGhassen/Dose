@@ -89,26 +89,28 @@ export function UnifiedSelector({
   const selectedItemRef = useRef<HTMLDivElement>(null);
   const tCommon = useTranslations('common');
 
-  const filteredItems = items.filter(item => {
-    const searchLower = searchValue.toLowerCase();
-    const name = getDisplayName 
-      ? getDisplayName(item)
-      : mode === 'single' && type === 'action' 
-        ? (item.name || item.act)
-        : mode === 'single' && type === 'question'
-        ? item.text
-        : (item.name || item.code || `${tCommon('item')} ${item.id}`);
-    const description = item.description || '';
-    const code = item.code || '';
-    
-    return (
-      name?.toLowerCase().includes(searchLower) ||
-      description.toLowerCase().includes(searchLower) ||
-      code.toLowerCase().includes(searchLower) ||
-      item.type?.toLowerCase().includes(searchLower) ||
-      item.id.toString().includes(searchLower)
-    );
-  });
+  const filterItems = (list: UnifiedSelectorItem[]) =>
+    list.filter(item => {
+      const searchLower = searchValue.toLowerCase();
+      const name = getDisplayName
+        ? getDisplayName(item)
+        : mode === 'single' && type === 'action'
+          ? (item.name || item.act)
+          : mode === 'single' && type === 'question'
+            ? item.text
+            : (item.name || item.code || `${tCommon('item')} ${item.id}`);
+      const description = item.description || '';
+      const code = item.code || '';
+      return (
+        name?.toLowerCase().includes(searchLower) ||
+        description.toLowerCase().includes(searchLower) ||
+        code.toLowerCase().includes(searchLower) ||
+        item.type?.toLowerCase().includes(searchLower) ||
+        item.id.toString().includes(searchLower)
+      );
+    });
+
+  const filteredItems = filterItems(items);
 
   const handleSelect = (item: UnifiedSelectorItem) => {
     setOpen(false);
@@ -259,7 +261,16 @@ export function UnifiedSelector({
 
   if (mode === 'single') {
     const hasSelectedId = selectedId != null && selectedId !== '' && (typeof selectedId === 'string' || !Number.isNaN(Number(selectedId)));
-    const selectedItem = hasSelectedId ? items.find(item => String(item.id) === String(selectedId)) : null;
+    const itemsIncludingPrefill = (() => {
+      if (!hasSelectedId || items.some(item => String(item.id) === String(selectedId))) return items;
+      const stub: UnifiedSelectorItem = {
+        id: selectedId,
+        name: selectedDisplayName ?? `${tCommon('item')} ${selectedId}`,
+      };
+      return [stub, ...items];
+    })();
+    const selectedItem = hasSelectedId ? itemsIncludingPrefill.find(item => String(item.id) === String(selectedId)) : null;
+    const filteredSingle = filterItems(itemsIncludingPrefill);
     const displayButtonText = buttonText
       ? buttonText
       : selectedItem
@@ -326,9 +337,9 @@ export function UnifiedSelector({
                 </CommandItem>
               </CommandGroup>
 
-              {filteredItems.length > 0 ? (
+              {filteredSingle.length > 0 ? (
                 <CommandGroup heading={tCommon('selectExisting', { item: type })}>
-                  {filteredItems.map((item) => {
+                  {filteredSingle.map((item) => {
                     const isSelected = hasSelectedId && String(item.id) === String(selectedId);
                     return (
                       <CommandItem
@@ -344,7 +355,7 @@ export function UnifiedSelector({
                     );
                   })}
                 </CommandGroup>
-              ) : items.length > 0 ? (
+              ) : itemsIncludingPrefill.length > 0 ? (
                 <CommandGroup>
                   <CommandItem disabled>
                     <span className="text-muted-foreground text-sm">{tCommon('noItemsMatchSearch')}</span>

@@ -382,7 +382,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
   return (
     <div className="flex h-full flex-col">
       <div className="flex-shrink-0 space-y-0">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 pb-4">
           <div>
             <p className="text-xs text-muted-foreground">
               {formatDateTime(sale.date)} · {TYPE_LABELS[sale.type] || sale.type}
