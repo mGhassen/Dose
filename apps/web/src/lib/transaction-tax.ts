@@ -16,3 +16,25 @@ export function getEffectiveTransactionTaxRate(
   valid.sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime());
   return valid[0]?.value ?? 0;
 }
+
+export function lineTaxAmount(
+  quantity: number,
+  unitPrice: number,
+  taxRatePercent: number,
+  taxInclusive: boolean
+): { lineTotalNet: number; taxAmount: number } {
+  const gross = Math.round(quantity * unitPrice * 100) / 100;
+  if (taxInclusive && taxRatePercent > 0) {
+    const lineTotalNet = Math.round((gross / (1 + taxRatePercent / 100)) * 100) / 100;
+    const taxAmount = Math.round((gross - lineTotalNet) * 100) / 100;
+    return { lineTotalNet, taxAmount };
+  }
+  const lineTotalNet = gross;
+  const taxAmount = Math.round(lineTotalNet * (taxRatePercent / 100) * 100) / 100;
+  return { lineTotalNet, taxAmount };
+}
+
+export function netUnitPriceFromInclusive(grossUnitPrice: number, taxRatePercent: number): number {
+  if (taxRatePercent <= 0) return grossUnitPrice;
+  return Math.round((grossUnitPrice / (1 + taxRatePercent / 100)) * 100) / 100;
+}

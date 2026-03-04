@@ -30,7 +30,7 @@ const TYPE_OPTIONS = [
   { id: "other", name: "Other" },
 ];
 
-import { getEffectiveTransactionTaxRate } from "@/lib/transaction-tax";
+import { getEffectiveTransactionTaxRate, lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
 
 export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps) {
   const router = useRouter();
@@ -51,8 +51,8 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     discountValue: "",
   });
 
-  const [lineItems, setLineItems] = useState<Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string }>>([
-    { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "" },
+  const [lineItems, setLineItems] = useState<Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string; taxInclusive: boolean }>>([
+    { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false },
   ]);
 
   const typeTaxRate = useMemo(
@@ -66,10 +66,10 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     for (const line of lineItems) {
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
-      const lineTotal = Math.round(q * p * 100) / 100;
-      sub += lineTotal;
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : typeTaxRate;
-      tax += Math.round(lineTotal * (lineRate / 100) * 100) / 100;
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, line.taxInclusive);
+      sub += lineTotalNet;
+      tax += taxAmount;
     }
     let disc = 0;
     if (formData.discountValue) {
@@ -82,7 +82,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
   }, [lineItems, typeTaxRate, formData.discountType, formData.discountValue]);
 
   const addLine = () => {
-    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "" }]);
+    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
   };
 
   const removeLine = (index: number) => {
@@ -90,7 +90,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     setLineItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const updateLine = (index: number, field: string, value: string | number | null) => {
+  const updateLine = (index: number, field: string, value: string | number | boolean | null) => {
     setLineItems((prev) => {
       const next = [...prev];
       const line = { ...next[index], [field]: value };
@@ -128,14 +128,15 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
         toast.error(`Line ${i + 1}: quantity (positive) and unit price are required`);
         return;
       }
-      const lineTax = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : undefined;
+      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : typeTaxRate;
+      const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, lineRate) : price;
       payloadLines.push({
         itemId: line.itemId ? parseInt(line.itemId) : undefined,
         quantity: qty,
         unitId: line.unitId ?? undefined,
-        unitPrice: price,
+        unitPrice: unitPriceNet,
         unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
-        taxRatePercent: lineTax,
+        taxRatePercent: line.taxRatePercent !== "" ? lineRate : undefined,
       });
     }
     const dateTimeIso = new Date(`${formData.date}T${formData.time}`).toISOString();
@@ -247,7 +248,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                     />
                   </div>
                   <div className="col-span-2">
-                    <Label className="text-xs">Price</Label>
+                    <Label className="text-xs">{line.taxInclusive ? "Price (incl. tax)" : "Price (excl. tax)"}</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -256,6 +257,18 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                       onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
                       placeholder="0"
                     />
+                  </div>
+                  <div className="col-span-1 flex flex-col gap-1 items-end justify-end pb-2">
+                    <Label className="text-xs opacity-0 pointer-events-none">Tax</Label>
+                    <select
+                      className="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-xs w-full min-w-0"
+                      value={line.taxInclusive ? "incl" : "excl"}
+                      onChange={(e) => updateLine(index, "taxInclusive", e.target.value === "incl")}
+                      title="Tax"
+                    >
+                      <option value="excl">Excl.</option>
+                      <option value="incl">Incl.</option>
+                    </select>
                   </div>
                   <div className="col-span-1 flex items-end pb-2">
                     <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>

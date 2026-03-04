@@ -39,7 +39,7 @@ import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatDateTime } from "@kit/lib/date-format";
 import type { SalesType } from "@kit/types";
-import { getEffectiveTransactionTaxRate } from "@/lib/transaction-tax";
+import { getEffectiveTransactionTaxRate, lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
 
 interface SaleDetailContentProps {
   saleId: string;
@@ -100,7 +100,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
     discountValue: "",
   });
 
-  const [lineItems, setLineItems] = useState<Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string }>>([]);
+  const [lineItems, setLineItems] = useState<Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxInclusive: boolean }>>([]);
 
   const effectiveTaxRate = useMemo(
     () => getEffectiveTransactionTaxRate(taxVariables, formData.type, formData.date),
@@ -109,12 +109,14 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
 
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
     let sub = 0;
+    let tax = 0;
     for (const line of lineItems) {
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
-      sub += Math.round(q * p * 100) / 100;
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, effectiveTaxRate, line.taxInclusive);
+      sub += lineTotalNet;
+      tax += taxAmount;
     }
-    const tax = Math.round(sub * (effectiveTaxRate / 100) * 100) / 100;
     let disc = 0;
     if (formData.discountValue) {
       const v = parseFloat(formData.discountValue) || 0;
@@ -126,13 +128,13 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
   }, [lineItems, effectiveTaxRate, formData.discountType, formData.discountValue]);
 
   const addLine = () => {
-    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "" }]);
+    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxInclusive: false }]);
   };
   const removeLine = (index: number) => {
     if (lineItems.length <= 1) return;
     setLineItems((prev) => prev.filter((_, i) => i !== index));
   };
-  const updateLine = (index: number, field: string, value: string | number | null) => {
+  const updateLine = (index: number, field: string, value: string | number | boolean | null) => {
     setLineItems((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
@@ -159,10 +161,11 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
             unitId: l.unitId ?? null,
             unitPrice: String(l.unitPrice),
             unitCost: l.unitCost != null ? String(l.unitCost) : "",
+            taxInclusive: false,
           }))
         );
       } else {
-        setLineItems([{ itemId: sale.itemId?.toString() ?? "", quantity: String(sale.quantity ?? 1), unitId: sale.unitId ?? null, unitPrice: String(sale.unitPrice ?? sale.amount), unitCost: sale.unitCost != null ? String(sale.unitCost) : "" }]);
+        setLineItems([{ itemId: sale.itemId?.toString() ?? "", quantity: String(sale.quantity ?? 1), unitId: sale.unitId ?? null, unitPrice: String(sale.unitPrice ?? sale.amount), unitCost: sale.unitCost != null ? String(sale.unitCost) : "", taxInclusive: false }]);
       }
     }
   }, [sale]);
@@ -171,13 +174,17 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
     e.preventDefault();
     try {
       const dateTimeIso = new Date(`${formData.date}T${formData.time}`).toISOString();
-      const payloadLines = lineItems.map((line) => ({
-        itemId: line.itemId ? parseInt(line.itemId) : undefined,
-        quantity: parseFloat(line.quantity) || 0,
-        unitId: line.unitId ?? undefined,
-        unitPrice: parseFloat(line.unitPrice) || 0,
-        unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
-      }));
+      const payloadLines = lineItems.map((line) => {
+        const price = parseFloat(line.unitPrice) || 0;
+        const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, effectiveTaxRate) : price;
+        return {
+          itemId: line.itemId ? parseInt(line.itemId) : undefined,
+          quantity: parseFloat(line.quantity) || 0,
+          unitId: line.unitId ?? undefined,
+          unitPrice: unitPriceNet,
+          unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
+        };
+      });
       if (payloadLines.some((l) => l.quantity <= 0 || l.unitPrice < 0)) {
         toast.error("Each line needs positive quantity and non-negative unit price");
         return;
@@ -335,8 +342,20 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                       <UnifiedSelector type="unit" items={unitItems} selectedId={line.unitId ?? undefined} onSelect={(item) => updateLine(index, "unitId", item.id === 0 ? null : (item.id as number))} placeholder="Unit" />
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs">Price</Label>
+                      <Label className="text-xs">{line.taxInclusive ? "Price (incl. tax)" : "Price (excl. tax)"}</Label>
                       <Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(index, "unitPrice", e.target.value)} />
+                    </div>
+                    <div className="col-span-1 flex flex-col gap-1 items-end justify-end pb-2">
+                      <Label className="text-xs opacity-0 pointer-events-none">Tax</Label>
+                      <select
+                        className="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-xs w-full min-w-0"
+                        value={line.taxInclusive ? "incl" : "excl"}
+                        onChange={(e) => updateLine(index, "taxInclusive", e.target.value === "incl")}
+                        title="Tax"
+                      >
+                        <option value="excl">Excl.</option>
+                        <option value="incl">Incl.</option>
+                      </select>
                     </div>
                     <div className="col-span-1 flex items-end pb-2">
                       <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
@@ -456,10 +475,6 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
               <Badge variant="outline">{TYPE_LABELS[sale.type] || sale.type}</Badge>
             </DetailRow>
             <Separator />
-            <DetailRow icon={DollarSign} label="Amount">
-              <span className="tabular-nums">{formatCurrency(sale.amount)}</span>
-            </DetailRow>
-            <Separator />
             <div className="py-3">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Line items</p>
               <div className="rounded-md border overflow-hidden">
@@ -494,19 +509,26 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                     <span className="tabular-nums">{formatCurrency(sale.subtotal)}</span>
                   </div>
                 )}
-                {sale.totalTax != null && sale.totalTax > 0 && (
+                {sale.totalTax != null && (
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Tax</span>
+                    <span>
+                      Tax
+                      {sale.subtotal != null && sale.subtotal > 0 && (
+                        <span className="ml-1 font-normal text-muted-foreground/80">
+                          ({((sale.totalTax / sale.subtotal) * 100).toFixed(1)}%)
+                        </span>
+                      )}
+                    </span>
                     <span className="tabular-nums">{formatCurrency(sale.totalTax)}</span>
                   </div>
                 )}
-                {sale.totalDiscount != null && sale.totalDiscount > 0 && (
+                {sale.totalDiscount != null && (
                   <div className="flex justify-between text-muted-foreground">
                     <span>Discount</span>
                     <span className="tabular-nums">-{formatCurrency(sale.totalDiscount)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-medium pt-1">
+                <div className="flex justify-between font-medium border-t mt-1 pt-2">
                   <span>Total</span>
                   <span className="tabular-nums">{formatCurrency(sale.amount)}</span>
                 </div>

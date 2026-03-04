@@ -95,6 +95,25 @@ export async function GET(
       .order('sort_order');
     sale.lineItems = (lineItemsData || []).map(transformLineItem);
 
+    const itemIds = [...new Set((sale.lineItems || []).map((l) => l.itemId).filter(Boolean))] as number[];
+    if (itemIds.length > 0) {
+      const { data: itemsData } = await supabase.from('items').select('id, name').in('id', itemIds);
+      const itemsMap = new Map((itemsData || []).map((i) => [i.id, { id: i.id, name: i.name }]));
+      const missingIds = itemIds.filter((id) => !itemsMap.has(id));
+      let recipesMap = new Map<number, { id: number; name: string }>();
+      if (missingIds.length > 0) {
+        const { data: recipesData } = await supabase.from('recipes').select('id, name').in('id', missingIds);
+        recipesMap = new Map((recipesData || []).map((r) => [r.id, { id: r.id, name: r.name }]));
+      }
+      sale.lineItems = sale.lineItems!.map((line) => {
+        if (line.itemId == null) return line;
+        const fromItems = itemsMap.get(line.itemId);
+        const fromRecipes = recipesMap.get(line.itemId);
+        const item = fromItems ?? fromRecipes;
+        return item ? { ...line, item: { id: item.id, name: item.name } as any } : line;
+      });
+    }
+
     // Fetch item if item_id exists (could be from items or recipes table)
     if (sale.itemId) {
       // Try items table first

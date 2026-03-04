@@ -50,7 +50,7 @@ import { formatDate } from "@kit/lib/date-format";
 import { dateToYYYYMMDD } from "@kit/lib";
 import type { ExpenseCategory } from "@kit/types";
 
-import { getEffectiveTransactionTaxRate } from "@/lib/transaction-tax";
+import { getEffectiveTransactionTaxRate, lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
 
 const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   rent: "Rent",
@@ -126,8 +126,8 @@ export function ExpenseDetailContent({
     discountValue: "",
   });
   const [lineItems, setLineItems] = useState<
-    Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string }>
-  >([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "" }]);
+    Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxInclusive: boolean }>
+  >([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxInclusive: false }]);
 
   const taxRate = useMemo(
     () => getEffectiveTransactionTaxRate(taxVariables, formData.category, formData.expenseDate),
@@ -135,12 +135,14 @@ export function ExpenseDetailContent({
   );
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
     let sub = 0;
+    let tax = 0;
     for (const line of lineItems) {
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
-      sub += Math.round(q * p * 100) / 100;
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, taxRate, line.taxInclusive);
+      sub += lineTotalNet;
+      tax += taxAmount;
     }
-    const tax = Math.round(sub * (taxRate / 100) * 100) / 100;
     let disc = 0;
     if (formData.discountValue) {
       const v = parseFloat(formData.discountValue) || 0;
@@ -169,20 +171,21 @@ export function ExpenseDetailContent({
             unitId: li.unitId ?? null,
             unitPrice: String(li.unitPrice),
             unitCost: li.unitCost != null ? String(li.unitCost) : "",
+            taxInclusive: false,
           }))
-        : [{ itemId: "", quantity: "1", unitId: null, unitPrice: String(expense.amount), unitCost: "" }];
+        : [{ itemId: "", quantity: "1", unitId: null, unitPrice: String(expense.amount), unitCost: "", taxInclusive: false }];
       setLineItems(lines);
     }
   }, [expense]);
 
   const addLine = () => {
-    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "" }]);
+    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxInclusive: false }]);
   };
   const removeLine = (index: number) => {
     if (lineItems.length <= 1) return;
     setLineItems((prev) => prev.filter((_, i) => i !== index));
   };
-  const updateLine = (index: number, field: string, value: string | number | null) => {
+  const updateLine = (index: number, field: string, value: string | number | boolean | null) => {
     setLineItems((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
@@ -224,11 +227,12 @@ export function ExpenseDetailContent({
         toast.error(`Line ${i + 1}: quantity and unit price required`);
         return;
       }
+      const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, taxRate) : price;
       payloadLines.push({
         itemId: line.itemId ? parseInt(line.itemId, 10) : undefined,
         quantity: qty,
         unitId: line.unitId ?? undefined,
-        unitPrice: price,
+        unitPrice: unitPriceNet,
         unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
       });
     }
@@ -398,8 +402,20 @@ export function ExpenseDetailContent({
                       />
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs">Price</Label>
+                      <Label className="text-xs">{line.taxInclusive ? "Price (incl. tax)" : "Price (excl. tax)"}</Label>
                       <Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(index, "unitPrice", e.target.value)} />
+                    </div>
+                    <div className="col-span-1 flex flex-col gap-1 items-end justify-end pb-2">
+                      <Label className="text-xs opacity-0 pointer-events-none">Tax</Label>
+                      <select
+                        className="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-xs w-full min-w-0"
+                        value={line.taxInclusive ? "incl" : "excl"}
+                        onChange={(e) => updateLine(index, "taxInclusive", e.target.value === "incl")}
+                        title="Tax"
+                      >
+                        <option value="excl">Excl.</option>
+                        <option value="incl">Incl.</option>
+                      </select>
                     </div>
                     <div className="col-span-1 flex items-end pb-2">
                       <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
