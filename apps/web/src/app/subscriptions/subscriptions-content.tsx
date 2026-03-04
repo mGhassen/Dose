@@ -1,13 +1,11 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useSubscriptions, useDeleteSubscription, useInventorySuppliers } from "@kit/hooks";
 import Link from "next/link";
-import { getDateRangeForPreset } from "@kit/lib/date-periods";
-import { safeLocalStorage } from "@kit/lib/localStorage";
 import type { Subscription, ExpenseCategory, ExpenseRecurrence } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Button } from "@kit/ui/button";
@@ -15,36 +13,13 @@ import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 import { Calendar } from "lucide-react";
-import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
-
-const SUBSCRIPTIONS_PERIOD_KEY = "subscriptions-period";
-
-function getInitialDateRange() {
-  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
-  try {
-    const saved = safeLocalStorage.getItem(SUBSCRIPTIONS_PERIOD_KEY);
-    if (saved) {
-      const { startDate, endDate } = JSON.parse(saved);
-      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
-        return { startDate, endDate };
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return getDateRangeForPreset("this_year");
-}
+import { useDashboardPeriod } from "@/components/dashboard-period-provider";
 
 export default function SubscriptionsContent() {
   const router = useRouter();
-  const [dateRange, setDateRange] = useState(getInitialDateRange);
+  const { dateRange } = useDashboardPeriod();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-
-  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
-    setDateRange(range);
-    safeLocalStorage.setItem(SUBSCRIPTIONS_PERIOD_KEY, JSON.stringify(range));
-  }, []);
 
   const { data: subscriptionsResponse, isLoading } = useSubscriptions({ page: 1, limit: 1000 });
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
@@ -250,7 +225,6 @@ export default function SubscriptionsContent() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
             <Button
               variant="outline"
               onClick={() => router.push('/subscriptions/timeline')}

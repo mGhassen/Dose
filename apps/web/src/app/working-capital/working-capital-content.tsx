@@ -1,10 +1,8 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getDateRangeForPreset } from "@kit/lib/date-periods";
-import { safeLocalStorage } from "@kit/lib/localStorage";
-import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
+import { useDashboardPeriod } from "@/components/dashboard-period-provider";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useWorkingCapital, useDeleteWorkingCapital } from "@kit/hooks";
@@ -32,34 +30,11 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, Wallet, BarChart3, ArrowUpDown } from "lucide-react";
 
-const WORKING_CAPITAL_PERIOD_KEY = "working-capital-period";
-
-function getInitialDateRange() {
-  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
-  try {
-    const saved = safeLocalStorage.getItem(WORKING_CAPITAL_PERIOD_KEY);
-    if (saved) {
-      const { startDate, endDate } = JSON.parse(saved);
-      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
-        return { startDate, endDate };
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return getDateRangeForPreset("this_year");
-}
-
 export default function WorkingCapitalContent() {
   const router = useRouter();
-  const [dateRange, setDateRange] = useState(getInitialDateRange);
+  const { dateRange } = useDashboardPeriod();
   const { data: workingCapital, isLoading } = useWorkingCapital();
   const deleteMutation = useDeleteWorkingCapital();
-
-  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
-    setDateRange(range);
-    safeLocalStorage.setItem(WORKING_CAPITAL_PERIOD_KEY, JSON.stringify(range));
-  }, []);
 
   const startMonth = dateRange.startDate.slice(0, 7);
   const endMonth = dateRange.endDate.slice(0, 7);
@@ -226,7 +201,6 @@ export default function WorkingCapitalContent() {
             Track your working capital needs and cash flow requirements
           </p>
         </div>
-        <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
       </div>
 
       {/* Summary Cards */}

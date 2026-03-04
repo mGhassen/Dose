@@ -1,37 +1,17 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useExpenses, useDeleteExpense, useSubscriptions, useInventorySuppliers } from "@kit/hooks";
 import Link from "next/link";
-import { getDateRangeForPreset } from "@kit/lib/date-periods";
-import { safeLocalStorage } from "@kit/lib/localStorage";
 import type { Expense, ExpenseCategory } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
-import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
-
-const EXPENSES_PERIOD_KEY = "expenses-period";
-
-function getInitialDateRange() {
-  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
-  try {
-    const saved = safeLocalStorage.getItem(EXPENSES_PERIOD_KEY);
-    if (saved) {
-      const { startDate, endDate } = JSON.parse(saved);
-      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
-        return { startDate, endDate };
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return getDateRangeForPreset("this_year");
-}
+import { useDashboardPeriod } from "@/components/dashboard-period-provider";
 
 interface ExpensesContentProps {
   selectedExpenseId?: number;
@@ -39,14 +19,9 @@ interface ExpensesContentProps {
 
 export default function ExpensesContent({ selectedExpenseId }: ExpensesContentProps) {
   const router = useRouter();
-  const [dateRange, setDateRange] = useState(getInitialDateRange);
+  const { dateRange } = useDashboardPeriod();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-
-  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
-    setDateRange(range);
-    safeLocalStorage.setItem(EXPENSES_PERIOD_KEY, JSON.stringify(range));
-  }, []);
 
   const { data: expensesResponse, isLoading } = useExpenses({
     page,
@@ -236,7 +211,6 @@ export default function ExpensesContent({ selectedExpenseId }: ExpensesContentPr
             Manage and analyze your business expenses and charges
           </p>
         </div>
-        <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
       </div>
       </div>
 

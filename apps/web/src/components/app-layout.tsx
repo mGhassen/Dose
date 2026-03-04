@@ -61,13 +61,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const userRole = getUserRole();
 
-  // Render appropriate layout based on role
   switch (userRole) {
-    case 'admin':
+    case "admin":
       return <AdminLayout>{children}</AdminLayout>;
-    case 'manager':
+    case "manager":
       return <ManagerLayout>{children}</ManagerLayout>;
-    case 'user':
+    case "user":
     default:
       return <UserLayout>{children}</UserLayout>;
   }

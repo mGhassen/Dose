@@ -1,32 +1,12 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import { useAuth } from "@kit/hooks";
 import { useFinancialKPIs, useRevenueChart, useExpensesChart, useProfitChart, useCashFlowChart } from "@kit/hooks";
 import { formatCurrency } from "@kit/lib/config";
 import { formatShortDate } from "@kit/lib/date-format";
-import { getDateRangeForPreset } from "@kit/lib/date-periods";
-import { safeLocalStorage } from "@kit/lib/localStorage";
-
-const DASHBOARD_PERIOD_KEY = "dashboard-period";
-
-function getInitialDateRange() {
-  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
-  try {
-    const saved = safeLocalStorage.getItem(DASHBOARD_PERIOD_KEY);
-    if (saved) {
-      const { startDate, endDate } = JSON.parse(saved);
-      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
-        return { startDate, endDate };
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return getDateRangeForPreset("this_year");
-}
 import AppLayout from "@/components/app-layout";
-import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
+import { useDashboardPeriod } from "@/components/dashboard-period-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import {
   TrendingUp,
@@ -41,12 +21,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 
 export default function DashboardContent() {
   const { user } = useAuth();
-  const [dateRange, setDateRange] = useState(getInitialDateRange);
-
-  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
-    setDateRange(range);
-    safeLocalStorage.setItem(DASHBOARD_PERIOD_KEY, JSON.stringify(range));
-  }, []);
+  const { dateRange } = useDashboardPeriod();
 
   const apiParams = useMemo(
     () => ({ startDate: dateRange.startDate, endDate: dateRange.endDate }),
@@ -69,7 +44,6 @@ export default function DashboardContent() {
               Welcome back, {user?.firstName || user?.email || "User"}! Here&apos;s your financial overview.
             </p>
           </div>
-          <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
         </div>
 
         {/* KPI Cards */}

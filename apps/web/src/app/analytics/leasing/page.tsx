@@ -1,10 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { getDateRangeForPreset } from "@kit/lib/date-periods";
-import { safeLocalStorage } from "@kit/lib/localStorage";
-import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
 import AppLayout from "@/components/app-layout";
+import { useDashboardPeriod } from "@/components/dashboard-period-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import { 
@@ -27,33 +24,10 @@ import { useLeasingAnalytics } from "@kit/hooks";
 
 const COLORS = ['#a855f7', '#3b82f6'];
 
-const LEASING_ANALYTICS_PERIOD_KEY = "leasing-analytics-period";
-
-function getInitialDateRange() {
-  if (typeof window === "undefined") return getDateRangeForPreset("this_year");
-  try {
-    const saved = safeLocalStorage.getItem(LEASING_ANALYTICS_PERIOD_KEY);
-    if (saved) {
-      const { startDate, endDate } = JSON.parse(saved);
-      if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
-        return { startDate, endDate };
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return getDateRangeForPreset("this_year");
-}
-
 export default function LeasingAnalyticsPage() {
-  const [dateRange, setDateRange] = useState(getInitialDateRange);
+  const { dateRange } = useDashboardPeriod();
   const selectedYear = dateRange.startDate.slice(0, 4);
   const leasingAnalytics = useLeasingAnalytics(selectedYear);
-
-  const handleDateRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
-    setDateRange(range);
-    safeLocalStorage.setItem(LEASING_ANALYTICS_PERIOD_KEY, JSON.stringify(range));
-  }, []);
 
   return (
     <AppLayout>
@@ -63,7 +37,6 @@ export default function LeasingAnalyticsPage() {
             <h1 className="text-3xl font-bold">Leasing Analytics</h1>
             <p className="text-muted-foreground">Comprehensive analytics for leasing</p>
           </div>
-          <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
         </div>
 
         <Tabs defaultValue="overview" className="space-y-4">

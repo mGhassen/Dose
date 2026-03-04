@@ -5,6 +5,7 @@ import { getQueryFn } from "@kit/lib/queryClient";
 import { MSWProvider } from "@/components/msw-provider";
 import { UserSettingsProvider } from "@/components/user-settings-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { DashboardPeriodProvider } from "@/components/dashboard-period-provider";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = React.useState(
@@ -52,7 +53,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <UserSettingsProvider>
           <ThemeProvider>
-            {children}
+            <DashboardPeriodProvider>
+              {children}
+            </DashboardPeriodProvider>
           </ThemeProvider>
         </UserSettingsProvider>
       </QueryClientProvider>

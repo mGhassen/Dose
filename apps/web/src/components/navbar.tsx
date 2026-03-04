@@ -24,9 +24,12 @@ import Link from "next/link";
 import { SidebarTrigger } from "@kit/ui/sidebar";
 import { GlobalSearch } from "@/components/global-search";
 import { useTheme } from "@/components/theme-provider";
+import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
+import { useDashboardPeriod } from "@/components/dashboard-period-provider";
 
 export function Navbar() {
   const { theme, setTheme } = useTheme();
+  const { dateRange, setDateRange } = useDashboardPeriod();
 
   const getThemeIcon = () => {
     switch (theme) {
@@ -47,12 +50,10 @@ export function Navbar() {
         {/* Sidebar Toggle */}
         <div className="flex items-center gap-4">
           <SidebarTrigger className="-ml-1" />
-          
-          {/* Global Search */}
           <GlobalSearch />
+          <DashboardPeriodFilter value={dateRange} onChange={setDateRange} />
         </div>
 
-        {/* Navigation */}
         <div className="flex items-center gap-6 ml-auto">
           <nav className="flex items-center gap-4">
             {/* Theme Switcher */}
