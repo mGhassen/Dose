@@ -27,7 +27,7 @@ export default function SalesLayoutClient({
       <AppLayout>
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <div
-            className={`flex flex-1 min-w-0 flex-col overflow-hidden pt-4 ${showSidebar ? "p-6" : "p-4"}`}
+            className={`flex flex-1 min-w-0 flex-col overflow-hidden pt-4 ${showSidebar ? "p-4" : "p-4"}`}
           >
             <SalesContent selectedSaleId={saleId ? Number(saleId) : undefined} />
           </div>

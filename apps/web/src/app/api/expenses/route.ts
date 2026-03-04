@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
         const l = lines[i];
         await supabase.from('expense_line_items').insert({
           expense_id: expenseRow.id,
-          item_id: l.itemId ?? null,
+          item_id: l.subscriptionId != null ? null : (l.itemId ?? null),
           subscription_id: l.subscriptionId ?? null,
           quantity: l.quantity,
           unit_id: l.unitId ?? null,
