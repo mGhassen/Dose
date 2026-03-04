@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { DatePicker } from "@kit/ui/date-picker";
 import { TimePicker } from "@kit/ui/time-picker";
@@ -21,6 +22,7 @@ export interface SaleCreateContentProps {
 }
 
 export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps) {
+  const router = useRouter();
   const createSale = useCreateSale();
   const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
   const items = itemsResponse?.data ?? [];
@@ -60,10 +62,24 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     return () => { cancelled = true; };
   }, [formData.itemId, formData.date]);
 
+  useEffect(() => {
+    if (!formData.itemId || !priceOnDate) return;
+    setFormData((prev) => ({
+      ...prev,
+      unitPrice: priceOnDate.unitPrice != null ? String(priceOnDate.unitPrice) : "",
+      unitCost: priceOnDate.unitCost != null ? String(priceOnDate.unitCost) : "",
+    }));
+  }, [priceOnDate?.unitPrice, priceOnDate?.unitCost, formData.itemId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.date || !formData.type || !formData.amount) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+    const amountNum = parseFloat(formData.amount);
+    if (Number.isNaN(amountNum) || amountNum <= 0) {
+      toast.error("Amount must be a number greater than 0");
       return;
     }
     if (quantityUnitRequired && (!formData.quantity || formData.unitId == null)) {
@@ -75,7 +91,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
       const sale = await createSale.mutateAsync({
         date: dateTimeIso,
         type: formData.type as SalesType,
-        amount: parseFloat(formData.amount),
+        amount: amountNum,
         quantity: formData.quantity ? parseFloat(formData.quantity) : undefined,
         unitId: formData.unitId ?? undefined,
         unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
@@ -94,19 +110,27 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
 
   const handleInputChange = (field: string, value: any) => {
     const updates: Record<string, any> = { [field]: value };
-    if (field === 'itemId') {
-      const item = value ? items.find(i => i.id === parseInt(value)) : undefined;
+    if (field === "itemId") {
+      const item = value ? items.find((i) => i.id === parseInt(value)) : undefined;
       updates.unitId = item?.unitId ?? null;
-      updates.unitPrice = item?.unitPrice != null ? String(item.unitPrice) : '';
-      updates.unitCost = item?.unitCost != null ? String(item.unitCost) : '';
       if (!value) {
-        updates.quantity = '';
+        updates.quantity = "";
         updates.unitId = null;
-        updates.unitPrice = '';
-        updates.unitCost = '';
+        updates.unitPrice = "";
+        updates.unitCost = "";
       }
     }
-    setFormData(prev => ({ ...prev, ...updates }));
+    setFormData((prev) => {
+      const next = { ...prev, ...updates };
+      if (field === "quantity" || field === "unitPrice") {
+        const qty = next.quantity !== "" && next.quantity != null ? parseFloat(String(next.quantity)) : NaN;
+        const price = next.unitPrice !== "" && next.unitPrice != null ? parseFloat(String(next.unitPrice)) : NaN;
+        if (!isNaN(qty) && !isNaN(price) && qty > 0 && price >= 0) {
+          next.amount = (qty * price).toFixed(2);
+        }
+      }
+      return next;
+    });
   };
 
   return (
@@ -125,9 +149,10 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
               type="item"
               items={items}
               selectedId={formData.itemId ? parseInt(formData.itemId) : undefined}
-              onSelect={(item) => handleInputChange('itemId', item.id === 0 ? '' : String(item.id))}
+              onSelect={(item) => handleInputChange("itemId", item.id === 0 ? "" : String(item.id))}
+              onCreateNew={() => router.push("/items/create")}
               placeholder="Select produced item (optional)"
-              getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}${(i as { category?: string }).category ? ` (${(i as { category?: string }).category})` : ''}`}
+              getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}${(i as { category?: string }).category ? ` (${(i as { category?: string }).category})` : ""}`}
             />
             <p className="text-xs text-muted-foreground">
               When selected, quantity and unit are required.

@@ -325,18 +325,6 @@ export function UnifiedSelector({
                   <span className="text-muted-foreground">{tCommon('noSelection')}</span>
                 </CommandItem>
               </CommandGroup>
-              
-              {onCreateNew && (
-                <CommandGroup>
-                  <CommandItem
-                    onSelect={handleCreateNew}
-                    className="flex items-center gap-2 cursor-pointer px-3 py-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span className="font-medium">{tCommon('createNew', { entity: type })}</span>
-                  </CommandItem>
-                </CommandGroup>
-              )}
 
               {filteredItems.length > 0 ? (
                 <CommandGroup heading={tCommon('selectExisting', { item: type })}>
@@ -390,6 +378,18 @@ export function UnifiedSelector({
                 </CommandGroup>
               )}
             </CommandList>
+            {onCreateNew && (
+              <div className="flex shrink-0 border-t bg-muted/30 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={handleCreateNew}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium hover:bg-muted"
+                >
+                  <Plus className="h-4 w-4" />
+                  {tCommon('createNew', { entity: type })}
+                </button>
+              </div>
+            )}
           </Command>
         </PopoverContent>
       </Popover>

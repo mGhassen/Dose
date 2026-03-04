@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useSaleById, useUpdateSale, useDeleteSale, useItems } from "@kit/hooks";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatDateTime } from "@kit/lib/date-format";
@@ -81,6 +82,7 @@ function DetailRow({
 }
 
 export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailContentProps) {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const { data: sale, isLoading } = useSaleById(saleId);
   const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
@@ -99,6 +101,8 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
     unitCost: "",
   });
 
+  const [priceOnDate, setPriceOnDate] = useState<{ unitPrice: number | null; unitCost: number | null } | null>(null);
+
   useEffect(() => {
     if (sale) {
       const hasTime = sale.date.includes("T");
@@ -115,6 +119,35 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
       });
     }
   }, [sale]);
+
+  useEffect(() => {
+    if (!formData.itemId || !formData.date) {
+      setPriceOnDate(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/items/${formData.itemId}/resolved-price?date=${formData.date}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d) setPriceOnDate({ unitPrice: d.unitPrice ?? null, unitCost: d.unitCost ?? null });
+        else if (!cancelled) setPriceOnDate(null);
+      })
+      .catch(() => {
+        if (!cancelled) setPriceOnDate(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.itemId, formData.date]);
+
+  useEffect(() => {
+    if (!formData.itemId || !priceOnDate) return;
+    setFormData((prev) => ({
+      ...prev,
+      unitPrice: priceOnDate.unitPrice != null ? String(priceOnDate.unitPrice) : "",
+      unitCost: priceOnDate.unitCost != null ? String(priceOnDate.unitCost) : "",
+    }));
+  }, [priceOnDate?.unitPrice, priceOnDate?.unitCost, formData.itemId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,11 +195,10 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
 
   const handleInputChange = (field: string, value: string | number) => {
     const updates: Record<string, string | number> = { [field]: value };
-    if (field === "itemId" && itemsResponse?.data) {
-      const item = value ? itemsResponse.data.find((i: { id: number }) => i.id === (typeof value === "string" ? parseInt(value, 10) : value)) : undefined;
-      if (item) {
-        updates.unitPrice = (item as { unitPrice?: number }).unitPrice?.toString() ?? "";
-        updates.unitCost = (item as { unitCost?: number }).unitCost?.toString() ?? "";
+    if (field === "itemId") {
+      if (!value) {
+        updates.unitPrice = "";
+        updates.unitCost = "";
       }
     }
     setFormData((prev) => ({ ...prev, ...updates }));
@@ -325,6 +357,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                   onSelect={(item) =>
                     handleInputChange("itemId", item.id === 0 ? "" : String(item.id))
                   }
+                  onCreateNew={() => router.push("/items/create")}
                   placeholder="Link to item or recipe (optional)"
                   getDisplayName={(i) =>
                     (i as { itemType?: string }).itemType === "recipe"

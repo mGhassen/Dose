@@ -60,6 +60,15 @@ export default function CreateSalePage() {
     return () => { cancelled = true; };
   }, [formData.itemId, formData.date]);
 
+  useEffect(() => {
+    if (!formData.itemId || !priceOnDate) return;
+    setFormData((prev) => ({
+      ...prev,
+      unitPrice: priceOnDate.unitPrice != null ? String(priceOnDate.unitPrice) : "",
+      unitCost: priceOnDate.unitCost != null ? String(priceOnDate.unitCost) : "",
+    }));
+  }, [priceOnDate?.unitPrice, priceOnDate?.unitCost, formData.itemId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -95,19 +104,17 @@ export default function CreateSalePage() {
 
   const handleInputChange = (field: string, value: any) => {
     const updates: Record<string, any> = { [field]: value };
-    if (field === 'itemId') {
-      const item = value ? items.find(i => i.id === parseInt(value)) : undefined;
+    if (field === "itemId") {
+      const item = value ? items.find((i) => i.id === parseInt(value)) : undefined;
       updates.unitId = item?.unitId ?? null;
-      updates.unitPrice = item?.unitPrice != null ? String(item.unitPrice) : '';
-      updates.unitCost = item?.unitCost != null ? String(item.unitCost) : '';
       if (!value) {
-        updates.quantity = '';
+        updates.quantity = "";
         updates.unitId = null;
-        updates.unitPrice = '';
-        updates.unitCost = '';
+        updates.unitPrice = "";
+        updates.unitCost = "";
       }
     }
-    setFormData(prev => ({ ...prev, ...updates }));
+    setFormData((prev) => ({ ...prev, ...updates }));
   };
 
   return (
@@ -133,9 +140,10 @@ export default function CreateSalePage() {
                     type="item"
                     items={items}
                     selectedId={formData.itemId ? parseInt(formData.itemId) : undefined}
-                    onSelect={(item) => handleInputChange('itemId', item.id === 0 ? '' : String(item.id))}
+                    onSelect={(item) => handleInputChange("itemId", item.id === 0 ? "" : String(item.id))}
+                    onCreateNew={() => router.push("/items/create")}
                     placeholder="Select produced item (optional)"
-                    getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}${(i as { category?: string }).category ? ` (${(i as { category?: string }).category})` : ''}`}
+                    getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}${(i as { category?: string }).category ? ` (${(i as { category?: string }).category})` : ""}`}
                   />
                   <p className="text-xs text-muted-foreground">
                     Only produced items (from recipes) are shown. When selected, quantity and unit are required.

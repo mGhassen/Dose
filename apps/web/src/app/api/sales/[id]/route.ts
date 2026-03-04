@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Sale, UpdateSaleData } from '@kit/types';
 import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
+import { upsertSellingPrice, upsertCost } from '@/lib/items/price-history-upsert';
 
 function transformSale(row: any): Sale {
   return {
@@ -155,26 +156,32 @@ export async function PUT(
       }
     }
     const dateStr = body.date ? body.date.split('T')[0] : undefined;
-    if (body.itemId && dateStr && (body.unitPrice === undefined || body.unitCost === undefined)) {
-      let priceLookupItemId: number | null = null;
+    let priceLookupItemId: number | null = null;
+    if (body.itemId) {
       const { data: itemRow } = await supabase.from('items').select('id').eq('id', body.itemId).single();
       if (itemRow) priceLookupItemId = itemRow.id;
       else {
         const { data: produced } = await supabase.from('items').select('id').eq('produced_from_recipe_id', body.itemId).single();
         if (produced) priceLookupItemId = produced.id;
       }
-      if (priceLookupItemId) {
-        if (body.unitPrice === undefined) {
-          const resolved = await getItemSellingPriceAsOf(supabase, priceLookupItemId, dateStr);
-          if (resolved != null) body.unitPrice = resolved;
-        }
-        if (body.unitCost === undefined) {
-          const resolved = await getItemCostAsOf(supabase, priceLookupItemId, dateStr);
-          if (resolved != null) body.unitCost = resolved;
-        }
+    }
+    if (priceLookupItemId && dateStr) {
+      if (body.unitPrice === undefined) {
+        const resolved = await getItemSellingPriceAsOf(supabase, priceLookupItemId, dateStr);
+        if (resolved != null) body.unitPrice = resolved;
+      }
+      if (body.unitCost === undefined) {
+        const resolved = await getItemCostAsOf(supabase, priceLookupItemId, dateStr);
+        if (resolved != null) body.unitCost = resolved;
+      }
+      if (body.unitPrice != null) {
+        await upsertSellingPrice(supabase, priceLookupItemId, dateStr, body.unitPrice);
+      }
+      if (body.unitCost != null) {
+        await upsertCost(supabase, priceLookupItemId, dateStr, body.unitCost);
       }
     }
-    
+
     const { data, error } = await supabase
       .from('sales')
       .update(transformToSnakeCase(body))

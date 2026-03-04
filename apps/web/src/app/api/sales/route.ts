@@ -8,6 +8,7 @@ import { StockMovementType, StockMovementReferenceType } from '@kit/types';
 import { getItemStock } from '@/lib/stock/get-item-stock';
 import { produceRecipe } from '@/lib/stock/produce-recipe';
 import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
+import { upsertSellingPrice, upsertCost } from '@/lib/items/price-history-upsert';
 
 function transformSale(row: any): Sale {
   return {
@@ -257,9 +258,15 @@ export async function POST(request: NextRequest) {
           const resolved = await getItemCostAsOf(supabase, priceLookupItemId, dateStr);
           if (resolved != null) body.unitCost = resolved;
         }
+        if (body.unitPrice != null) {
+          await upsertSellingPrice(supabase, priceLookupItemId, dateStr, body.unitPrice);
+        }
+        if (body.unitCost != null) {
+          await upsertCost(supabase, priceLookupItemId, dateStr, body.unitCost);
+        }
       }
     }
-    
+
     const { data, error } = await supabase
       .from('sales')
       .insert(transformToSnakeCase(body))

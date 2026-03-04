@@ -77,16 +77,14 @@ export async function POST(
 
     const { data, error } = await supabase
       .from(table)
-      .insert({ item_id: itemId, effective_date: effectiveDate, [valueCol]: value })
-      .select('id, effective_date')
+      .upsert(
+        { item_id: itemId, effective_date: effectiveDate, [valueCol]: value },
+        { onConflict: 'item_id,effective_date' }
+      )
+      .select('id, effective_date, ' + valueCol)
       .single();
 
-    if (error) {
-      if (error.code === '23505') {
-        return NextResponse.json({ error: 'Entry already exists for this date' }, { status: 409 });
-      }
-      throw error;
-    }
+    if (error) throw error;
 
     if (type === 'cost') {
       await supabase.from('items').update({ unit_cost: null }).eq('id', itemId);
@@ -95,8 +93,8 @@ export async function POST(
     return NextResponse.json({
       id: data.id,
       effectiveDate: data.effective_date,
-      value,
-    }, { status: 201 });
+      value: data[valueCol] != null ? parseFloat(data[valueCol]) : value,
+    }, { status: 200 });
   } catch (error: unknown) {
     const err = error as { message?: string };
     console.error('Error creating price history:', error);
