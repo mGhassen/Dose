@@ -131,7 +131,6 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!subscriptionError && subscription) {
-        // Create an expense entry linked to this subscription
         const expenseData = {
           name: `${subscription.name} - Payment ${body.month}`,
           category: subscription.category,
@@ -140,15 +139,35 @@ export async function POST(request: NextRequest) {
           expense_date: body.paymentDate,
           description: body.notes || `Payment for subscription: ${subscription.name}`,
           vendor: subscription.vendor || null,
+          start_date: body.paymentDate,
+          subtotal: body.amount,
+          total_tax: 0,
+          total_discount: 0,
+          is_active: true,
         };
 
-        const { error: expenseError } = await supabase
+        const { data: expenseRow, error: expenseError } = await supabase
           .from('expenses')
-          .insert(expenseData);
+          .insert(expenseData)
+          .select()
+          .single();
 
-        if (expenseError) {
+        if (!expenseError && expenseRow) {
+          await supabase.from('expense_line_items').insert({
+            expense_id: expenseRow.id,
+            item_id: null,
+            subscription_id: body.referenceId,
+            quantity: 1,
+            unit_id: null,
+            unit_price: body.amount,
+            unit_cost: null,
+            tax_rate_percent: 0,
+            tax_amount: 0,
+            line_total: body.amount,
+            sort_order: 0,
+          });
+        } else if (expenseError) {
           console.error('Error creating expense for subscription payment:', expenseError);
-          // Don't fail the payment creation if expense creation fails
         }
       }
     }

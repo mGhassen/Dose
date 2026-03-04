@@ -220,6 +220,8 @@
         "metadataEnums": "Metadata Enums",
         "integrations": "Integrations",
         "units": "Units",
+        "taxRates": "Tax rates",
+        "expenseTaxRates": "Expense tax rates",
         "connectedIntegrations": "Connected Integrations",
         "profile": "Profile",
         "logout": "Logout",

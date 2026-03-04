@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ import {
   Receipt,
   Package,
   ChevronRight,
+  Plus,
 } from "lucide-react";
 import { DatePicker } from "@kit/ui/date-picker";
 import { UnifiedSelector } from "@/components/unified-selector";
@@ -37,6 +39,9 @@ import {
   useDeleteExpense,
   useSubscriptions,
   useInventorySuppliers,
+  useItems,
+  useUnits,
+  useVariablesByType,
 } from "@kit/hooks";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -44,6 +49,8 @@ import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { dateToYYYYMMDD } from "@kit/lib";
 import type { ExpenseCategory } from "@kit/types";
+
+import { getEffectiveTransactionTaxRate } from "@/lib/transaction-tax";
 
 const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   rent: "Rent",
@@ -91,6 +98,7 @@ export function ExpenseDetailContent({
   onClose,
   onDeleted,
 }: ExpenseDetailContentProps) {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const { data: expense, isLoading } = useExpenseById(expenseId);
   const { data: subscriptionsResponse } = useSubscriptions();
@@ -100,70 +108,148 @@ export function ExpenseDetailContent({
     supplierType: "vendor",
   });
   const suppliers = suppliersResponse?.data || [];
+  const { data: itemsResponse } = useItems({ limit: 1000 });
+  const items = itemsResponse?.data ?? [];
+  const { data: unitsData } = useUnits();
+  const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
+  const { data: taxVariables } = useVariablesByType('transaction_tax');
   const updateExpense = useUpdateExpense();
   const deleteMutation = useDeleteExpense();
 
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
-    amount: "",
-    subscriptionId: "",
     expenseDate: "",
     description: "",
-    vendor: "",
     supplierId: "",
+    discountType: "amount" as "amount" | "percent",
+    discountValue: "",
   });
+  const [lineItems, setLineItems] = useState<
+    Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string }>
+  >([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "" }]);
+
+  const taxRate = useMemo(
+    () => getEffectiveTransactionTaxRate(taxVariables, formData.category, formData.expenseDate),
+    [taxVariables, formData.category, formData.expenseDate]
+  );
+  const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
+    let sub = 0;
+    for (const line of lineItems) {
+      const q = parseFloat(line.quantity) || 0;
+      const p = parseFloat(line.unitPrice) || 0;
+      sub += Math.round(q * p * 100) / 100;
+    }
+    const tax = Math.round(sub * (taxRate / 100) * 100) / 100;
+    let disc = 0;
+    if (formData.discountValue) {
+      const v = parseFloat(formData.discountValue) || 0;
+      if (formData.discountType === "percent") disc = Math.round(sub * (v / 100) * 100) / 100;
+      else disc = Math.round(v * 100) / 100;
+    }
+    const tot = Math.round((sub + tax - disc) * 100) / 100;
+    return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
+  }, [lineItems, taxRate, formData.discountType, formData.discountValue]);
 
   useEffect(() => {
     if (expense) {
       setFormData({
         name: expense.name,
         category: expense.category,
-        amount: expense.amount.toString(),
-        subscriptionId: expense.subscriptionId?.toString() || "",
         expenseDate: expense.expenseDate.split("T")[0],
         description: expense.description || "",
-        vendor: expense.vendor || "",
         supplierId: expense.supplierId?.toString() || "",
+        discountType: "amount",
+        discountValue: expense.totalDiscount && expense.totalDiscount > 0 ? String(expense.totalDiscount) : "",
       });
+      const lines = expense.lineItems?.length
+        ? expense.lineItems.map((li) => ({
+            itemId: li.itemId?.toString() ?? "",
+            quantity: String(li.quantity),
+            unitId: li.unitId ?? null,
+            unitPrice: String(li.unitPrice),
+            unitCost: li.unitCost != null ? String(li.unitCost) : "",
+          }))
+        : [{ itemId: "", quantity: "1", unitId: null, unitPrice: String(expense.amount), unitCost: "" }];
+      setLineItems(lines);
     }
   }, [expense]);
 
+  const addLine = () => {
+    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "" }]);
+  };
+  const removeLine = (index: number) => {
+    if (lineItems.length <= 1) return;
+    setLineItems((prev) => prev.filter((_, i) => i !== index));
+  };
+  const updateLine = (index: number, field: string, value: string | number | null) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+  const handleItemSelect = (index: number, itemId: string) => {
+    updateLine(index, "itemId", itemId);
+    if (!itemId) return;
+    const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10));
+    if (item) {
+      const price = (item as { unitCost?: number; unitPrice?: number }).unitCost ?? (item as { unitPrice?: number }).unitPrice;
+      const cost = (item as { unitCost?: number }).unitCost;
+      setLineItems((prev) => {
+        const next = [...prev];
+        next[index] = {
+          ...next[index],
+          itemId,
+          unitPrice: price != null ? String(price) : next[index].unitPrice,
+          unitCost: cost != null ? String(cost) : next[index].unitCost,
+        };
+        return next;
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      !formData.name ||
-      !formData.category ||
-      !formData.amount ||
-      !formData.expenseDate
-    ) {
-      toast.error("Please fill in all required fields");
+    if (!formData.name || !formData.category || !formData.expenseDate) {
+      toast.error("Name, category and date are required");
       return;
     }
-    try {
-      await updateExpense.mutateAsync({
-        id: expenseId,
-        data: {
-          name: formData.name,
-          category: formData.category as ExpenseCategory,
-          amount: parseFloat(formData.amount),
-          subscriptionId: formData.subscriptionId
-            ? parseInt(formData.subscriptionId)
-            : undefined,
-          expenseDate: formData.expenseDate,
-          description: formData.description || undefined,
-          vendor: formData.vendor || undefined,
-          supplierId: formData.supplierId
-            ? parseInt(formData.supplierId)
-            : undefined,
-        },
+    const payloadLines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number }> = [];
+    for (let i = 0; i < lineItems.length; i++) {
+      const line = lineItems[i];
+      const qty = parseFloat(line.quantity);
+      const price = parseFloat(line.unitPrice);
+      if (isNaN(qty) || qty <= 0 || isNaN(price) || price < 0) {
+        toast.error(`Line ${i + 1}: quantity and unit price required`);
+        return;
+      }
+      payloadLines.push({
+        itemId: line.itemId ? parseInt(line.itemId, 10) : undefined,
+        quantity: qty,
+        unitId: line.unitId ?? undefined,
+        unitPrice: price,
+        unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
       });
-      toast.success("Expense updated successfully");
+    }
+    const payload = {
+      name: formData.name,
+      category: formData.category as ExpenseCategory,
+      expenseDate: formData.expenseDate,
+      description: formData.description || undefined,
+      supplierId: formData.supplierId ? parseInt(formData.supplierId, 10) : undefined,
+      lineItems: payloadLines,
+      discount:
+        formData.discountValue && parseFloat(formData.discountValue) > 0
+          ? { type: formData.discountType as "amount" | "percent", value: parseFloat(formData.discountValue) }
+          : undefined,
+    };
+    try {
+      await updateExpense.mutateAsync({ id: expenseId, data: payload as any });
+      toast.success("Expense updated");
       setIsEditing(false);
     } catch (error: unknown) {
-      toast.error(
-        (error as { message?: string })?.message || "Failed to update expense"
-      );
+      toast.error((error as { message?: string })?.message || "Failed to update expense");
     }
   };
 
@@ -183,10 +269,6 @@ export function ExpenseDetailContent({
       toast.error("Failed to delete expense");
       console.error(error);
     }
-  };
-
-  const handleInputChange = (field: string, value: string | number) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   if (isLoading) {
@@ -238,35 +320,23 @@ export function ExpenseDetailContent({
 
   if (isEditing) {
     return (
-      <form
-        onSubmit={handleSubmit}
-        className="flex min-h-0 flex-1 flex-col"
-      >
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
         <ScrollArea className="min-h-0 flex-1 pr-2">
-          <div className="space-y-6 pb-6 pr-1">
+          <div className="space-y-4 pb-6 pr-1">
             <div>
               <h2 className="text-lg font-semibold">Edit expense</h2>
-              <p className="text-sm text-muted-foreground">
-                Update the details below
-              </p>
+              <p className="text-sm text-muted-foreground">Update line items and totals</p>
             </div>
             <Separator />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                  placeholder="e.g., Office Rent"
-                  required
-                />
+                <Label htmlFor="name">Name *</Label>
+                <Input id="name" value={formData.name} onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))} required />
               </div>
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label>Category *</Label>
                 <UnifiedSelector
                   type="category"
-                  required
                   items={[
                     { id: "rent", name: "Rent" },
                     { id: "utilities", name: "Utilities" },
@@ -278,110 +348,130 @@ export function ExpenseDetailContent({
                     { id: "other", name: "Other" },
                   ]}
                   selectedId={formData.category || undefined}
-                  onSelect={(item) =>
-                    handleInputChange(
-                      "category",
-                      item.id === 0 ? "" : String(item.id)
-                    )
-                  }
-                  placeholder="Select category"
+                  onSelect={(item) => setFormData((p) => ({ ...p, category: item.id === 0 ? "" : String(item.id) }))}
+                  placeholder="Category"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="amount">Amount</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  value={formData.amount}
-                  onChange={(e) => handleInputChange("amount", e.target.value)}
-                  placeholder="0.00"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="expenseDate">Expense date</Label>
+              <div className="space-y-2 col-span-2">
+                <Label>Date *</Label>
                 <DatePicker
-                  id="expenseDate"
-                  value={
-                    formData.expenseDate
-                      ? new Date(formData.expenseDate)
-                      : undefined
-                  }
-                  onChange={(d) =>
-                    handleInputChange("expenseDate", d ? dateToYYYYMMDD(d) : "")
-                  }
+                  value={formData.expenseDate ? new Date(formData.expenseDate) : undefined}
+                  onChange={(d) => setFormData((p) => ({ ...p, expenseDate: d ? dateToYYYYMMDD(d) : "" }))}
                   placeholder="Pick a date"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Subscription</Label>
-                <UnifiedSelector
-                  type="subscription"
-                  items={subscriptions.map((sub: { id: number; name: string; description?: string }) => ({
-                    id: sub.id,
-                    name: sub.name,
-                    description: sub.description,
-                  }))}
-                  selectedId={
-                    formData.subscriptionId
-                      ? parseInt(formData.subscriptionId)
-                      : undefined
-                  }
-                  onSelect={(item) =>
-                    handleInputChange(
-                      "subscriptionId",
-                      item.id === 0 ? "" : String(item.id)
-                    )
-                  }
-                  placeholder="Link to subscription (optional)"
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Line items</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addLine}>
+                  <Plus className="h-4 w-4 mr-1" /> Add line
+                </Button>
+              </div>
+              <div className="space-y-3 border rounded-md p-3 bg-muted/30">
+                {lineItems.map((line, index) => (
+                  <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-4">
+                      <UnifiedSelector
+                        label=""
+                        type="item"
+                        items={items}
+                        selectedId={line.itemId ? parseInt(line.itemId, 10) : undefined}
+                        onSelect={(item) => handleItemSelect(index, item.id === 0 ? "" : String(item.id))}
+                        onCreateNew={() => router.push("/items/create")}
+                        placeholder="Item (optional)"
+                        getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}`}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-xs">Qty</Label>
+                      <Input type="number" step="0.01" min="0.01" value={line.quantity} onChange={(e) => updateLine(index, "quantity", e.target.value)} />
+                    </div>
+                    <div className="col-span-2">
+                      <UnifiedSelector
+                        label=""
+                        type="unit"
+                        items={unitItems}
+                        selectedId={line.unitId ?? undefined}
+                        onSelect={(item) => updateLine(index, "unitId", item.id === 0 ? null : (item.id as number))}
+                        placeholder="Unit"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-xs">Price</Label>
+                      <Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(index, "unitPrice", e.target.value)} />
+                    </div>
+                    <div className="col-span-1 flex items-end pb-2">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Label>Discount</Label>
+              <div className="flex gap-2">
+                <select
+                  className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  value={formData.discountType}
+                  onChange={(e) => setFormData((p) => ({ ...p, discountType: e.target.value as "amount" | "percent" }))}
+                >
+                  <option value="amount">Amount</option>
+                  <option value="percent">Percent</option>
+                </select>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.discountValue}
+                  onChange={(e) => setFormData((p) => ({ ...p, discountValue: e.target.value }))}
+                  placeholder="0"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Vendor</Label>
-                <UnifiedSelector
-                  type="vendor"
-                  items={suppliers}
-                  selectedId={
-                    formData.supplierId
-                      ? parseInt(formData.supplierId)
-                      : undefined
-                  }
-                  onSelect={(item) =>
-                    handleInputChange(
-                      "supplierId",
-                      item.id === 0 ? "" : String(item.id)
-                    )
-                  }
-                  placeholder="Select vendor"
-                />
+            </div>
+            <div className="rounded-md border bg-muted/50 p-3 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>{subtotal.toFixed(2)}</span>
               </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) =>
-                    handleInputChange("description", e.target.value)
-                  }
-                  placeholder="Additional notes"
-                  rows={3}
-                  className="resize-none"
-                />
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Tax ({taxRate.toFixed(1)}%)</span>
+                <span>{totalTax.toFixed(2)}</span>
               </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Discount</span>
+                  <span>-{discountAmount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-semibold pt-2 border-t">
+                <span>Total</span>
+                <span>{total.toFixed(2)}</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Vendor</Label>
+              <UnifiedSelector
+                type="vendor"
+                items={suppliers}
+                selectedId={formData.supplierId ? parseInt(formData.supplierId, 10) : undefined}
+                onSelect={(item) => setFormData((p) => ({ ...p, supplierId: item.id === 0 ? "" : String(item.id) }))}
+                placeholder="Select vendor"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea id="description" value={formData.description} onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))} rows={2} />
             </div>
           </div>
         </ScrollArea>
         <div className="flex shrink-0 gap-3 border-t bg-background p-4 -mx-6">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setIsEditing(false)}
-            className="flex-1"
-          >
+          <Button type="button" variant="outline" onClick={() => setIsEditing(false)} className="flex-1">
             Cancel
           </Button>
-          <Button type="submit" disabled={updateExpense.isPending} className="flex-1">
+          <Button type="submit" disabled={updateExpense.isPending || total <= 0} className="flex-1">
             {updateExpense.isPending ? "Saving…" : "Save changes"}
           </Button>
         </div>
@@ -477,6 +567,59 @@ export function ExpenseDetailContent({
             <DetailRow icon={DollarSign} label="Amount">
               <span className="tabular-nums">{formatCurrency(expense.amount)}</span>
             </DetailRow>
+            <Separator />
+            <div className="py-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Line items</p>
+              <div className="rounded-md border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-2 font-medium">Item</th>
+                      <th className="text-right p-2 font-medium">Qty</th>
+                      <th className="text-right p-2 font-medium">Price</th>
+                      <th className="text-right p-2 font-medium">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(expense.lineItems && expense.lineItems.length > 0
+                      ? expense.lineItems
+                      : [{ id: 0, item: undefined, quantity: 1, unitPrice: expense.amount, lineTotal: expense.amount }]
+                    ).map((line: { id: number; item?: { name?: string }; quantity: number; unitPrice: number; lineTotal: number }) => (
+                      <tr key={line.id} className="border-b last:border-0">
+                        <td className="p-2">{line.item?.name ?? line.subscription?.name ?? "—"}</td>
+                        <td className="p-2 text-right tabular-nums">{line.quantity}</td>
+                        <td className="p-2 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
+                        <td className="p-2 text-right tabular-nums">{formatCurrency(line.lineTotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-2 space-y-1 text-sm">
+                {expense.subtotal != null && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Subtotal</span>
+                    <span className="tabular-nums">{formatCurrency(expense.subtotal)}</span>
+                  </div>
+                )}
+                {expense.totalTax != null && expense.totalTax > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Tax</span>
+                    <span className="tabular-nums">{formatCurrency(expense.totalTax)}</span>
+                  </div>
+                )}
+                {expense.totalDiscount != null && expense.totalDiscount > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Discount</span>
+                    <span className="tabular-nums">-{formatCurrency(expense.totalDiscount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-medium pt-1">
+                  <span>Total</span>
+                  <span className="tabular-nums">{formatCurrency(expense.amount)}</span>
+                </div>
+              </div>
+            </div>
             <Separator />
             <DetailRow icon={Calendar} label="Expense date">
               {formatDate(expense.expenseDate)}

@@ -123,7 +123,6 @@ export async function PUT(
                 expense_date: body.paidDate || data.month + '-01',
                 description: body.notes || `Payment for expense: ${expenseData.name} - ${data.month}`,
                 vendor: expenseData.vendor || null,
-                recurrence: 'one_time',
                 start_date: body.paidDate || data.month + '-01',
                 is_active: true,
               };

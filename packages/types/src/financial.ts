@@ -54,6 +54,7 @@ export enum DepreciationMethod {
 export enum VariableType {
   COST = 'cost',
   TAX = 'tax',
+  TRANSACTION_TAX = 'transaction_tax',
   INFLATION = 'inflation',
   EXCHANGE_RATE = 'exchange_rate',
   OTHER = 'other'
@@ -145,29 +146,72 @@ export interface UpdateVendorData extends Partial<CreateVendorData> {}
 // EXPENSES (Charges d'exploitation - one-time or linked to subscription)
 // ============================================================================
 
+export interface ExpenseLineItem {
+  id: number;
+  expenseId: number;
+  itemId?: number;
+  subscriptionId?: number;
+  quantity: number;
+  unitId?: number;
+  unitPrice: number;
+  unitCost?: number;
+  taxRatePercent?: number;
+  taxAmount?: number;
+  lineTotal: number;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+  item?: Item;
+  subscription?: { id: number; name: string };
+}
+
 export interface Expense {
   id: number;
   name: string;
   category: ExpenseCategory;
   amount: number;
-  subscriptionId?: number; // Optional link to subscription
+  subscriptionId?: number;
   description?: string;
-  vendor?: string; // Deprecated: use supplierId instead
-  supplierId?: number; // Link to supplier (vendor type)
-  expenseDate: string; // ISO date - when the expense occurred
+  vendor?: string;
+  supplierId?: number;
+  expenseDate: string;
+  subtotal?: number;
+  totalTax?: number;
+  totalDiscount?: number;
+  lineItems?: ExpenseLineItem[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ExpenseLineItemInput {
+  itemId?: number;
+  subscriptionId?: number;
+  quantity: number;
+  unitId?: number;
+  unitPrice: number;
+  unitCost?: number;
+  taxRatePercent?: number;
 }
 
 export interface CreateExpenseData {
   name: string;
   category: ExpenseCategory;
   amount: number;
-  subscriptionId?: number; // Optional link to subscription
+  subscriptionId?: number;
   description?: string;
-  vendor?: string; // Deprecated: use supplierId instead
-  supplierId?: number; // Link to supplier (vendor type)
-  expenseDate: string; // ISO date - when the expense occurred
+  vendor?: string;
+  supplierId?: number;
+  expenseDate: string;
+}
+
+export interface CreateExpenseTransactionPayload {
+  name: string;
+  category: ExpenseCategory;
+  expenseDate: string;
+  description?: string;
+  supplierId?: number;
+  lineItems: ExpenseLineItemInput[];
+  discount?: TransactionDiscount;
 }
 
 export interface UpdateExpenseData extends Partial<CreateExpenseData> {}
@@ -440,8 +484,47 @@ export interface CreatePersonnelData {
 export interface UpdatePersonnelData extends Partial<CreatePersonnelData> {}
 
 // ============================================================================
-// SALES (CA - Chiffre d'affaires)
+// SALES (CA - Chiffre d'affaires) / TRANSACTIONS
 // ============================================================================
+
+export interface SalesTaxRate {
+  id: number;
+  name: string;
+  ratePercent: number;
+  salesType: SalesType | string;
+  effectiveDate: string;
+  endDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExpenseTaxRate {
+  id: number;
+  name: string;
+  ratePercent: number;
+  expenseCategory: ExpenseCategory | string;
+  effectiveDate: string;
+  endDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaleLineItem {
+  id: number;
+  saleId: number;
+  itemId?: number;
+  quantity: number;
+  unitId?: number;
+  unitPrice: number;
+  unitCost?: number;
+  taxRatePercent?: number;
+  taxAmount?: number;
+  lineTotal: number;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+  item?: Item;
+}
 
 export interface Sale {
   id: number;
@@ -455,9 +538,13 @@ export interface Sale {
   itemId?: number;
   unitPrice?: number;
   unitCost?: number;
+  subtotal?: number;
+  totalTax?: number;
+  totalDiscount?: number;
   createdAt: string;
   updatedAt: string;
   item?: Item;
+  lineItems?: SaleLineItem[];
 }
 
 export interface SalesSummary {
@@ -481,6 +568,33 @@ export interface CreateSaleData {
   itemId?: number;
   unitPrice?: number;
   unitCost?: number;
+  subtotal?: number;
+  totalTax?: number;
+  totalDiscount?: number;
+  lineItems?: SaleLineItemInput[];
+  discount?: TransactionDiscount;
+}
+
+export interface SaleLineItemInput {
+  itemId?: number;
+  quantity: number;
+  unitId?: number;
+  unitPrice: number;
+  unitCost?: number;
+  taxRatePercent?: number;
+}
+
+export interface TransactionDiscount {
+  type: 'amount' | 'percent';
+  value: number;
+}
+
+export interface CreateTransactionPayload {
+  date: string;
+  type: SalesType;
+  lineItems: SaleLineItemInput[];
+  discount?: TransactionDiscount;
+  description?: string;
 }
 
 export interface UpdateSaleData extends Partial<CreateSaleData> {}
@@ -830,6 +944,7 @@ export interface Item {
   vendorId?: number;
   notes?: string;
   producedFromRecipeId?: number; // ID of recipe that produced this item
+  defaultTaxRatePercent?: number; // Default tax % when item is added to sale/expense line (user can override)
   // Recipe-specific fields (only when itemType === 'recipe')
   servingSize?: number;
   preparationTime?: number;
@@ -848,6 +963,7 @@ export interface CreateItemData {
   unitCost?: number;
   vendorId?: number;
   notes?: string;
+  defaultTaxRatePercent?: number;
   isActive?: boolean;
   // Note: Recipes are created via CreateRecipeData, not CreateItemData
   // Items table only stores regular inventory items

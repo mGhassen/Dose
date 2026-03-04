@@ -12,7 +12,6 @@ function transformExpense(row: any): Expense {
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
-    recurrence: row.recurrence,
     startDate: row.start_date,
     endDate: row.end_date,
     description: row.description,

@@ -22,6 +22,7 @@ function transformItem(row: any): Item {
     vendorId: row.vendor_id,
     notes: row.notes,
     producedFromRecipeId: row.produced_from_recipe_id,
+    defaultTaxRatePercent: row.default_tax_rate_percent != null ? parseFloat(row.default_tax_rate_percent) : undefined,
   };
 }
 
@@ -40,6 +41,7 @@ function transformToSnakeCase(data: UpdateItemData): any {
   if (data.notes !== undefined) result.notes = data.notes;
   if (data.isActive !== undefined) result.is_active = data.isActive;
   if (data.producedFromRecipeId !== undefined) result.produced_from_recipe_id = data.producedFromRecipeId;
+  if (data.defaultTaxRatePercent !== undefined) result.default_tax_rate_percent = data.defaultTaxRatePercent;
   return result;
 }
 

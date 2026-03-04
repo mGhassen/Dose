@@ -1046,7 +1046,7 @@ export default function DataTablePage<T>({
           )}
 
           {/* Grid / Table View */}
-          <div className="flex-1 min-h-0 border-t border-border overflow-auto flex flex-col">
+          <div className="flex-1 min-h-0 border-t border-border flex flex-col">
           {view === 'grid' && enableGridView ? (
             <div className="flex-1 min-h-0">
               {(() => {
@@ -1181,9 +1181,9 @@ export default function DataTablePage<T>({
               })()}
             </div>
           ) : (
-            /* Table View */
-            <div className="flex-1 min-h-0 overflow-auto">
-            <DataTable 
+            /* Table View: full height, scroll inside DataTable, pagination fixed at bottom */
+            <div className="flex-1 min-h-0 flex flex-col">
+                <DataTable 
             key={pagination ? `server-${pagination.page}-${pagination.pageSize}` : `client-${filteredData.length}`}
             columns={columnOrder
               .map(key => columns.find((col, idx) => {

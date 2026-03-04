@@ -2,13 +2,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { Sale, CreateSaleData, PaginatedResponse } from '@kit/types';
+import type { Sale, CreateSaleData, CreateTransactionPayload, SaleLineItem, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { StockMovementType, StockMovementReferenceType } from '@kit/types';
 import { getItemStock } from '@/lib/stock/get-item-stock';
 import { produceRecipe } from '@/lib/stock/produce-recipe';
 import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
 import { upsertSellingPrice, upsertCost } from '@/lib/items/price-history-upsert';
+import { getTaxRateFor } from '@/lib/tax-rate';
 
 function transformSale(row: any): Sale {
   return {
@@ -23,9 +24,30 @@ function transformSale(row: any): Sale {
     itemId: row.item_id,
     unitPrice: row.unit_price != null ? parseFloat(row.unit_price) : undefined,
     unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
+    subtotal: row.subtotal != null ? parseFloat(row.subtotal) : undefined,
+    totalTax: row.total_tax != null ? parseFloat(row.total_tax) : undefined,
+    totalDiscount: row.total_discount != null ? parseFloat(row.total_discount) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     item: undefined,
+  };
+}
+
+function transformLineItem(row: any): SaleLineItem {
+  return {
+    id: row.id,
+    saleId: row.sale_id,
+    itemId: row.item_id ?? undefined,
+    quantity: parseFloat(row.quantity),
+    unitId: row.unit_id ?? undefined,
+    unitPrice: parseFloat(row.unit_price),
+    unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
+    taxRatePercent: row.tax_rate_percent != null ? parseFloat(row.tax_rate_percent) : undefined,
+    taxAmount: row.tax_amount != null ? parseFloat(row.tax_amount) : undefined,
+    lineTotal: parseFloat(row.line_total),
+    sortOrder: row.sort_order ?? 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -42,6 +64,9 @@ function transformToSnakeCase(data: CreateSaleData): Record<string, unknown> {
   if (data.unitId != null) result.unit_id = data.unitId;
   if (data.unitPrice != null) result.unit_price = data.unitPrice;
   if (data.unitCost != null) result.unit_cost = data.unitCost;
+  if (data.subtotal != null) result.subtotal = data.subtotal;
+  if (data.totalTax != null) result.total_tax = data.totalTax;
+  if (data.totalDiscount != null) result.total_discount = data.totalDiscount;
   return result;
 }
 
@@ -210,177 +235,187 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateSaleData = await request.json();
-    
-    if (!body.date || !body.type || !body.amount) {
+    const body: CreateSaleData & { lineItems?: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number }>; discount?: { type: 'amount' | 'percent'; value: number } } = await request.json();
+
+    if (!Array.isArray(body.lineItems) || body.lineItems.length === 0) {
       return NextResponse.json(
-        { error: 'Missing required fields: date, type, amount' },
+        { error: 'lineItems (at least one line) is required' },
+        { status: 400 }
+      );
+    }
+    if (!body.date || !body.type) {
+      return NextResponse.json(
+        { error: 'Missing required fields: date, type' },
         { status: 400 }
       );
     }
 
     const supabase = createServerSupabaseClient();
-    
-    // Validate itemId if provided - check if it exists in items or recipes
-    if (body.itemId) {
-      const [itemCheck, recipeCheck] = await Promise.all([
-        supabase.from('items').select('id').eq('id', body.itemId).single(),
-        supabase.from('recipes').select('id').eq('id', body.itemId).single(),
-      ]);
-
-      if (itemCheck.error && recipeCheck.error) {
-        return NextResponse.json(
-          { error: `Item or recipe with id ${body.itemId} not found` },
-          { status: 400 }
-        );
-      }
-
-      if (!body.quantity || body.quantity <= 0) {
-        return NextResponse.json(
-          { error: 'Quantity is required and must be greater than 0 when an item or recipe is selected' },
-          { status: 400 }
-        );
+    for (let i = 0; i < body.lineItems!.length; i++) {
+        const line = body.lineItems![i];
+        if (line.quantity == null || line.quantity <= 0 || line.unitPrice == null) {
+          return NextResponse.json(
+            { error: `Line ${i + 1}: quantity (positive) and unitPrice are required` },
+            { status: 400 }
+          );
+        }
       }
       const dateStr = body.date.split('T')[0] || body.date;
-      let priceLookupItemId: number | null = null;
-      const { data: itemRow } = await supabase.from('items').select('id').eq('id', body.itemId).single();
-      if (itemRow) priceLookupItemId = itemRow.id;
-      else {
-        const { data: produced } = await supabase.from('items').select('id').eq('produced_from_recipe_id', body.itemId).single();
-        if (produced) priceLookupItemId = produced.id;
+      const typeTaxRate = await getTaxRateFor(supabase, body.type, dateStr);
+      const lines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxRatePercent: number; taxAmount: number }> = [];
+      for (let i = 0; i < body.lineItems!.length; i++) {
+        const line = body.lineItems![i];
+        let unitPrice = line.unitPrice;
+        let unitCost = line.unitCost;
+        let lineTaxRate = typeTaxRate;
+        if (line.itemId && dateStr) {
+          let priceLookupItemId: number | null = null;
+          const { data: itemRow } = await supabase.from('items').select('id, default_tax_rate_percent').eq('id', line.itemId).single();
+          if (itemRow) {
+            priceLookupItemId = itemRow.id;
+            if (itemRow.default_tax_rate_percent != null) lineTaxRate = parseFloat(String(itemRow.default_tax_rate_percent));
+          } else {
+            const { data: produced } = await supabase.from('items').select('id, default_tax_rate_percent').eq('produced_from_recipe_id', line.itemId).single();
+            if (produced) {
+              priceLookupItemId = produced.id;
+              if (produced.default_tax_rate_percent != null) lineTaxRate = parseFloat(String(produced.default_tax_rate_percent));
+            }
+          }
+          if (priceLookupItemId) {
+            if (unitPrice == null) {
+              const resolved = await getItemSellingPriceAsOf(supabase, priceLookupItemId, dateStr);
+              if (resolved != null) unitPrice = resolved;
+            }
+            if (unitCost == null) {
+              const resolved = await getItemCostAsOf(supabase, priceLookupItemId, dateStr);
+              if (resolved != null) unitCost = resolved;
+            }
+            if (unitPrice != null) await upsertSellingPrice(supabase, priceLookupItemId, dateStr, unitPrice);
+            if (unitCost != null) await upsertCost(supabase, priceLookupItemId, dateStr, unitCost);
+          }
+        }
+        if (line.taxRatePercent != null) lineTaxRate = line.taxRatePercent;
+        const qty = typeof line.quantity === 'number' ? line.quantity : parseFloat(String(line.quantity));
+        const lineTotal = Math.round(qty * (unitPrice ?? 0) * 100) / 100;
+        const taxAmount = Math.round(lineTotal * (lineTaxRate / 100) * 100) / 100;
+        lines.push({
+          itemId: line.itemId,
+          quantity: qty,
+          unitId: line.unitId,
+          unitPrice: unitPrice ?? 0,
+          unitCost,
+          lineTotal,
+          taxRatePercent: lineTaxRate,
+          taxAmount,
+        });
       }
-      if (priceLookupItemId && dateStr) {
-        if (body.unitPrice == null) {
-          const resolved = await getItemSellingPriceAsOf(supabase, priceLookupItemId, dateStr);
-          if (resolved != null) body.unitPrice = resolved;
-        }
-        if (body.unitCost == null) {
-          const resolved = await getItemCostAsOf(supabase, priceLookupItemId, dateStr);
-          if (resolved != null) body.unitCost = resolved;
-        }
-        if (body.unitPrice != null) {
-          await upsertSellingPrice(supabase, priceLookupItemId, dateStr, body.unitPrice);
-        }
-        if (body.unitCost != null) {
-          await upsertCost(supabase, priceLookupItemId, dateStr, body.unitCost);
+      const subtotal = Math.round(lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100;
+      const totalTax = Math.round(lines.reduce((s, l) => s + l.taxAmount, 0) * 100) / 100;
+      let discountAmount = 0;
+      if (body.discount?.value != null && body.discount.value > 0) {
+        if (body.discount.type === 'percent') {
+          discountAmount = Math.round(subtotal * (body.discount.value / 100) * 100) / 100;
+        } else {
+          discountAmount = Math.round(body.discount.value * 100) / 100;
         }
       }
-    }
+      const total = Math.round((subtotal + totalTax - discountAmount) * 100) / 100;
 
-    const { data, error } = await supabase
-      .from('sales')
-      .insert(transformToSnakeCase(body))
-      .select()
-      .single();
+      const { data: saleRow, error: saleError } = await supabase
+        .from('sales')
+        .insert({
+          date: body.date,
+          type: body.type,
+          amount: total,
+          subtotal,
+          total_tax: totalTax,
+          total_discount: discountAmount,
+          description: body.description ?? null,
+        })
+        .select()
+        .single();
+      if (saleError) throw saleError;
 
-    if (error) throw error;
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i];
+        await supabase.from('sale_line_items').insert({
+          sale_id: saleRow.id,
+          item_id: l.itemId ?? null,
+          quantity: l.quantity,
+          unit_id: l.unitId ?? null,
+          unit_price: l.unitPrice,
+          unit_cost: l.unitCost ?? null,
+          tax_rate_percent: l.taxRatePercent,
+          tax_amount: l.taxAmount,
+          line_total: l.lineTotal,
+          sort_order: i,
+        });
+      }
 
-    // Create an INPUT entry for the sale
-    const { error: entryError } = await supabase
-      .from('entries')
-      .insert({
+      await supabase.from('entries').insert({
         direction: 'input',
         entry_type: 'sale',
         name: body.description || `Sale - ${body.type}`,
-        amount: body.amount,
+        amount: total,
         description: body.description,
-        entry_date: body.date.split('T')[0],
-        reference_id: data.id,
+        entry_date: dateStr,
+        reference_id: saleRow.id,
         is_active: true,
       });
 
-    if (entryError) {
-      console.error('Error creating entry for sale:', entryError);
-    }
-
-    if (body.itemId && (body.quantity != null && body.quantity > 0)) {
-      const quantity = typeof body.quantity === 'number' ? body.quantity : parseFloat(String(body.quantity));
-      const unit = body.unit || 'unit';
-      const location = null;
-
-      const [itemResult, recipeResult] = await Promise.all([
-        supabase.from('items').select('id, unit, produced_from_recipe_id').eq('id', body.itemId).single(),
-        supabase.from('recipes').select('id, unit').eq('id', body.itemId).single(),
-      ]);
-
-      if (itemResult.data) {
-        const targetItemId = itemResult.data.id;
-        const itemUnit = itemResult.data.unit || unit;
-
-        const { error: outError } = await supabase.from('stock_movements').insert({
-          item_id: targetItemId,
-          movement_type: StockMovementType.OUT,
-          quantity,
-          unit: itemUnit,
-          reference_type: StockMovementReferenceType.SALE,
-          reference_id: data.id,
-          location,
-          movement_date: body.date,
-          notes: `Sale #${data.id}`,
-        });
-
-        if (outError) {
-          console.error('Error creating stock movement for sale:', outError);
-          return NextResponse.json(
-            { error: 'Failed to create stock movement', details: outError.message },
-            { status: 500 }
-          );
-        }
-      } else if (recipeResult.data) {
-        let producedItemId: number;
-        let producedItemUnit: string;
-
-        const { data: producedItem } = await supabase
-          .from('items')
-          .select('id, unit')
-          .eq('produced_from_recipe_id', body.itemId)
-          .single();
-
-        if (!producedItem) {
-          const result = await produceRecipe(supabase, String(body.itemId), {
-            quantity,
-            location,
-            notes: `Sale #${data.id}`,
+      for (const l of lines) {
+        if (!l.itemId || l.quantity <= 0) continue;
+        const [itemResult, recipeResult] = await Promise.all([
+          supabase.from('items').select('id, unit, produced_from_recipe_id').eq('id', l.itemId).single(),
+          supabase.from('recipes').select('id, unit').eq('id', l.itemId).single(),
+        ]);
+        if (itemResult.data) {
+          const targetItemId = itemResult.data.id;
+          const unit = itemResult.data.unit || 'unit';
+          const { error: outError } = await supabase.from('stock_movements').insert({
+            item_id: targetItemId,
+            movement_type: StockMovementType.OUT,
+            quantity: l.quantity,
+            unit,
+            reference_type: StockMovementReferenceType.SALE,
+            reference_id: saleRow.id,
+            movement_date: body.date,
+            notes: `Sale #${saleRow.id}`,
           });
-          producedItemId = result.producedItemId;
-          producedItemUnit = recipeResult.data.unit || unit;
-        } else {
-          producedItemId = producedItem.id;
-          producedItemUnit = producedItem.unit || unit;
-          const stock = await getItemStock(supabase, producedItem.id, location);
-          if (stock < quantity) {
-            const toProduce = quantity - stock;
-            await produceRecipe(supabase, String(body.itemId), {
-              quantity: toProduce,
-              location,
-              notes: `Sale #${data.id} - auto-produced`,
-            });
+          if (outError) console.error('Stock movement error:', outError);
+        } else if (recipeResult.data) {
+          const { data: producedItem } = await supabase.from('items').select('id, unit').eq('produced_from_recipe_id', l.itemId).single();
+          let producedItemId: number;
+          let producedItemUnit: string;
+          if (!producedItem) {
+            const result = await produceRecipe(supabase, String(l.itemId), { quantity: l.quantity, location: null, notes: `Sale #${saleRow.id}` });
+            producedItemId = result.producedItemId;
+            producedItemUnit = recipeResult.data.unit || 'unit';
+          } else {
+            producedItemId = producedItem.id;
+            producedItemUnit = producedItem.unit || 'unit';
+            const stock = await getItemStock(supabase, producedItem.id, null);
+            if (stock < l.quantity) {
+              await produceRecipe(supabase, String(l.itemId), { quantity: l.quantity - stock, location: null, notes: `Sale #${saleRow.id}` });
+            }
           }
-        }
-
-        const { error: outError } = await supabase.from('stock_movements').insert({
-          item_id: producedItemId,
-          movement_type: StockMovementType.OUT,
-          quantity,
-          unit: producedItemUnit,
-          reference_type: StockMovementReferenceType.SALE,
-          reference_id: data.id,
-          location,
-          movement_date: body.date,
-          notes: `Sale #${data.id}`,
-        });
-
-        if (outError) {
-          console.error('Error creating stock movement for sale:', outError);
-          return NextResponse.json(
-            { error: 'Failed to create stock movement', details: outError.message },
-            { status: 500 }
-          );
+          await supabase.from('stock_movements').insert({
+            item_id: producedItemId,
+            movement_type: StockMovementType.OUT,
+            quantity: l.quantity,
+            unit: producedItemUnit,
+            reference_type: StockMovementReferenceType.SALE,
+            reference_id: saleRow.id,
+            movement_date: body.date,
+            notes: `Sale #${saleRow.id}`,
+          });
         }
       }
-    }
 
-    return NextResponse.json(transformSale(data), { status: 201 });
+    const { data: lineItemsData } = await supabase.from('sale_line_items').select('*').eq('sale_id', saleRow.id).order('sort_order');
+    const sale = transformSale(saleRow);
+    sale.lineItems = (lineItemsData || []).map(transformLineItem);
+    return NextResponse.json(sale, { status: 201 });
   } catch (error: any) {
     console.error('Error creating sale:', error);
     const details = error?.message || String(error);

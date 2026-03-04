@@ -1,9 +1,14 @@
 -- Allow Multiple Partial Payments
 -- Remove unique constraint to allow multiple partial payments for the same schedule entry
 
--- Drop the unique constraint that prevents multiple payments
-ALTER TABLE actual_payments 
-  DROP CONSTRAINT IF EXISTS actual_payments_payment_type_reference_id_schedule_entry_id_month_key;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_class t ON c.conrelid = t.oid WHERE t.relname = 'actual_payments' AND c.conname = 'actual_payments_uniq_entry_month') THEN
+    ALTER TABLE actual_payments DROP CONSTRAINT actual_payments_uniq_entry_month;
+  ELSIF EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_class t ON c.conrelid = t.oid WHERE t.relname = 'actual_payments' AND c.conname = 'actual_payments_payment_type_reference_id_schedule_entry_id_mon') THEN
+    ALTER TABLE actual_payments DROP CONSTRAINT actual_payments_payment_type_reference_id_schedule_entry_id_mon;
+  END IF;
+END $$;
 
 -- Add payment_number to track multiple payments for the same entry (optional, for display purposes)
 ALTER TABLE actual_payments 

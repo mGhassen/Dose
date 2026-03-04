@@ -15,7 +15,6 @@ function transformSale(row: any) {
 function transformExpense(row: any) {
   return {
     amount: parseFloat(row.amount),
-    recurrence: row.recurrence,
     startDate: row.start_date,
     endDate: row.end_date,
     isActive: row.is_active,
@@ -73,7 +72,7 @@ export async function GET(request: NextRequest) {
 
     const [salesResult, expensesResult, personnelResult, loansResult, cashFlowResult, workingCapitalResult, profitLossResult] = await Promise.all([
       supabase.from('sales').select('date, amount').gte('date', startDate).lte('date', endDate),
-      supabase.from('expenses').select('amount, recurrence, start_date, end_date, is_active').eq('is_active', true),
+      supabase.from('expenses').select('amount, start_date, end_date, is_active').eq('is_active', true),
       supabase.from('personnel').select('base_salary, employer_charges, employer_charges_type, start_date, end_date, is_active').eq('is_active', true),
       supabase.from('loans').select('principal_amount, status').eq('status', 'active'),
       supabase.from('cash_flow').select('month, closing_balance').eq('month', lastMonth),

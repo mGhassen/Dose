@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS actual_payments (
   notes TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(payment_type, reference_id, schedule_entry_id, month)
+  CONSTRAINT actual_payments_uniq_entry_month UNIQUE(payment_type, reference_id, schedule_entry_id, month)
 );
 
 CREATE INDEX idx_actual_payments_type_reference ON actual_payments(payment_type, reference_id);

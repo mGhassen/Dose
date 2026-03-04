@@ -29,8 +29,8 @@ export function projectExpense(
     return projections;
   }
 
-  // Handle one-time expenses
-  if (expense.recurrence === ExpenseRecurrence.ONE_TIME) {
+  // Expenses are always one-time (recurrence lives on subscriptions)
+  if (!expense.recurrence || expense.recurrence === ExpenseRecurrence.ONE_TIME) {
     const expenseMonth = expenseStart.toISOString().slice(0, 7); // YYYY-MM
     if (expenseMonth >= startMonth && expenseMonth <= endMonth) {
       // Check if expense date is within range

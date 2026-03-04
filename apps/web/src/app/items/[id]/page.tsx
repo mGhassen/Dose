@@ -437,6 +437,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     sku: "",
     unitId: null as number | null,
     unitCost: "",
+    defaultTaxRatePercent: "",
     vendorId: "",
     notes: "",
     isActive: true,
@@ -495,6 +496,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         sku: item.sku || "",
         unitId: item.unitId ?? null,
         unitCost: item.unitCost?.toString() || "",
+        defaultTaxRatePercent: item.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : "",
         vendorId: item.vendorId?.toString() || "",
         notes: item.notes || "",
         isActive: item.isActive,
@@ -523,6 +525,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           unitId: formData.unitId ?? undefined,
           unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
           unitCost: formData.unitCost ? parseFloat(formData.unitCost) : undefined,
+          defaultTaxRatePercent: formData.defaultTaxRatePercent ? parseFloat(formData.defaultTaxRatePercent) : undefined,
           vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
           notes: formData.notes || undefined,
           isActive: formData.isActive,
@@ -588,9 +591,19 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">
-              {isEditing ? "Edit Item" : item.name}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">
+                {isEditing ? "Edit Item" : item.name}
+              </h1>
+              {item.itemType === "recipe" && (
+                <Badge variant="secondary" className="text-xs">Recipe</Badge>
+              )}
+              {item.itemType === "item" && (
+                <Badge variant="secondary" className="text-xs">
+                  {item.producedFromRecipeId ? "Product" : "Item"}
+                </Badge>
+              )}
+            </div>
             <p className="text-muted-foreground">
               {isEditing ? "Update item information" : "Item details and information"}
             </p>
@@ -684,6 +697,19 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       min="0"
                       value={formData.unitCost}
                       onChange={(e) => handleInputChange('unitCost', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="defaultTaxRatePercent">Default tax rate %</Label>
+                    <Input
+                      id="defaultTaxRatePercent"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={formData.defaultTaxRatePercent}
+                      onChange={(e) => handleInputChange('defaultTaxRatePercent', e.target.value)}
                     />
                   </div>
 

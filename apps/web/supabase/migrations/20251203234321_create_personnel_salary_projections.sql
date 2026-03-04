@@ -43,10 +43,11 @@ BEGIN
     CREATE INDEX IF NOT EXISTS idx_personnel_salary_projection_net_payment_date ON personnel_salary_projections(net_payment_date);
     CREATE INDEX IF NOT EXISTS idx_personnel_salary_projection_taxes_payment_date ON personnel_salary_projections(taxes_payment_date);
 
-    -- Create trigger if function exists
     IF EXISTS (SELECT FROM pg_proc WHERE proname = 'update_updated_at_column') THEN
-      DROP TRIGGER IF EXISTS update_personnel_salary_projections_updated_at ON personnel_salary_projections;
-      CREATE TRIGGER update_personnel_salary_projections_updated_at 
+      IF EXISTS (SELECT 1 FROM pg_trigger t JOIN pg_class c ON t.tgrelid = c.oid WHERE c.relname = 'personnel_salary_projections' AND t.tgname = 'update_personnel_salary_projections_updated_at') THEN
+        DROP TRIGGER update_personnel_salary_projections_updated_at ON personnel_salary_projections;
+      END IF;
+      CREATE TRIGGER update_personnel_salary_projections_updated_at
         BEFORE UPDATE ON personnel_salary_projections
         FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;

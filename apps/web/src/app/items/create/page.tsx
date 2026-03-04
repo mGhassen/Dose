@@ -27,6 +27,7 @@ export default function CreateItemPage() {
     sku: "",
     unitId: null as number | null,
     unitCost: "",
+    defaultTaxRatePercent: "",
     vendorId: "",
     notes: "",
     isActive: true,
@@ -49,6 +50,7 @@ export default function CreateItemPage() {
         unitId: formData.unitId ?? undefined,
         unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
         unitCost: formData.unitCost ? parseFloat(formData.unitCost) : undefined,
+        defaultTaxRatePercent: formData.defaultTaxRatePercent ? parseFloat(formData.defaultTaxRatePercent) : undefined,
         vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
         notes: formData.notes || undefined,
         isActive: formData.isActive,
@@ -140,6 +142,21 @@ export default function CreateItemPage() {
                     placeholder="0.00"
                   />
                   <p className="text-xs text-muted-foreground">Used for recipe cost when no supplier order data</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="defaultTaxRatePercent">Default tax rate %</Label>
+                  <Input
+                    id="defaultTaxRatePercent"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={formData.defaultTaxRatePercent}
+                    onChange={(e) => handleInputChange('defaultTaxRatePercent', e.target.value)}
+                    placeholder="e.g. 10"
+                  />
+                  <p className="text-xs text-muted-foreground">Pre-fills when item is added to a sale or expense line</p>
                 </div>
 
                 {/* Vendor */}

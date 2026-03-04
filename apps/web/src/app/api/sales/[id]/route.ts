@@ -2,9 +2,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { Sale, UpdateSaleData } from '@kit/types';
+import type { Sale, UpdateSaleData, SaleLineItem } from '@kit/types';
 import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
 import { upsertSellingPrice, upsertCost } from '@/lib/items/price-history-upsert';
+import { getTaxRateFor } from '@/lib/tax-rate';
 
 function transformSale(row: any): Sale {
   return {
@@ -19,14 +20,35 @@ function transformSale(row: any): Sale {
     itemId: row.item_id,
     unitPrice: row.unit_price != null ? parseFloat(row.unit_price) : undefined,
     unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
+    subtotal: row.subtotal != null ? parseFloat(row.subtotal) : undefined,
+    totalTax: row.total_tax != null ? parseFloat(row.total_tax) : undefined,
+    totalDiscount: row.total_discount != null ? parseFloat(row.total_discount) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     item: undefined,
   };
 }
 
+function transformLineItem(row: any): SaleLineItem {
+  return {
+    id: row.id,
+    saleId: row.sale_id,
+    itemId: row.item_id ?? undefined,
+    quantity: parseFloat(row.quantity),
+    unitId: row.unit_id ?? undefined,
+    unitPrice: parseFloat(row.unit_price),
+    unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
+    taxRatePercent: row.tax_rate_percent != null ? parseFloat(row.tax_rate_percent) : undefined,
+    taxAmount: row.tax_amount != null ? parseFloat(row.tax_amount) : undefined,
+    lineTotal: parseFloat(row.line_total),
+    sortOrder: row.sort_order ?? 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function transformToSnakeCase(data: UpdateSaleData): any {
-  const result: any = {};
+  const result: any = { updated_at: new Date().toISOString() };
   if (data.date !== undefined) result.date = data.date;
   if (data.type !== undefined) result.type = data.type;
   if (data.amount !== undefined) result.amount = data.amount;
@@ -37,7 +59,9 @@ function transformToSnakeCase(data: UpdateSaleData): any {
   if (data.itemId !== undefined) result.item_id = data.itemId;
   if (data.unitPrice !== undefined) result.unit_price = data.unitPrice;
   if (data.unitCost !== undefined) result.unit_cost = data.unitCost;
-  result.updated_at = new Date().toISOString();
+  if (data.subtotal !== undefined) result.subtotal = data.subtotal;
+  if (data.totalTax !== undefined) result.total_tax = data.totalTax;
+  if (data.totalDiscount !== undefined) result.total_discount = data.totalDiscount;
   return result;
 }
 
@@ -63,7 +87,14 @@ export async function GET(
     }
 
     let sale = transformSale(data);
-    
+
+    const { data: lineItemsData } = await supabase
+      .from('sale_line_items')
+      .select('*')
+      .eq('sale_id', id)
+      .order('sort_order');
+    sale.lineItems = (lineItemsData || []).map(transformLineItem);
+
     // Fetch item if item_id exists (could be from items or recipes table)
     if (sale.itemId) {
       // Try items table first
@@ -133,70 +164,121 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateSaleData = await request.json();
+    const body: UpdateSaleData & { lineItems?: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number }>; discount?: { type: 'amount' | 'percent'; value: number } } = await request.json();
+
+    if (!Array.isArray(body.lineItems) || body.lineItems.length === 0) {
+      return NextResponse.json(
+        { error: 'lineItems (at least one line) is required' },
+        { status: 400 }
+      );
+    }
+    if (!body.date || !body.type) {
+      return NextResponse.json(
+        { error: 'Missing required fields: date, type' },
+        { status: 400 }
+      );
+    }
 
     const supabase = createServerSupabaseClient();
-    
-    // Validate itemId if provided - check if it exists in items or recipes
-    if (body.itemId !== undefined) {
-      if (body.itemId === null) {
-        // null is allowed (no item linked)
-      } else {
-        const [itemCheck, recipeCheck] = await Promise.all([
-          supabase.from('items').select('id').eq('id', body.itemId).single(),
-          supabase.from('recipes').select('id').eq('id', body.itemId).single(),
-        ]);
-        
-        if (itemCheck.error && recipeCheck.error) {
-          return NextResponse.json(
-            { error: `Item or recipe with id ${body.itemId} not found` },
-            { status: 400 }
-          );
+    const dateStr = body.date.split('T')[0] || body.date;
+    const taxRate = await getTaxRateFor(supabase, body.type, dateStr);
+    const lines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxAmount: number }> = [];
+    for (let i = 0; i < body.lineItems!.length; i++) {
+        const line = body.lineItems![i];
+        let unitPrice = line.unitPrice;
+        let unitCost = line.unitCost;
+        if (line.itemId && dateStr) {
+          let priceLookupItemId: number | null = null;
+          const { data: itemRow } = await supabase.from('items').select('id').eq('id', line.itemId).single();
+          if (itemRow) priceLookupItemId = itemRow.id;
+          else {
+            const { data: produced } = await supabase.from('items').select('id').eq('produced_from_recipe_id', line.itemId).single();
+            if (produced) priceLookupItemId = produced.id;
+          }
+          if (priceLookupItemId) {
+            if (unitPrice == null) {
+              const resolved = await getItemSellingPriceAsOf(supabase, priceLookupItemId, dateStr);
+              if (resolved != null) unitPrice = resolved;
+            }
+            if (unitCost == null) {
+              const resolved = await getItemCostAsOf(supabase, priceLookupItemId, dateStr);
+              if (resolved != null) unitCost = resolved;
+            }
+            if (unitPrice != null) await upsertSellingPrice(supabase, priceLookupItemId, dateStr, unitPrice);
+            if (unitCost != null) await upsertCost(supabase, priceLookupItemId, dateStr, unitCost);
+          }
         }
+        const qty = typeof line.quantity === 'number' ? line.quantity : parseFloat(String(line.quantity));
+        const lineTotal = Math.round(qty * (unitPrice ?? 0) * 100) / 100;
+        const taxAmount = Math.round(lineTotal * (taxRate / 100) * 100) / 100;
+        lines.push({
+          itemId: line.itemId,
+          quantity: qty,
+          unitId: line.unitId,
+          unitPrice: unitPrice ?? 0,
+          unitCost,
+          lineTotal,
+          taxAmount,
+        });
+    }
+    const subtotal = Math.round(lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100;
+    const totalTax = Math.round(lines.reduce((s, l) => s + l.taxAmount, 0) * 100) / 100;
+    let discountAmount = 0;
+    if (body.discount?.value != null && body.discount.value > 0) {
+      if (body.discount.type === 'percent') {
+        discountAmount = Math.round(subtotal * (body.discount.value / 100) * 100) / 100;
+      } else {
+        discountAmount = Math.round(body.discount.value * 100) / 100;
       }
     }
-    const dateStr = body.date ? body.date.split('T')[0] : undefined;
-    let priceLookupItemId: number | null = null;
-    if (body.itemId) {
-      const { data: itemRow } = await supabase.from('items').select('id').eq('id', body.itemId).single();
-      if (itemRow) priceLookupItemId = itemRow.id;
-      else {
-        const { data: produced } = await supabase.from('items').select('id').eq('produced_from_recipe_id', body.itemId).single();
-        if (produced) priceLookupItemId = produced.id;
-      }
-    }
-    if (priceLookupItemId && dateStr) {
-      if (body.unitPrice === undefined) {
-        const resolved = await getItemSellingPriceAsOf(supabase, priceLookupItemId, dateStr);
-        if (resolved != null) body.unitPrice = resolved;
-      }
-      if (body.unitCost === undefined) {
-        const resolved = await getItemCostAsOf(supabase, priceLookupItemId, dateStr);
-        if (resolved != null) body.unitCost = resolved;
-      }
-      if (body.unitPrice != null) {
-        await upsertSellingPrice(supabase, priceLookupItemId, dateStr, body.unitPrice);
-      }
-      if (body.unitCost != null) {
-        await upsertCost(supabase, priceLookupItemId, dateStr, body.unitCost);
-      }
-    }
+    const total = Math.round((subtotal + totalTax - discountAmount) * 100) / 100;
 
-    const { data, error } = await supabase
+    const { data: saleRow, error: updateError } = await supabase
       .from('sales')
-      .update(transformToSnakeCase(body))
+      .update({
+        date: body.date,
+        type: body.type,
+        amount: total,
+        subtotal,
+        total_tax: totalTax,
+        total_discount: discountAmount,
+        description: body.description ?? undefined,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', id)
       .select()
       .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Sale not found' }, { status: 404 });
-      }
-      throw error;
+    if (updateError) {
+      if (updateError.code === 'PGRST116') return NextResponse.json({ error: 'Sale not found' }, { status: 404 });
+      throw updateError;
     }
 
-    return NextResponse.json(transformSale(data));
+    await supabase.from('sale_line_items').delete().eq('sale_id', id);
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      await supabase.from('sale_line_items').insert({
+        sale_id: id,
+        item_id: l.itemId ?? null,
+        quantity: l.quantity,
+        unit_id: l.unitId ?? null,
+        unit_price: l.unitPrice,
+        unit_cost: l.unitCost ?? null,
+        tax_rate_percent: taxRate,
+        tax_amount: l.taxAmount,
+        line_total: l.lineTotal,
+        sort_order: i,
+      });
+    }
+
+    const { data: entries } = await supabase.from('entries').select('id').eq('entry_type', 'sale').eq('reference_id', id);
+    if (entries?.length) {
+      await supabase.from('entries').update({ amount: total, updated_at: new Date().toISOString() }).eq('id', entries[0].id);
+    }
+
+    const { data: lineItemsData } = await supabase.from('sale_line_items').select('*').eq('sale_id', id).order('sort_order');
+    const sale = transformSale(saleRow);
+    sale.lineItems = (lineItemsData || []).map(transformLineItem);
+    return NextResponse.json(sale);
   } catch (error: any) {
     console.error('Error updating sale:', error);
     return NextResponse.json(

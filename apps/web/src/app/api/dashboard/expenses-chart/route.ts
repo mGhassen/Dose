@@ -7,7 +7,6 @@ import { getMonthsInRange } from '@kit/lib/date-periods';
 function transformExpense(row: any) {
   return {
     amount: parseFloat(row.amount),
-    recurrence: row.recurrence,
     startDate: row.start_date,
     endDate: row.end_date,
     isActive: row.is_active,
@@ -26,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('expenses')
-      .select('amount, recurrence, start_date, end_date, is_active')
+      .select('amount, start_date, end_date, is_active')
       .eq('is_active', true);
 
     if (error) throw error;

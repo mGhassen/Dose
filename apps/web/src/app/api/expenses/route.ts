@@ -3,24 +3,50 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { Expense, CreateExpenseData, PaginatedResponse } from '@kit/types';
+import type { Expense, CreateExpenseData, PaginatedResponse, ExpenseLineItem } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
-// Helper functions for transformation
-function transformExpense(row: any): Expense {
+function transformLineItem(row: any): ExpenseLineItem {
+  const subscription = row.subscription;
   return {
+    id: row.id,
+    expenseId: row.expense_id,
+    itemId: row.item_id ?? undefined,
+    subscriptionId: row.subscription_id ?? undefined,
+    quantity: parseFloat(row.quantity),
+    unitId: row.unit_id ?? undefined,
+    unitPrice: parseFloat(row.unit_price),
+    unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
+    taxRatePercent: row.tax_rate_percent != null ? parseFloat(row.tax_rate_percent) : undefined,
+    taxAmount: row.tax_amount != null ? parseFloat(row.tax_amount) : undefined,
+    lineTotal: parseFloat(row.line_total),
+    sortOrder: row.sort_order ?? 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    item: row.item,
+    subscription: subscription ? { id: subscription.id, name: subscription.name } : undefined,
+  };
+}
+
+function transformExpense(row: any, lineItems?: ExpenseLineItem[]): Expense {
+  const expense: Expense = {
     id: row.id,
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
     subscriptionId: row.subscription_id || undefined,
     description: row.description,
-    vendor: row.vendor, // Keep for backward compatibility
+    vendor: row.vendor,
     supplierId: row.supplier_id || undefined,
-    expenseDate: row.expense_date || row.start_date, // Fallback to start_date for migration
+    expenseDate: row.expense_date || row.start_date,
+    subtotal: row.subtotal != null ? parseFloat(row.subtotal) : undefined,
+    totalTax: row.total_tax != null ? parseFloat(row.total_tax) : undefined,
+    totalDiscount: row.total_discount != null ? parseFloat(row.total_discount) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+  if (lineItems?.length) expense.lineItems = lineItems;
+  return expense;
 }
 
 function transformToSnakeCase(data: CreateExpenseData): any {
@@ -33,8 +59,7 @@ function transformToSnakeCase(data: CreateExpenseData): any {
     vendor: data.vendor, // Keep for backward compatibility
     supplier_id: data.supplierId || null,
     expense_date: data.expenseDate,
-    recurrence: 'one_time', // Expenses are always one-time
-    start_date: data.expenseDate, // Required field, use expense_date
+    start_date: data.expenseDate,
     is_active: true,
   };
 }
@@ -127,10 +152,119 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateExpenseData = await request.json();
-    
-    // Basic validation
-    if (!body.name || !body.category || !body.amount || !body.expenseDate) {
+    const body = await request.json();
+
+    if (Array.isArray(body.lineItems) && body.lineItems.length > 0) {
+      if (!body.name || !body.category || !body.expenseDate) {
+        return NextResponse.json(
+          { error: 'Missing required fields: name, category, expenseDate' },
+          { status: 400 }
+        );
+      }
+      const supabase = createServerSupabaseClient();
+      const { getTaxRateFor } = await import('@/lib/tax-rate');
+      const dateStr = (body.expenseDate || '').split('T')[0] || body.expenseDate;
+      const categoryTaxRate = await getTaxRateFor(supabase, body.category, dateStr);
+
+      const lines: Array<{ itemId?: number; subscriptionId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxRatePercent: number; taxAmount: number }> = [];
+      for (let i = 0; i < body.lineItems.length; i++) {
+        const line = body.lineItems[i];
+        if (line.quantity == null || line.quantity <= 0 || line.unitPrice == null) {
+          return NextResponse.json(
+            { error: `Line ${i + 1}: quantity (positive) and unitPrice are required` },
+            { status: 400 }
+          );
+        }
+        let taxRate = categoryTaxRate;
+        if (line.itemId && !line.subscriptionId) {
+          const { data: itemRow } = await supabase.from('items').select('default_tax_rate_percent').eq('id', line.itemId).single();
+          if (itemRow?.default_tax_rate_percent != null) taxRate = parseFloat(String(itemRow.default_tax_rate_percent));
+        }
+        if (line.taxRatePercent != null) taxRate = line.taxRatePercent;
+        const qty = typeof line.quantity === 'number' ? line.quantity : parseFloat(String(line.quantity));
+        const lineTotal = Math.round(qty * line.unitPrice * 100) / 100;
+        const taxAmount = Math.round(lineTotal * (taxRate / 100) * 100) / 100;
+        lines.push({
+          itemId: line.itemId,
+          subscriptionId: line.subscriptionId,
+          quantity: qty,
+          unitId: line.unitId,
+          unitPrice: line.unitPrice,
+          unitCost: line.unitCost,
+          lineTotal,
+          taxRatePercent: taxRate,
+          taxAmount,
+        });
+      }
+      const subtotal = Math.round(lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100;
+      const totalTax = Math.round(lines.reduce((s, l) => s + l.taxAmount, 0) * 100) / 100;
+      let discountAmount = 0;
+      if (body.discount?.value != null && body.discount.value > 0) {
+        if (body.discount.type === 'percent') {
+          discountAmount = Math.round(subtotal * (body.discount.value / 100) * 100) / 100;
+        } else {
+          discountAmount = Math.round(body.discount.value * 100) / 100;
+        }
+      }
+      const amount = Math.round((subtotal + totalTax - discountAmount) * 100) / 100;
+
+      const { data: expenseRow, error: insertError } = await supabase
+        .from('expenses')
+        .insert({
+          name: body.name,
+          category: body.category,
+          expense_date: body.expenseDate,
+          description: body.description ?? null,
+          supplier_id: body.supplierId ?? null,
+          start_date: body.expenseDate,
+          amount,
+          subtotal,
+          total_tax: totalTax,
+          total_discount: discountAmount,
+          is_active: true,
+        })
+        .select()
+        .single();
+      if (insertError) throw insertError;
+
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i];
+        await supabase.from('expense_line_items').insert({
+          expense_id: expenseRow.id,
+          item_id: l.itemId ?? null,
+          subscription_id: l.subscriptionId ?? null,
+          quantity: l.quantity,
+          unit_id: l.unitId ?? null,
+          unit_price: l.unitPrice,
+          unit_cost: l.unitCost ?? null,
+          tax_rate_percent: l.taxRatePercent,
+          tax_amount: l.taxAmount,
+          line_total: l.lineTotal,
+          sort_order: i,
+        });
+      }
+
+      const { error: entryError } = await supabase.from('entries').insert({
+        direction: 'output',
+        entry_type: 'expense',
+        name: body.name,
+        amount,
+        description: body.description,
+        category: body.category,
+        supplier_id: body.supplierId ?? null,
+        entry_date: body.expenseDate,
+        reference_id: expenseRow.id,
+        is_active: true,
+      });
+      if (entryError) console.error('Error creating entry for expense:', entryError);
+
+      const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_type, unit_cost, default_tax_rate_percent), subscription:subscriptions(id, name)').eq('expense_id', expenseRow.id).order('sort_order', { ascending: true });
+      const lineItems = (lineRows || []).map(transformLineItem);
+      return NextResponse.json(transformExpense(expenseRow, lineItems), { status: 201 });
+    }
+
+    const bodyLegacy: CreateExpenseData = body;
+    if (!bodyLegacy.name || !bodyLegacy.category || !bodyLegacy.amount || !bodyLegacy.expenseDate) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -140,35 +274,35 @@ export async function POST(request: NextRequest) {
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from('expenses')
-      .insert(transformToSnakeCase(body))
+      .insert(transformToSnakeCase(bodyLegacy))
       .select()
       .single();
 
     if (error) throw error;
 
-    // Create an OUTPUT entry for the expense
     const { error: entryError } = await supabase
       .from('entries')
       .insert({
         direction: 'output',
         entry_type: 'expense',
-        name: body.name,
-        amount: body.amount,
-        description: body.description,
-        category: body.category,
-        vendor: body.vendor, // Keep for backward compatibility
-        supplier_id: body.supplierId || null,
-        entry_date: body.expenseDate,
+        name: bodyLegacy.name,
+        amount: bodyLegacy.amount,
+        description: bodyLegacy.description,
+        category: bodyLegacy.category,
+        vendor: bodyLegacy.vendor,
+        supplier_id: bodyLegacy.supplierId || null,
+        entry_date: bodyLegacy.expenseDate,
         reference_id: data.id,
         is_active: true,
       });
 
     if (entryError) {
       console.error('Error creating entry for expense:', entryError);
-      // Don't fail the expense creation if entry creation fails, but log it
     }
 
-    return NextResponse.json(transformExpense(data), { status: 201 });
+    const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_type, unit_cost, default_tax_rate_percent), subscription:subscriptions(id, name)').eq('expense_id', data.id).order('sort_order', { ascending: true });
+    const lineItems = (lineRows || []).map(transformLineItem);
+    return NextResponse.json(transformExpense(data, lineItems), { status: 201 });
   } catch (error: any) {
     console.error('Error creating expense:', error);
     return NextResponse.json(

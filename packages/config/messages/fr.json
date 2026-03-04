@@ -222,6 +222,8 @@
     "metadataEnums": "Énumérations Métadonnées",
     "integrations": "Intégrations",
     "units": "Unités",
+    "taxRates": "Taux de taxe",
+    "expenseTaxRates": "Taux de taxe (charges)",
     "connectedIntegrations": "Intégrations Connectées",
     "profile": "Profil",
     "logout": "Déconnexion",

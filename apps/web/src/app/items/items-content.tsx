@@ -34,16 +34,24 @@ export default function ItemsContent() {
     {
       accessorKey: "name",
       header: "Name",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <div className="font-medium">
-            {row.original.name}
+      cell: ({ row }) => {
+        const isProduced = row.original.itemType === 'item' && row.original.producedFromRecipeId;
+        return (
+          <div className="flex items-center gap-2">
+            <div className="font-medium">
+              {row.original.name}
+            </div>
+            {row.original.itemType === 'recipe' && (
+              <Badge variant="secondary" className="text-xs">Recipe</Badge>
+            )}
+            {row.original.itemType === 'item' && (
+              <Badge variant="secondary" className="text-xs">
+                {isProduced ? 'Product' : 'Item'}
+              </Badge>
+            )}
           </div>
-          {row.original.itemType === 'recipe' && (
-            <Badge variant="secondary" className="text-xs">Recipe</Badge>
-          )}
-        </div>
-      ),
+        );
+      },
     },
     {
       accessorKey: "sku",
@@ -59,14 +67,6 @@ export default function ItemsContent() {
       accessorKey: "unit",
       header: "Unit",
       cell: ({ row }) => row.original.unit || <span className="text-muted-foreground">—</span>,
-    },
-    {
-      accessorKey: "unitCost",
-      header: "Unit cost",
-      cell: ({ row }) => {
-        if (row.original.itemType === 'recipe') return <span className="text-muted-foreground">—</span>;
-        return row.original.unitCost != null ? formatCurrency(row.original.unitCost) : <span className="text-muted-foreground">—</span>;
-      },
     },
     {
       accessorKey: "unitPrice",
@@ -207,7 +207,6 @@ export default function ItemsContent() {
           ]}
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
-            { value: "unitCost", label: "Unit cost", type: "numeric" },
             { value: "unitPrice", label: "Selling price", type: "numeric" },
             { value: "createdAt", label: "Created", type: "timestamp" },
           ]}

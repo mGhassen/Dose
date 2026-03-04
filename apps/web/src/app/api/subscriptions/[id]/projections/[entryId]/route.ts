@@ -132,26 +132,44 @@ export async function PUT(
               .single();
 
             if (subscriptionData) {
+              const amount = body.actualAmount || parseFloat(existingEntry.amount);
               const expenseData = {
                 name: `${subscriptionData.name} - ${data.month}`,
                 category: subscriptionData.category,
-                amount: body.actualAmount || parseFloat(existingEntry.amount),
+                amount,
                 subscription_id: parseInt(id),
                 expense_date: body.paidDate || data.month + '-01',
                 description: body.notes || `Payment for subscription: ${subscriptionData.name} - ${data.month}`,
                 vendor: subscriptionData.vendor || null,
-                recurrence: 'one_time', // Expenses are always one-time
                 start_date: body.paidDate || data.month + '-01',
+                subtotal: amount,
+                total_tax: 0,
+                total_discount: 0,
                 is_active: true,
               };
 
-              const { error: expenseError } = await supabase
+              const { data: expenseRow, error: expenseError } = await supabase
                 .from('expenses')
-                .insert(expenseData);
+                .insert(expenseData)
+                .select()
+                .single();
 
-              if (expenseError) {
+              if (!expenseError && expenseRow) {
+                await supabase.from('expense_line_items').insert({
+                  expense_id: expenseRow.id,
+                  item_id: null,
+                  subscription_id: parseInt(id),
+                  quantity: 1,
+                  unit_id: null,
+                  unit_price: amount,
+                  unit_cost: null,
+                  tax_rate_percent: 0,
+                  tax_amount: 0,
+                  line_total: amount,
+                  sort_order: 0,
+                });
+              } else if (expenseError) {
                 console.error('Error creating expense for subscription payment:', expenseError);
-                // Don't fail the update if expense creation fails
               }
             }
           } else if (!body.isPaid) {

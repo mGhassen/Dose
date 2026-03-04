@@ -11,7 +11,6 @@ function transformExpense(row: any): Expense {
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
-    recurrence: row.recurrence,
     startDate: row.start_date,
     endDate: row.end_date,
     description: row.description,
@@ -45,28 +44,9 @@ export async function GET(request: NextRequest) {
       categoryBreakdown[exp.category] = (categoryBreakdown[exp.category] || 0) + exp.amount;
     });
 
-    // Calculate recurrence breakdown
     const recurrenceBreakdown: Record<string, number> = {};
     expenses.forEach(exp => {
-      // Calculate annual cost based on recurrence
-      let annualCost = 0;
-      switch (exp.recurrence) {
-        case 'monthly':
-          annualCost = exp.amount * 12;
-          break;
-        case 'quarterly':
-          annualCost = exp.amount * 4;
-          break;
-        case 'yearly':
-          annualCost = exp.amount;
-          break;
-        case 'one_time':
-          annualCost = exp.amount;
-          break;
-        default:
-          annualCost = exp.amount * 12; // Default to monthly
-      }
-      recurrenceBreakdown[exp.recurrence] = (recurrenceBreakdown[exp.recurrence] || 0) + annualCost;
+      recurrenceBreakdown['one_time'] = (recurrenceBreakdown['one_time'] || 0) + exp.amount;
     });
 
     // Project expenses for the year to get monthly breakdown
@@ -110,28 +90,8 @@ export async function GET(request: NextRequest) {
       ...monthlyData[month].byCategory,
     }));
 
-    // Top expenses by annual cost
     const topExpenses = expenses
-      .map(exp => {
-        let annualCost = 0;
-        switch (exp.recurrence) {
-          case 'monthly':
-            annualCost = exp.amount * 12;
-            break;
-          case 'quarterly':
-            annualCost = exp.amount * 4;
-            break;
-          case 'yearly':
-            annualCost = exp.amount;
-            break;
-          case 'one_time':
-            annualCost = exp.amount;
-            break;
-          default:
-            annualCost = exp.amount * 12;
-        }
-        return { ...exp, annualCost };
-      })
+      .map(exp => ({ ...exp, annualCost: exp.amount }))
       .sort((a, b) => b.annualCost - a.annualCost)
       .slice(0, 10);
 

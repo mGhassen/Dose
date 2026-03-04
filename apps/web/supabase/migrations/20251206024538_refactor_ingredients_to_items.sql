@@ -148,15 +148,14 @@ BEGIN
       END LOOP;
     END;
     
-    -- Now drop the ingredients table itself
     IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'ingredients') THEN
-      -- Drop constraints on ingredients table (primary key, unique constraints)
       FOR constr_record IN
-        SELECT constraint_name
-        FROM information_schema.table_constraints
-        WHERE table_name = 'ingredients'
+        SELECT c.conname
+        FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        WHERE t.relname = 'ingredients'
       LOOP
-        EXECUTE format('ALTER TABLE ingredients DROP CONSTRAINT IF EXISTS %I', constr_record.constraint_name);
+        EXECUTE format('ALTER TABLE ingredients DROP CONSTRAINT %I', constr_record.conname);
       END LOOP;
       
       -- Drop triggers on ingredients table

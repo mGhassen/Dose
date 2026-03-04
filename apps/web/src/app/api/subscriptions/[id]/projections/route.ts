@@ -231,21 +231,41 @@ export async function POST(
                 notes: body.notes || null,
               });
 
-            // Create expense entry
-            await supabase
+            const amount = body.actualAmount || body.amount;
+            const { data: expenseRow, error: expenseErr } = await supabase
               .from('expenses')
               .insert({
                 name: `${subscriptionData.name} - ${body.month}`,
                 category: subscriptionData.category,
-                amount: body.actualAmount || body.amount,
+                amount,
                 subscription_id: parseInt(id),
                 expense_date: body.paidDate || `${body.month}-01`,
                 description: body.notes || `Payment for subscription: ${subscriptionData.name} - ${body.month}`,
                 vendor: subscriptionData.vendor || null,
-                recurrence: 'one_time',
                 start_date: body.paidDate || `${body.month}-01`,
+                subtotal: amount,
+                total_tax: 0,
+                total_discount: 0,
                 is_active: true,
+              })
+              .select()
+              .single();
+
+            if (!expenseErr && expenseRow) {
+              await supabase.from('expense_line_items').insert({
+                expense_id: expenseRow.id,
+                item_id: null,
+                subscription_id: parseInt(id),
+                quantity: 1,
+                unit_id: null,
+                unit_price: amount,
+                unit_cost: null,
+                tax_rate_percent: 0,
+                tax_amount: 0,
+                line_total: amount,
+                sort_order: 0,
               });
+            }
           }
         }
       }
