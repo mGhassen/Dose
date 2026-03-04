@@ -10,11 +10,9 @@ import { getDateRangeForPreset } from "@kit/lib/date-periods";
 import { safeLocalStorage } from "@kit/lib/localStorage";
 import type { Expense, ExpenseCategory } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
-import { DollarSign, Receipt } from "lucide-react";
 import { DashboardPeriodFilter } from "@/components/dashboard-period-filter";
 
 const EXPENSES_PERIOD_KEY = "expenses-period";
@@ -84,12 +82,6 @@ export default function ExpensesContent({ selectedExpenseId }: ExpensesContentPr
     }
     return map;
   }, [suppliers]);
-  
-  // Calculate summary stats from expenses
-  const totalExpenses = useMemo(() => {
-    if (!expenses || !Array.isArray(expenses)) return 0;
-    return expenses.reduce((sum, exp) => sum + exp.amount, 0);
-  }, [expenses]);
 
   const columns: ColumnDef<Expense>[] = useMemo(() => [
     {
@@ -245,63 +237,6 @@ export default function ExpensesContent({ selectedExpenseId }: ExpensesContentPr
           </p>
         </div>
         <DashboardPeriodFilter value={dateRange} onChange={handleDateRangeChange} />
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-            <Receipt className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalCount}</div>
-            <p className="text-xs text-muted-foreground">
-              Period: {dateRange.startDate} – {dateRange.endDate}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
-            <p className="text-xs text-muted-foreground">
-              Amount in selected period
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg per Expense</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {expenses.length > 0 
-                ? formatCurrency(totalExpenses / expenses.length)
-                : formatCurrency(0)}
-            </div>
-            <p className="text-xs text-muted-foreground">Average amount</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Categories</CardTitle>
-            <Receipt className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {new Set(expenses.map(e => e.category)).size}
-            </div>
-            <p className="text-xs text-muted-foreground">Unique categories</p>
-          </CardContent>
-        </Card>
       </div>
       </div>
 
