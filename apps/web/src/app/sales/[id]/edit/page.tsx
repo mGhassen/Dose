@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { dateToYYYYMMDD } from "@kit/lib";
 import type { SalesType } from "@kit/types";
 import { DatePicker } from "@kit/ui/date-picker";
+import { TimePicker } from "@kit/ui/time-picker";
 
 interface EditSalePageProps {
   params: Promise<{ id: string }>;
@@ -32,6 +33,7 @@ export default function EditSalePage({ params }: EditSalePageProps) {
   
   const [formData, setFormData] = useState({
     date: "",
+    time: "00:00",
     type: "" as SalesType | "",
     amount: "",
     quantity: "",
@@ -68,8 +70,10 @@ export default function EditSalePage({ params }: EditSalePageProps) {
 
   useEffect(() => {
     if (sale) {
+      const hasTime = sale.date.includes("T");
       setFormData({
-        date: sale.date.split('T')[0],
+        date: sale.date.split("T")[0],
+        time: hasTime ? sale.date.slice(11, 16) : "00:00",
         type: sale.type,
         amount: sale.amount.toString(),
         quantity: sale.quantity?.toString() || "",
@@ -97,10 +101,11 @@ export default function EditSalePage({ params }: EditSalePageProps) {
     if (!resolvedParams?.id) return;
 
     try {
+      const dateTimeIso = new Date(`${formData.date}T${formData.time}`).toISOString();
       await updateSale.mutateAsync({
         id: resolvedParams.id,
         data: {
-          date: formData.date,
+          date: dateTimeIso,
           type: formData.type as SalesType,
           amount: parseFloat(formData.amount),
           quantity: formData.quantity ? parseFloat(formData.quantity) : undefined,
@@ -249,7 +254,6 @@ export default function EditSalePage({ params }: EditSalePageProps) {
                   </>
                 )}
 
-                {/* Date */}
                 <div className="space-y-2">
                   <Label htmlFor="date">Date *</Label>
                   <DatePicker
@@ -257,6 +261,15 @@ export default function EditSalePage({ params }: EditSalePageProps) {
                     value={formData.date ? new Date(formData.date) : undefined}
                     onChange={(d) => handleInputChange("date", d ? dateToYYYYMMDD(d) : "")}
                     placeholder="Pick a date"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="time">Time</Label>
+                  <TimePicker
+                    id="time"
+                    value={formData.time}
+                    onChange={(t) => handleInputChange("time", t)}
+                    placeholder="Pick a time"
                   />
                 </div>
 

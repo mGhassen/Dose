@@ -274,32 +274,23 @@ export function UnifiedSelector({
     
     return (
       <div className="space-y-2">
-        {displayLabel && (
-          manageLink ? (
-            <div className="flex items-center justify-between">
-              <Label htmlFor={id}>{displayLabel}</Label>
-              <RelatedDataLink href={manageLink.href} className="text-xs">
-                {manageLink.text}
-              </RelatedDataLink>
-            </div>
-          ) : (
-            <Label htmlFor={id}>{displayLabel}</Label>
-          )
-        )}
-        <Popover open={disabled ? false : open} onOpenChange={disabled ? undefined : setOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              id={id}
-              disabled={disabled}
-              className={cn(
-                "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background shadow-md placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-                className
-              )}
-            >
-              <span className="truncate text-left">{displayButtonText}</span>
-            </button>
-          </PopoverTrigger>
+        {displayLabel && <Label htmlFor={id}>{displayLabel}</Label>}
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+          <Popover open={disabled ? false : open} onOpenChange={disabled ? undefined : setOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                id={id}
+                disabled={disabled}
+                className={cn(
+                  "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background shadow-md placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+                  className
+                )}
+              >
+                <span className="truncate text-left">{displayButtonText}</span>
+              </button>
+            </PopoverTrigger>
           <PopoverContent className="w-96 p-0" align="start" sideOffset={5}>
           <Command>
             <div className="flex items-center border-b px-3">
@@ -393,6 +384,13 @@ export function UnifiedSelector({
           </Command>
         </PopoverContent>
       </Popover>
+          </div>
+          {manageLink && (
+            <RelatedDataLink href={manageLink.href} className="text-xs shrink-0">
+              {manageLink.text}
+            </RelatedDataLink>
+          )}
+        </div>
       </div>
     );
   }
@@ -401,21 +399,11 @@ export function UnifiedSelector({
   
   return (
     <>
-      {displayLabel && (
-        <div className="flex items-center justify-between">
-          <Label htmlFor={id}>{displayLabel}</Label>
-          {manageLink && (
-            <RelatedDataLink 
-              href={manageLink.href} 
-              className="text-xs"
-            >
-              {manageLink.text}
-            </RelatedDataLink>
-          )}
-        </div>
-      )}
-      <Select open={open} onOpenChange={setOpen}>
-        <SelectTrigger id={id} className={cn("h-10 shadow-md text-base md:text-sm justify-start [&_svg]:hidden", className)}>
+      {displayLabel && <Label htmlFor={id}>{displayLabel}</Label>}
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+        <Select open={open} onOpenChange={setOpen}>
+          <SelectTrigger id={id} className={cn("h-10 w-full shadow-md text-base md:text-sm justify-start [&_svg]:hidden", className)}>
           <SelectValue placeholder={selectedIds.length > 0 ? `${selectedIds.length} ${tCommon('item')}${selectedIds.length !== 1 ? 's' : ''} ${tCommon('selected')}` : placeholder || tCommon('selectItemsMultiple')} />
         </SelectTrigger>
         <SelectContent className="p-0" align="start">
@@ -476,6 +464,13 @@ export function UnifiedSelector({
           </Command>
         </SelectContent>
       </Select>
+        </div>
+        {manageLink && (
+          <RelatedDataLink href={manageLink.href} className="text-xs shrink-0">
+            {manageLink.text}
+          </RelatedDataLink>
+        )}
+      </div>
       {selectedIds.length > 0 && (
         <div className="flex flex-wrap gap-2 mt-2">
           {selectedIds.map(itemId => {

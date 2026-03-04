@@ -8,7 +8,7 @@ import { useSales, useDeleteSale } from "@kit/hooks";
 import type { Sale, SalesType } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
-import { formatDate } from "@kit/lib/date-format";
+import { formatDateTime } from "@kit/lib/date-format";
 import { toast } from "sonner";
 
 interface SalesContentProps {
@@ -34,7 +34,7 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
     {
       accessorKey: "date",
       header: "Date",
-      cell: ({ row }) => formatDate(row.original.date),
+      cell: ({ row }) => formatDateTime(row.original.date),
     },
     {
       accessorKey: "type",

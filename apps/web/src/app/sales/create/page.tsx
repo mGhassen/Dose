@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { DatePicker } from "@kit/ui/date-picker";
+import { TimePicker } from "@kit/ui/time-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -21,8 +22,10 @@ export default function CreateSalePage() {
   const createSale = useCreateSale();
   const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
   const items = itemsResponse?.data ?? [];
+  const now = new Date();
   const [formData, setFormData] = useState({
-    date: dateToYYYYMMDD(new Date()),
+    date: dateToYYYYMMDD(now),
+    time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
     type: "" as SalesType | "",
     amount: "",
     quantity: "",
@@ -70,8 +73,9 @@ export default function CreateSalePage() {
     }
 
     try {
+      const dateTimeIso = new Date(`${formData.date}T${formData.time}`).toISOString();
       await createSale.mutateAsync({
-        date: formData.date,
+        date: dateTimeIso,
         type: formData.type as SalesType,
         amount: parseFloat(formData.amount),
         quantity: formData.quantity ? parseFloat(formData.quantity) : undefined,
@@ -196,7 +200,6 @@ export default function CreateSalePage() {
                   </>
                 )}
 
-                {/* Date */}
                 <div className="space-y-2">
                   <Label htmlFor="date">Date *</Label>
                   <DatePicker
@@ -204,6 +207,15 @@ export default function CreateSalePage() {
                     value={formData.date ? new Date(formData.date) : undefined}
                     onChange={(d) => handleInputChange("date", d ? dateToYYYYMMDD(d) : "")}
                     placeholder="Pick a date"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="time">Time</Label>
+                  <TimePicker
+                    id="time"
+                    value={formData.time}
+                    onChange={(t) => handleInputChange("time", t)}
+                    placeholder="Pick a time"
                   />
                 </div>
 

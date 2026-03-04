@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
         name: body.description || `Sale - ${body.type}`,
         amount: body.amount,
         description: body.description,
-        entry_date: body.date,
+        entry_date: body.date.split('T')[0],
         reference_id: data.id,
         is_active: true,
       });

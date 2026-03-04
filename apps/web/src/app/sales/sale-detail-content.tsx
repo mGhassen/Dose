@@ -11,6 +11,7 @@ import {
 } from "@kit/ui/dropdown-menu";
 import { dateToYYYYMMDD } from "@kit/lib";
 import { DatePicker } from "@kit/ui/date-picker";
+import { TimePicker } from "@kit/ui/time-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -38,7 +39,7 @@ import { useSaleById, useUpdateSale, useDeleteSale, useItems } from "@kit/hooks"
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
-import { formatDate } from "@kit/lib/date-format";
+import { formatDate, formatDateTime } from "@kit/lib/date-format";
 import type { SalesType } from "@kit/types";
 
 interface SaleDetailContentProps {
@@ -88,6 +89,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
 
   const [formData, setFormData] = useState({
     date: "",
+    time: "00:00",
     type: "" as SalesType | "",
     amount: "",
     quantity: "",
@@ -99,8 +101,10 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
 
   useEffect(() => {
     if (sale) {
+      const hasTime = sale.date.includes("T");
       setFormData({
         date: sale.date.split("T")[0],
+        time: hasTime ? sale.date.slice(11, 16) : "00:00",
         type: sale.type,
         amount: sale.amount.toString(),
         quantity: sale.quantity?.toString() || "",
@@ -119,10 +123,11 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
       return;
     }
     try {
+      const dateTimeIso = new Date(`${formData.date}T${formData.time}`).toISOString();
       await updateSale.mutateAsync({
         id: saleId,
         data: {
-          date: formData.date,
+          date: dateTimeIso,
           type: formData.type as SalesType,
           amount: parseFloat(formData.amount),
           quantity: formData.quantity ? parseInt(formData.quantity) : undefined,
@@ -237,6 +242,15 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                   value={formData.date ? new Date(formData.date) : undefined}
                   onChange={(d) => handleInputChange("date", d ? dateToYYYYMMDD(d) : "")}
                   placeholder="Pick a date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="time">Time</Label>
+                <TimePicker
+                  id="time"
+                  value={formData.time}
+                  onChange={(t) => handleInputChange("time", t)}
+                  placeholder="Pick a time"
                 />
               </div>
               <div className="space-y-2">
@@ -356,7 +370,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs text-muted-foreground">
-              {formatDate(sale.date)} · {TYPE_LABELS[sale.type] || sale.type}
+              {formatDateTime(sale.date)} · {TYPE_LABELS[sale.type] || sale.type}
             </p>
             <h2 className="text-lg font-semibold">Sale details</h2>
           </div>
@@ -409,7 +423,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground">
-                  {formatDate(sale.date)}
+                  {formatDateTime(sale.date)}
                 </span>
                 <Badge variant="secondary" className="font-normal">
                   {TYPE_LABELS[sale.type] || sale.type}
@@ -420,7 +434,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
 
           <div className="space-y-0">
             <DetailRow icon={Calendar} label="Date">
-              {formatDate(sale.date)}
+              {formatDateTime(sale.date)}
             </DetailRow>
             <Separator />
             <DetailRow icon={Tag} label="Type">

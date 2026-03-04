@@ -37,3 +37,8 @@ ON CONFLICT (item_id, effective_date) DO UPDATE SET unit_price = EXCLUDED.unit_p
 
 ALTER TABLE items DROP COLUMN IF EXISTS unit_price;
 
+-- Phase 4: Convert sales.date to TIMESTAMPTZ
+-- Sales: store date + time (TIMESTAMPTZ). Existing rows: date at midnight UTC.
+ALTER TABLE sales
+  ALTER COLUMN date TYPE TIMESTAMPTZ
+  USING (date::text || ' 00:00:00+00')::timestamptz;
