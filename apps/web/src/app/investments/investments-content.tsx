@@ -4,8 +4,8 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useInvestments, useDeleteInvestment } from "@kit/hooks";
-import type { Investment, InvestmentType, DepreciationMethod } from "@kit/types";
+import { useInvestments, useDeleteInvestment, useMetadataEnum } from "@kit/hooks";
+import type { Investment } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -15,6 +15,16 @@ export default function InvestmentsContent() {
   const router = useRouter();
   const { data: investments, isLoading } = useInvestments();
   const deleteMutation = useDeleteInvestment();
+  const { data: investmentTypeValues = [] } = useMetadataEnum("InvestmentType");
+  const { data: depreciationMethodValues = [] } = useMetadataEnum("DepreciationMethod");
+  const typeLabels: Record<string, string> = useMemo(
+    () => Object.fromEntries(investmentTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [investmentTypeValues]
+  );
+  const methodLabels: Record<string, string> = useMemo(
+    () => Object.fromEntries(depreciationMethodValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [depreciationMethodValues]
+  );
 
   const columns: ColumnDef<Investment>[] = useMemo(() => [
     {
@@ -27,21 +37,11 @@ export default function InvestmentsContent() {
     {
       accessorKey: "type",
       header: "Type",
-      cell: ({ row }) => {
-        const type = row.original.type;
-        const typeLabels: Record<InvestmentType, string> = {
-          equipment: "Equipment",
-          renovation: "Renovation",
-          technology: "Technology",
-          vehicle: "Vehicle",
-          other: "Other",
-        };
-        return (
-          <Badge variant="outline">
-            {typeLabels[type] || type}
-          </Badge>
-        );
-      },
+      cell: ({ row }) => (
+        <Badge variant="outline">
+          {typeLabels[row.original.type] || row.original.type}
+        </Badge>
+      ),
     },
     {
       accessorKey: "amount",
@@ -61,26 +61,18 @@ export default function InvestmentsContent() {
     {
       accessorKey: "depreciationMethod",
       header: "Depreciation Method",
-      cell: ({ row }) => {
-        const method = row.original.depreciationMethod;
-        const methodLabels: Record<DepreciationMethod, string> = {
-          straight_line: "Straight Line",
-          declining_balance: "Declining Balance",
-          units_of_production: "Units of Production",
-        };
-        return (
-          <span className="text-sm text-muted-foreground">
-            {methodLabels[method] || method}
-          </span>
-        );
-      },
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {methodLabels[row.original.depreciationMethod] || row.original.depreciationMethod}
+        </span>
+      ),
     },
     {
       accessorKey: "residualValue",
       header: "Residual Value",
       cell: ({ row }) => formatCurrency(row.original.residualValue),
     },
-  ], []);
+  ], [typeLabels, methodLabels]);
 
   const handleDelete = async (id: number) => {
     try {

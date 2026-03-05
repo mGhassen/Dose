@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useSubscriptions, useDeleteSubscription, useInventorySuppliers } from "@kit/hooks";
+import { useSubscriptions, useDeleteSubscription, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
 import Link from "next/link";
-import type { Subscription, ExpenseCategory, ExpenseRecurrence } from "@kit/types";
+import type { Subscription } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { Button } from "@kit/ui/button";
@@ -25,6 +25,16 @@ export default function SubscriptionsContent() {
   const { data: subscriptionsResponse, isLoading } = useSubscriptions({ page: 1, limit: 1000 });
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const suppliers = suppliersResponse?.data || [];
+  const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
+  const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
+  const categoryLabels = useMemo(
+    () => Object.fromEntries(categoryValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [categoryValues]
+  );
+  const recurrenceLabels = useMemo(
+    () => Object.fromEntries(recurrenceValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [recurrenceValues]
+  );
 
   const filteredSubscriptions = useMemo(() => {
     if (!subscriptionsResponse?.data) return [];
@@ -66,24 +76,11 @@ export default function SubscriptionsContent() {
     {
       accessorKey: "category",
       header: "Category",
-      cell: ({ row }) => {
-        const category = row.original.category;
-        const categoryLabels: Record<ExpenseCategory, string> = {
-          rent: "Rent",
-          utilities: "Utilities",
-          supplies: "Supplies",
-          marketing: "Marketing",
-          insurance: "Insurance",
-          maintenance: "Maintenance",
-          professional_services: "Professional Services",
-          other: "Other",
-        };
-        return (
-          <Badge variant="outline">
-            {categoryLabels[category] || category}
-          </Badge>
-        );
-      },
+      cell: ({ row }) => (
+        <Badge variant="outline">
+          {categoryLabels[row.original.category] ?? row.original.category}
+        </Badge>
+      ),
     },
     {
       accessorKey: "amount",
@@ -93,21 +90,11 @@ export default function SubscriptionsContent() {
     {
       accessorKey: "recurrence",
       header: "Recurrence",
-      cell: ({ row }) => {
-        const recurrence = row.original.recurrence;
-        const recurrenceLabels: Record<ExpenseRecurrence, string> = {
-          one_time: "One Time",
-          monthly: "Monthly",
-          quarterly: "Quarterly",
-          yearly: "Yearly",
-          custom: "Custom",
-        };
-        return (
-          <span className="text-sm text-muted-foreground">
-            {recurrenceLabels[recurrence] || recurrence}
-          </span>
-        );
-      },
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {recurrenceLabels[row.original.recurrence] ?? row.original.recurrence}
+        </span>
+      ),
     },
     {
       accessorKey: "startDate",
@@ -139,7 +126,7 @@ export default function SubscriptionsContent() {
         return subscription.vendor || <span className="text-muted-foreground">—</span>;
       },
     },
-  ], [supplierMap]);
+  ], [supplierMap, categoryLabels, recurrenceLabels]);
 
   const handleDelete = async (id: number) => {
     try {

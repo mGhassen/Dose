@@ -2,10 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { taxRulesApi } from '@kit/lib';
 import type { CreateTaxRuleData, UpdateTaxRuleData } from '@kit/types';
 
-export function useTaxRules() {
+export function useTaxRules(params?: { variableId?: number }) {
   return useQuery({
-    queryKey: ['tax-rules'],
-    queryFn: () => taxRulesApi.getAll(),
+    queryKey: ['tax-rules', params],
+    queryFn: () => taxRulesApi.getAll(params),
   });
 }
 

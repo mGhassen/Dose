@@ -11,7 +11,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateLeasing, useInventorySuppliers } from "@kit/hooks";
+import { useCreateLeasing, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import type { LeasingType, ExpenseRecurrence } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
@@ -24,6 +24,10 @@ export default function CreateLeasingPage() {
   const createLeasing = useCreateLeasing();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
   const suppliers = suppliersResponse?.data || [];
+  const { data: leasingTypeValues = [] } = useMetadataEnum("LeasingType");
+  const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
+  const leasingTypeItems = leasingTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const frequencyItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [amountMode, setAmountMode] = useState<"periodic" | "total">("periodic");
   const [formData, setFormData] = useState({
     name: "",
@@ -204,10 +208,7 @@ export default function CreateLeasingPage() {
                   label="Type"
                   required
                   type="type"
-                  items={[
-                    { id: 'operating', name: 'Operating' },
-                    { id: 'finance', name: 'Finance' },
-                  ]}
+                  items={leasingTypeItems}
                   selectedId={formData.type || undefined}
                   onSelect={(item) => handleInputChange('type', String(item.id) as LeasingType)}
                   placeholder="Select type"
@@ -281,13 +282,7 @@ export default function CreateLeasingPage() {
                     label="Frequency"
                     required
                     type="frequency"
-                    items={[
-                      { id: 'one_time', name: 'One Time' },
-                      { id: 'monthly', name: 'Monthly' },
-                      { id: 'quarterly', name: 'Quarterly' },
-                      { id: 'yearly', name: 'Yearly' },
-                      { id: 'custom', name: 'Custom' },
-                    ]}
+                    items={frequencyItems}
                     selectedId={formData.frequency || undefined}
                     onSelect={(item) => handleInputChange('frequency', String(item.id) as ExpenseRecurrence)}
                     placeholder="Select frequency"

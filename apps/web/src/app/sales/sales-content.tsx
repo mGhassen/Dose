@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useDashboardPeriod } from "@/components/dashboard-period-provider";
-import { useSales, useDeleteSale } from "@kit/hooks";
-import type { Sale, SalesType } from "@kit/types";
+import { useSales, useDeleteSale, useMetadataEnum } from "@kit/hooks";
+import type { Sale } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDateTime } from "@kit/lib/date-format";
@@ -37,6 +37,11 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
   const totalCount = salesResponse?.pagination?.total || 0;
   const totalPages = salesResponse?.pagination?.totalPages || 0;
   const deleteMutation = useDeleteSale();
+  const { data: salesTypeValues = [] } = useMetadataEnum("SalesType");
+  const typeLabels: Record<string, string> = useMemo(
+    () => Object.fromEntries(salesTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [salesTypeValues]
+  );
 
   const columns: ColumnDef<Sale>[] = useMemo(() => [
     {
@@ -47,21 +52,11 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
     {
       accessorKey: "type",
       header: "Type",
-      cell: ({ row }) => {
-        const type = row.original.type;
-        const typeLabels: Record<SalesType, string> = {
-          on_site: "On Site",
-          delivery: "Delivery",
-          takeaway: "Takeaway",
-          catering: "Catering",
-          other: "Other",
-        };
-        return (
-          <Badge variant="outline">
-            {typeLabels[type] || type}
-          </Badge>
-        );
-      },
+      cell: ({ row }) => (
+        <Badge variant="outline">
+          {typeLabels[row.original.type] || row.original.type}
+        </Badge>
+      ),
     },
     {
       accessorKey: "amount",
@@ -116,7 +111,7 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
       header: "Description",
       cell: ({ row }) => row.original.description || <span className="text-muted-foreground">—</span>,
     },
-  ], []);
+  ], [typeLabels]);
 
   const handleDelete = async (id: number) => {
     try {

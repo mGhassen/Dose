@@ -35,7 +35,7 @@ import {
   X,
   Plus,
 } from "lucide-react";
-import { useSaleById, useUpdateSale, useDeleteSale, useItems, useUnits } from "@kit/hooks";
+import { useSaleById, useUpdateSale, useDeleteSale, useItems, useUnits, useMetadataEnum } from "@kit/hooks";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -50,14 +50,6 @@ interface SaleDetailContentProps {
   onClose: () => void;
   onDeleted: () => void;
 }
-
-const TYPE_LABELS: Record<SalesType, string> = {
-  on_site: "On Site",
-  delivery: "Delivery",
-  takeaway: "Takeaway",
-  catering: "Catering",
-  other: "Other",
-};
 
 function DetailRow({
   icon: Icon,
@@ -97,6 +89,11 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
   const deleteMutation = useDeleteSale();
   const items = itemsResponse?.data ?? [];
   const unitItems = (unitsData || []).map((u: { id: number; symbol?: string; name?: string }) => ({ id: u.id, name: `${u.symbol ?? ""} (${u.name ?? ""})` }));
+  const { data: salesTypeValues = [] } = useMetadataEnum("SalesType");
+  const typeOptions = salesTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const typeLabels: Record<string, string> = Object.fromEntries(
+    salesTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
 
   const [formData, setFormData] = useState({
     date: "",
@@ -366,7 +363,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                 <Label>Dining option</Label>
                 <UnifiedSelector
                   type="type"
-                  items={[{ id: "on_site", name: "On site" }, { id: "delivery", name: "Delivery" }, { id: "takeaway", name: "Takeaway" }, { id: "catering", name: "Catering" }, { id: "other", name: "Other" }]}
+                  items={typeOptions}
                   selectedId={formData.type || undefined}
                   onSelect={(item) => handleInputChange("type", item.id === 0 ? "" : String(item.id))}
                   placeholder="Select type"
@@ -553,7 +550,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
         <div className="flex items-start justify-between gap-4 pb-4">
           <div>
             <p className="text-xs text-muted-foreground">
-              {formatDateTime(sale.date)} · {TYPE_LABELS[sale.type] || sale.type}
+              {formatDateTime(sale.date)} · {typeLabels[sale.type] || sale.type}
             </p>
             <h2 className="text-lg font-semibold">Sale details</h2>
           </div>
@@ -609,7 +606,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                   {formatDateTime(sale.date)}
                 </span>
                 <Badge variant="secondary" className="font-normal">
-                  {TYPE_LABELS[sale.type] || sale.type}
+                  {typeLabels[sale.type] || sale.type}
                 </Badge>
               </div>
             </div>
@@ -621,7 +618,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
             </DetailRow>
             <Separator />
             <DetailRow icon={Tag} label="Type">
-              <Badge variant="outline">{TYPE_LABELS[sale.type] || sale.type}</Badge>
+              <Badge variant="outline">{typeLabels[sale.type] || sale.type}</Badge>
             </DetailRow>
             <Separator />
             <div className="py-3">

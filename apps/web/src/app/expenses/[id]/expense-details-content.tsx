@@ -43,6 +43,7 @@ import {
   useInventorySuppliers,
   useItems,
   useUnits,
+  useMetadataEnum,
 } from "@kit/hooks";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -53,17 +54,6 @@ import type { ExpenseCategory } from "@kit/types";
 
 import { lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
-
-const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
-  rent: "Rent",
-  utilities: "Utilities",
-  supplies: "Supplies",
-  marketing: "Marketing",
-  insurance: "Insurance",
-  maintenance: "Maintenance",
-  professional_services: "Professional Services",
-  other: "Other",
-};
 
 function DetailRow({
   icon: Icon,
@@ -116,6 +106,11 @@ export function ExpenseDetailContent({
   const items = itemsResponse?.data ?? [];
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
+  const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
+  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const categoryLabels: Record<string, string> = Object.fromEntries(
+    categoryValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
@@ -363,16 +358,7 @@ export function ExpenseDetailContent({
                 <Label>Category *</Label>
                 <UnifiedSelector
                   type="category"
-                  items={[
-                    { id: "rent", name: "Rent" },
-                    { id: "utilities", name: "Utilities" },
-                    { id: "supplies", name: "Supplies" },
-                    { id: "marketing", name: "Marketing" },
-                    { id: "insurance", name: "Insurance" },
-                    { id: "maintenance", name: "Maintenance" },
-                    { id: "professional_services", name: "Professional Services" },
-                    { id: "other", name: "Other" },
-                  ]}
+                  items={categoryItems}
                   selectedId={formData.category || undefined}
                   onSelect={(item) => setFormData((p) => ({ ...p, category: (item.id === 0 ? "" : String(item.id)) as ExpenseCategory | "" }))}
                   placeholder="Category"
@@ -607,7 +593,7 @@ export function ExpenseDetailContent({
           <div>
             <p className="text-xs text-muted-foreground">
               {formatDate(expense.expenseDate)} ·{" "}
-              {CATEGORY_LABELS[expense.category] || expense.category}
+              {categoryLabels[expense.category] || expense.category}
             </p>
             <h2 className="text-lg font-semibold">Expense details</h2>
           </div>
@@ -663,7 +649,7 @@ export function ExpenseDetailContent({
                   {formatDate(expense.expenseDate)}
                 </span>
                 <Badge variant="secondary" className="font-normal">
-                  {CATEGORY_LABELS[expense.category] || expense.category}
+                  {categoryLabels[expense.category] || expense.category}
                 </Badge>
               </div>
             </div>
@@ -676,7 +662,7 @@ export function ExpenseDetailContent({
             <Separator />
             <DetailRow icon={Tag} label="Category">
               <Badge variant="outline">
-                {CATEGORY_LABELS[expense.category] || expense.category}
+                {categoryLabels[expense.category] || expense.category}
               </Badge>
             </DetailRow>
             <Separator />

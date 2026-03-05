@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Badge } from "@kit/ui/badge";
 import { Trash2, TrendingUp, TrendingDown, Package, MoreVertical } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useStockMovementById, useDeleteStockMovement } from "@kit/hooks";
+import { useStockMovementById, useDeleteStockMovement, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
 import { StockMovementType } from "@kit/types";
@@ -40,6 +40,10 @@ export default function StockMovementDetailPage({ params }: StockMovementDetailP
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: movement, isLoading } = useStockMovementById(resolvedParams?.id || "");
   const deleteMutation = useDeleteStockMovement();
+  const { data: movementTypeValues = [] } = useMetadataEnum("StockMovementType");
+  const movementTypeLabels: Record<string, string> = Object.fromEntries(
+    movementTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -144,7 +148,7 @@ export default function StockMovementDetailPage({ params }: StockMovementDetailP
                 <label className="text-sm font-medium text-muted-foreground">Movement Type</label>
                 <div className="mt-1">
                   <Badge variant={getMovementTypeBadge(movement.movementType)}>
-                    {movement.movementType.toUpperCase()}
+                    {movementTypeLabels[movement.movementType] || movement.movementType}
                   </Badge>
                 </div>
               </div>

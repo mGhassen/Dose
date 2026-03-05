@@ -8,7 +8,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { ArrowLeft, Calendar, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLeasingById } from "@kit/hooks";
+import { useLeasingById, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
@@ -36,6 +36,14 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
   const queryClient = useQueryClient();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: leasing, isLoading: leasingLoading } = useLeasingById(resolvedParams?.id || "");
+  const { data: leasingTypeValues = [] } = useMetadataEnum("LeasingType");
+  const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
+  const typeLabels: Record<string, string> = Object.fromEntries(
+    leasingTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
+  const frequencyLabels: Record<string, string> = Object.fromEntries(
+    recurrenceValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
   const [startMonth, setStartMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -183,19 +191,6 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
       </AppLayout>
     );
   }
-
-  const frequencyLabels: Record<string, string> = {
-    one_time: "One Time",
-    monthly: "Monthly",
-    quarterly: "Quarterly",
-    yearly: "Yearly",
-    custom: "Custom",
-  };
-
-  const typeLabels: Record<string, string> = {
-    operating: "Operating",
-    finance: "Finance",
-  };
 
   const totalAmount = timeline.reduce((sum, e) => sum + e.amount, 0);
   const actualCount = timeline.filter(e => !e.isProjected).length;

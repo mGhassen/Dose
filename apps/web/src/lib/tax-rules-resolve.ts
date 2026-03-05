@@ -22,11 +22,12 @@ interface TaxRuleRow {
   variable_id: number;
   condition_type: string | null;
   condition_value: string | null;
+  condition_values: string[] | null;
   scope_type: string;
   scope_item_ids: number[] | null;
   scope_categories: string[] | null;
   priority: number;
-  variable_value: number;
+  variable_value?: number;
 }
 
 function scopeMatches(
@@ -53,6 +54,14 @@ function ruleValidAt(rule: { effective_date?: string | null; end_date?: string |
   return true;
 }
 
+function conditionMatchesSalesType(rule: TaxRuleRow, salesType: string): boolean {
+  const values = rule.condition_values;
+  if (values && Array.isArray(values) && values.length > 0) {
+    return values.includes(salesType);
+  }
+  return rule.condition_value === salesType;
+}
+
 export async function getTaxRateForSaleLine(
   supabase: SupabaseClient | any,
   itemId: number | null,
@@ -63,15 +72,19 @@ export async function getTaxRateForSaleLine(
   const { data: rules } = await supabase
     .from('tax_rules')
     .select(
-      'id, variable_id, condition_type, condition_value, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date'
+      'id, variable_id, condition_type, condition_value, condition_values, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date'
     )
     .eq('condition_type', 'sales_type')
-    .eq('condition_value', salesType)
     .order('priority', { ascending: true });
 
   if (!rules?.length) return getItemDefaultTaxRate(supabase, itemId);
 
-  const variableIds = [...new Set((rules as { variable_id: number }[]).map((r) => r.variable_id))];
+  const matching = (rules as (TaxRuleRow & { effective_date?: string; end_date?: string })[]).filter((r) =>
+    conditionMatchesSalesType(r, salesType)
+  );
+  if (!matching.length) return getItemDefaultTaxRate(supabase, itemId);
+
+  const variableIds = [...new Set(matching.map((r) => r.variable_id))];
   const { data: variables } = await supabase
     .from('variables')
     .select('id, value, is_active, effective_date, end_date')
@@ -79,7 +92,7 @@ export async function getTaxRateForSaleLine(
   const varMap = new Map((variables || []).map((v: any) => [v.id, v]));
 
   const date = dateStr.slice(0, 10);
-  for (const r of rules as (TaxRuleRow & { effective_date?: string; end_date?: string })[]) {
+  for (const r of matching) {
     if (!ruleValidAt(r, date)) continue;
     const variable = varMap.get(r.variable_id);
     const v = variable as { is_active?: boolean; value?: unknown; effective_date?: string | null; end_date?: string | null };
@@ -100,7 +113,7 @@ export async function getTaxRateForExpenseLine(
   const { data: rules } = await supabase
     .from('tax_rules')
     .select(
-      'id, variable_id, condition_type, condition_value, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date'
+      'id, variable_id, condition_type, condition_value, condition_values, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date'
     )
     .eq('condition_type', 'expense')
     .order('priority', { ascending: true });

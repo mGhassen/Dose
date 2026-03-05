@@ -8,7 +8,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Calendar, TrendingUp, Download, Eye, MoreVertical } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLeasing } from "@kit/hooks";
+import { useLeasing, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatMonthYear } from "@kit/lib/date-format";
@@ -38,6 +38,14 @@ export default function LeasingTimelinePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: leasingPayments, isLoading } = useLeasing();
+  const { data: leasingTypeValues = [] } = useMetadataEnum("LeasingType");
+  const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
+  const typeLabels: Record<string, string> = Object.fromEntries(
+    leasingTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
+  const frequencyLabels: Record<string, string> = Object.fromEntries(
+    recurrenceValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
 
   const handleTimelineUpdate = () => {
     queryClient.invalidateQueries({ queryKey: ['actual-payments'] });
@@ -105,19 +113,6 @@ export default function LeasingTimelinePage() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Timeline exported successfully");
-  };
-
-  const frequencyLabels: Record<string, string> = {
-    one_time: "One Time",
-    monthly: "Monthly",
-    quarterly: "Quarterly",
-    yearly: "Yearly",
-    custom: "Custom",
-  };
-
-  const typeLabels: Record<string, string> = {
-    operating: "Operating",
-    finance: "Finance",
   };
 
   const totalAmount = allEntries.reduce((sum, e) => sum + e.amount, 0);

@@ -13,7 +13,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateSubscription, useInventorySuppliers } from "@kit/hooks";
+import { useCreateSubscription, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseRecurrence } from "@kit/types";
 import Link from "next/link";
@@ -28,6 +28,10 @@ export default function CreateSubscriptionPage() {
   const createSubscription = useCreateSubscription();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: "vendor" });
   const suppliers = suppliersResponse?.data || [];
+  const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
+  const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
+  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const recurrenceItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
   const {
     register,
@@ -110,16 +114,7 @@ export default function CreateSubscriptionPage() {
                         label="Category"
                         required
                         type="category"
-                        items={[
-                          { id: "rent", name: "Rent" },
-                          { id: "utilities", name: "Utilities" },
-                          { id: "supplies", name: "Supplies" },
-                          { id: "marketing", name: "Marketing" },
-                          { id: "insurance", name: "Insurance" },
-                          { id: "maintenance", name: "Maintenance" },
-                          { id: "professional_services", name: "Professional Services" },
-                          { id: "other", name: "Other" },
-                        ]}
+                        items={categoryItems}
                         selectedId={field.value ?? undefined}
                         onSelect={(item) =>
                           field.onChange(item.id === 0 ? undefined : String(item.id))
@@ -156,12 +151,7 @@ export default function CreateSubscriptionPage() {
                         label="Recurrence"
                         required
                         type="recurrence"
-                        items={[
-                          { id: "monthly", name: "Monthly" },
-                          { id: "quarterly", name: "Quarterly" },
-                          { id: "yearly", name: "Yearly" },
-                          { id: "custom", name: "Custom" },
-                        ]}
+                        items={recurrenceItems}
                         selectedId={field.value ?? undefined}
                         onSelect={(item) =>
                           field.onChange(String(item.id) as ExpenseRecurrence)

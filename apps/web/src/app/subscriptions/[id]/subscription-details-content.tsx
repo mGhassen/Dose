@@ -22,7 +22,7 @@ import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections, useInventorySupplierById } from "@kit/hooks";
+import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections, useInventorySupplierById, useMetadataEnum } from "@kit/hooks";
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -43,9 +43,6 @@ interface SubscriptionDetailsContentProps {
   subscriptionId: string;
 }
 
-type CategoryLabelsMap = Record<ExpenseCategory, string>;
-type RecurrenceLabelsMap = Record<ExpenseRecurrence, string>;
-
 export default function SubscriptionDetailsContent({ subscriptionId }: SubscriptionDetailsContentProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
@@ -53,6 +50,16 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
   const { data: supplier } = useInventorySupplierById(subscription?.supplierId?.toString() || "");
   const updateSubscription = useUpdateSubscription();
   const deleteMutation = useDeleteSubscription();
+  const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
+  const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
+  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const recurrenceItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const categoryLabels: Record<string, string> = Object.fromEntries(
+    categoryValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
+  const recurrenceLabels: Record<string, string> = Object.fromEntries(
+    recurrenceValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
   
   // Fetch stored subscription projection entries (for payment status)
   const { data: storedProjections, refetch: refetchProjections } = useSubscriptionProjections(subscriptionId);
@@ -192,25 +199,6 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
     );
   }
 
-  const categoryLabels: CategoryLabelsMap = {
-    rent: "Rent",
-    utilities: "Utilities",
-    supplies: "Supplies",
-    marketing: "Marketing",
-    insurance: "Insurance",
-    maintenance: "Maintenance",
-    professional_services: "Professional Services",
-    other: "Other",
-  };
-
-  const recurrenceLabels: RecurrenceLabelsMap = {
-    one_time: "One Time",
-    monthly: "Monthly",
-    quarterly: "Quarterly",
-    yearly: "Yearly",
-    custom: "Custom",
-  };
-
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -279,16 +267,7 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                     label="Category"
                     required
                     type="category"
-                    items={[
-                      { id: 'rent', name: 'Rent' },
-                      { id: 'utilities', name: 'Utilities' },
-                      { id: 'supplies', name: 'Supplies' },
-                      { id: 'marketing', name: 'Marketing' },
-                      { id: 'insurance', name: 'Insurance' },
-                      { id: 'maintenance', name: 'Maintenance' },
-                      { id: 'professional_services', name: 'Professional Services' },
-                      { id: 'other', name: 'Other' },
-                    ]}
+                    items={categoryItems}
                     selectedId={formData.category || undefined}
                     onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
                     placeholder="Select category"
@@ -311,12 +290,7 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                     label="Recurrence"
                     required
                     type="recurrence"
-                    items={[
-                      { id: 'monthly', name: 'Monthly' },
-                      { id: 'quarterly', name: 'Quarterly' },
-                      { id: 'yearly', name: 'Yearly' },
-                      { id: 'custom', name: 'Custom' },
-                    ]}
+                    items={recurrenceItems}
                     selectedId={formData.recurrence || undefined}
                     onSelect={(item) => handleInputChange('recurrence', String(item.id) as ExpenseRecurrence)}
                     placeholder="Select recurrence"

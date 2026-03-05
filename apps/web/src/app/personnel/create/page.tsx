@@ -12,7 +12,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreatePersonnel, useVariables } from "@kit/hooks";
+import { useCreatePersonnel, useVariables, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import type { PersonnelType } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
@@ -20,8 +20,9 @@ import { dateToYYYYMMDD } from "@kit/lib";
 export default function CreatePersonnelPage() {
   const router = useRouter();
   const createPersonnel = useCreatePersonnel();
-  
-  // Fetch variables to get Social Security Rate
+  const { data: personnelTypeValues = [] } = useMetadataEnum("PersonnelType");
+  const personnelTypeItems = personnelTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+
   const { data: variables } = useVariables();
   const variablesList = Array.isArray(variables) ? variables : [];
   const socialSecurityVariable = useMemo(() => 
@@ -165,12 +166,7 @@ export default function CreatePersonnelPage() {
                   label="Type"
                   required
                   type="type"
-                  items={[
-                    { id: 'full_time', name: 'Full Time' },
-                    { id: 'part_time', name: 'Part Time' },
-                    { id: 'contractor', name: 'Contractor' },
-                    { id: 'intern', name: 'Intern' },
-                  ]}
+                  items={personnelTypeItems}
                   selectedId={formData.type || undefined}
                   onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))}
                   placeholder="Select type"

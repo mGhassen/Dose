@@ -129,35 +129,13 @@ export default function Register() {
     }
   };
 
-  const registerGoogleUser = async (data: {
+  const registerGoogleUser = async (_data: {
     email: string;
     firstName: string;
     lastName: string;
     googleData: GoogleUserData;
   }) => {
-    // Create account with Google data
-    const response = await fetch('/api/auth/register-google', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: data.email,
-        first_name: data.firstName,
-        last_name: data.lastName,
-        google_id: data.googleData.google_id,
-        avatar_url: data.googleData.avatar_url,
-        access_token: data.googleData.access_token,
-        refresh_token: data.googleData.refresh_token
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Google registration failed');
-    }
-
-    return response.json();
+    throw new Error('Google registration is not available');
   };
 
   return (

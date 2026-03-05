@@ -34,7 +34,7 @@ import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { Save, X, Trash2, MoreVertical, Edit2, Calendar, ChevronLeft, User, Briefcase, Wallet, Mail, FileText } from "lucide-react";
 import Link from "next/link";
 import AppLayout from "@/components/app-layout";
-import { usePersonnelById, useUpdatePersonnel, useDeletePersonnel, usePersonnelSalaryProjections, useVariables } from "@kit/hooks";
+import { usePersonnelById, useUpdatePersonnel, useDeletePersonnel, usePersonnelSalaryProjections, useVariables, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { dateToYYYYMMDD } from "@kit/lib";
@@ -317,12 +317,11 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     );
   }
 
-  const typeLabels: Record<PersonnelType, string> = {
-    full_time: "Full Time",
-    part_time: "Part Time",
-    contractor: "Contractor",
-    intern: "Intern",
-  };
+  const { data: personnelTypeValues = [] } = useMetadataEnum("PersonnelType");
+  const personnelTypeItems = personnelTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const typeLabels: Record<string, string> = Object.fromEntries(
+    personnelTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
 
   const totalCost = personnel.baseSalary + (personnel.baseSalary * employeeSocialTaxRate);
   const initials = `${personnel.firstName.charAt(0)}${personnel.lastName.charAt(0)}`.toUpperCase();
@@ -429,10 +428,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                     <Label htmlFor="position">Position *</Label>
                     <Input id="position" value={formData.position} onChange={(e) => handleInputChange('position', e.target.value)} required />
                   </div>
-                  <UnifiedSelector label="Type" required type="type" items={[
-                    { id: 'full_time', name: 'Full Time' }, { id: 'part_time', name: 'Part Time' },
-                    { id: 'contractor', name: 'Contractor' }, { id: 'intern', name: 'Intern' },
-                  ]} selectedId={formData.type || undefined} onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))} placeholder="Select type" />
+                  <UnifiedSelector label="Type" required type="type" items={personnelTypeItems} selectedId={formData.type || undefined} onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))} placeholder="Select type" />
                   <div className="space-y-2">
                     <Label htmlFor="baseSalary">Base Salary *</Label>
                     <Input id="baseSalary" type="number" step="0.01" value={formData.baseSalary} onChange={(e) => handleInputChange('baseSalary', e.target.value)} required />

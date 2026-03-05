@@ -7,7 +7,20 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 type AccountRow = { id: string; is_admin?: boolean; profiles?: { id: unknown } | null };
 
-// Helper to convert UUID to numeric ID (same as in route.ts)
+type RoleEnumIds = { memberId: number; managerId: number; administratorId: number };
+
+async function getRoleEnumIds(supabase: any): Promise<RoleEnumIds> {
+  const { data: enumRow } = await supabase.from('metadata_enums').select('id').eq('name', 'Role').single();
+  if (!enumRow) return { memberId: 0, managerId: 1, administratorId: 2 };
+  const { data: values } = await supabase.from('metadata_enum_values').select('id, name').eq('enum_id', enumRow.id);
+  const byName = Object.fromEntries((values || []).map((v: { id: number; name: string }) => [v.name, v.id]));
+  return {
+    memberId: byName['member'] ?? 0,
+    managerId: byName['manager'] ?? 1,
+    administratorId: byName['administrator'] ?? 2,
+  };
+}
+
 function uuidToNumber(uuid: string): number {
   let hash = 0;
   for (let i = 0; i < uuid.length; i++) {
@@ -18,9 +31,11 @@ function uuidToNumber(uuid: string): number {
   return Math.abs(hash);
 }
 
-function transformAccountToUser(account: any, profile: any = null): User {
+function transformAccountToUser(account: any, profile: any = null, roleIds?: RoleEnumIds): User {
   const numericId = profile?.id ? Number(profile.id) : uuidToNumber(account.id);
-  const roleId = account.is_admin ? 2 : 0;
+  const roleId = roleIds
+    ? (account.is_admin ? roleIds.administratorId : roleIds.memberId)
+    : (account.is_admin ? 2 : 0);
   const isActive = account.status === 'active';
   
   return {
@@ -156,7 +171,8 @@ export async function GET(
       );
     }
 
-    const user = transformAccountToUser(account, profile);
+    const roleIds = await getRoleEnumIds(supabase);
+    const user = transformAccountToUser(account, profile, roleIds);
     return NextResponse.json(user);
   } catch (error: any) {
     console.error('Error in GET /api/users/[id]:', error);
@@ -276,7 +292,10 @@ export async function PUT(
     // Update account
     const updates: any = {};
     if (body.email !== undefined) updates.email = body.email;
-    if (body.roleId !== undefined) updates.is_admin = body.roleId === 2;
+    if (body.roleId !== undefined) {
+      const roleIds = await getRoleEnumIds(supabase);
+      updates.is_admin = body.roleId === roleIds.administratorId;
+    }
 
     if (Object.keys(updates).length > 0) {
       const { error: updateError } = await supabase
@@ -319,7 +338,8 @@ export async function PUT(
       );
     }
 
-    const user = transformAccountToUser(updatedAccount, updatedAccount.profiles);
+    const roleIds = await getRoleEnumIds(supabase);
+    const user = transformAccountToUser(updatedAccount, updatedAccount.profiles, roleIds);
     return NextResponse.json(user);
   } catch (error: any) {
     console.error('Error in PUT /api/users/[id]:', error);

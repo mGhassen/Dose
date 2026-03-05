@@ -252,11 +252,6 @@ export const pathsConfig: NavigationConfig = {
           url: "/settings/integrations",
           translationKey: "integrations"
         },
-        {
-          title: "taxes",
-          url: "/settings/taxes",
-          translationKey: "taxes"
-        },
       ]
     },
   ],

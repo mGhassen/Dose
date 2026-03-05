@@ -20,7 +20,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { Badge } from "@kit/ui/badge";
 import { Save, X, Trash2, TrendingDown, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useInvestmentById, useUpdateInvestment, useDeleteInvestment, useDepreciationSchedule } from "@kit/hooks";
+import { useInvestmentById, useUpdateInvestment, useDeleteInvestment, useDepreciationSchedule, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -37,7 +37,17 @@ export default function InvestmentDetailsContent({ investmentId }: InvestmentDet
   const { data: depreciation } = useDepreciationSchedule(investmentId);
   const updateInvestment = useUpdateInvestment();
   const deleteMutation = useDeleteInvestment();
-  
+  const { data: investmentTypeValues = [] } = useMetadataEnum("InvestmentType");
+  const { data: depreciationMethodValues = [] } = useMetadataEnum("DepreciationMethod");
+  const investmentTypeItems = investmentTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const depreciationMethodItems = depreciationMethodValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const typeLabels: Record<string, string> = Object.fromEntries(
+    investmentTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
+  const methodLabels: Record<string, string> = Object.fromEntries(
+    depreciationMethodValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
+
   const [formData, setFormData] = useState({
     name: "",
     type: "" as InvestmentType | "",
@@ -137,20 +147,6 @@ export default function InvestmentDetailsContent({ investmentId }: InvestmentDet
     );
   }
 
-  const typeLabels: Record<InvestmentType, string> = {
-    equipment: "Equipment",
-    renovation: "Renovation",
-    technology: "Technology",
-    vehicle: "Vehicle",
-    other: "Other",
-  };
-
-  const methodLabels: Record<DepreciationMethod, string> = {
-    straight_line: "Straight Line",
-    declining_balance: "Declining Balance",
-    units_of_production: "Units of Production",
-  };
-
   const currentBookValue = depreciation && depreciation.length > 0
     ? depreciation[depreciation.length - 1].bookValue
     : investment.amount;
@@ -225,13 +221,7 @@ export default function InvestmentDetailsContent({ investmentId }: InvestmentDet
                     label="Type"
                     required
                     type="type"
-                    items={[
-                      { id: 'equipment', name: 'Equipment' },
-                      { id: 'renovation', name: 'Renovation' },
-                      { id: 'technology', name: 'Technology' },
-                      { id: 'vehicle', name: 'Vehicle' },
-                      { id: 'other', name: 'Other' },
-                    ]}
+                    items={investmentTypeItems}
                     selectedId={formData.type || undefined}
                     onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))}
                     placeholder="Select type"
@@ -277,11 +267,7 @@ export default function InvestmentDetailsContent({ investmentId }: InvestmentDet
                     label="Depreciation Method"
                     required
                     type="method"
-                    items={[
-                      { id: 'straight_line', name: 'Straight Line' },
-                      { id: 'declining_balance', name: 'Declining Balance' },
-                      { id: 'units_of_production', name: 'Units of Production' },
-                    ]}
+                    items={depreciationMethodItems}
                     selectedId={formData.depreciationMethod || undefined}
                     onSelect={(item) => handleInputChange('depreciationMethod', item.id === 0 ? '' : String(item.id))}
                     placeholder="Select method"

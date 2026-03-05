@@ -30,7 +30,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2, Plus, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLoanById, useUpdateLoan, useDeleteLoan, useLoanSchedule, useEntries, usePaymentsByEntry, useCreatePayment, useDeletePayment, useGenerateLoanSchedule, useInventorySupplierById } from "@kit/hooks";
+import { useLoanById, useUpdateLoan, useDeleteLoan, useLoanSchedule, useEntries, usePaymentsByEntry, useCreatePayment, useDeletePayment, useGenerateLoanSchedule, useInventorySupplierById, useMetadataEnum } from "@kit/hooks";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -38,7 +38,6 @@ import { formatCurrency } from "@kit/lib/config";
 import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate } from "@kit/lib/date-format";
 import { DatePicker } from "@kit/ui/date-picker";
-import type { LoanStatus } from "@kit/types";
 import {
   TableBody,
   TableCell,
@@ -71,6 +70,16 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
   const updateLoan = useUpdateLoan();
   const deleteMutation = useDeleteLoan();
   const generateSchedule = useGenerateLoanSchedule();
+  const { data: loanStatusValues = [] } = useMetadataEnum("LoanStatus");
+  const statusItems = loanStatusValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const statusLabels: Record<string, string> = Object.fromEntries(
+    loanStatusValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
+  const statusVariants: Record<string, "default" | "secondary" | "destructive"> = {
+    active: "default",
+    paid_off: "secondary",
+    defaulted: "destructive",
+  };
   
   // Fetch the loan's input entry
   const { data: entriesData } = useEntries({
@@ -265,18 +274,6 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
     );
   }
 
-  const statusLabels: Record<LoanStatus, string> = {
-    active: "Active",
-    paid_off: "Paid Off",
-    defaulted: "Defaulted",
-  };
-
-  const statusVariants: Record<LoanStatus, "default" | "secondary" | "destructive"> = {
-    active: "default",
-    paid_off: "secondary",
-    defaulted: "destructive",
-  };
-
   return (
     <AppLayout>
       <div className="flex flex-col max-h-[calc(100vh-5rem)] overflow-hidden">
@@ -410,11 +407,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                     label="Status"
                     required
                     type="status"
-                    items={[
-                      { id: 'active', name: 'Active' },
-                      { id: 'paid_off', name: 'Paid Off' },
-                      { id: 'defaulted', name: 'Defaulted' },
-                    ]}
+                    items={statusItems}
                     selectedId={formData.status || undefined}
                     onSelect={(item) => handleInputChange('status', item.id === 0 ? '' : String(item.id))}
                     placeholder="Select status"

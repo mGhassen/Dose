@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { usePersonnel, useDeletePersonnel } from "@kit/hooks";
-import type { Personnel, PersonnelType } from "@kit/types";
+import { usePersonnel, useDeletePersonnel, useMetadataEnum } from "@kit/hooks";
+import type { Personnel } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { formatCurrency } from "@kit/lib/config";
@@ -20,6 +20,11 @@ export default function PersonnelContent() {
   const [pageSize, setPageSize] = useState(20);
 
   const { data: personnelResponse, isLoading } = usePersonnel({ page: 1, limit: 1000 });
+  const { data: personnelTypeValues = [] } = useMetadataEnum("PersonnelType");
+  const typeLabels: Record<string, string> = useMemo(
+    () => Object.fromEntries(personnelTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [personnelTypeValues]
+  );
 
   const filteredPersonnel = useMemo(() => {
     if (!personnelResponse?.data) return [];
@@ -62,20 +67,11 @@ export default function PersonnelContent() {
     {
       accessorKey: "type",
       header: "Type",
-      cell: ({ row }) => {
-        const type = row.original.type;
-        const typeLabels: Record<PersonnelType, string> = {
-          full_time: "Full Time",
-          part_time: "Part Time",
-          contractor: "Contractor",
-          intern: "Intern",
-        };
-        return (
-          <Badge variant="outline">
-            {typeLabels[type] || type}
-          </Badge>
-        );
-      },
+      cell: ({ row }) => (
+        <Badge variant="outline">
+          {typeLabels[row.original.type] || row.original.type}
+        </Badge>
+      ),
     },
     {
       accessorKey: "baseSalary",
@@ -98,7 +94,7 @@ export default function PersonnelContent() {
       header: "Start Date",
       cell: ({ row }) => formatDate(row.original.startDate),
     },
-  ], []);
+  ], [typeLabels]);
 
   const handleDelete = async (id: number) => {
     try {

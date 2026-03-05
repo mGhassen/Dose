@@ -10,20 +10,10 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { ScrollArea } from "@kit/ui/scroll-area";
 import { Save, X } from "lucide-react";
-import { useCreateVariable, useUnits } from "@kit/hooks";
+import { useCreateVariable, useUnits, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import type { VariableType } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
-
-const TYPE_ITEMS = [
-  { id: "cost", name: "Cost" },
-  { id: "tax", name: "Tax" },
-  { id: "transaction_tax", name: "Transaction tax" },
-  { id: "inflation", name: "Inflation" },
-  { id: "exchange_rate", name: "Exchange Rate" },
-  { id: "unit", name: "Unit" },
-  { id: "other", name: "Other" },
-];
 
 export interface VariableCreateContentProps {
   onClose: () => void;
@@ -33,6 +23,8 @@ export interface VariableCreateContentProps {
 export function VariableCreateContent({ onClose, onCreated }: VariableCreateContentProps) {
   const createVariable = useCreateVariable();
   const { data: units = [] } = useUnits();
+  const { data: variableTypeValues = [] } = useMetadataEnum("VariableType");
+  const typeItems = variableTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [formData, setFormData] = useState({
     name: "",
     type: "" as VariableType | "",
@@ -126,7 +118,7 @@ export function VariableCreateContent({ onClose, onCreated }: VariableCreateCont
                 <Label>Type *</Label>
                 <UnifiedSelector
                   type="type"
-                  items={TYPE_ITEMS}
+                  items={typeItems}
                   selectedId={formData.type || undefined}
                   onSelect={(item) => handleInputChange("type", item.id === 0 ? "" : String(item.id))}
                   placeholder="Select type"

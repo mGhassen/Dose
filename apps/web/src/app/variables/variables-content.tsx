@@ -4,8 +4,8 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useVariables, useDeleteVariable } from "@kit/hooks";
-import type { Variable, VariableType } from "@kit/types";
+import { useVariables, useDeleteVariable, useMetadataEnum } from "@kit/hooks";
+import type { Variable } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { formatDate } from "@kit/lib/date-format";
@@ -19,6 +19,11 @@ export default function VariablesContent({ selectedVariableId }: VariablesConten
   const router = useRouter();
   const { data: variables, isLoading } = useVariables();
   const deleteMutation = useDeleteVariable();
+  const { data: variableTypeValues = [] } = useMetadataEnum("VariableType");
+  const typeLabels: Record<string, string> = useMemo(
+    () => Object.fromEntries(variableTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [variableTypeValues]
+  );
 
   const columns: ColumnDef<Variable>[] = useMemo(() => [
     {
@@ -34,23 +39,11 @@ export default function VariablesContent({ selectedVariableId }: VariablesConten
     {
       accessorKey: "type",
       header: "Type",
-      cell: ({ row }) => {
-        const type = row.original.type;
-        const typeLabels: Record<string, string> = {
-          cost: "Cost",
-          tax: "Tax",
-          transaction_tax: "Transaction tax",
-          inflation: "Inflation",
-          exchange_rate: "Exchange Rate",
-          unit: "Unit",
-          other: "Other",
-        };
-        return (
-          <Badge variant="outline">
-            {typeLabels[type] || type}
-          </Badge>
-        );
-      },
+      cell: ({ row }) => (
+        <Badge variant="outline">
+          {typeLabels[row.original.type] || row.original.type}
+        </Badge>
+      ),
     },
     {
       accessorKey: "value",
@@ -77,7 +70,7 @@ export default function VariablesContent({ selectedVariableId }: VariablesConten
       cell: ({ row }) => 
         row.original.endDate ? formatDate(row.original.endDate) : <span className="text-muted-foreground">—</span>
     },
-  ], []);
+  ], [typeLabels]);
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this variable?")) return;

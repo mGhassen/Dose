@@ -21,32 +21,14 @@ import { Separator } from "@kit/ui/separator";
 import { ScrollArea } from "@kit/ui/scroll-area";
 import { Skeleton } from "@kit/ui/skeleton";
 import { Edit2, Trash2, MoreHorizontal, X } from "lucide-react";
-import { useVariableById, useUpdateVariable, useDeleteVariable, useUnits } from "@kit/hooks";
+import { useVariableById, useUpdateVariable, useDeleteVariable, useUnits, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
 import { dateToYYYYMMDD } from "@kit/lib";
 import type { VariableType } from "@kit/types";
 import { DatePicker } from "@kit/ui/date-picker";
-
-const TYPE_ITEMS = [
-  { id: "cost", name: "Cost" },
-  { id: "tax", name: "Tax" },
-  { id: "transaction_tax", name: "Transaction tax" },
-  { id: "inflation", name: "Inflation" },
-  { id: "exchange_rate", name: "Exchange Rate" },
-  { id: "unit", name: "Unit" },
-  { id: "other", name: "Other" },
-];
-
-const TYPE_LABELS: Record<string, string> = {
-  cost: "Cost",
-  tax: "Tax",
-  transaction_tax: "Transaction tax",
-  inflation: "Inflation",
-  exchange_rate: "Exchange Rate",
-  unit: "Unit",
-  other: "Other",
-};
+import { TaxVariableDetail } from "./tax-variable-detail";
+import { TaxVariableEditSection } from "./tax-variable-edit-section";
 
 function KeyValue({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -84,6 +66,11 @@ export function VariableDetailContent({
   const { data: variable, isLoading } = useVariableById(variableId);
   const updateVariable = useUpdateVariable();
   const deleteMutation = useDeleteVariable();
+  const { data: variableTypeValues = [] } = useMetadataEnum("VariableType");
+  const typeItems = variableTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const typeLabels: Record<string, string> = Object.fromEntries(
+    variableTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
 
   const [formData, setFormData] = useState({
     name: "",
@@ -233,6 +220,17 @@ export function VariableDetailContent({
     );
   }
 
+  if ((variable.type === "tax" || variable.type === "transaction_tax") && !isEditing) {
+    return (
+      <TaxVariableDetail
+        variableId={variableId}
+        variable={variable}
+        onClose={onClose}
+        onDeleted={onDeleted}
+      />
+    );
+  }
+
   if (isEditing) {
     return (
       <div className="flex h-full flex-col">
@@ -261,7 +259,7 @@ export function VariableDetailContent({
                     <Label>Type *</Label>
                     <UnifiedSelector
                       type="type"
-                      items={TYPE_ITEMS}
+                      items={typeItems}
                       selectedId={formData.type || undefined}
                       onSelect={(item) => handleInputChange("type", item.id === 0 ? "" : String(item.id))}
                       placeholder="Select type"
@@ -376,11 +374,18 @@ export function VariableDetailContent({
                       id="isActive"
                       checked={formData.isActive}
                       onCheckedChange={(c) => handleInputChange("isActive", c === true)}
+                      className="shrink-0"
                     />
                     <Label htmlFor="isActive" className="cursor-pointer font-normal">Active</Label>
                   </div>
                 </div>
               </div>
+
+              {isTaxOrTransactionTax && (
+                <div className="pt-2">
+                  <TaxVariableEditSection variableId={variableId} variable={variable} />
+                </div>
+              )}
             </div>
           </ScrollArea>
           <div className="mt-auto flex shrink-0 gap-3 border-t border-border bg-background p-4 -mx-6">
@@ -420,7 +425,7 @@ export function VariableDetailContent({
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="font-normal text-xs">
-              {TYPE_LABELS[variable.type] || variable.type}
+              {typeLabels[variable.type] || variable.type}
             </Badge>
             {showDateRange && variable.effectiveDate && (
               <span className="text-xs text-muted-foreground">From {formatDate(variable.effectiveDate)}</span>

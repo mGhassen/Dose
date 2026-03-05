@@ -8,13 +8,18 @@ function transformRule(row: any, variable?: any): TaxRule {
     id: row.id,
     variableId: row.variable_id,
     conditionType: row.condition_type,
-    conditionValue: row.condition_value,
+    conditionValue: row.condition_value ?? null,
+    conditionValues: row.condition_values ?? null,
     scopeType: row.scope_type || 'all',
     scopeItemIds: row.scope_item_ids,
     scopeCategories: row.scope_categories,
     priority: row.priority ?? 0,
     effectiveDate: row.effective_date ?? null,
     endDate: row.end_date ?? null,
+    name: row.name ?? null,
+    description: row.description ?? null,
+    applyToCustomAmounts: row.apply_to_custom_amounts ?? true,
+    ruleType: row.rule_type || 'exemption',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     variable,
@@ -26,12 +31,17 @@ function toSnakeCase(data: UpdateTaxRuleData): any {
   if (data.variableId !== undefined) result.variable_id = data.variableId;
   if (data.conditionType !== undefined) result.condition_type = data.conditionType;
   if (data.conditionValue !== undefined) result.condition_value = data.conditionValue;
+  if (data.conditionValues !== undefined) result.condition_values = data.conditionValues;
   if (data.scopeType !== undefined) result.scope_type = data.scopeType;
   if (data.scopeItemIds !== undefined) result.scope_item_ids = data.scopeItemIds;
   if (data.scopeCategories !== undefined) result.scope_categories = data.scopeCategories;
   if (data.priority !== undefined) result.priority = data.priority;
   if (data.effectiveDate !== undefined) result.effective_date = data.effectiveDate;
   if (data.endDate !== undefined) result.end_date = data.endDate;
+  if (data.name !== undefined) result.name = data.name;
+  if (data.description !== undefined) result.description = data.description;
+  if (data.applyToCustomAmounts !== undefined) result.apply_to_custom_amounts = data.applyToCustomAmounts;
+  if (data.ruleType !== undefined) result.rule_type = data.ruleType;
   return result;
 }
 

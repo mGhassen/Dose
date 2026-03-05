@@ -4,9 +4,9 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useLoans, useDeleteLoan, useInventorySuppliers } from "@kit/hooks";
+import { useLoans, useDeleteLoan, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
 import Link from "next/link";
-import type { Loan, LoanStatus } from "@kit/types";
+import type { Loan } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Button } from "@kit/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@kit/ui/dropdown-menu";
@@ -15,14 +15,24 @@ import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 
+const statusVariants: Record<string, "default" | "secondary" | "destructive"> = {
+  active: "default",
+  paid_off: "secondary",
+  defaulted: "destructive",
+};
+
 export default function LoansContent() {
   const router = useRouter();
   const { data: loans, isLoading } = useLoans();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const suppliers = suppliersResponse?.data || [];
   const deleteMutation = useDeleteLoan();
-  
-  // Create a map of supplier IDs to suppliers for display
+  const { data: loanStatusValues = [] } = useMetadataEnum("LoanStatus");
+  const statusLabels: Record<string, string> = useMemo(
+    () => Object.fromEntries(loanStatusValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [loanStatusValues]
+  );
+
   const supplierMap = useMemo(() => {
     const map = new Map<number, typeof suppliers[0]>();
     if (suppliers && Array.isArray(suppliers)) {
@@ -68,24 +78,11 @@ export default function LoansContent() {
     {
       accessorKey: "status",
       header: "Status",
-      cell: ({ row }) => {
-        const status = row.original.status;
-        const statusLabels: Record<LoanStatus, string> = {
-          active: "Active",
-          paid_off: "Paid Off",
-          defaulted: "Defaulted",
-        };
-        const variants: Record<LoanStatus, "default" | "secondary" | "destructive"> = {
-          active: "default",
-          paid_off: "secondary",
-          defaulted: "destructive",
-        };
-        return (
-          <Badge variant={variants[status]}>
-            {statusLabels[status] || status}
-          </Badge>
-        );
-      },
+      cell: ({ row }) => (
+        <Badge variant={statusVariants[row.original.status] ?? "default"}>
+          {statusLabels[row.original.status] || row.original.status}
+        </Badge>
+      ),
     },
     {
       accessorKey: "lender",
@@ -154,7 +151,7 @@ export default function LoansContent() {
         );
       },
     },
-  ], [router, supplierMap]);
+  ], [router, supplierMap, statusLabels]);
 
   const handleDelete = async (id: number) => {
     try {

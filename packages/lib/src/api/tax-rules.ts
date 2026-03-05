@@ -2,7 +2,10 @@ import { apiRequest } from './api';
 import type { TaxRule, CreateTaxRuleData, UpdateTaxRuleData } from '@kit/types';
 
 export const taxRulesApi = {
-  getAll: () => apiRequest<TaxRule[]>('GET', '/api/tax-rules'),
+  getAll: (params?: { variableId?: number }) => {
+    const search = params?.variableId != null ? `?variableId=${params.variableId}` : '';
+    return apiRequest<TaxRule[]>('GET', `/api/tax-rules${search}`);
+  },
   getById: (id: string) => apiRequest<TaxRule>('GET', `/api/tax-rules/${id}`),
   create: (data: CreateTaxRuleData) => apiRequest<TaxRule>('POST', '/api/tax-rules', data),
   update: (id: string, data: UpdateTaxRuleData) => apiRequest<TaxRule>('PUT', `/api/tax-rules/${id}`, data),

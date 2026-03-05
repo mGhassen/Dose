@@ -8,13 +8,18 @@ function transformRule(row: any, variable?: any): TaxRule {
     id: row.id,
     variableId: row.variable_id,
     conditionType: row.condition_type,
-    conditionValue: row.condition_value,
+    conditionValue: row.condition_value ?? null,
+    conditionValues: row.condition_values ?? null,
     scopeType: row.scope_type || 'all',
     scopeItemIds: row.scope_item_ids,
     scopeCategories: row.scope_categories,
     priority: row.priority ?? 0,
     effectiveDate: row.effective_date ?? null,
     endDate: row.end_date ?? null,
+    name: row.name ?? null,
+    description: row.description ?? null,
+    applyToCustomAmounts: row.apply_to_custom_amounts ?? true,
+    ruleType: row.rule_type || 'exemption',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     variable,
@@ -29,20 +34,29 @@ function toSnakeCase(data: CreateTaxRuleData): any {
   };
   if (data.conditionType !== undefined) result.condition_type = data.conditionType;
   if (data.conditionValue !== undefined) result.condition_value = data.conditionValue;
+  if (data.conditionValues !== undefined) result.condition_values = data.conditionValues;
   if (data.scopeItemIds !== undefined) result.scope_item_ids = data.scopeItemIds;
   if (data.scopeCategories !== undefined) result.scope_categories = data.scopeCategories;
   if (data.effectiveDate !== undefined) result.effective_date = data.effectiveDate;
   if (data.endDate !== undefined) result.end_date = data.endDate;
+  if (data.name !== undefined) result.name = data.name;
+  if (data.description !== undefined) result.description = data.description;
+  if (data.applyToCustomAmounts !== undefined) result.apply_to_custom_amounts = data.applyToCustomAmounts;
+  if (data.ruleType !== undefined) result.rule_type = data.ruleType;
   return result;
 }
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const supabase = createServerSupabaseClient();
-    const { data: rows, error } = await supabase
-      .from('tax_rules')
-      .select('*')
-      .order('priority', { ascending: true });
+    const { searchParams } = new URL(request.url);
+    const variableId = searchParams.get('variableId');
+    let query = supabase.from('tax_rules').select('*').order('priority', { ascending: true });
+    if (variableId) {
+      const id = parseInt(variableId, 10);
+      if (!isNaN(id)) query = query.eq('variable_id', id);
+    }
+    const { data: rows, error } = await query;
 
     if (error) throw error;
 

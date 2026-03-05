@@ -19,16 +19,6 @@ export async function GET(
       );
     }
 
-    // Special case: Role enum is hardcoded since we use is_admin boolean in accounts
-    if (name === 'Role') {
-      const roleValues: MetadataEnumValue[] = [
-        { id: 0, name: 'member', label: 'Member', description: 'Member role', isActive: true },
-        { id: 1, name: 'manager', label: 'Manager', description: 'Manager role', isActive: true },
-        { id: 2, name: 'administrator', label: 'Administrator', description: 'Administrator role', isActive: true }
-      ];
-      return NextResponse.json(roleValues);
-    }
-
     const supabase = createServerSupabaseClient();
     
     // First, get the enum definition

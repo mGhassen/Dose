@@ -13,7 +13,8 @@ import { formatDate } from "@kit/lib/date-format";
 import { 
   useIncomeStatement,
   useBalanceSheet,
-  useCashFlow
+  useCashFlow,
+  useMetadataEnum,
 } from "@kit/hooks";
 import { 
   LineChart, 
@@ -76,26 +77,16 @@ export default function FinancialStatementContent() {
 
   const isLoadingData = isLoading || bsLoading || cfLoading;
 
-  // Sales type labels - using translations
-  const salesTypeLabels: Record<SalesType, string> = {
-    on_site: tCommon('sales.onSite'),
-    delivery: tCommon('sales.delivery'),
-    takeaway: tCommon('sales.takeaway'),
-    catering: tCommon('sales.catering'),
-    other: tCommon('sales.other')
-  };
-
-  // Category labels mapping - using translations
-  const categoryLabels: Record<ExpenseCategory | string, string> = {
-    rent: tCommon('expenses.categories.rent'),
-    utilities: tCommon('expenses.categories.utilities'),
-    supplies: tCommon('expenses.categories.supplies'),
-    marketing: tCommon('expenses.categories.marketing'),
-    insurance: tCommon('expenses.categories.insurance'),
-    maintenance: tCommon('expenses.categories.maintenance'),
-    professional_services: tCommon('expenses.categories.professionalServices'),
-    other: tCommon('expenses.categories.other')
-  };
+  const { data: salesTypeValues = [] } = useMetadataEnum("SalesType");
+  const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
+  const salesTypeLabels: Record<string, string> = useMemo(
+    () => Object.fromEntries(salesTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [salesTypeValues]
+  );
+  const categoryLabels: Record<string, string> = useMemo(
+    () => Object.fromEntries(categoryValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [categoryValues]
+  );
 
   // Build income statement from actual API data
   const incomeStatement = useMemo(() => {

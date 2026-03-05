@@ -11,7 +11,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateStockMovement, useItems, useUnits } from "@kit/hooks";
+import { useCreateStockMovement, useItems, useUnits, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { StockMovementType } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
@@ -24,6 +24,8 @@ export default function CreateStockMovementPage() {
   const items = itemsResponse?.data || [];
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
+  const { data: movementTypeValues = [] } = useMetadataEnum("StockMovementType");
+  const movementTypeItems = movementTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [formData, setFormData] = useState({
     itemId: "",
     movementType: StockMovementType.IN,
@@ -77,15 +79,6 @@ export default function CreateStockMovementPage() {
     }
   };
 
-  const movementTypeOptions = [
-    { value: StockMovementType.IN, label: 'In - Stock Received' },
-    { value: StockMovementType.OUT, label: 'Out - Stock Used' },
-    { value: StockMovementType.ADJUSTMENT, label: 'Adjustment - Stock Correction' },
-    { value: StockMovementType.TRANSFER, label: 'Transfer - Location Transfer' },
-    { value: StockMovementType.WASTE, label: 'Waste - Stock Wasted' },
-    { value: StockMovementType.EXPIRED, label: 'Expired - Stock Expired' },
-  ];
-
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -123,7 +116,7 @@ export default function CreateStockMovementPage() {
                   label="Movement Type"
                   required
                   type="type"
-                  items={movementTypeOptions.map((o) => ({ id: o.value, name: o.label }))}
+                  items={movementTypeItems}
                   selectedId={formData.movementType || undefined}
                   onSelect={(item) => handleInputChange('movementType', String(item.id) as StockMovementType)}
                   placeholder="Select type"

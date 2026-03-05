@@ -4,9 +4,9 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useLeasing, useDeleteLeasing, useInventorySuppliers } from "@kit/hooks";
+import { useLeasing, useDeleteLeasing, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
 import Link from "next/link";
-import type { LeasingPayment, LeasingType, ExpenseRecurrence } from "@kit/types";
+import type { LeasingPayment } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { Button } from "@kit/ui/button";
@@ -21,8 +21,17 @@ export default function LeasingContent() {
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const suppliers = suppliersResponse?.data || [];
   const deleteMutation = useDeleteLeasing();
-  
-  // Create a map of supplier IDs to suppliers for display
+  const { data: leasingTypeValues = [] } = useMetadataEnum("LeasingType");
+  const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
+  const typeLabels: Record<string, string> = useMemo(
+    () => Object.fromEntries(leasingTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [leasingTypeValues]
+  );
+  const frequencyLabels: Record<string, string> = useMemo(
+    () => Object.fromEntries(recurrenceValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [recurrenceValues]
+  );
+
   const supplierMap = useMemo(() => {
     const map = new Map<number, typeof suppliers[0]>();
     if (suppliers && Array.isArray(suppliers)) {
@@ -45,18 +54,11 @@ export default function LeasingContent() {
     {
       accessorKey: "type",
       header: "Type",
-      cell: ({ row }) => {
-        const type = row.original.type;
-        const typeLabels: Record<LeasingType, string> = {
-          operating: "Operating",
-          finance: "Finance",
-        };
-        return (
-          <Badge variant="outline">
-            {typeLabels[type] || type}
-          </Badge>
-        );
-      },
+      cell: ({ row }) => (
+        <Badge variant="outline">
+          {typeLabels[row.original.type] || row.original.type}
+        </Badge>
+      ),
     },
     {
       accessorKey: "amount",
@@ -66,21 +68,11 @@ export default function LeasingContent() {
     {
       accessorKey: "frequency",
       header: "Frequency",
-      cell: ({ row }) => {
-        const frequency = row.original.frequency;
-        const frequencyLabels: Record<ExpenseRecurrence, string> = {
-          one_time: "One Time",
-          monthly: "Monthly",
-          quarterly: "Quarterly",
-          yearly: "Yearly",
-          custom: "Custom",
-        };
-        return (
-          <span className="text-sm text-muted-foreground">
-            {frequencyLabels[frequency] || frequency}
-          </span>
-        );
-      },
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {frequencyLabels[row.original.frequency] || row.original.frequency}
+        </span>
+      ),
     },
     {
       accessorKey: "startDate",
@@ -112,7 +104,7 @@ export default function LeasingContent() {
         return leasingPayment.lessor || <span className="text-muted-foreground">—</span>;
       },
     },
-  ], [supplierMap]);
+  ], [supplierMap, typeLabels, frequencyLabels]);
 
   const handleDelete = async (id: number) => {
     try {

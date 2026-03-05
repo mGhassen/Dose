@@ -12,7 +12,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { usePersonnelById, useUpdatePersonnel, useVariables } from "@kit/hooks";
+import { usePersonnelById, useUpdatePersonnel, useVariables, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { dateToYYYYMMDD } from "@kit/lib";
 import type { PersonnelType } from "@kit/types";
@@ -26,8 +26,9 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: personnel, isLoading } = usePersonnelById(resolvedParams?.id || "");
   const updatePersonnel = useUpdatePersonnel();
-  
-  // Fetch variables to get Social Security Rate
+  const { data: personnelTypeValues = [] } = useMetadataEnum("PersonnelType");
+  const personnelTypeItems = personnelTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+
   const { data: variables } = useVariables();
   const variablesList = variables ?? [];
   const socialSecurityVariable = useMemo(() => 
@@ -219,12 +220,7 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
                   label="Type"
                   required
                   type="type"
-                  items={[
-                    { id: 'full_time', name: 'Full Time' },
-                    { id: 'part_time', name: 'Part Time' },
-                    { id: 'contractor', name: 'Contractor' },
-                    { id: 'intern', name: 'Intern' },
-                  ]}
+                  items={personnelTypeItems}
                   selectedId={formData.type || undefined}
                   onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))}
                   placeholder="Select type"

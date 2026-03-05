@@ -7,7 +7,7 @@ import { Card, CardContent } from "@kit/ui/card";
 import { Input } from "@kit/ui/input";
 import { Calendar, Download, Eye, MoreVertical, ChevronDown, LayoutList, CalendarDays } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useSubscriptions } from "@kit/hooks";
+import { useSubscriptions, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatMonthYear } from "@kit/lib/date-format";
@@ -38,30 +38,15 @@ import {
   PopoverTrigger,
 } from "@kit/ui/popover";
 
-const categoryLabels: Record<string, string> = {
-  rent: "Rent",
-  utilities: "Utilities",
-  supplies: "Supplies",
-  marketing: "Marketing",
-  insurance: "Insurance",
-  maintenance: "Maintenance",
-  professional_services: "Professional Services",
-  other: "Other",
-};
-
-const recurrenceLabels: Record<string, string> = {
-  one_time: "One Time",
-  monthly: "Monthly",
-  quarterly: "Quarterly",
-  yearly: "Yearly",
-  custom: "Custom",
-};
-
 export default function SubscriptionsTimelinePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: subscriptionsResponse, isLoading } = useSubscriptions();
   const subscriptions = subscriptionsResponse?.data || [];
+  const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
+  const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
+  const categoryLabels = Object.fromEntries(categoryValues.map((ev) => [ev.name, ev.label ?? ev.name]));
+  const recurrenceLabels = Object.fromEntries(recurrenceValues.map((ev) => [ev.name, ev.label ?? ev.name]));
 
   const handleTimelineUpdate = () => {
     queryClient.invalidateQueries({ queryKey: ['actual-payments'] });

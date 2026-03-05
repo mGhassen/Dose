@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useStockMovements, useDeleteStockMovement, useItems } from "@kit/hooks";
+import { useStockMovements, useDeleteStockMovement, useItems, useMetadataEnum } from "@kit/hooks";
 import type { StockMovement } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
@@ -53,7 +53,12 @@ export default function StockMovementsContent() {
     return movements;
   }, [movements]);
   const deleteMutation = useDeleteStockMovement();
-  
+  const { data: movementTypeValues = [] } = useMetadataEnum("StockMovementType");
+  const movementTypeLabels: Record<string, string> = useMemo(
+    () => Object.fromEntries(movementTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [movementTypeValues]
+  );
+
   // Calculate summary stats
   const inMovements = useMemo(() => {
     return movements.filter(m => m.movementType === StockMovementType.IN).length;
@@ -219,7 +224,7 @@ export default function StockMovementsContent() {
       header: "Type",
       cell: ({ row }) => (
         <Badge variant={getMovementTypeBadge(row.original.movementType)}>
-          {row.original.movementType.toUpperCase()}
+          {movementTypeLabels[row.original.movementType] || row.original.movementType}
         </Badge>
       ),
     },
@@ -243,7 +248,7 @@ export default function StockMovementsContent() {
       header: "Reference",
       cell: ({ row }) => row.original.referenceType ? `${row.original.referenceType} #${row.original.referenceId || ''}` : <span className="text-muted-foreground">—</span>,
     },
-  ], [itemMap]);
+  ], [itemMap, movementTypeLabels]);
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this stock movement?")) return;

@@ -715,20 +715,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         throw new Error(error.message || 'Failed to check account status');
       }
     },
-    resendConfirmation: async (email: string) => {
-      try {
-        // This might need to be added to the auth API
-        const response = await fetch('/api/auth/resend-confirmation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        });
-        if (!response.ok) {
-          throw new Error('Failed to resend confirmation');
-        }
-      } catch (error: any) {
-        throw new Error(error.message || 'Failed to resend confirmation');
-      }
+    resendConfirmation: async (_email: string) => {
+      throw new Error('Resend confirmation is not available');
     },
     loginWithGoogle: async () => {
       try {

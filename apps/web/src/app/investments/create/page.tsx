@@ -11,7 +11,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateInvestment } from "@kit/hooks";
+import { useCreateInvestment, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import type { InvestmentType, DepreciationMethod } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
@@ -19,6 +19,10 @@ import { dateToYYYYMMDD } from "@kit/lib";
 export default function CreateInvestmentPage() {
   const router = useRouter();
   const createInvestment = useCreateInvestment();
+  const { data: investmentTypeValues = [] } = useMetadataEnum("InvestmentType");
+  const { data: depreciationMethodValues = [] } = useMetadataEnum("DepreciationMethod");
+  const investmentTypeItems = investmentTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const depreciationMethodItems = depreciationMethodValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [formData, setFormData] = useState({
     name: "",
     type: "" as InvestmentType | "",
@@ -93,13 +97,7 @@ export default function CreateInvestmentPage() {
                   label="Type"
                   required
                   type="type"
-                  items={[
-                    { id: 'equipment', name: 'Equipment' },
-                    { id: 'renovation', name: 'Renovation' },
-                    { id: 'technology', name: 'Technology' },
-                    { id: 'vehicle', name: 'Vehicle' },
-                    { id: 'other', name: 'Other' },
-                  ]}
+                  items={investmentTypeItems}
                   selectedId={formData.type || undefined}
                   onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))}
                   placeholder="Select type"
@@ -147,11 +145,7 @@ export default function CreateInvestmentPage() {
                   label="Depreciation Method"
                   required
                   type="method"
-                  items={[
-                    { id: 'straight_line', name: 'Straight Line' },
-                    { id: 'declining_balance', name: 'Declining Balance' },
-                    { id: 'units_of_production', name: 'Units of Production' },
-                  ]}
+                  items={depreciationMethodItems}
                   selectedId={formData.depreciationMethod || undefined}
                   onSelect={(item) => handleInputChange('depreciationMethod', item.id === 0 ? '' : String(item.id))}
                   placeholder="Select method"

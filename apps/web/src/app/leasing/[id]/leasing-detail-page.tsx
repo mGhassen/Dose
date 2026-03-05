@@ -21,7 +21,7 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@kit/ui/radio-group";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLeasingById, useUpdateLeasing, useDeleteLeasing, useActualPayments, useInventorySupplierById } from "@kit/hooks";
+import { useLeasingById, useUpdateLeasing, useDeleteLeasing, useActualPayments, useInventorySupplierById, useMetadataEnum } from "@kit/hooks";
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -461,18 +461,16 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
     );
   }
 
-  const typeLabels: Record<LeasingType, string> = {
-    operating: "Operating",
-    finance: "Finance",
-  };
-
-  const frequencyLabels: Record<ExpenseRecurrence, string> = {
-    one_time: "One Time",
-    monthly: "Monthly",
-    quarterly: "Quarterly",
-    yearly: "Yearly",
-    custom: "Custom",
-  };
+  const { data: leasingTypeValues = [] } = useMetadataEnum("LeasingType");
+  const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
+  const leasingTypeItems = leasingTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const frequencyItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const typeLabels: Record<string, string> = Object.fromEntries(
+    leasingTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
+  const frequencyLabels: Record<string, string> = Object.fromEntries(
+    recurrenceValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
 
   return (
     <AppLayout>
@@ -546,10 +544,7 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
                     label="Type"
                     required
                     type="type"
-                    items={[
-                      { id: 'operating', name: 'Operating' },
-                      { id: 'finance', name: 'Finance' },
-                    ]}
+                    items={leasingTypeItems}
                     selectedId={formData.type || undefined}
                     onSelect={(item) => handleInputChange('type', String(item.id) as LeasingType)}
                     placeholder="Select type"
@@ -623,13 +618,7 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
                       label="Frequency"
                       required
                       type="frequency"
-                      items={[
-                        { id: 'one_time', name: 'One Time' },
-                        { id: 'monthly', name: 'Monthly' },
-                        { id: 'quarterly', name: 'Quarterly' },
-                        { id: 'yearly', name: 'Yearly' },
-                        { id: 'custom', name: 'Custom' },
-                      ]}
+                      items={frequencyItems}
                       selectedId={formData.frequency || undefined}
                       onSelect={(item) => handleInputChange('frequency', String(item.id) as ExpenseRecurrence)}
                       placeholder="Select frequency"

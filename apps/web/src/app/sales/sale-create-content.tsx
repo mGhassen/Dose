@@ -13,7 +13,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
 import { ScrollArea } from "@kit/ui/scroll-area";
 import { Save, X, Plus, Trash2 } from "lucide-react";
-import { useCreateSale, useItems, useUnits } from "@kit/hooks";
+import { useCreateSale, useItems, useUnits, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import type { SalesType } from "@kit/types";
 import type { SaleLineItemInput } from "@kit/types";
@@ -23,14 +23,6 @@ export interface SaleCreateContentProps {
   onClose: () => void;
   onCreated?: (saleId: number) => void;
 }
-
-const TYPE_OPTIONS = [
-  { id: "on_site", name: "On site" },
-  { id: "delivery", name: "Delivery" },
-  { id: "takeaway", name: "Takeaway" },
-  { id: "catering", name: "Catering" },
-  { id: "other", name: "Other" },
-];
 
 import { lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
@@ -43,6 +35,8 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
   const items = itemsResponse?.data ?? [];
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
+  const { data: salesTypeValues = [] } = useMetadataEnum("SalesType");
+  const typeOptions = salesTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
   const now = new Date();
   const [formData, setFormData] = useState({
@@ -224,7 +218,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
               <Label>Dining option *</Label>
               <UnifiedSelector
                 type="type"
-                items={TYPE_OPTIONS}
+                items={typeOptions}
                 selectedId={formData.type || undefined}
                 onSelect={(item) => setFormData((p) => ({ ...p, type: (item.id === 0 ? "" : String(item.id)) as SalesType }))}
                 placeholder="Select type"

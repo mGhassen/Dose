@@ -95,3 +95,44 @@ BEGIN
 END $$;
 
 DROP TABLE units;
+
+
+-- Add unit_id to variables: non-unit variables (tax, cost, etc.) can reference a unit variable for their unit.
+ALTER TABLE variables
+  ADD COLUMN IF NOT EXISTS unit_id BIGINT NULL;
+
+ALTER TABLE variables
+  ADD CONSTRAINT variables_unit_id_fkey
+  FOREIGN KEY (unit_id) REFERENCES variables(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_variables_unit_id ON variables(unit_id);
+
+
+
+-- Tax rules: add name, description, apply_to_custom_amounts, rule_type, condition_values (multi-value conditions).
+
+ALTER TABLE tax_rules ADD COLUMN IF NOT EXISTS name VARCHAR(255) NULL;
+ALTER TABLE tax_rules ADD COLUMN IF NOT EXISTS description TEXT NULL;
+ALTER TABLE tax_rules ADD COLUMN IF NOT EXISTS apply_to_custom_amounts BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE tax_rules ADD COLUMN IF NOT EXISTS rule_type VARCHAR(50) NOT NULL DEFAULT 'exemption';
+ALTER TABLE tax_rules ADD COLUMN IF NOT EXISTS condition_values JSONB NULL;
+
+COMMENT ON COLUMN tax_rules.rule_type IS 'exemption | reduction';
+COMMENT ON COLUMN tax_rules.condition_values IS 'Array of values for condition (e.g. ["on_site","delivery"] for dining options); when set, used instead of condition_value for matching.';
+
+-- Backfill name/description from condition where possible
+UPDATE tax_rules
+SET
+  name = CASE
+    WHEN condition_type = 'sales_type' AND condition_value IS NOT NULL THEN 'Dining: ' || condition_value
+    WHEN condition_type = 'expense' THEN 'Expense'
+    WHEN condition_type IS NULL THEN 'Default application'
+    ELSE 'Rule ' || id
+  END,
+  description = CASE
+    WHEN condition_type = 'sales_type' AND condition_value IS NOT NULL THEN 'When dining option is ' || condition_value
+    WHEN condition_type = 'expense' THEN 'Expense'
+    WHEN condition_type IS NULL THEN 'Default tax application'
+    ELSE NULL
+  END
+WHERE name IS NULL;

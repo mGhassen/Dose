@@ -371,6 +371,14 @@ export interface VariablePayloadUnit {
   base_unit_id?: number | null;
 }
 
+export interface VariablePayloadTax {
+  calculationType?: 'additive' | 'inclusive';
+  applyToCustomAmounts?: boolean;
+  defaultScopeType?: 'all' | 'items' | 'categories';
+  defaultScopeItemIds?: number[] | null;
+  defaultScopeCategories?: string[] | null;
+}
+
 export interface Variable {
   id: number;
   name: string;
@@ -382,7 +390,7 @@ export interface Variable {
   endDate?: string | null;
   description?: string;
   isActive: boolean;
-  payload?: Record<string, unknown> | VariablePayloadUnit;
+  payload?: Record<string, unknown> | VariablePayloadUnit | VariablePayloadTax;
   createdAt: string;
   updatedAt: string;
 }
@@ -397,7 +405,7 @@ export interface CreateVariableData {
   endDate?: string | null;
   description?: string;
   isActive?: boolean;
-  payload?: Record<string, unknown> | VariablePayloadUnit;
+  payload?: Record<string, unknown> | VariablePayloadUnit | VariablePayloadTax;
 }
 
 export interface UpdateVariableData extends Partial<CreateVariableData> {}
@@ -408,18 +416,24 @@ export interface UpdateVariableData extends Partial<CreateVariableData> {}
 
 export type TaxRuleConditionType = 'sales_type' | 'expense' | null;
 export type TaxRuleScopeType = 'all' | 'items' | 'categories';
+export type TaxRuleRuleType = 'exemption' | 'reduction';
 
 export interface TaxRule {
   id: number;
   variableId: number;
   conditionType: TaxRuleConditionType;
   conditionValue: string | null;
+  conditionValues: string[] | null;
   scopeType: TaxRuleScopeType;
   scopeItemIds: number[] | null;
   scopeCategories: string[] | null;
   priority: number;
   effectiveDate: string | null;
   endDate: string | null;
+  name: string | null;
+  description: string | null;
+  applyToCustomAmounts: boolean;
+  ruleType: TaxRuleRuleType;
   createdAt: string;
   updatedAt: string;
   variable?: Variable;
@@ -429,12 +443,17 @@ export interface CreateTaxRuleData {
   variableId: number;
   conditionType?: TaxRuleConditionType;
   conditionValue?: string | null;
+  conditionValues?: string[] | null;
   scopeType?: TaxRuleScopeType;
   scopeItemIds?: number[] | null;
   scopeCategories?: string[] | null;
   priority?: number;
   effectiveDate?: string | null;
   endDate?: string | null;
+  name?: string | null;
+  description?: string | null;
+  applyToCustomAmounts?: boolean;
+  ruleType?: TaxRuleRuleType;
 }
 
 export interface UpdateTaxRuleData extends Partial<CreateTaxRuleData> {}

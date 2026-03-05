@@ -13,14 +13,25 @@ function uuidToNumber(uuid: string): number {
   return Math.abs(hash);
 }
 
-function transformAccountToUser(account: any, profile: any = null, index: number = 0): User {
-  // Use profile_id if available (it's a BIGINT), otherwise hash the UUID
+type RoleEnumIds = { memberId: number; managerId: number; administratorId: number };
+
+async function getRoleEnumIds(supabase: any): Promise<RoleEnumIds> {
+  const { data: enumRow } = await supabase.from('metadata_enums').select('id').eq('name', 'Role').single();
+  if (!enumRow) return { memberId: 0, managerId: 1, administratorId: 2 };
+  const { data: values } = await supabase.from('metadata_enum_values').select('id, name').eq('enum_id', enumRow.id);
+  const byName = Object.fromEntries((values || []).map((v: { id: number; name: string }) => [v.name, v.id]));
+  return {
+    memberId: byName['member'] ?? 0,
+    managerId: byName['manager'] ?? 1,
+    administratorId: byName['administrator'] ?? 2,
+  };
+}
+
+function transformAccountToUser(account: any, profile: any = null, index: number = 0, roleIds?: RoleEnumIds): User {
   const numericId = profile?.id ? Number(profile.id) : uuidToNumber(account.id);
-  
-  // Map is_admin to roleId: 2 = admin, 1 = manager (if we add that), 0 = user
-  const roleId = account.is_admin ? 2 : 0;
-  
-  // Map status to isActive
+  const roleId = roleIds
+    ? (account.is_admin ? roleIds.administratorId : roleIds.memberId)
+    : (account.is_admin ? 2 : 0);
   const isActive = account.status === 'active';
   
   return {
@@ -105,10 +116,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Transform accounts to users
+    const roleIds = await getRoleEnumIds(supabase);
     const users: User[] = (accounts || []).map((account: any, index: number) => {
       const profile = account.profiles;
-      return transformAccountToUser(account, profile, index);
+      return transformAccountToUser(account, profile, index, roleIds);
     });
 
     return NextResponse.json(users);

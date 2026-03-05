@@ -12,7 +12,7 @@ import { InputGroupAttached } from "@/components/input-group";
 import { Checkbox } from "@kit/ui/checkbox";
 import { ScrollArea } from "@kit/ui/scroll-area";
 import { Save, X, Plus, Trash2 } from "lucide-react";
-import { useCreateExpense, useInventorySuppliers, useItems, useUnits } from "@kit/hooks";
+import { useCreateExpense, useInventorySuppliers, useItems, useUnits, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import type { CreateExpenseData, ExpenseCategory, ExpenseLineItemInput } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
@@ -21,17 +21,6 @@ export interface ExpenseCreateContentProps {
   onClose: () => void;
   onCreated?: (expenseId: number) => void;
 }
-
-const CATEGORY_ITEMS = [
-  { id: "rent", name: "Rent" },
-  { id: "utilities", name: "Utilities" },
-  { id: "supplies", name: "Supplies" },
-  { id: "marketing", name: "Marketing" },
-  { id: "insurance", name: "Insurance" },
-  { id: "maintenance", name: "Maintenance" },
-  { id: "professional_services", name: "Professional Services" },
-  { id: "other", name: "Other" },
-];
 
 import { lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
@@ -46,6 +35,8 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
   const items = itemsResponse?.data ?? [];
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
+  const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
+  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
   const [formData, setFormData] = useState({
     name: "",
@@ -217,7 +208,7 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
               label="Category *"
               required
               type="category"
-              items={CATEGORY_ITEMS}
+              items={categoryItems}
               selectedId={formData.category || undefined}
               onSelect={(item) => handleInputChange("category", item.id === 0 ? "" : String(item.id))}
               placeholder="Select category"

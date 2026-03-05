@@ -11,7 +11,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useSubscriptionById, useUpdateSubscription, useInventorySuppliers } from "@kit/hooks";
+import { useSubscriptionById, useUpdateSubscription, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseCategory, ExpenseRecurrence } from "@kit/types";
 import Link from "next/link";
@@ -29,7 +29,11 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
   const updateSubscription = useUpdateSubscription();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
   const suppliers = suppliersResponse?.data || [];
-  
+  const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
+  const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
+  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const recurrenceItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
@@ -160,16 +164,7 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
                   label="Category"
                   required
                   type="category"
-                  items={[
-                    { id: 'rent', name: 'Rent' },
-                    { id: 'utilities', name: 'Utilities' },
-                    { id: 'supplies', name: 'Supplies' },
-                    { id: 'marketing', name: 'Marketing' },
-                    { id: 'insurance', name: 'Insurance' },
-                    { id: 'maintenance', name: 'Maintenance' },
-                    { id: 'professional_services', name: 'Professional Services' },
-                    { id: 'other', name: 'Other' },
-                  ]}
+                  items={categoryItems}
                   selectedId={formData.category || undefined}
                   onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
                   placeholder="Select category"
@@ -209,12 +204,7 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
                   label="Recurrence"
                   required
                   type="recurrence"
-                  items={[
-                    { id: 'monthly', name: 'Monthly' },
-                    { id: 'quarterly', name: 'Quarterly' },
-                    { id: 'yearly', name: 'Yearly' },
-                    { id: 'custom', name: 'Custom' },
-                  ]}
+                  items={recurrenceItems}
                   selectedId={formData.recurrence || undefined}
                   onSelect={(item) => handleInputChange('recurrence', String(item.id) as ExpenseRecurrence)}
                   placeholder="Select recurrence"

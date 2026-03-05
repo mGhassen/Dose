@@ -50,7 +50,7 @@ export function parseBody<T>(
   return { success: true, data: result.data };
 }
 
-const expenseCategoryEnum = z.enum([
+export const EXPENSE_CATEGORY_NAMES = [
   "rent",
   "utilities",
   "supplies",
@@ -59,14 +59,27 @@ const expenseCategoryEnum = z.enum([
   "maintenance",
   "professional_services",
   "other",
-]);
-const expenseRecurrenceEnum = z.enum([
-  "one_time",
-  "monthly",
-  "quarterly",
-  "yearly",
-  "custom",
-]);
+] as const;
+export const EXPENSE_RECURRENCE_NAMES = ["one_time", "monthly", "quarterly", "yearly", "custom"] as const;
+export const SALES_TYPE_NAMES = ["on_site", "delivery", "takeaway", "catering", "other"] as const;
+export const VARIABLE_TYPE_NAMES = [
+  "cost",
+  "tax",
+  "transaction_tax",
+  "inflation",
+  "exchange_rate",
+  "unit",
+  "other",
+] as const;
+export const PERSONNEL_TYPE_NAMES = ["full_time", "part_time", "contractor", "intern"] as const;
+export const LEASING_TYPE_NAMES = ["operating", "finance"] as const;
+export const LOAN_STATUS_NAMES = ["active", "paid_off", "defaulted"] as const;
+export const INVESTMENT_TYPE_NAMES = ["equipment", "renovation", "technology", "vehicle", "other"] as const;
+export const DEPRECIATION_METHOD_NAMES = ["straight_line", "declining_balance", "units_of_production"] as const;
+export const STOCK_MOVEMENT_TYPE_NAMES = ["in", "out", "adjustment", "transfer", "waste", "expired"] as const;
+
+const expenseCategoryEnum = z.enum(EXPENSE_CATEGORY_NAMES);
+const expenseRecurrenceEnum = z.enum(EXPENSE_RECURRENCE_NAMES);
 
 export const createSubscriptionSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -170,13 +183,7 @@ export const updateExpenseSchema = z.object({
 });
 export type UpdateExpenseInput = z.infer<typeof updateExpenseSchema>;
 
-const salesTypeEnum = z.enum([
-  "on_site",
-  "delivery",
-  "takeaway",
-  "catering",
-  "other",
-]);
+const salesTypeEnum = z.enum(SALES_TYPE_NAMES);
 
 const saleLineItemSchema = z.object({
   itemId: z.number().optional(),
@@ -371,15 +378,7 @@ export const updateItemPriceHistorySchema = z
   });
 export type UpdateItemPriceHistoryInput = z.infer<typeof updateItemPriceHistorySchema>;
 
-const variableTypeEnum = z.enum([
-  "cost",
-  "tax",
-  "transaction_tax",
-  "inflation",
-  "exchange_rate",
-  "unit",
-  "other",
-]);
+const variableTypeEnum = z.enum(VARIABLE_TYPE_NAMES);
 const variablePayloadSchema = z.record(z.string(), z.unknown()).optional();
 export const createVariableSchema = z
   .object({
@@ -411,12 +410,17 @@ export const createTaxRuleSchema = z.object({
   variableId: z.number().int().positive("variableId is required"),
   conditionType: z.enum(["sales_type", "expense"]).nullable().optional(),
   conditionValue: z.string().nullable().optional(),
+  conditionValues: z.array(z.string()).nullable().optional(),
   scopeType: z.enum(["all", "items", "categories"]).optional(),
   scopeItemIds: z.array(z.number()).nullable().optional(),
   scopeCategories: z.array(z.string()).nullable().optional(),
   priority: z.number().optional(),
   effectiveDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  applyToCustomAmounts: z.boolean().optional(),
+  ruleType: z.enum(["exemption", "reduction"]).optional(),
 });
 export type CreateTaxRuleInput = z.infer<typeof createTaxRuleSchema>;
 
@@ -556,7 +560,7 @@ export const updateActualPaymentSchema = z.object({
 });
 export type UpdateActualPaymentInput = z.infer<typeof updateActualPaymentSchema>;
 
-const personnelTypeEnum = z.enum(["full_time", "part_time", "contractor", "intern"]);
+const personnelTypeEnum = z.enum(PERSONNEL_TYPE_NAMES);
 export const createPersonnelSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
@@ -595,7 +599,7 @@ export const createPersonnelProjectionSchema = z.object({
 });
 export type CreatePersonnelProjectionInput = z.infer<typeof createPersonnelProjectionSchema>;
 
-const leasingTypeEnum = z.enum(["operating", "finance"]);
+const leasingTypeEnum = z.enum(LEASING_TYPE_NAMES);
 export const createLeasingSchema = z
   .object({
     name: z.string().min(1),
@@ -631,7 +635,7 @@ export const createLoanSchema = z.object({
   interestRate: z.number(),
   durationMonths: z.number().int().positive(),
   startDate: z.string().min(1),
-  status: z.enum(["active", "paid_off", "defaulted"]).optional(),
+  status: z.enum(LOAN_STATUS_NAMES).optional(),
   lender: z.string().optional(),
   supplierId: z.number().optional(),
   description: z.string().optional(),
@@ -641,8 +645,8 @@ export type CreateLoanInput = z.infer<typeof createLoanSchema>;
 export const updateLoanSchema = createLoanSchema.partial();
 export type UpdateLoanInput = z.infer<typeof updateLoanSchema>;
 
-const investmentTypeEnum = z.enum(["equipment", "renovation", "technology", "vehicle", "other"]);
-const depreciationMethodEnum = z.enum(["straight_line", "declining_balance", "units_of_production"]);
+const investmentTypeEnum = z.enum(INVESTMENT_TYPE_NAMES);
+const depreciationMethodEnum = z.enum(DEPRECIATION_METHOD_NAMES);
 export const createInvestmentSchema = z.object({
   name: z.string().min(1),
   type: investmentTypeEnum,
@@ -693,7 +697,7 @@ export type CreateStockLevelInput = z.infer<typeof createStockLevelSchema>;
 export const updateStockLevelSchema = createStockLevelSchema.partial();
 export type UpdateStockLevelInput = z.infer<typeof updateStockLevelSchema>;
 
-const stockMovementTypeEnum = z.enum(["in", "out", "adjustment", "transfer", "waste", "expired"]);
+const stockMovementTypeEnum = z.enum(STOCK_MOVEMENT_TYPE_NAMES);
 export const createStockMovementSchema = z
   .object({
     itemId: z.number(),
