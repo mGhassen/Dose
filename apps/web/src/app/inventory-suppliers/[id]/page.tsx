@@ -10,6 +10,7 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { Separator } from "@kit/ui/separator";
 import {
   DropdownMenu,
@@ -280,10 +281,12 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
     <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-2">
+            <StatusPin active={supplier.isActive} title={supplier.isActive ? "Active" : "Inactive"} />
             <h1 className="text-2xl font-bold">
               {isEditing ? "Edit Supplier" : supplier.name}
             </h1>
+          </div>
             <p className="text-muted-foreground">
               {isEditing ? "Update supplier information" : "Supplier details and information"}
             </p>
@@ -865,18 +868,9 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                   {/* Name */}
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">Name</label>
-                    <p className="text-base font-semibold mt-1">{supplier.name}</p>
-                  </div>
-
-                  <Separator />
-
-                  {/* Status */}
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Status</label>
-                    <div className="mt-1">
-                      <Badge variant={supplier.isActive ? "default" : "secondary"}>
-                        {supplier.isActive ? "Active" : "Inactive"}
-                      </Badge>
+                    <div className="flex items-center gap-2 mt-1">
+                      <StatusPin active={supplier.isActive} title={supplier.isActive ? "Active" : "Inactive"} />
+                      <p className="text-base font-semibold">{supplier.name}</p>
                     </div>
                   </div>
 

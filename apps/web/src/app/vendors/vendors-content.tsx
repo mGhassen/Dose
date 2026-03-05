@@ -7,6 +7,7 @@ import DataTablePage from "@/components/data-table-page";
 import { useVendors, useDeleteVendor } from "@kit/hooks";
 import type { Vendor } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 
@@ -38,8 +39,9 @@ export default function VendorsContent() {
       accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <div className="font-medium">
-          {row.original.name}
+        <div className="flex items-center gap-2">
+          <StatusPin active={row.original.isActive} size="sm" />
+          <span className="font-medium">{row.original.name}</span>
         </div>
       ),
     },
@@ -62,15 +64,6 @@ export default function VendorsContent() {
       accessorKey: "address",
       header: "Address",
       cell: ({ row }) => row.original.address || <span className="text-muted-foreground">—</span>,
-    },
-    {
-      accessorKey: "isActive",
-      header: "Status",
-      cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? "default" : "secondary"}>
-          {row.original.isActive ? "Active" : "Inactive"}
-        </Badge>
-      ),
     },
     {
       accessorKey: "createdAt",

@@ -25,6 +25,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { Avatar, AvatarFallback } from "@kit/ui/avatar";
 import { Skeleton } from "@kit/ui/skeleton";
 import { Separator } from "@kit/ui/separator";
@@ -362,11 +363,9 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                   {isEditing ? "Update personnel information" : personnel.position}
                 </p>
                 {!isEditing && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
+                  <div className="flex flex-wrap gap-1.5 mt-2 items-center">
                     <Badge variant="outline">{typeLabels[personnel.type]}</Badge>
-                    <Badge variant={personnel.isActive ? "default" : "secondary"}>
-                      {personnel.isActive ? "Active" : "Inactive"}
-                    </Badge>
+                    <StatusPin active={personnel.isActive} title={personnel.isActive ? "Active" : "Inactive"} />
                   </div>
                 )}
               </div>

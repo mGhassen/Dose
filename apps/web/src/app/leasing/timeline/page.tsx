@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -222,9 +223,7 @@ export default function LeasingTimelinePage() {
                       <CardTitle className="flex items-center space-x-2">
                         <span>{leasing.name}</span>
                         <Badge variant="outline">{typeLabels[leasing.type] || leasing.type}</Badge>
-                        <Badge variant={leasing.isActive ? "default" : "secondary"}>
-                          {leasing.isActive ? "Active" : "Inactive"}
-                        </Badge>
+                        <StatusPin active={leasing.isActive} size="sm" title={leasing.isActive ? "Active" : "Inactive"} />
                       </CardTitle>
                       <CardDescription className="mt-2">
                         {frequencyLabels[leasing.frequency] || leasing.frequency} • {formatCurrency(leasing.amount)} per payment

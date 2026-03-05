@@ -18,6 +18,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { StockMovementType } from "@kit/types";
 import { Save, X, Trash2, MoreVertical, Edit2, Package, TrendingUp, TrendingDown, Plus, DollarSign, History } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
@@ -592,6 +593,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
+              <StatusPin active={item.isActive} title={item.isActive ? "Active" : "Inactive"} />
               <h1 className="text-2xl font-bold">
                 {isEditing ? "Edit Item" : item.name}
               </h1>
@@ -1077,18 +1079,9 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   {/* Name */}
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">Name</label>
-                    <p className="text-base font-semibold mt-1">{item.name}</p>
-                  </div>
-
-                  <Separator />
-
-                  {/* Status */}
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Status</label>
-                    <div className="mt-1">
-                      <Badge variant={item.isActive ? "default" : "secondary"}>
-                        {item.isActive ? "Active" : "Inactive"}
-                      </Badge>
+                    <div className="flex items-center gap-2 mt-1">
+                      <StatusPin active={item.isActive} title={item.isActive ? "Active" : "Inactive"} />
+                      <p className="text-base font-semibold">{item.name}</p>
                     </div>
                   </div>
 

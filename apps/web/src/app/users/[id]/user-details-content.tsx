@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { Separator } from "@kit/ui/separator";
 import {
@@ -124,8 +125,9 @@ export default function UserDetailsContent({ userId }: UserDetailsContentProps) 
           {/* Basic Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center">
+              <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 mr-2" />
+                <StatusPin active={user.isActive} title={user.isActive ? "Active" : "Inactive"} />
                 Basic Information
               </CardTitle>
             </CardHeader>
@@ -206,15 +208,6 @@ export default function UserDetailsContent({ userId }: UserDetailsContentProps) 
                     </RelatedDataLink>
                   );
                 })()}
-              </div>
-              <Separator />
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Status</label>
-                <div className="mt-1">
-                  <Badge className={user.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                    {user.isActive ? 'Active' : 'Inactive'}
-                  </Badge>
-                </div>
               </div>
             </CardContent>
           </Card>

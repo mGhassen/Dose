@@ -10,6 +10,7 @@ import {
 } from "@kit/hooks";
 import type { MetadataEnum } from "@kit/lib/api/metadata-enums";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 
@@ -24,7 +25,10 @@ export default function MetadataEnumsContent() {
         accessorKey: "name",
         header: "Enum Name",
         cell: ({ row }) => (
-          <div className="font-medium">{row.original.name}</div>
+          <div className="flex items-center gap-2">
+            <StatusPin active={row.original.isActive} size="sm" />
+            <span className="font-medium">{row.original.name}</span>
+          </div>
         ),
       },
       {
@@ -37,15 +41,6 @@ export default function MetadataEnumsContent() {
         header: "Values",
         cell: ({ row }) => (
           <Badge variant="outline">{row.original.valueCount || 0}</Badge>
-        ),
-      },
-      {
-        accessorKey: "isActive",
-        header: "Status",
-        cell: ({ row }) => (
-          <Badge variant={row.original.isActive ? "default" : "secondary"}>
-            {row.original.isActive ? "Active" : "Inactive"}
-          </Badge>
         ),
       },
       {

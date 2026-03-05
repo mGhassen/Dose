@@ -7,6 +7,7 @@ import DataTablePage from "@/components/data-table-page";
 import { useRecipes, useDeleteRecipe } from "@kit/hooks";
 import type { Recipe } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
@@ -49,8 +50,9 @@ export default function RecipesContent() {
       accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <div className="font-medium">
-          {row.original.name}
+        <div className="flex items-center gap-2">
+          <StatusPin active={row.original.isActive} size="sm" />
+          <span className="font-medium">{row.original.name}</span>
         </div>
       ),
     },
@@ -68,15 +70,6 @@ export default function RecipesContent() {
       accessorKey: "cookingTime",
       header: "Cook Time",
       cell: ({ row }) => row.original.cookingTime ? `${row.original.cookingTime} min` : <span className="text-muted-foreground">—</span>,
-    },
-    {
-      accessorKey: "isActive",
-      header: "Status",
-      cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? "default" : "secondary"}>
-          {row.original.isActive ? "Active" : "Inactive"}
-        </Badge>
-      ),
     },
     {
       accessorKey: "createdAt",

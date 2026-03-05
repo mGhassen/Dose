@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 
 interface LeasingTimelinePageProps {
   params: Promise<{ id: string }>;
@@ -263,9 +264,7 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Status</label>
                 <div className="mt-1">
-                  <Badge variant={leasing.isActive ? "default" : "secondary"}>
-                    {leasing.isActive ? "Active" : "Inactive"}
-                  </Badge>
+                  <StatusPin active={leasing.isActive} title={leasing.isActive ? "Active" : "Inactive"} />
                 </div>
               </div>
             </div>

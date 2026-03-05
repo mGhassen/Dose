@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import {
   DropdownMenu,
@@ -253,9 +254,7 @@ export default function SubscriptionsTimelinePage() {
                           <Badge variant="outline" className="text-xs font-normal">
                             {categoryLabels[subscription.category] || subscription.category}
                           </Badge>
-                          <Badge variant={subscription.isActive ? "default" : "secondary"} className="text-xs">
-                            {subscription.isActive ? "Active" : "Inactive"}
-                          </Badge>
+                          <StatusPin active={subscription.isActive} size="sm" title={subscription.isActive ? "Active" : "Inactive"} />
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
                           {recurrenceLabels[subscription.recurrence] || subscription.recurrence} · {formatCurrency(subscription.amount)}/occurrence

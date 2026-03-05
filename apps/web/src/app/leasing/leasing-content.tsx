@@ -8,6 +8,7 @@ import { useLeasing, useDeleteLeasing, useInventorySuppliers } from "@kit/hooks"
 import Link from "next/link";
 import type { LeasingPayment, LeasingType, ExpenseRecurrence } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { Button } from "@kit/ui/button";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -35,7 +36,10 @@ export default function LeasingContent() {
       accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <div className="font-medium">{row.original.name}</div>
+        <div className="flex items-center gap-2">
+          <StatusPin active={row.original.isActive} size="sm" />
+          <span className="font-medium">{row.original.name}</span>
+        </div>
       ),
     },
     {
@@ -107,15 +111,6 @@ export default function LeasingContent() {
         }
         return leasingPayment.lessor || <span className="text-muted-foreground">—</span>;
       },
-    },
-    {
-      accessorKey: "isActive",
-      header: "Status",
-      cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? "default" : "secondary"}>
-          {row.original.isActive ? "Active" : "Inactive"}
-        </Badge>
-      ),
     },
   ], [supplierMap]);
 

@@ -8,6 +8,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
+import { StatusPin } from "@/components/status-pin";
 import { Save, X, Trash2, Package, ChefHat, MoreVertical, Edit2 } from "lucide-react";
 import Link from "next/link";
 import AppLayout from "@/components/app-layout";
@@ -161,10 +162,12 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
     <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-2">
+            <StatusPin active={ingredient.isActive} title={ingredient.isActive ? "Active" : "Inactive"} />
             <h1 className="text-2xl font-bold">
               {isEditing ? "Edit Ingredient" : ingredient.name}
             </h1>
+          </div>
             <p className="text-muted-foreground">
               {isEditing ? "Update ingredient information" : "Ingredient details and information"}
             </p>
@@ -277,7 +280,10 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Name</label>
-                    <p className="text-base font-semibold mt-1">{ingredient.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <StatusPin active={ingredient.isActive} title={ingredient.isActive ? "Active" : "Inactive"} />
+                      <p className="text-base font-semibold">{ingredient.name}</p>
+                    </div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Unit</label>
@@ -286,10 +292,6 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Category</label>
                     <p className="text-base mt-1">{ingredient.category || "—"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Status</label>
-                    <p className="text-base mt-1">{ingredient.isActive ? "Active" : "Inactive"}</p>
                   </div>
                   {ingredient.description && (
                     <div className="md:col-span-2">

@@ -19,6 +19,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections, useInventorySupplierById } from "@kit/hooks";
@@ -215,10 +216,12 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between shrink-0 py-2">
-          <div>
+          <div className="flex items-center gap-2">
+            <StatusPin active={subscription.isActive} title={subscription.isActive ? "Active" : "Inactive"} />
             <h1 className="text-2xl font-bold">
               {isEditing ? "Edit Subscription" : subscription.name}
             </h1>
+          </div>
             <p className="text-muted-foreground">
               {isEditing ? "Update subscription information" : "Subscription details and information"}
             </p>
@@ -406,7 +409,10 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                   {/* Name */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Name</label>
-                    <p className="text-base font-semibold mt-1">{subscription.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <StatusPin active={subscription.isActive} title={subscription.isActive ? "Active" : "Inactive"} />
+                      <p className="text-base font-semibold">{subscription.name}</p>
+                    </div>
                   </div>
 
                   {/* Category */}
@@ -461,16 +467,6 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Status */}
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Status</label>
-                    <div className="mt-1">
-                      <Badge variant={subscription.isActive ? "default" : "secondary"}>
-                        {subscription.isActive ? "Active" : "Inactive"}
-                      </Badge>
                     </div>
                   </div>
                 </div>

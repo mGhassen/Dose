@@ -3,8 +3,8 @@
 import { usePathname, useRouter } from "next/navigation";
 import AppLayout from "@/components/app-layout";
 import VariablesContent from "./variables-content";
-import { VariableCreateContent } from "./variable-create-content";
-import { VariableDetailContent } from "./variable-detail-content";
+import { VariableCreateContent } from "@/app/variables/variable-create-content";
+import { VariableDetailContent } from "@/app/variables/variable-detail-content";
 
 export default function VariablesLayoutClient({
   children,
@@ -44,7 +44,7 @@ export default function VariablesLayoutClient({
                 {isCreate ? (
                   <VariableCreateContent
                     onClose={() => router.push("/variables")}
-                    onCreated={(id) => router.push(`/variables/${id}`)}
+                    onCreated={(id: number) => router.push(`/variables/${id}`)}
                   />
                 ) : variableId ? (
                   <VariableDetailContent

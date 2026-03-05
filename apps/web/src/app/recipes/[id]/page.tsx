@@ -10,6 +10,7 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { UnifiedSelector } from "@/components/unified-selector";
+import { StatusPin } from "@/components/status-pin";
 import { Save, X, Trash2, Plus, ChefHat, MoreVertical, Edit2, AlertTriangle, CheckCircle, Package, Link2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useCreateProducedItem, useItems, useUnits, useUpdateItem, useProduceRecipe, useRecipeCost, useStockLevels } from "@kit/hooks";
@@ -284,10 +285,12 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-2">
+            <StatusPin active={recipe.isActive} title={recipe.isActive ? "Active" : "Inactive"} />
             <h1 className="text-2xl font-bold">
               {isEditing ? "Edit Recipe" : recipe.name}
             </h1>
+          </div>
             <p className="text-muted-foreground">
               {isEditing ? "Update recipe information" : "Recipe details and information"}
             </p>
@@ -557,22 +560,19 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                 <div className="space-y-6">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Name</label>
-                    <p className="text-base font-semibold mt-1">{recipe.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <StatusPin active={recipe.isActive} title={recipe.isActive ? "Active" : "Inactive"} />
+                      <p className="text-base font-semibold">{recipe.name}</p>
+                    </div>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Serving Size</label>
-                      <p className="text-base mt-1">
-                        {recipe.servingSize
-                          ? `${recipe.servingSize} ${recipe.unit || 'serving'}${recipe.servingSize !== 1 ? 's' : ''}`
-                          : "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Status</label>
-                      <p className="text-base mt-1">{recipe.isActive ? "Active" : "Inactive"}</p>
-                    </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Serving Size</label>
+                    <p className="text-base mt-1">
+                      {recipe.servingSize
+                        ? `${recipe.servingSize} ${recipe.unit || 'serving'}${recipe.servingSize !== 1 ? 's' : ''}`
+                        : "—"}
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -667,7 +667,10 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                                 <div>
                                   <label className="text-sm font-medium text-muted-foreground">Name</label>
-                                  <p className="text-base mt-1 font-medium">{pi.name || "—"}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <StatusPin active={pi.isActive} title={pi.isActive ? "Active" : "Inactive"} />
+                                    <p className="text-base font-medium">{pi.name || "—"}</p>
+                                  </div>
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium text-muted-foreground">Category</label>
@@ -689,10 +692,6 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                                     <p className="text-base mt-1">{formatCurrency(pi.unitPrice)}</p>
                                   </div>
                                 )}
-                                <div>
-                                  <label className="text-sm font-medium text-muted-foreground">Status</label>
-                                  <p className="text-base mt-1">{pi.isActive ? "Active" : "Inactive"}</p>
-                                </div>
                               </div>
                               {pi.description && (
                                 <div>

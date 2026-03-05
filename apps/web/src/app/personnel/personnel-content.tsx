@@ -7,6 +7,7 @@ import DataTablePage from "@/components/data-table-page";
 import { usePersonnel, useDeletePersonnel } from "@kit/hooks";
 import type { Personnel, PersonnelType } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
@@ -42,8 +43,9 @@ export default function PersonnelContent() {
       accessorKey: "firstName",
       header: "Name",
       cell: ({ row }) => (
-        <div className="font-medium">
-          {row.original.firstName} {row.original.lastName}
+        <div className="flex items-center gap-2">
+          <StatusPin active={row.original.isActive} size="sm" />
+          <span className="font-medium">{row.original.firstName} {row.original.lastName}</span>
         </div>
       ),
     },
@@ -95,15 +97,6 @@ export default function PersonnelContent() {
       accessorKey: "startDate",
       header: "Start Date",
       cell: ({ row }) => formatDate(row.original.startDate),
-    },
-    {
-      accessorKey: "isActive",
-      header: "Status",
-      cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? "default" : "secondary"}>
-          {row.original.isActive ? "Active" : "Inactive"}
-        </Badge>
-      ),
     },
   ], []);
 

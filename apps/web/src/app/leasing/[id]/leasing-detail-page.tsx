@@ -16,6 +16,7 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { Checkbox } from "@kit/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@kit/ui/radio-group";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2, Download } from "lucide-react";
@@ -779,7 +780,10 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
                   {/* Name */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Name</label>
-                    <p className="text-base font-semibold mt-1">{leasing.name}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <StatusPin active={leasing.isActive} title={leasing.isActive ? "Active" : "Inactive"} />
+                      <p className="text-base font-semibold">{leasing.name}</p>
+                    </div>
                   </div>
 
                   {/* Type */}
@@ -854,16 +858,6 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Status */}
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Status</label>
-                    <div className="mt-1">
-                      <Badge variant={leasing.isActive ? "default" : "secondary"}>
-                        {leasing.isActive ? "Active" : "Inactive"}
-                      </Badge>
                     </div>
                   </div>
 

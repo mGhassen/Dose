@@ -2,6 +2,7 @@
 
 import { Button } from "@kit/ui/button";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
 import { Separator } from "@kit/ui/separator";
 import { 
@@ -57,9 +58,12 @@ export default function QuestionDetailView({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <div>
-            <h1 className="text-3xl font-bold">Question #{question.id}</h1>
-            <p className="text-muted-foreground">Question ID: {question.id}</p>
+          <div className="flex items-center gap-2">
+            <StatusPin active={question.isActive} title={question.isActive ? "Active" : "Inactive"} />
+            <div>
+              <h1 className="text-3xl font-bold">Question #{question.id}</h1>
+              <p className="text-muted-foreground">Question ID: {question.id}</p>
+            </div>
           </div>
         </div>
         {showActions && (
@@ -128,14 +132,6 @@ export default function QuestionDetailView({
                     {getDifficultyIcon(question.difficulty)}
                     {question.difficulty}
                   </span>
-                </Badge>
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Active Status</label>
-              <div className="mt-1">
-                <Badge className={question.isActive ? 'bg-green-100 text-green-800' : 'bg-secondary text-secondary-foreground'}>
-                  {question.isActive ? 'Active' : 'Inactive'}
                 </Badge>
               </div>
             </div>

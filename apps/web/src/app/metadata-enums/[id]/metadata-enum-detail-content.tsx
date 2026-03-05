@@ -8,6 +8,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X, Edit, Plus, Trash2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
@@ -176,9 +177,12 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
     <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{enumItem.label}</h1>
-            <p className="text-muted-foreground">Enum: {enumItem.name}</p>
+          <div className="flex items-center gap-2">
+            <StatusPin active={enumItem.isActive} title={enumItem.isActive ? "Active" : "Inactive"} />
+            <div>
+              <h1 className="text-2xl font-bold">{enumItem.label}</h1>
+              <p className="text-muted-foreground">Enum: {enumItem.name}</p>
+            </div>
           </div>
           <div className="flex gap-2">
             {!isEditing && (
@@ -295,14 +299,6 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
                     <div className="mt-1 font-medium">{enumItem.label}</div>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Status</Label>
-                    <div className="mt-1">
-                      <Badge variant={enumItem.isActive ? "default" : "secondary"}>
-                        {enumItem.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
                     <Label className="text-muted-foreground">Value Count</Label>
                     <div className="mt-1 font-medium">{enumItem.valueCount || 0}</div>
                   </div>
@@ -372,9 +368,7 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant={value.isActive ? "default" : "secondary"}>
-                        {value.isActive ? "Active" : "Inactive"}
-                      </Badge>
+                      <StatusPin active={!!value.isActive} title={value.isActive ? "Active" : "Inactive"} />
                       <Button
                         variant="ghost"
                         size="sm"

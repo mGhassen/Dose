@@ -16,6 +16,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
+import { StatusPin } from "@/components/status-pin";
 import { Separator } from "@kit/ui/separator";
 import { ScrollArea } from "@kit/ui/scroll-area";
 import { Skeleton } from "@kit/ui/skeleton";
@@ -413,7 +414,10 @@ export function VariableDetailContent({
     <div className="flex h-full flex-col">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border pb-4">
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold truncate">{variable.name}</h2>
+          <div className="flex items-center gap-2">
+            <StatusPin active={variable.isActive} title={variable.isActive ? "Active" : "Inactive"} />
+            <h2 className="text-lg font-semibold truncate">{variable.name}</h2>
+          </div>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="font-normal text-xs">
               {TYPE_LABELS[variable.type] || variable.type}
@@ -487,22 +491,11 @@ export function VariableDetailContent({
             )}
           </Section>
 
-          <Section title="Status">
-            <KeyValue
-              label="State"
-              value={
-                <Badge variant={variable.isActive ? "default" : "secondary"} className="font-normal">
-                  {variable.isActive ? "Active" : "Inactive"}
-                </Badge>
-              }
-            />
-            {variable.description && (
-              <div className="pt-2.5 border-t border-border/60 mt-2.5">
-                <p className="text-xs text-muted-foreground mb-1.5">Description</p>
-                <p className="text-sm text-foreground/90 whitespace-pre-wrap">{variable.description}</p>
-              </div>
-            )}
-          </Section>
+          {variable.description && (
+            <Section title="Description">
+              <p className="text-sm text-foreground/90 whitespace-pre-wrap">{variable.description}</p>
+            </Section>
+          )}
 
           <div className="flex gap-6 text-xs text-muted-foreground pt-1">
             <span>Created {formatDate(variable.createdAt)}</span>
