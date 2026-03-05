@@ -14,11 +14,10 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const isSalesSplitView =
-    pathname === "/sales" || /^\/sales\/\d+$/.test(pathname) || 
-    pathname === "/expenses" || /^\/expenses\/\d+$/.test(pathname) ||
-    pathname === "/variables" || /^\/variables\/\d+$/.test(pathname) || /^\/variables\/\d+\/edit$/.test(pathname) || /^\/variables\/\d+\/create$/.test(pathname);
-  const isSplitView = isSalesSplitView;
+  const isSplitView =
+    pathname === "/sales" || pathname === "/sales/create" || /^\/sales\/\d+(\/edit)?$/.test(pathname) ||
+    pathname === "/expenses" || pathname === "/expenses/create" || /^\/expenses\/\d+(\/edit)?$/.test(pathname) ||
+    pathname === "/variables" || pathname === "/variables/create" || /^\/variables\/\d+(\/edit)?$/.test(pathname);
 
   return (
     <SidebarProvider>

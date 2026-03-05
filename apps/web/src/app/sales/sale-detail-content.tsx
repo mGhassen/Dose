@@ -18,7 +18,6 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
-import { useSalesPanelFormView } from "./sales-layout-client";
 import { Badge } from "@kit/ui/badge";
 import { Separator } from "@kit/ui/separator";
 import { ScrollArea } from "@kit/ui/scroll-area";
@@ -47,6 +46,7 @@ import { taxRulesApi } from "@kit/lib";
 
 interface SaleDetailContentProps {
   saleId: string;
+  initialEditMode?: boolean;
   onClose: () => void;
   onDeleted: () => void;
 }
@@ -83,15 +83,14 @@ function DetailRow({
   );
 }
 
-export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailContentProps) {
+export function SaleDetailContent({ saleId, initialEditMode = false, onClose, onDeleted }: SaleDetailContentProps) {
   const router = useRouter();
-  const { setIsFormView } = useSalesPanelFormView();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(initialEditMode);
   const { data: sale, isLoading } = useSaleById(saleId);
 
   useEffect(() => {
-    setIsFormView(isEditing);
-  }, [isEditing, setIsFormView]);
+    setIsEditing(initialEditMode);
+  }, [initialEditMode]);
   const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
   const { data: unitsData } = useUnits();
   const updateSale = useUpdateSale();
@@ -263,6 +262,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
         } as any,
       });
       toast.success("Sale updated successfully");
+      router.push(`/sales/${saleId}`);
       setIsEditing(false);
     } catch (error: any) {
       toast.error(error?.message || "Failed to update sale");
@@ -534,7 +534,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
           </div>
         </ScrollArea>
         <div className="mt-auto flex shrink-0 gap-3 border-t bg-background p-4 -mx-6">
-          <Button type="button" variant="outline" onClick={() => setIsEditing(false)} className="flex-1">Cancel</Button>
+          <Button type="button" variant="outline" onClick={() => router.push(`/sales/${saleId}`)} className="flex-1">Cancel</Button>
           <Button
             type="submit"
             disabled={updateSale.isPending || (hasAnyItem ? total <= 0 : (parseFloat(lineItems[0]?.unitPrice ?? "0") || 0) <= 0)}
@@ -566,7 +566,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                <DropdownMenuItem onClick={() => router.push(`/sales/${saleId}/edit`)}>
                   <Edit2 className="mr-2 h-4 w-4" />
                   Edit sale
                 </DropdownMenuItem>

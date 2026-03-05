@@ -35,7 +35,6 @@ import { DatePicker } from "@kit/ui/date-picker";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
 import { Checkbox } from "@kit/ui/checkbox";
-import { useExpensesPanelFormView } from "../expenses-layout-client";
 import {
   useExpenseById,
   useUpdateExpense,
@@ -92,17 +91,19 @@ function DetailRow({
 
 export interface ExpenseDetailContentProps {
   expenseId: string;
+  initialEditMode?: boolean;
   onClose: () => void;
   onDeleted: () => void;
 }
 
 export function ExpenseDetailContent({
   expenseId,
+  initialEditMode = false,
   onClose,
   onDeleted,
 }: ExpenseDetailContentProps) {
   const router = useRouter();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(initialEditMode);
   const { data: expense, isLoading } = useExpenseById(expenseId);
   const { data: subscriptionsResponse } = useSubscriptions();
   const subscriptions = subscriptionsResponse?.data || [];
@@ -125,6 +126,11 @@ export function ExpenseDetailContent({
     discountValue: "",
   });
   const [defaultTaxRate, setDefaultTaxRate] = useState(0);
+
+  useEffect(() => {
+    setIsEditing(initialEditMode);
+  }, [initialEditMode]);
+
   useEffect(() => {
     if (!formData.expenseDate) {
       setDefaultTaxRate(0);
@@ -138,11 +144,6 @@ export function ExpenseDetailContent({
   const [lineItems, setLineItems] = useState<
     Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string; taxInclusive: boolean }>
   >([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
-  const { setIsFormView } = useExpensesPanelFormView();
-
-  useEffect(() => {
-    setIsFormView(isEditing);
-  }, [isEditing, setIsFormView]);
 
   const hasAnyItem = lineItems.some((l) => l.itemId !== "");
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
@@ -271,6 +272,7 @@ export function ExpenseDetailContent({
     try {
       await updateExpense.mutateAsync({ id: expenseId, data: payload as any });
       toast.success("Expense updated");
+      router.push(`/expenses/${expenseId}`);
       setIsEditing(false);
     } catch (error: unknown) {
       toast.error((error as { message?: string })?.message || "Failed to update expense");
@@ -581,7 +583,7 @@ export function ExpenseDetailContent({
           </div>
         </ScrollArea>
         <div className="flex shrink-0 gap-3 border-t bg-background p-4 -mx-6">
-          <Button type="button" variant="outline" onClick={() => setIsEditing(false)} className="flex-1">
+          <Button type="button" variant="outline" onClick={() => router.push(`/expenses/${expenseId}`)} className="flex-1">
             Cancel
           </Button>
           <Button type="submit" disabled={updateExpense.isPending || (hasAnyItem ? total <= 0 : (parseFloat(lineItems[0]?.unitPrice ?? "0") || 0) <= 0)} className="flex-1">
@@ -618,7 +620,7 @@ export function ExpenseDetailContent({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                <DropdownMenuItem onClick={() => router.push(`/expenses/${expenseId}/edit`)}>
                   <Edit2 className="mr-2 h-4 w-4" />
                   Edit expense
                 </DropdownMenuItem>

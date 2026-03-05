@@ -19,7 +19,7 @@ import { Badge } from "@kit/ui/badge";
 import { Separator } from "@kit/ui/separator";
 import { ScrollArea } from "@kit/ui/scroll-area";
 import { Skeleton } from "@kit/ui/skeleton";
-import { Edit2, Trash2, MoreHorizontal, X, Hash, Calendar, Tag, FileText } from "lucide-react";
+import { Edit2, Trash2, MoreHorizontal, X } from "lucide-react";
 import { useVariableById, useUpdateVariable, useDeleteVariable, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
@@ -47,29 +47,21 @@ const TYPE_LABELS: Record<string, string> = {
   other: "Other",
 };
 
-const LABEL_MIN_WIDTH = "7.5rem";
-
-function DetailRow({
-  icon: Icon,
-  label,
-  children,
-}: {
-  icon: React.ElementType;
-  label: string;
-  children: React.ReactNode;
-}) {
+function KeyValue({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
-        <Icon className="h-4 w-4" />
-      </div>
-      <div className="flex min-w-0 flex-1 items-start gap-4">
-        <p className="shrink-0 text-xs font-medium uppercase tracking-wider text-muted-foreground" style={{ minWidth: LABEL_MIN_WIDTH }}>
-          {label}
-        </p>
-        <div className="min-w-0 flex-1 text-sm font-medium">{children}</div>
-      </div>
+    <div className="flex justify-between gap-4 py-2.5">
+      <span className="text-sm text-muted-foreground shrink-0">{label}</span>
+      <span className="text-sm font-medium text-right min-w-0">{value}</span>
     </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">{title}</h3>
+      <div className="rounded-lg border border-border/60 bg-muted/30 p-4">{children}</div>
+    </section>
   );
 }
 
@@ -404,32 +396,45 @@ export function VariableDetailContent({
   }
 
   const isUnitTypeView = variable.type === "unit";
-  const isTaxOrTransactionTaxView = variable.type === "tax" || variable.type === "transaction_tax";
   const isTimeRelevantView = ["tax", "transaction_tax", "inflation", "exchange_rate"].includes(variable.type);
   const isRateTypeView = ["cost", "tax", "transaction_tax", "inflation", "exchange_rate", "other"].includes(variable.type);
   const payloadView = variable.payload as { symbol?: string; dimension?: string } | undefined;
-
   const showDateRange = !isUnitTypeView && (isTimeRelevantView || isRateTypeView);
+
+  const displayValue = isUnitTypeView
+    ? (payloadView?.symbol ? `${variable.value} ${payloadView.symbol}` : String(variable.value))
+    : variable.unit === "percentage"
+      ? `${variable.value}%`
+      : `${variable.value} ${variable.unit || ""}`.trim() || String(variable.value);
+
+  const valueSubtitle = isUnitTypeView ? "Unit · factor to base" : "Current value";
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border pb-4">
-        <div>
-          <p className="text-xs text-muted-foreground">{TYPE_LABELS[variable.type] || variable.type}</p>
-          <h2 className="text-lg font-semibold">{variable.name}</h2>
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border pb-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-semibold truncate">{variable.name}</h2>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="font-normal text-xs">
+              {TYPE_LABELS[variable.type] || variable.type}
+            </Badge>
+            {showDateRange && variable.effectiveDate && (
+              <span className="text-xs text-muted-foreground">From {formatDate(variable.effectiveDate)}</span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8">
                 <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">More options</span>
+                <span className="sr-only">Actions</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => router.push(`/variables/${variableId}/edit`)}>
                 <Edit2 className="mr-2 h-4 w-4" />
-                Edit variable
+                Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -442,112 +447,64 @@ export function VariableDetailContent({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={onClose}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose} aria-label="Close">
             <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
           </Button>
         </div>
-      </div>
+      </header>
+
       <ScrollArea className="flex-1 pr-2">
-        <div className="space-y-0 pt-4 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Hash className="h-7 w-7" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-2xl font-bold tracking-tight tabular-nums">
-                {isUnitTypeView
-                  ? (payloadView?.symbol ? `${variable.value} ${payloadView.symbol}` : variable.value)
-                  : variable.unit === "percentage"
-                    ? `${variable.value}%`
-                    : `${variable.value} ${variable.unit || ""}`.trim() || String(variable.value)}
-              </p>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <Badge variant="secondary" className="font-normal">
-                  {TYPE_LABELS[variable.type] || variable.type}
-                </Badge>
-                {showDateRange && variable.effectiveDate && (
-                  <span className="text-sm text-muted-foreground">{formatDate(variable.effectiveDate)}</span>
-                )}
-              </div>
-            </div>
+        <div className="space-y-6 pt-5 pb-6">
+          <div className="rounded-xl border border-border bg-muted/40 p-5 text-center">
+            <p className="text-3xl font-bold tabular-nums tracking-tight">{displayValue}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{valueSubtitle}</p>
           </div>
 
-          <Separator className="my-4" />
+          <Section title={isUnitTypeView ? "Unit" : "Details"}>
+            {isUnitTypeView ? (
+              <>
+                <KeyValue label="Symbol" value={payloadView?.symbol ?? "—"} />
+                <KeyValue label="Dimension" value={payloadView?.dimension ?? "—"} />
+                <KeyValue label="Factor to base" value={variable.value} />
+              </>
+            ) : (
+              <>
+                <KeyValue
+                  label="Value"
+                  value={variable.unit ? `${variable.value} ${variable.unit === "percentage" ? "%" : variable.unit}` : variable.value}
+                />
+                {variable.unit && <KeyValue label="Unit" value={variable.unit} />}
+                {showDateRange && (
+                  <>
+                    <KeyValue
+                      label="Effective date"
+                      value={variable.effectiveDate ? formatDate(variable.effectiveDate) : "—"}
+                    />
+                    <KeyValue label="End date" value={variable.endDate ? formatDate(variable.endDate) : "—"} />
+                  </>
+                )}
+              </>
+            )}
+          </Section>
 
-          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground pl-[calc(2.25rem+0.75rem+7.5rem+1rem)]">Basic</p>
-          <DetailRow icon={Tag} label="Type">
-            <Badge variant="outline">{TYPE_LABELS[variable.type] || variable.type}</Badge>
-          </DetailRow>
+          <Section title="Status">
+            <KeyValue
+              label="State"
+              value={
+                <Badge variant={variable.isActive ? "default" : "secondary"} className="font-normal">
+                  {variable.isActive ? "Active" : "Inactive"}
+                </Badge>
+              }
+            />
+            {variable.description && (
+              <div className="pt-2.5 border-t border-border/60 mt-2.5">
+                <p className="text-xs text-muted-foreground mb-1.5">Description</p>
+                <p className="text-sm text-foreground/90 whitespace-pre-wrap">{variable.description}</p>
+              </div>
+            )}
+          </Section>
 
-          <Separator className="my-3" />
-          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground pl-[calc(2.25rem+0.75rem+7.5rem+1rem)]">
-            {isUnitTypeView ? "Unit details" : isTaxOrTransactionTaxView ? "Rate & period" : "Value & period"}
-          </p>
-          {isUnitTypeView ? (
-            <>
-              <DetailRow icon={Hash} label="Factor to base">
-                {variable.value.toString()}
-              </DetailRow>
-              {payloadView && (
-                <>
-                  <Separator />
-                  <DetailRow icon={Tag} label="Symbol">
-                    {payloadView.symbol ?? "—"}
-                  </DetailRow>
-                  <Separator />
-                  <DetailRow icon={Tag} label="Dimension">
-                    {payloadView.dimension ?? "—"}
-                  </DetailRow>
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <DetailRow icon={Hash} label="Value">
-                {variable.unit ? `${variable.value} ${variable.unit === "percentage" ? "%" : variable.unit}` : variable.value.toString()}
-              </DetailRow>
-              {variable.unit && (
-                <>
-                  <Separator />
-                  <DetailRow icon={Tag} label="Unit">
-                    {variable.unit}
-                  </DetailRow>
-                </>
-              )}
-              {showDateRange && (
-                <>
-                  <Separator />
-                  <DetailRow icon={Calendar} label="Effective date">
-                    {variable.effectiveDate ? formatDate(variable.effectiveDate) : <span className="text-muted-foreground">—</span>}
-                  </DetailRow>
-                  <Separator />
-                  <DetailRow icon={Calendar} label="End date">
-                    {variable.endDate ? formatDate(variable.endDate) : <span className="text-muted-foreground">—</span>}
-                  </DetailRow>
-                </>
-              )}
-            </>
-          )}
-
-          <Separator className="my-3" />
-          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground pl-[calc(2.25rem+0.75rem+7.5rem+1rem)]">Optional</p>
-          <DetailRow icon={Tag} label="Status">
-            <Badge variant={variable.isActive ? "default" : "secondary"}>
-              {variable.isActive ? "Active" : "Inactive"}
-            </Badge>
-          </DetailRow>
-          {variable.description && (
-            <>
-              <Separator />
-              <DetailRow icon={FileText} label="Description">
-                <p className="whitespace-pre-wrap text-foreground/90">{variable.description}</p>
-              </DetailRow>
-            </>
-          )}
-
-          <Separator className="my-4" />
-          <div className="flex gap-6 text-xs text-muted-foreground pt-2">
+          <div className="flex gap-6 text-xs text-muted-foreground pt-1">
             <span>Created {formatDate(variable.createdAt)}</span>
             <span>Updated {formatDate(variable.updatedAt)}</span>
           </div>
