@@ -184,16 +184,27 @@ export async function PUT(
     const body = parsed.data as UpdateRecipeData;
     const supabase = supabaseServer();
     
-    // Update recipe in recipes table
     const updateData = transformToSnakeCase(body);
-    const { data: recipeData, error: recipeError } = await supabase
-      .from('recipes')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (recipeError) throw recipeError;
+    let recipeData: any = null;
+    if (Object.keys(updateData).length > 0) {
+      const { data, error: recipeError } = await supabase
+        .from('recipes')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      if (recipeError) throw recipeError;
+      recipeData = data;
+    }
+    if (!recipeData) {
+      const { data, error: fetchError } = await supabase
+        .from('recipes')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (fetchError) throw fetchError;
+      recipeData = data;
+    }
     if (!recipeData) {
       return NextResponse.json(
         { error: 'Recipe not found' },
