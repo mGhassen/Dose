@@ -230,7 +230,7 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
               </p>
             </div>
             <div className="flex-1 min-h-0 rounded-md border overflow-y-auto overflow-x-auto">
-              <table className="w-full caption-bottom text-sm">
+              <table className="w-full min-w-[800px] caption-bottom text-sm">
                 <TableHeader className="sticky top-0 z-20 bg-background [&_tr]:border-b shadow-sm">
                   <TableRow>
                     <TableHead>Month</TableHead>
@@ -261,7 +261,7 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
                     <TableCell className="text-right">{formatCurrency(totalPrincipal)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(totalInterest)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(totalPayments)}</TableCell>
-                    <TableCell colSpan={2} />
+                    <TableCell colSpan={3} />
                   </TableRow>
                 </TableFooter>
               </table>

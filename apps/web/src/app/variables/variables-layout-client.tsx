@@ -20,8 +20,9 @@ export default function VariablesLayoutClient({
   const isListOrPanel =
     pathname === "/variables" || isCreate || (variableId !== null);
   const showPanel = isCreate || variableId !== null;
-  const rightWidth = showPanel ? "40%" : "0";
-  const leftWidth = showPanel ? "60%" : "100%";
+  const panelIsCreateOrEdit = isCreate || isEdit;
+  const rightWidth = showPanel ? (panelIsCreateOrEdit ? "60%" : "40%") : "0";
+  const leftWidth = showPanel ? (panelIsCreateOrEdit ? "40%" : "60%") : "100%";
 
   const handleDeleted = () => router.push("/variables");
 

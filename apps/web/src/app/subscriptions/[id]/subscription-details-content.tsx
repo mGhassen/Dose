@@ -216,12 +216,13 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between shrink-0 py-2">
-          <div className="flex items-center gap-2">
-            <StatusPin active={subscription.isActive} title={subscription.isActive ? "Active" : "Inactive"} />
-            <h1 className="text-2xl font-bold">
-              {isEditing ? "Edit Subscription" : subscription.name}
-            </h1>
-          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <StatusPin active={subscription.isActive} title={subscription.isActive ? "Active" : "Inactive"} />
+              <h1 className="text-2xl font-bold">
+                {isEditing ? "Edit Subscription" : subscription.name}
+              </h1>
+            </div>
             <p className="text-muted-foreground">
               {isEditing ? "Update subscription information" : "Subscription details and information"}
             </p>

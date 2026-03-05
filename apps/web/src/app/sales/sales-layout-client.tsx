@@ -20,8 +20,9 @@ export default function SalesLayoutClient({
   const isListOrPanel =
     pathname === "/sales" || isCreate || saleId !== null;
   const showPanel = isCreate || saleId !== null;
-  const rightWidth = showPanel ? "40%" : "0";
-  const leftWidth = showPanel ? "60%" : "100%";
+  const panelIsCreateOrEdit = isCreate || isEdit;
+  const rightWidth = showPanel ? (panelIsCreateOrEdit ? "60%" : "40%") : "0";
+  const leftWidth = showPanel ? (panelIsCreateOrEdit ? "40%" : "60%") : "100%";
 
   const handleDeleted = () => router.push("/sales");
 
