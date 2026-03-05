@@ -304,7 +304,7 @@ export function UnifiedSelector({
               id={id}
               disabled={disabled}
               className={cn(
-                "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background shadow-md placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+                "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base shadow-none ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
                 className
               )}
             >
@@ -425,7 +425,7 @@ export function UnifiedSelector({
         )
       )}
       <Select open={open} onOpenChange={setOpen}>
-        <SelectTrigger id={id} className={cn("h-10 w-full shadow-md text-base md:text-sm justify-start [&_svg]:hidden", className)}>
+        <SelectTrigger id={id} className={cn("h-10 w-full shadow-none text-base md:text-sm justify-start [&_svg]:hidden", className)}>
           <SelectValue placeholder={selectedIds.length > 0 ? `${selectedIds.length} ${tCommon('item')}${selectedIds.length !== 1 ? 's' : ''} ${tCommon('selected')}` : placeholder || tCommon('selectItemsMultiple')} />
         </SelectTrigger>
         <SelectContent className="p-0" align="start">

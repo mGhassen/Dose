@@ -36,7 +36,7 @@ function DatePicker({
   const dateOnly = value ? new Date(value.getFullYear(), value.getMonth(), value.getDate()) : undefined;
 
   const triggerClassName = cn(
-    "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background md:text-sm shadow-md",
+    "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-base shadow-none ring-offset-background md:text-sm",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
     "disabled:cursor-not-allowed disabled:opacity-50",
     !value && "text-muted-foreground",

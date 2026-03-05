@@ -14,8 +14,11 @@ import { DatePicker } from "@kit/ui/date-picker";
 import { TimePicker } from "@kit/ui/time-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
+import { Checkbox } from "@kit/ui/checkbox";
 import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
+import { InputGroupAttached } from "@/components/input-group";
+import { useSalesPanelFormView } from "./sales-layout-client";
 import { Badge } from "@kit/ui/badge";
 import { Separator } from "@kit/ui/separator";
 import { ScrollArea } from "@kit/ui/scroll-area";
@@ -81,8 +84,13 @@ function DetailRow({
 
 export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailContentProps) {
   const router = useRouter();
+  const { setIsFormView } = useSalesPanelFormView();
   const [isEditing, setIsEditing] = useState(false);
   const { data: sale, isLoading } = useSaleById(saleId);
+
+  useEffect(() => {
+    setIsFormView(isEditing);
+  }, [isEditing, setIsFormView]);
   const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
   const { data: taxVariables } = useVariablesByType('transaction_tax');
   const { data: unitsData } = useUnits();
@@ -100,7 +108,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
     discountValue: "",
   });
 
-  const [lineItems, setLineItems] = useState<Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxInclusive: boolean }>>([]);
+  const [lineItems, setLineItems] = useState<Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string; taxInclusive: boolean }>>([]);
 
   const effectiveTaxRate = useMemo(
     () => getEffectiveTransactionTaxRate(taxVariables, formData.type, formData.date),
@@ -113,7 +121,8 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
     for (const line of lineItems) {
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, effectiveTaxRate, line.taxInclusive);
+      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? effectiveTaxRate : 0);
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, line.taxInclusive);
       sub += lineTotalNet;
       tax += taxAmount;
     }
@@ -125,10 +134,20 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
     }
     const tot = Math.round((sub + tax - disc) * 100) / 100;
     return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
-  }, [lineItems, effectiveTaxRate, formData.discountType, formData.discountValue]);
+  }, [lineItems, effectiveTaxRate, formData.type, formData.discountType, formData.discountValue]);
+
+  const detailTotals = useMemo(() => {
+    if (!sale) return { subtotal: 0, total: 0 };
+    const lines = sale.lineItems?.length ? sale.lineItems : [{ quantity: sale.quantity ?? 1, unitPrice: sale.unitPrice ?? sale.amount }];
+    const sub = Math.round(lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0) * 100) / 100;
+    const tax = sale.totalTax ?? 0;
+    const disc = sale.totalDiscount ?? 0;
+    const tot = Math.round((sub + tax - disc) * 100) / 100;
+    return { subtotal: sub, total: tot };
+  }, [sale]);
 
   const addLine = () => {
-    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxInclusive: false }]);
+    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
   };
   const removeLine = (index: number) => {
     if (lineItems.length <= 1) return;
@@ -141,6 +160,31 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
       return next;
     });
   };
+
+  const handleItemSelect = (index: number, itemId: string) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      const line = { ...next[index] };
+      line.itemId = itemId;
+      if (!itemId) {
+        line.quantity = "1";
+        line.unitId = null;
+        line.unitPrice = "";
+        line.taxRatePercent = "";
+      } else {
+        const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; unit_price?: number; unitPrice?: number; defaultTaxRatePercent?: number } | undefined;
+        line.quantity = "1";
+        line.unitId = item?.unitId ?? null;
+        const price = item?.unit_price ?? item?.unitPrice;
+        line.unitPrice = price != null ? String(price) : "";
+        line.taxRatePercent = item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : (formData.type ? String(effectiveTaxRate) : "");
+      }
+      next[index] = line;
+      return next;
+    });
+  };
+
+  const hasAnyItem = lineItems.some((l) => l.itemId !== "");
 
   useEffect(() => {
     if (sale) {
@@ -161,11 +205,12 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
             unitId: l.unitId ?? null,
             unitPrice: String(l.unitPrice),
             unitCost: l.unitCost != null ? String(l.unitCost) : "",
-            taxInclusive: false,
+            taxRatePercent: l.taxRatePercent != null ? String(l.taxRatePercent) : "",
+            taxInclusive: (l as { taxInclusive?: boolean }).taxInclusive ?? false,
           }))
         );
       } else {
-        setLineItems([{ itemId: sale.itemId?.toString() ?? "", quantity: String(sale.quantity ?? 1), unitId: sale.unitId ?? null, unitPrice: String(sale.unitPrice ?? sale.amount), unitCost: sale.unitCost != null ? String(sale.unitCost) : "", taxInclusive: false }]);
+        setLineItems([{ itemId: sale.itemId?.toString() ?? "", quantity: String(sale.quantity ?? 1), unitId: sale.unitId ?? null, unitPrice: String(sale.unitPrice ?? sale.amount), unitCost: sale.unitCost != null ? String(sale.unitCost) : "", taxRatePercent: "", taxInclusive: false }]);
       }
     }
   }, [sale]);
@@ -176,13 +221,15 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
       const dateTimeIso = new Date(`${formData.date}T${formData.time}`).toISOString();
       const payloadLines = lineItems.map((line) => {
         const price = parseFloat(line.unitPrice) || 0;
-        const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, effectiveTaxRate) : price;
+        const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : effectiveTaxRate;
+        const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, lineRate) : price;
         return {
           itemId: line.itemId ? parseInt(line.itemId) : undefined,
           quantity: parseFloat(line.quantity) || 0,
           unitId: line.unitId ?? undefined,
           unitPrice: unitPriceNet,
           unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
+          taxRatePercent: line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : undefined,
         };
       });
       if (payloadLines.some((l) => l.quantity <= 0 || l.unitPrice < 0)) {
@@ -311,7 +358,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                   onSelect={(item) => handleInputChange("type", item.id === 0 ? "" : String(item.id))}
                   placeholder="Select type"
                 />
-                <p className="text-xs text-muted-foreground">Tax rate: {effectiveTaxRate.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground pl-3">Tax rate: {effectiveTaxRate.toFixed(1)}%</p>
               </div>
             </div>
             <div className="space-y-2">
@@ -324,65 +371,148 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
               <div className="space-y-3 border rounded-md p-3 bg-muted/30">
                 {lineItems.map((line, index) => (
                   <div key={index} className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-4">
+                    <div className="col-span-3">
                       <UnifiedSelector
                         type="item"
                         items={items}
                         selectedId={line.itemId ? parseInt(line.itemId) : undefined}
-                        onSelect={(item) => updateLine(index, "itemId", item.id === 0 ? "" : String(item.id))}
+                        onSelect={(item) => handleItemSelect(index, item.id === 0 ? "" : String(item.id))}
                         placeholder="Item (optional)"
                         getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}`}
+                        className="h-10"
                       />
                     </div>
-                    <div className="col-span-2">
-                      <Label className="text-xs">Qty</Label>
-                      <Input type="number" step="0.01" min="0.01" value={line.quantity} onChange={(e) => updateLine(index, "quantity", e.target.value)} />
-                    </div>
-                    <div className="col-span-2">
-                      <UnifiedSelector type="unit" items={unitItems} selectedId={line.unitId ?? undefined} onSelect={(item) => updateLine(index, "unitId", item.id === 0 ? null : (item.id as number))} placeholder="Unit" />
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-xs">{line.taxInclusive ? "Price (incl. tax)" : "Price (excl. tax)"}</Label>
-                      <Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(index, "unitPrice", e.target.value)} />
-                    </div>
-                    <div className="col-span-1 flex flex-col gap-1 items-end justify-end pb-2">
-                      <Label className="text-xs opacity-0 pointer-events-none">Tax</Label>
-                      <select
-                        className="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-xs w-full min-w-0"
-                        value={line.taxInclusive ? "incl" : "excl"}
-                        onChange={(e) => updateLine(index, "taxInclusive", e.target.value === "incl")}
-                        title="Tax"
-                      >
-                        <option value="excl">Excl.</option>
-                        <option value="incl">Incl.</option>
-                      </select>
-                    </div>
-                    <div className="col-span-1 flex items-end pb-2">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
-                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </div>
+                    {line.itemId ? (
+                      <>
+                        <div className="col-span-4">
+                          <InputGroupAttached
+                            label="Qty / Unit"
+                            input={
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                className="text-sm tabular-nums"
+                                value={line.quantity}
+                                onChange={(e) => updateLine(index, "quantity", e.target.value)}
+                              />
+                            }
+                            addon={
+                            <UnifiedSelector
+                              type="unit"
+                              items={unitItems}
+                              selectedId={line.unitId ?? undefined}
+                              onSelect={(item) => updateLine(index, "unitId", item.id === 0 ? null : (item.id as number))}
+                              placeholder="—"
+                              className="!min-w-0 w-20"
+                            />
+                            }
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Label className="text-xs text-muted-foreground">{line.taxInclusive ? "Price (incl. tax)" : "Price (excl. tax)"}</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="text-sm tabular-nums"
+                            value={line.unitPrice}
+                            onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <InputGroupAttached
+                            label="Tax % / Incl. tax"
+                            addonStyle="default"
+                            input={
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="text-sm tabular-nums"
+                                value={line.taxRatePercent !== "" ? line.taxRatePercent : (formData.type ? String(effectiveTaxRate) : "")}
+                                onChange={(e) => updateLine(index, "taxRatePercent", e.target.value)}
+                                placeholder={formData.type ? String(effectiveTaxRate) : "—"}
+                              />
+                            }
+                            addon={
+                              <div className="flex h-full min-h-10 items-center justify-center leading-none" title="Price includes tax">
+                                <Checkbox
+                                  id={`tax-incl-${index}`}
+                                  checked={line.taxInclusive}
+                                  onCheckedChange={(checked) => updateLine(index, "taxInclusive", checked === true)}
+                                  aria-label="Price includes tax"
+                                />
+                              </div>
+                            }
+                          />
+                        </div>
+                        <div className="col-span-1 flex h-10 items-center">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="col-span-4">
+                          <Label className="text-xs">Amount</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={line.unitPrice}
+                            onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="col-span-4 flex h-10 items-center">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Discount</Label>
-                <div className="flex gap-2">
-                  <select className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm" value={formData.discountType} onChange={(e) => setFormData((p) => ({ ...p, discountType: e.target.value as "amount" | "percent" }))}>
-                    <option value="amount">Amount</option>
-                    <option value="percent">Percent</option>
-                  </select>
-                  <Input type="number" step="0.01" min="0" value={formData.discountValue} onChange={(e) => setFormData((p) => ({ ...p, discountValue: e.target.value }))} placeholder="0" />
+            {hasAnyItem && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Discount</Label>
+                  <div className="flex gap-2">
+                    <select className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm" value={formData.discountType} onChange={(e) => setFormData((p) => ({ ...p, discountType: e.target.value as "amount" | "percent" }))}>
+                      <option value="amount">Amount</option>
+                      <option value="percent">Percent</option>
+                    </select>
+                    <Input type="number" step="0.01" min="0" value={formData.discountValue} onChange={(e) => setFormData((p) => ({ ...p, discountValue: e.target.value }))} placeholder="0" />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
             <div className="rounded-md border bg-muted/50 p-3 space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{subtotal.toFixed(2)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span>{totalTax.toFixed(2)}</span></div>
-              {discountAmount > 0 && <div className="flex justify-between text-muted-foreground"><span>Discount</span><span>-{discountAmount.toFixed(2)}</span></div>}
-              <div className="flex justify-between font-semibold pt-2 border-t"><span>Total</span><span>{total.toFixed(2)}</span></div>
+              {hasAnyItem ? (
+                <>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="tabular-nums">{subtotal.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Tax ({effectiveTaxRate.toFixed(1)}%)</span><span className="tabular-nums">{totalTax.toFixed(2)}</span></div>
+                  {discountAmount > 0 && <div className="flex justify-between text-muted-foreground"><span>Discount</span><span className="tabular-nums">-{discountAmount.toFixed(2)}</span></div>}
+                  <div className="flex justify-between font-semibold pt-2 border-t"><span>Total</span><span className="tabular-nums">{total.toFixed(2)}</span></div>
+                </>
+              ) : (
+                <div className="flex justify-between font-semibold items-center">
+                  <span>Total</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="h-10 w-24 text-right tabular-nums"
+                    value={lineItems[0]?.unitPrice ?? ""}
+                    onChange={(e) => updateLine(0, "unitPrice", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
@@ -392,7 +522,13 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
         </ScrollArea>
         <div className="mt-auto flex shrink-0 gap-3 border-t bg-background p-4 -mx-6">
           <Button type="button" variant="outline" onClick={() => setIsEditing(false)} className="flex-1">Cancel</Button>
-          <Button type="submit" disabled={updateSale.isPending || total <= 0} className="flex-1">{updateSale.isPending ? "Saving…" : "Save changes"}</Button>
+          <Button
+            type="submit"
+            disabled={updateSale.isPending || (hasAnyItem ? total <= 0 : (parseFloat(lineItems[0]?.unitPrice ?? "0") || 0) <= 0)}
+            className="flex-1"
+          >
+            {updateSale.isPending ? "Saving…" : "Save changes"}
+          </Button>
         </div>
       </form>
     );
@@ -453,7 +589,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
             </div>
             <div className="min-w-0">
               <p className="text-2xl font-bold tracking-tight tabular-nums">
-                {formatCurrency(sale.amount)}
+                {formatCurrency(detailTotals.total)}
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground">
@@ -491,38 +627,39 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                     {(sale.lineItems && sale.lineItems.length > 0
                       ? sale.lineItems
                       : [{ id: 0, item: sale.item, quantity: sale.quantity ?? 1, unitPrice: sale.unitPrice ?? sale.amount, lineTotal: sale.amount }]
-                    ).map((line: { id: number; item?: { name?: string }; quantity: number; unitPrice: number; lineTotal: number }) => (
-                      <tr key={line.id} className="border-b last:border-0">
-                        <td className="p-2">{line.item?.name ?? "—"}</td>
-                        <td className="p-2 text-right tabular-nums">{line.quantity}</td>
-                        <td className="p-2 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
-                        <td className="p-2 text-right tabular-nums">{formatCurrency(line.lineTotal)}</td>
-                      </tr>
-                    ))}
+                    ).map((line: { id: number; item?: { name?: string }; quantity: number; unitPrice: number; lineTotal: number }) => {
+                      const lineTotalDisplay = Math.round(line.quantity * line.unitPrice * 100) / 100;
+                      return (
+                        <tr key={line.id} className="border-b last:border-0">
+                          <td className="p-2">{line.item?.name ?? "—"}</td>
+                          <td className="p-2 text-right tabular-nums">{line.quantity}</td>
+                          <td className="p-2 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
+                          <td className="p-2 text-right tabular-nums">{formatCurrency(lineTotalDisplay)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
               <div className="mt-2 space-y-1 text-sm">
-                {sale.subtotal != null && (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Subtotal</span>
-                    <span className="tabular-nums">{formatCurrency(sale.subtotal)}</span>
-                  </div>
-                )}
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className="tabular-nums">{formatCurrency(detailTotals.subtotal)}</span>
+                </div>
                 {sale.totalTax != null && (
                   <div className="flex justify-between text-muted-foreground">
                     <span>
                       Tax
-                      {sale.subtotal != null && sale.subtotal > 0 && (
+                      {detailTotals.subtotal > 0 && (
                         <span className="ml-1 font-normal text-muted-foreground/80">
-                          ({((sale.totalTax / sale.subtotal) * 100).toFixed(1)}%)
+                          ({((sale.totalTax / detailTotals.subtotal) * 100).toFixed(1)}%)
                         </span>
                       )}
                     </span>
                     <span className="tabular-nums">{formatCurrency(sale.totalTax)}</span>
                   </div>
                 )}
-                {sale.totalDiscount != null && (
+                {sale.totalDiscount != null && sale.totalDiscount > 0 && (
                   <div className="flex justify-between text-muted-foreground">
                     <span>Discount</span>
                     <span className="tabular-nums">-{formatCurrency(sale.totalDiscount)}</span>
@@ -530,7 +667,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                 )}
                 <div className="flex justify-between font-medium border-t mt-1 pt-2">
                   <span>Total</span>
-                  <span className="tabular-nums">{formatCurrency(sale.amount)}</span>
+                  <span className="tabular-nums">{formatCurrency(detailTotals.total)}</span>
                 </div>
               </div>
             </div>

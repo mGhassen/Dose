@@ -7,8 +7,10 @@ import { DatePicker } from "@kit/ui/date-picker";
 import { TimePicker } from "@kit/ui/time-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
+import { Checkbox } from "@kit/ui/checkbox";
 import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
+import { InputGroupAttached } from "@/components/input-group";
 import { ScrollArea } from "@kit/ui/scroll-area";
 import { Save, X, Plus, Trash2 } from "lucide-react";
 import { useCreateSale, useItems, useUnits, useVariablesByType } from "@kit/hooks";
@@ -60,13 +62,14 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     [taxVariables, formData.type, formData.date]
   );
 
+  const hasAnyItem = lineItems.some((l) => l.itemId !== "");
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
     let sub = 0;
     let tax = 0;
     for (const line of lineItems) {
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
-      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : typeTaxRate;
+      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? typeTaxRate : 0);
       const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, line.taxInclusive);
       sub += lineTotalNet;
       tax += taxAmount;
@@ -100,17 +103,26 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
   };
 
   const handleItemSelect = (index: number, itemId: string) => {
-    updateLine(index, "itemId", itemId);
-    if (!itemId) {
-      updateLine(index, "taxRatePercent", "");
-      return;
-    }
-    const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10));
-    if (item && (item as { defaultTaxRatePercent?: number }).defaultTaxRatePercent != null) {
-      updateLine(index, "taxRatePercent", String((item as { defaultTaxRatePercent: number }).defaultTaxRatePercent));
-    } else {
-      updateLine(index, "taxRatePercent", "");
-    }
+    setLineItems((prev) => {
+      const next = [...prev];
+      const line = { ...next[index] };
+      line.itemId = itemId;
+      if (!itemId) {
+        line.quantity = "1";
+        line.unitId = null;
+        line.unitPrice = "";
+        line.taxRatePercent = "";
+      } else {
+        const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; unit_price?: number; unitPrice?: number; defaultTaxRatePercent?: number } | undefined;
+        line.quantity = "1";
+        line.unitId = item?.unitId ?? null;
+        const price = item?.unit_price ?? item?.unitPrice;
+        line.unitPrice = price != null ? String(price) : "";
+        line.taxRatePercent = item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : (formData.type ? String(typeTaxRate) : "");
+      }
+      next[index] = line;
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -199,7 +211,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                 placeholder="Select type"
               />
               {formData.type && (
-                <p className="text-xs text-muted-foreground">Default tax: {typeTaxRate.toFixed(1)}% (from Settings). Item default tax is used when set.</p>
+                <p className="text-xs text-muted-foreground pl-3">Default tax: {typeTaxRate.toFixed(1)}% (from Settings). Item default tax is used when set.</p>
               )}
             </div>
           </div>
@@ -214,7 +226,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
             <div className="space-y-3 border rounded-md p-3 bg-muted/30">
               {lineItems.map((line, index) => (
                 <div key={index} className="grid grid-cols-12 gap-2 items-end">
-                  <div className="col-span-4">
+                  <div className="col-span-3">
                     <UnifiedSelector
                       label=""
                       type="item"
@@ -224,105 +236,169 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                       onCreateNew={() => router.push("/items/create")}
                       placeholder="Item (optional)"
                       getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}`}
+                      className="h-10"
                     />
                   </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs">Qty</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      value={line.quantity}
-                      onChange={(e) => updateLine(index, "quantity", e.target.value)}
-                      placeholder="1"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <UnifiedSelector
-                      label=""
-                      type="unit"
-                      items={unitItems}
-                      selectedId={line.unitId ?? undefined}
-                      onSelect={(item) => updateLine(index, "unitId", item.id === 0 ? null : (item.id as number))}
-                      placeholder="Unit"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs">{line.taxInclusive ? "Price (incl. tax)" : "Price (excl. tax)"}</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={line.unitPrice}
-                      onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="col-span-1 flex flex-col gap-1 items-end justify-end pb-2">
-                    <Label className="text-xs opacity-0 pointer-events-none">Tax</Label>
-                    <select
-                      className="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-xs w-full min-w-0"
-                      value={line.taxInclusive ? "incl" : "excl"}
-                      onChange={(e) => updateLine(index, "taxInclusive", e.target.value === "incl")}
-                      title="Tax"
-                    >
-                      <option value="excl">Excl.</option>
-                      <option value="incl">Incl.</option>
-                    </select>
-                  </div>
-                  <div className="col-span-1 flex items-end pb-2">
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
-                      <Trash2 className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </div>
+                  {line.itemId ? (
+                    <>
+                      <div className="col-span-4">
+                        <InputGroupAttached
+                          label="Qty / Unit"
+                          input={
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              className="text-sm tabular-nums"
+                              value={line.quantity}
+                              onChange={(e) => updateLine(index, "quantity", e.target.value)}
+                            />
+                          }
+                          addon={
+                            <UnifiedSelector
+                              type="unit"
+                              items={unitItems}
+                              selectedId={line.unitId ?? undefined}
+                              onSelect={(item) => updateLine(index, "unitId", item.id === 0 ? null : (item.id as number))}
+                              placeholder="—"
+                              className="!min-w-0 w-20"
+                            />
+                          }
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="text-xs text-muted-foreground">{line.taxInclusive ? "Price (incl. tax)" : "Price (excl. tax)"}</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="text-sm tabular-nums"
+                          value={line.unitPrice}
+                          onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <InputGroupAttached
+                          label="Tax % / Incl. tax"
+                          addonStyle="default"
+                          input={
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="text-sm tabular-nums"
+                              value={line.taxRatePercent !== "" ? line.taxRatePercent : (formData.type ? String(typeTaxRate) : "")}
+                              onChange={(e) => updateLine(index, "taxRatePercent", e.target.value)}
+                              placeholder={formData.type ? String(typeTaxRate) : "—"}
+                            />
+                          }
+                          addon={
+                            <div className="flex h-full min-h-10 items-center justify-center leading-none" title="Price includes tax">
+                              <Checkbox
+                                id={`tax-incl-${index}`}
+                                checked={line.taxInclusive}
+                                onCheckedChange={(checked) => updateLine(index, "taxInclusive", checked === true)}
+                                aria-label="Price includes tax"
+                              />
+                            </div>
+                          }
+                        />
+                      </div>
+                      <div className="col-span-1 flex h-10 items-center">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="col-span-4">
+                        <Label className="text-xs">Amount</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={line.unitPrice}
+                          onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                          placeholder="0"
+                        />
+                      </div>
+                        <div className="col-span-4 flex h-10 items-center">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                        </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Discount</Label>
-              <div className="flex gap-2">
-                <select
-                  className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                  value={formData.discountType}
-                  onChange={(e) => setFormData((p) => ({ ...p, discountType: e.target.value as "amount" | "percent" }))}
-                >
-                  <option value="amount">Amount</option>
-                  <option value="percent">Percent</option>
-                </select>
+          {hasAnyItem && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Discount</Label>
+                <div className="flex gap-2">
+                  <select
+                    className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                    value={formData.discountType}
+                    onChange={(e) => setFormData((p) => ({ ...p, discountType: e.target.value as "amount" | "percent" }))}
+                  >
+                    <option value="amount">Amount</option>
+                    <option value="percent">Percent</option>
+                  </select>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.discountValue}
+                    onChange={(e) => setFormData((p) => ({ ...p, discountValue: e.target.value }))}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-md border bg-muted/50 p-3 space-y-1 text-sm">
+            {hasAnyItem ? (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="tabular-nums">{subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Tax {typeTaxRate > 0 && `(${typeTaxRate.toFixed(1)}%)`}
+                  </span>
+                  <span className="tabular-nums">{totalTax.toFixed(2)}</span>
+                </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Discount</span>
+                    <span className="tabular-nums">-{discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-semibold pt-2 border-t">
+                  <span>Total</span>
+                  <span className="tabular-nums">{total.toFixed(2)}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between font-semibold">
+                <span>Total</span>
                 <Input
                   type="number"
                   step="0.01"
                   min="0"
-                  value={formData.discountValue}
-                  onChange={(e) => setFormData((p) => ({ ...p, discountValue: e.target.value }))}
+                  className="h-10 w-24 text-right tabular-nums"
+                  value={lineItems[0]?.unitPrice ?? ""}
+                  onChange={(e) => updateLine(0, "unitPrice", e.target.value)}
                   placeholder="0"
                 />
               </div>
-            </div>
-          </div>
-
-          <div className="rounded-md border bg-muted/50 p-3 space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span>{subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax</span>
-              <span>{totalTax.toFixed(2)}</span>
-            </div>
-            {discountAmount > 0 && (
-              <div className="flex justify-between text-muted-foreground">
-                <span>Discount</span>
-                <span>-{discountAmount.toFixed(2)}</span>
-              </div>
             )}
-            <div className="flex justify-between font-semibold pt-2 border-t">
-              <span>Total</span>
-              <span>{total.toFixed(2)}</span>
-            </div>
           </div>
 
           <div className="space-y-2">
@@ -340,7 +416,11 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancel
             </Button>
-            <Button type="submit" disabled={createSale.isPending || total <= 0} className="flex-1">
+            <Button
+              type="submit"
+              disabled={createSale.isPending || (hasAnyItem ? total <= 0 : (parseFloat(lineItems[0]?.unitPrice ?? "0") || 0) <= 0)}
+              className="flex-1"
+            >
               {createSale.isPending ? "Creating…" : "Create transaction"}
             </Button>
           </div>
