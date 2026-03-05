@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const expenses = (data || []).map(transformExpense);
 
     const { projectExpensesForDateRange } = await import('@/lib/calculations/expense-projections');
-    const expenseProjections = projectExpensesForDateRange(expenses, startDate, endDate);
+    const expenseProjections = projectExpensesForDateRange(expenses as any, startDate, endDate);
 
     const monthlyData: Record<string, number> = {};
     monthsInRange.forEach(m => { monthlyData[m] = 0; });

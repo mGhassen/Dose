@@ -44,7 +44,6 @@ import {
   useInventorySuppliers,
   useItems,
   useUnits,
-  useVariablesByType,
 } from "@kit/hooks";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -53,7 +52,8 @@ import { formatDate } from "@kit/lib/date-format";
 import { dateToYYYYMMDD } from "@kit/lib";
 import type { ExpenseCategory } from "@kit/types";
 
-import { getEffectiveTransactionTaxRate, lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
+import { lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
+import { taxRulesApi } from "@kit/lib";
 
 const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   rent: "Rent",
@@ -115,10 +115,6 @@ export function ExpenseDetailContent({
   const items = itemsResponse?.data ?? [];
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
-  const { data: taxVariables } = useVariablesByType('transaction_tax');
-  const updateExpense = useUpdateExpense();
-  const deleteMutation = useDeleteExpense();
-
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
@@ -128,6 +124,17 @@ export function ExpenseDetailContent({
     discountType: "amount" as "amount" | "percent",
     discountValue: "",
   });
+  const [defaultTaxRate, setDefaultTaxRate] = useState(0);
+  useEffect(() => {
+    if (!formData.expenseDate) {
+      setDefaultTaxRate(0);
+      return;
+    }
+    taxRulesApi.resolve({ context: 'expense', date: formData.expenseDate }).then((r) => setDefaultTaxRate(r.rate)).catch(() => setDefaultTaxRate(0));
+  }, [formData.expenseDate]);
+
+  const updateExpense = useUpdateExpense();
+  const deleteMutation = useDeleteExpense();
   const [lineItems, setLineItems] = useState<
     Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string; taxInclusive: boolean }>
   >([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
@@ -137,10 +144,6 @@ export function ExpenseDetailContent({
     setIsFormView(isEditing);
   }, [isEditing, setIsFormView]);
 
-  const taxRate = useMemo(
-    () => getEffectiveTransactionTaxRate(taxVariables, formData.category, formData.expenseDate),
-    [taxVariables, formData.category, formData.expenseDate]
-  );
   const hasAnyItem = lineItems.some((l) => l.itemId !== "");
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
     let sub = 0;
@@ -148,7 +151,7 @@ export function ExpenseDetailContent({
     for (const line of lineItems) {
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
-      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.category ? taxRate : 0);
+      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : defaultTaxRate;
       const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, line.taxInclusive);
       sub += lineTotalNet;
       tax += taxAmount;
@@ -161,7 +164,7 @@ export function ExpenseDetailContent({
     }
     const tot = Math.round((sub + tax - disc) * 100) / 100;
     return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
-  }, [lineItems, taxRate, formData.category, formData.discountType, formData.discountValue]);
+  }, [lineItems, defaultTaxRate, formData.discountType, formData.discountValue]);
 
   useEffect(() => {
     if (expense) {
@@ -220,7 +223,7 @@ export function ExpenseDetailContent({
         const price = item?.unit_cost ?? item?.unitCost ?? item?.unit_price ?? item?.unitPrice;
         line.unitPrice = price != null ? String(price) : "";
         line.unitCost = item?.unitCost != null ? String(item.unitCost) : (item?.unit_cost != null ? String(item.unit_cost) : "");
-        line.taxRatePercent = item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : (formData.category ? String(taxRate) : "");
+        line.taxRatePercent = item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : String(defaultTaxRate);
       }
       next[index] = line;
       return next;
@@ -242,7 +245,7 @@ export function ExpenseDetailContent({
         toast.error(`Line ${i + 1}: quantity and unit price required`);
         return;
       }
-      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : taxRate;
+      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : defaultTaxRate;
       const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, lineRate) : price;
       payloadLines.push({
         itemId: line.itemId ? parseInt(line.itemId, 10) : undefined,
@@ -283,7 +286,7 @@ export function ExpenseDetailContent({
       return;
     }
     try {
-      await deleteMutation.mutateAsync(Number(expenseId));
+      await deleteMutation.mutateAsync(String(expenseId));
       toast.success("Expense deleted successfully");
       onDeleted();
     } catch (error) {
@@ -369,10 +372,10 @@ export function ExpenseDetailContent({
                     { id: "other", name: "Other" },
                   ]}
                   selectedId={formData.category || undefined}
-                  onSelect={(item) => setFormData((p) => ({ ...p, category: item.id === 0 ? "" : String(item.id) }))}
+                  onSelect={(item) => setFormData((p) => ({ ...p, category: (item.id === 0 ? "" : String(item.id)) as ExpenseCategory | "" }))}
                   placeholder="Category"
                 />
-                <p className="text-xs text-muted-foreground pl-3">Default tax: {taxRate.toFixed(1)}% (from Settings). Item default tax is used when set.</p>
+                <p className="text-xs text-muted-foreground pl-3">Tax: {defaultTaxRate.toFixed(1)}% (from tax rules; not tied to category).</p>
               </div>
               <div className="space-y-2">
                 <Label>Date *</Label>
@@ -454,9 +457,9 @@ export function ExpenseDetailContent({
                                 step="0.01"
                                 min="0"
                                 className="text-sm tabular-nums"
-                                value={line.taxRatePercent !== "" ? line.taxRatePercent : (formData.category ? String(taxRate) : "")}
+                                value={line.taxRatePercent !== "" ? line.taxRatePercent : String(defaultTaxRate)}
                                 onChange={(e) => updateLine(index, "taxRatePercent", e.target.value)}
-                                placeholder={formData.category ? String(taxRate) : "—"}
+                                placeholder={String(defaultTaxRate)}
                               />
                             }
                             addon={
@@ -534,7 +537,7 @@ export function ExpenseDetailContent({
                     <span className="tabular-nums">{subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tax {taxRate > 0 && `(${taxRate.toFixed(1)}%)`}</span>
+                    <span className="text-muted-foreground">Tax {defaultTaxRate > 0 && `(${defaultTaxRate.toFixed(1)}%)`}</span>
                     <span className="tabular-nums">{totalTax.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
@@ -593,7 +596,7 @@ export function ExpenseDetailContent({
     expense.subscriptionId && subscriptions.length
       ? subscriptions.find((s: { id: number }) => s.id === expense.subscriptionId)?.name
       : null;
-  const effectiveTaxRateView = getEffectiveTransactionTaxRate(taxVariables ?? [], expense.category, expense.expenseDate?.split?.("T")[0] ?? expense.expenseDate ?? "");
+  const effectiveTaxRateView = defaultTaxRate;
 
   return (
     <div className="flex h-full flex-col">
@@ -695,7 +698,7 @@ export function ExpenseDetailContent({
                     {(expense.lineItems && expense.lineItems.length > 0
                       ? expense.lineItems
                       : [{ id: 0, item: undefined, quantity: 1, unitPrice: expense.amount, lineTotal: expense.amount }]
-                    ).map((line: { id: number; item?: { name?: string }; quantity: number; unitPrice: number; lineTotal: number }) => (
+                    ).map((line: { id: number; item?: { name?: string }; subscription?: { name?: string }; quantity: number; unitPrice: number; lineTotal: number }) => (
                       <tr key={line.id} className="border-b last:border-0">
                         <td className="p-2">{line.item?.name ?? line.subscription?.name ?? "—"}</td>
                         <td className="p-2 text-right tabular-nums">{line.quantity}</td>

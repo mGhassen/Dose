@@ -12,8 +12,8 @@ import type {
   LeasingPayment,
   LoanScheduleEntry,
   DepreciationEntry,
-  ExpenseCategory
 } from '@kit/types';
+import { ExpenseCategory } from '@kit/types';
 
 /**
  * Calculate Profit and Loss statement for a month

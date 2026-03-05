@@ -41,7 +41,7 @@ export default function VariableDetailContent({ params }: VariableDetailPageProp
     }
 
     try {
-      await deleteMutation.mutateAsync(Number(resolvedParams.id));
+      await deleteMutation.mutateAsync(String(resolvedParams.id));
       toast.success("Variable deleted successfully");
       router.push('/variables');
     } catch (error) {
@@ -74,9 +74,10 @@ export default function VariableDetailContent({ params }: VariableDetailPageProp
     );
   }
 
-  const typeLabels: Record<VariableType, string> = {
+  const typeLabels: Record<string, string> = {
     cost: "Cost",
     tax: "Tax",
+    transaction_tax: "Transaction tax",
     inflation: "Inflation",
     exchange_rate: "Exchange Rate",
     other: "Other",

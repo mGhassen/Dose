@@ -33,6 +33,7 @@ export default function CreateSubscriptionPage() {
     description: "",
     vendor: "",
     supplierId: "",
+    defaultTaxRatePercent: "",
     isActive: true,
   });
 
@@ -55,6 +56,7 @@ export default function CreateSubscriptionPage() {
         description: formData.description || undefined,
         vendor: formData.vendor || undefined,
         supplierId: formData.supplierId ? parseInt(formData.supplierId) : undefined,
+        defaultTaxRatePercent: formData.defaultTaxRatePercent ? parseFloat(formData.defaultTaxRatePercent) : undefined,
         isActive: formData.isActive,
       });
       toast.success("Subscription created successfully");
@@ -167,6 +169,22 @@ export default function CreateSubscriptionPage() {
                   <p className="text-xs text-muted-foreground">
                     Leave empty for ongoing subscriptions
                   </p>
+                </div>
+
+                {/* Tax */}
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="defaultTaxRatePercent">Default tax rate % (optional)</Label>
+                  <Input
+                    id="defaultTaxRatePercent"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={formData.defaultTaxRatePercent}
+                    onChange={(e) => handleInputChange('defaultTaxRatePercent', e.target.value)}
+                    placeholder="e.g. 10"
+                  />
+                  <p className="text-xs text-muted-foreground">Applied when this subscription generates expense lines (e.g. when a payment is marked paid).</p>
                 </div>
 
                 {/* Supplier/Vendor */}

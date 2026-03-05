@@ -28,9 +28,10 @@ export default function VariablesContent() {
       header: "Type",
       cell: ({ row }) => {
         const type = row.original.type;
-        const typeLabels: Record<VariableType, string> = {
+        const typeLabels: Record<string, string> = {
           cost: "Cost",
           tax: "Tax",
+          transaction_tax: "Transaction tax",
           inflation: "Inflation",
           exchange_rate: "Exchange Rate",
           other: "Other",
@@ -81,7 +82,7 @@ export default function VariablesContent() {
     if (!confirm("Are you sure you want to delete this variable?")) return;
     
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(String(id));
       toast.success("Variable deleted successfully");
     } catch (error) {
       toast.error("Failed to delete variable");
@@ -93,7 +94,7 @@ export default function VariablesContent() {
     if (!confirm(`Are you sure you want to delete ${ids.length} variable(s)?`)) return;
     
     try {
-      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
+      await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} variable(s) deleted successfully`);
     } catch (error) {
       toast.error("Failed to delete variables");
@@ -152,7 +153,7 @@ export default function VariablesContent() {
       title="Variables"
       description="Manage financial variables (costs, taxes, inflation, etc.)"
       createHref="/variables/create"
-      data={Array.isArray(variables) ? variables : (variables?.data ?? [])}
+      data={variables ?? []}
       columns={columns}
       loading={isLoading}
       onRowClick={(variable) => router.push(`/variables/${variable.id}`)}

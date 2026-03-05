@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       email,
       password,
       options: {
-        email_redirect_to: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`
       }
     });
     

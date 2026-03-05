@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     const totalRevenue = sales.reduce((sum, sale) => sum + sale.amount, 0);
 
     const { projectExpensesForDateRange } = await import('@/lib/calculations/expense-projections');
-    const expenseProjections = projectExpensesForDateRange(expenses, startDate, endDate);
+    const expenseProjections = projectExpensesForDateRange(expenses as any, startDate, endDate);
     const totalExpenses = expenseProjections.reduce((sum, proj) => sum + proj.amount, 0);
 
     const netProfit = profitLoss.reduce((sum, pl) => sum + parseFloat(pl.net_profit || '0'), 0) || (totalRevenue - totalExpenses);

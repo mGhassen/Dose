@@ -91,8 +91,8 @@ export function EditablePersonnelTimelineRow({
         isProjected: projection.isProjected,
         isNetPaid: isNetPaidChecked,
         isTaxesPaid: isTaxesPaidChecked,
-        netPaidDate: isNetPaidChecked ? netDate : null,
-        taxesPaidDate: isTaxesPaidChecked ? taxesDate : null,
+        netPaidDate: isNetPaidChecked ? netDate : undefined,
+        taxesPaidDate: isTaxesPaidChecked ? taxesDate : undefined,
         actualNetAmount: netAmount,
         actualTaxesAmount: taxesAmount,
         notes: notes || undefined,
@@ -107,7 +107,7 @@ export function EditablePersonnelTimelineRow({
       } else {
         await createOrUpdateProjectionEntry.mutateAsync({
           personnelId: personnelId.toString(),
-          data: { month: projection.month, ...payload },
+          data: { personnelId: Number(personnelId), month: projection.month, ...payload },
         });
       }
 

@@ -7,19 +7,18 @@ import { projectExpensesForYear, calculateAnnualBudgetSummary, expenseProjection
 import type { Expense, ExpenseProjection, ExpenseProjectionSummary } from '@kit/types';
 
 function transformExpense(row: any): Expense {
-  return {
+  const base = {
     id: row.id,
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
-    startDate: row.start_date,
-    endDate: row.end_date,
+    expenseDate: row.expense_date ?? row.start_date,
     description: row.description,
     vendor: row.vendor,
-    isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+  return { ...base, startDate: row.start_date, endDate: row.end_date, isActive: row.is_active } as Expense;
 }
 
 export async function GET(request: NextRequest) {

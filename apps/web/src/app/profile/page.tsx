@@ -37,13 +37,34 @@ export default function ProfilePage() {
   const { formatDate } = useDateFormat();
   const [isEditOpen, setIsEditOpen] = useState(false);
   
-  // Profile data is the same as user data for now
-  const profileData = user ? {
+  type ProfileDisplay = {
+    id: string;
+    email: string | undefined;
+    firstName: string | undefined;
+    lastName: string | undefined;
+    phone: string | undefined;
+    position: string | undefined;
+    avatar?: string;
+    address?: { street?: string; city?: string; postalCode?: string; country?: string };
+    department?: string;
+    employeeId?: string;
+    hireDate?: string;
+    emergencyContact?: { name?: string; relationship?: string; phone?: string };
+    bio?: string;
+    skills?: unknown[];
+    languages?: unknown[];
+    certifications?: { name?: string; issuer?: string; status: string; issueDate?: string; expiryDate?: string }[];
+    createdAt?: string;
+    updatedAt?: string;
+  };
+  const profileData: ProfileDisplay | null = user ? {
     id: user.id,
     email: user.email || user.profileEmail,
     firstName: user.firstName,
     lastName: user.lastName,
     phone: user.phone,
+    position: user.profession,
+    avatar: undefined,
     address: undefined,
     department: undefined,
     employeeId: undefined,
@@ -53,8 +74,6 @@ export default function ProfilePage() {
     skills: undefined,
     languages: undefined,
     certifications: undefined,
-    position: user.profession,
-    avatar: undefined,
     createdAt: undefined,
     updatedAt: undefined,
   } : null;
@@ -62,12 +81,14 @@ export default function ProfilePage() {
   // Calculate statistics from profile data
   const statistics = useMemo(() => {
     if (!profileData) return null;
-    
-    const totalCertifications = profileData.certifications?.length || 0;
-    const activeCertifications = profileData.certifications?.filter(c => c.status === 'active').length || 0;
-    const expiredCertifications = profileData.certifications?.filter(c => c.status === 'expired').length || 0;
-    const skillsCount = profileData.skills?.length || 0;
-    const languagesCount = profileData.languages?.length || 0;
+    const certs = profileData.certifications ?? [];
+    const skills = profileData.skills ?? [];
+    const languages = profileData.languages ?? [];
+    const totalCertifications = certs.length;
+    const activeCertifications = certs.filter(c => c.status === 'active').length;
+    const expiredCertifications = certs.filter(c => c.status === 'expired').length;
+    const skillsCount = skills.length;
+    const languagesCount = languages.length;
     
     return {
       totalCertifications,
@@ -306,7 +327,7 @@ export default function ProfilePage() {
                     <div>
                       <p className="text-sm font-medium">Address</p>
                       <p className="text-sm text-muted-foreground">
-                        {profileData.address.street}, {profileData.address.city} {profileData.address.postalCode}, {profileData.address.country}
+                        {profileData?.address?.street}, {profileData?.address?.city} {profileData?.address?.postalCode}, {profileData?.address?.country}
                       </p>
                     </div>
                   </div>
@@ -471,7 +492,7 @@ export default function ProfilePage() {
                       <div className="flex flex-wrap gap-2">
                         {profileData.skills.map((skill, index) => (
                           <Badge key={index} variant="outline">
-                            {skill}
+                            {String(skill)}
                           </Badge>
                         ))}
                       </div>
@@ -484,7 +505,7 @@ export default function ProfilePage() {
                       <div className="flex flex-wrap gap-2">
                         {profileData.languages.map((language, index) => (
                           <Badge key={index} variant="secondary">
-                            {language}
+                            {String(language)}
                           </Badge>
                         ))}
                       </div>

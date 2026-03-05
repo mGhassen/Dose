@@ -195,7 +195,7 @@ export async function GET(request: NextRequest) {
     if (countError) throw countError;
 
     // Fetch payments if requested
-    let paymentsMap: Map<number, any[]> = new Map();
+    const paymentsMap: Map<number, any[]> = new Map();
     if (includePayments && data && data.length > 0) {
       const entryIds = data.map((e: any) => e.id);
       const { data: payments, error: paymentsError } = await supabase

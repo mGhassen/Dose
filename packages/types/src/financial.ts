@@ -87,6 +87,7 @@ export interface Subscription {
   description?: string;
   vendor?: string; // Deprecated: use supplierId instead
   supplierId?: number; // Link to supplier (vendor type)
+  defaultTaxRatePercent?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -102,6 +103,7 @@ export interface CreateSubscriptionData {
   description?: string;
   vendor?: string; // Deprecated: use supplierId instead
   supplierId?: number; // Link to supplier (vendor type)
+  defaultTaxRatePercent?: number;
   isActive?: boolean;
 }
 
@@ -388,6 +390,43 @@ export interface CreateVariableData {
 }
 
 export interface UpdateVariableData extends Partial<CreateVariableData> {}
+
+// ============================================================================
+// TAX RULES (when to apply which tax variable; conditions + scope)
+// ============================================================================
+
+export type TaxRuleConditionType = 'sales_type' | 'expense' | null;
+export type TaxRuleScopeType = 'all' | 'items' | 'categories';
+
+export interface TaxRule {
+  id: number;
+  variableId: number;
+  conditionType: TaxRuleConditionType;
+  conditionValue: string | null;
+  scopeType: TaxRuleScopeType;
+  scopeItemIds: number[] | null;
+  scopeCategories: string[] | null;
+  priority: number;
+  effectiveDate: string | null;
+  endDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+  variable?: Variable;
+}
+
+export interface CreateTaxRuleData {
+  variableId: number;
+  conditionType?: TaxRuleConditionType;
+  conditionValue?: string | null;
+  scopeType?: TaxRuleScopeType;
+  scopeItemIds?: number[] | null;
+  scopeCategories?: string[] | null;
+  priority?: number;
+  effectiveDate?: string | null;
+  endDate?: string | null;
+}
+
+export interface UpdateTaxRuleData extends Partial<CreateTaxRuleData> {}
 
 // ============================================================================
 // PERSONNEL (Salaires et charges)

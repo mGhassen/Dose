@@ -90,7 +90,7 @@ export default function WorkingCapitalDetailContent({ params }: WorkingCapitalDe
     }
 
     try {
-      await deleteMutation.mutateAsync(Number(resolvedParams.id));
+      await deleteMutation.mutateAsync(String(resolvedParams.id));
       toast.success("Working capital entry deleted successfully");
       router.push('/working-capital');
     } catch (error) {

@@ -40,6 +40,7 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
     description: "",
     vendor: "",
     supplierId: "",
+    defaultTaxRatePercent: "",
     isActive: true,
   });
 
@@ -59,6 +60,7 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
         description: subscription.description || "",
         vendor: subscription.vendor || "",
         supplierId: subscription.supplierId?.toString() || "",
+        defaultTaxRatePercent: subscription.defaultTaxRatePercent != null ? String(subscription.defaultTaxRatePercent) : "",
         isActive: subscription.isActive,
       });
     }
@@ -87,6 +89,7 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
           description: formData.description || undefined,
           vendor: formData.vendor || undefined,
           supplierId: formData.supplierId ? parseInt(formData.supplierId) : undefined,
+          defaultTaxRatePercent: formData.defaultTaxRatePercent ? parseFloat(formData.defaultTaxRatePercent) : undefined,
           isActive: formData.isActive,
         },
       });
@@ -184,6 +187,22 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
                     placeholder="0.00"
                     required
                   />
+                </div>
+
+                {/* Tax */}
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="defaultTaxRatePercent">Default tax rate % (optional)</Label>
+                  <Input
+                    id="defaultTaxRatePercent"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={formData.defaultTaxRatePercent}
+                    onChange={(e) => handleInputChange('defaultTaxRatePercent', e.target.value)}
+                    placeholder="e.g. 10"
+                  />
+                  <p className="text-xs text-muted-foreground">Applied when this subscription generates expense lines (e.g. when a payment is marked paid).</p>
                 </div>
 
                 <UnifiedSelector

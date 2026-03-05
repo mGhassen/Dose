@@ -16,12 +16,13 @@ export function useVendors(params?: { page?: number; limit?: number }) {
         }
         // If result is already an array (fallback for backward compatibility)
         if (Array.isArray(result)) {
+          const arr = result as import('@kit/types').Vendor[];
           return {
-            data: result,
+            data: arr,
             pagination: {
               page: 1,
-              limit: result.length,
-              total: result.length,
+              limit: arr.length,
+              total: arr.length,
               totalPages: 1,
               hasMore: false,
             },

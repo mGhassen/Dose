@@ -9,12 +9,12 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateCashFlowEntry } from "@kit/hooks";
+import { useCreateCashFlow } from "@kit/hooks";
 import { toast } from "sonner";
 
 export default function CreateCashFlowPage() {
   const router = useRouter();
-  const createCashFlow = useCreateCashFlowEntry();
+  const createCashFlow = useCreateCashFlow();
   const [formData, setFormData] = useState({
     month: new Date().toISOString().slice(0, 7), // YYYY-MM
     openingBalance: "",

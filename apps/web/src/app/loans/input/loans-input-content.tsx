@@ -151,19 +151,19 @@ export default function LoansInputContent() {
     },
   ], []);
 
-  const handleDelete = async (entry: Entry) => {
+  const handleDelete = async (id: number) => {
     try {
-      await deleteMutation.mutateAsync(entry.id.toString());
+      await deleteMutation.mutateAsync(String(id));
       toast.success("Loan entry deleted successfully");
     } catch (error: any) {
       toast.error(error?.message || "Failed to delete loan entry");
     }
   };
 
-  const handleBulkDelete = async (entries: Entry[]) => {
+  const handleBulkDelete = async (ids: number[]) => {
     try {
-      await Promise.all(entries.map(entry => deleteMutation.mutateAsync(entry.id.toString())));
-      toast.success(`${entries.length} loan entry(ies) deleted successfully`);
+      await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
+      toast.success(`${ids.length} loan entry(ies) deleted successfully`);
     } catch (error: any) {
       toast.error(error?.message || "Failed to delete loan entries");
     }

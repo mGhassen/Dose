@@ -12,6 +12,7 @@ function transformIngredient(row: any): Ingredient {
     description: row.description,
     unit: row.unit,
     category: row.category,
+    itemType: row.item_type ?? 'item',
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

@@ -13,7 +13,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
 import { ScrollArea } from "@kit/ui/scroll-area";
 import { Save, X, Plus, Trash2 } from "lucide-react";
-import { useCreateSale, useItems, useUnits, useVariablesByType } from "@kit/hooks";
+import { useCreateSale, useItems, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 import type { SalesType } from "@kit/types";
 import type { SaleLineItemInput } from "@kit/types";
@@ -32,7 +32,8 @@ const TYPE_OPTIONS = [
   { id: "other", name: "Other" },
 ];
 
-import { getEffectiveTransactionTaxRate, lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
+import { lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
+import { taxRulesApi } from "@kit/lib";
 
 export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps) {
   const router = useRouter();
@@ -40,7 +41,6 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
   const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
   const items = itemsResponse?.data ?? [];
   const { data: unitsData } = useUnits();
-  const { data: taxVariables } = useVariablesByType('transaction_tax');
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
 
   const now = new Date();
@@ -53,14 +53,18 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     discountValue: "",
   });
 
+  const [defaultTaxRate, setDefaultTaxRate] = useState(0);
+  useEffect(() => {
+    if (!formData.type || !formData.date) {
+      setDefaultTaxRate(0);
+      return;
+    }
+    taxRulesApi.resolve({ context: 'sale', salesType: formData.type, date: formData.date }).then((r) => setDefaultTaxRate(r.rate)).catch(() => setDefaultTaxRate(0));
+  }, [formData.type, formData.date]);
+
   const [lineItems, setLineItems] = useState<Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string; taxInclusive: boolean }>>([
     { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false },
   ]);
-
-  const typeTaxRate = useMemo(
-    () => getEffectiveTransactionTaxRate(taxVariables, formData.type, formData.date),
-    [taxVariables, formData.type, formData.date]
-  );
 
   const hasAnyItem = lineItems.some((l) => l.itemId !== "");
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
@@ -69,7 +73,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     for (const line of lineItems) {
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
-      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? typeTaxRate : 0);
+      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
       const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, line.taxInclusive);
       sub += lineTotalNet;
       tax += taxAmount;
@@ -82,7 +86,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     }
     const tot = Math.round((sub + tax - disc) * 100) / 100;
     return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
-  }, [lineItems, typeTaxRate, formData.discountType, formData.discountValue]);
+  }, [lineItems, defaultTaxRate, formData.type, formData.discountType, formData.discountValue]);
 
   const addLine = () => {
     setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
@@ -118,11 +122,20 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
         line.unitId = item?.unitId ?? null;
         const price = item?.unit_price ?? item?.unitPrice;
         line.unitPrice = price != null ? String(price) : "";
-        line.taxRatePercent = item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : (formData.type ? String(typeTaxRate) : "");
+        line.taxRatePercent = formData.type ? String(defaultTaxRate) : (item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : "");
       }
       next[index] = line;
       return next;
     });
+    if (itemId && formData.type && formData.date) {
+      taxRulesApi.resolve({ context: 'sale', salesType: formData.type, itemId: parseInt(itemId, 10), date: formData.date })
+        .then((r) => setLineItems((prev) => {
+          const next = [...prev];
+          if (next[index]?.itemId === itemId) next[index] = { ...next[index], taxRatePercent: r.rate.toString() };
+          return next;
+        }))
+        .catch(() => {});
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -140,7 +153,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
         toast.error(`Line ${i + 1}: quantity (positive) and unit price are required`);
         return;
       }
-      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : typeTaxRate;
+      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : defaultTaxRate;
       const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, lineRate) : price;
       payloadLines.push({
         itemId: line.itemId ? parseInt(line.itemId) : undefined,
@@ -211,7 +224,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                 placeholder="Select type"
               />
               {formData.type && (
-                <p className="text-xs text-muted-foreground pl-3">Default tax: {typeTaxRate.toFixed(1)}% (from Settings). Item default tax is used when set.</p>
+                <p className="text-xs text-muted-foreground pl-3">Tax: {defaultTaxRate.toFixed(1)}% (from tax rules when item has no override).</p>
               )}
             </div>
           </div>
@@ -287,9 +300,9 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                               step="0.01"
                               min="0"
                               className="text-sm tabular-nums"
-                              value={line.taxRatePercent !== "" ? line.taxRatePercent : (formData.type ? String(typeTaxRate) : "")}
+                              value={line.taxRatePercent !== "" ? line.taxRatePercent : (formData.type ? String(defaultTaxRate) : "")}
                               onChange={(e) => updateLine(index, "taxRatePercent", e.target.value)}
-                              placeholder={formData.type ? String(typeTaxRate) : "—"}
+                              placeholder={formData.type ? String(defaultTaxRate) : "—"}
                             />
                           }
                           addon={
@@ -370,7 +383,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
-                    Tax {typeTaxRate > 0 && `(${typeTaxRate.toFixed(1)}%)`}
+                    Tax {defaultTaxRate > 0 && `(${defaultTaxRate.toFixed(1)}%)`}
                   </span>
                   <span className="tabular-nums">{totalTax.toFixed(2)}</span>
                 </div>

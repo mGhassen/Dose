@@ -57,7 +57,7 @@ export async function GET(
 
     // Get all unique entry IDs
     const allEntryIds = Array.from(new Set(Array.from(scheduleEntryToEntriesMap.values()).flat()));
-    let entryPaymentsMap = new Map<number, number>(); // Map: entryId -> totalPaid
+    const entryPaymentsMap = new Map<number, number>(); // Map: entryId -> totalPaid
     
     if (allEntryIds.length > 0) {
       const { data: paymentsData } = await supabase

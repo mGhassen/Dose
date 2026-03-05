@@ -38,7 +38,8 @@ export function DashboardPeriodFilter({ value, onChange }: DashboardPeriodFilter
   };
 
   const [preset, setPreset] = useState<string>(() => detectPreset(value));
-  const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({
+  type CalendarRange = { from?: Date; to?: Date };
+  const [customRange, setCustomRange] = useState<CalendarRange>({
     from: value.startDate ? new Date(value.startDate) : undefined,
     to: value.endDate ? new Date(value.endDate) : undefined,
   });
@@ -108,7 +109,7 @@ export function DashboardPeriodFilter({ value, onChange }: DashboardPeriodFilter
           <PopoverContent align="end" className="w-auto p-0">
             <Calendar
               mode="range"
-              selected={customRange}
+              selected={customRange.from != null ? { from: customRange.from, to: customRange.to ?? customRange.from } : undefined}
               onSelect={handleCustomSelect}
               numberOfMonths={2}
             />

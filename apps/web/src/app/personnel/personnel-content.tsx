@@ -109,7 +109,7 @@ export default function PersonnelContent() {
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(String(id));
       toast.success("Personnel record deleted successfully");
     } catch (error) {
       toast.error("Failed to delete personnel record");
@@ -119,7 +119,7 @@ export default function PersonnelContent() {
 
   const handleBulkDelete = async (ids: number[]) => {
     try {
-      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
+      await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} personnel record(s) deleted successfully`);
     } catch (error) {
       toast.error("Failed to delete personnel records");

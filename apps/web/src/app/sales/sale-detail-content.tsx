@@ -36,13 +36,14 @@ import {
   X,
   Plus,
 } from "lucide-react";
-import { useSaleById, useUpdateSale, useDeleteSale, useItems, useUnits, useVariablesByType } from "@kit/hooks";
+import { useSaleById, useUpdateSale, useDeleteSale, useItems, useUnits } from "@kit/hooks";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatDateTime } from "@kit/lib/date-format";
 import type { SalesType } from "@kit/types";
-import { getEffectiveTransactionTaxRate, lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
+import { lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
+import { taxRulesApi } from "@kit/lib";
 
 interface SaleDetailContentProps {
   saleId: string;
@@ -92,7 +93,6 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
     setIsFormView(isEditing);
   }, [isEditing, setIsFormView]);
   const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
-  const { data: taxVariables } = useVariablesByType('transaction_tax');
   const { data: unitsData } = useUnits();
   const updateSale = useUpdateSale();
   const deleteMutation = useDeleteSale();
@@ -108,12 +108,16 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
     discountValue: "",
   });
 
-  const [lineItems, setLineItems] = useState<Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string; taxInclusive: boolean }>>([]);
+  const [defaultTaxRate, setDefaultTaxRate] = useState(0);
+  useEffect(() => {
+    if (!formData.type || !formData.date) {
+      setDefaultTaxRate(0);
+      return;
+    }
+    taxRulesApi.resolve({ context: 'sale', salesType: formData.type, date: formData.date }).then((r) => setDefaultTaxRate(r.rate)).catch(() => setDefaultTaxRate(0));
+  }, [formData.type, formData.date]);
 
-  const effectiveTaxRate = useMemo(
-    () => getEffectiveTransactionTaxRate(taxVariables, formData.type, formData.date),
-    [taxVariables, formData.type, formData.date]
-  );
+  const [lineItems, setLineItems] = useState<Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string; taxInclusive: boolean }>>([]);
 
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
     let sub = 0;
@@ -121,7 +125,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
     for (const line of lineItems) {
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
-      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? effectiveTaxRate : 0);
+      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
       const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, line.taxInclusive);
       sub += lineTotalNet;
       tax += taxAmount;
@@ -134,7 +138,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
     }
     const tot = Math.round((sub + tax - disc) * 100) / 100;
     return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
-  }, [lineItems, effectiveTaxRate, formData.type, formData.discountType, formData.discountValue]);
+  }, [lineItems, defaultTaxRate, formData.type, formData.discountType, formData.discountValue]);
 
   const detailTotals = useMemo(() => {
     if (!sale) return { subtotal: 0, total: 0 };
@@ -177,11 +181,20 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
         line.unitId = item?.unitId ?? null;
         const price = item?.unit_price ?? item?.unitPrice;
         line.unitPrice = price != null ? String(price) : "";
-        line.taxRatePercent = item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : (formData.type ? String(effectiveTaxRate) : "");
+        line.taxRatePercent = formData.type ? String(defaultTaxRate) : (item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : "");
       }
       next[index] = line;
       return next;
     });
+    if (itemId && formData.type && formData.date) {
+      taxRulesApi.resolve({ context: 'sale', salesType: formData.type, itemId: parseInt(itemId, 10), date: formData.date })
+        .then((r) => setLineItems((prev) => {
+          const next = [...prev];
+          if (next[index]?.itemId === itemId) next[index] = { ...next[index], taxRatePercent: r.rate.toString() };
+          return next;
+        }))
+        .catch(() => {});
+    }
   };
 
   const hasAnyItem = lineItems.some((l) => l.itemId !== "");
@@ -221,7 +234,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
       const dateTimeIso = new Date(`${formData.date}T${formData.time}`).toISOString();
       const payloadLines = lineItems.map((line) => {
         const price = parseFloat(line.unitPrice) || 0;
-        const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : effectiveTaxRate;
+        const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
         const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, lineRate) : price;
         return {
           itemId: line.itemId ? parseInt(line.itemId) : undefined,
@@ -358,7 +371,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                   onSelect={(item) => handleInputChange("type", item.id === 0 ? "" : String(item.id))}
                   placeholder="Select type"
                 />
-                <p className="text-xs text-muted-foreground pl-3">Tax rate: {effectiveTaxRate.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground pl-3">Tax rate: {defaultTaxRate.toFixed(1)}%</p>
               </div>
             </div>
             <div className="space-y-2">
@@ -430,9 +443,9 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                                 step="0.01"
                                 min="0"
                                 className="text-sm tabular-nums"
-                                value={line.taxRatePercent !== "" ? line.taxRatePercent : (formData.type ? String(effectiveTaxRate) : "")}
+                                value={line.taxRatePercent !== "" ? line.taxRatePercent : (formData.type ? String(defaultTaxRate) : "")}
                                 onChange={(e) => updateLine(index, "taxRatePercent", e.target.value)}
-                                placeholder={formData.type ? String(effectiveTaxRate) : "—"}
+                                placeholder={formData.type ? String(defaultTaxRate) : "—"}
                               />
                             }
                             addon={
@@ -495,7 +508,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
               {hasAnyItem ? (
                 <>
                   <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="tabular-nums">{subtotal.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Tax ({effectiveTaxRate.toFixed(1)}%)</span><span className="tabular-nums">{totalTax.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Tax ({defaultTaxRate.toFixed(1)}%)</span><span className="tabular-nums">{totalTax.toFixed(2)}</span></div>
                   <div className="flex justify-between text-muted-foreground"><span>Discount</span><span className="tabular-nums">-{discountAmount.toFixed(2)}</span></div>
                   <div className="flex justify-between font-semibold pt-2 border-t"><span>Total</span><span className="tabular-nums">{total.toFixed(2)}</span></div>
                 </>

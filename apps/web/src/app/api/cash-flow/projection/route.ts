@@ -59,6 +59,7 @@ function transformPersonnel(row: any): Personnel {
     position: row.position,
     type: row.type,
     baseSalary: parseFloat(row.base_salary),
+    salaryFrequency: row.salary_frequency || 'monthly',
     employerCharges: parseFloat(row.employer_charges),
     employerChargesType: row.employer_charges_type,
     startDate: row.start_date,
@@ -174,7 +175,7 @@ export async function GET(request: NextRequest) {
     }> = {};
 
     // Initialize all months
-    let current = new Date(startMonth + '-01');
+    const current = new Date(startMonth + '-01');
     const end = new Date(endMonth + '-01');
     end.setMonth(end.getMonth() + 1);
     end.setDate(0);

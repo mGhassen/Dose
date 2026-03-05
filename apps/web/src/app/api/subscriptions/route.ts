@@ -16,8 +16,9 @@ function transformSubscription(row: any): Subscription {
     startDate: row.start_date,
     endDate: row.end_date,
     description: row.description,
-    vendor: row.vendor, // Keep for backward compatibility
+    vendor: row.vendor,
     supplierId: row.supplier_id || undefined,
+    defaultTaxRatePercent: row.default_tax_rate_percent != null ? parseFloat(String(row.default_tax_rate_percent)) : undefined,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -33,8 +34,9 @@ function transformToSnakeCase(data: CreateSubscriptionData): any {
     start_date: data.startDate,
     end_date: data.endDate,
     description: data.description,
-    vendor: data.vendor, // Keep for backward compatibility
+    vendor: data.vendor,
     supplier_id: data.supplierId || null,
+    default_tax_rate_percent: data.defaultTaxRatePercent ?? null,
     is_active: data.isActive ?? true,
   };
 }

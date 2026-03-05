@@ -16,17 +16,18 @@ export function useIngredients(params?: { page?: number; limit?: number }) {
     queryFn: async () => {
       try {
         // Filter to only items (not recipes) for backward compatibility
-        const result = await itemsApi.getAll({ ...params, itemType: 'item' });
+        const result = await itemsApi.getAll(params);
         if (result && result !== null && typeof result === 'object' && 'data' in result && 'pagination' in result) {
           return result;
         }
         if (Array.isArray(result)) {
+          const arr = result as Item[];
           return {
-            data: result,
+            data: arr,
             pagination: {
               page: 1,
-              limit: result.length,
-              total: result.length,
+              limit: arr.length,
+              total: arr.length,
               totalPages: 1,
               hasMore: false,
             },
@@ -63,7 +64,7 @@ export function useCreateIngredient() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (data: CreateIngredientData) => itemsApi.create({ ...data, itemType: 'item' }),
+    mutationFn: (data: CreateIngredientData) => itemsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ingredients'] });
       queryClient.invalidateQueries({ queryKey: ['items'] });

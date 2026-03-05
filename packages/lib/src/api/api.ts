@@ -41,7 +41,7 @@ async function getServerBaseUrl(): Promise<string> {
 }
 
 export async function apiRequest<T>(
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   endpoint: string,
   data?: any,
   signal?: AbortSignal
@@ -242,7 +242,7 @@ export async function apiRequest<T>(
 }
 
 export async function apiBlobRequest(
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   endpoint: string,
   data?: any
 ): Promise<Blob> {

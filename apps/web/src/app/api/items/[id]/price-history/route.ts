@@ -31,7 +31,7 @@ export async function GET(
 
     if (error) throw error;
 
-    const list = (data || []).map((row: Record<string, unknown>) => ({
+    const list = ((data || []) as unknown as Record<string, unknown>[]).map((row) => ({
       id: row.id,
       effectiveDate: row.effective_date,
       value: row[valueCol] != null ? parseFloat(String(row[valueCol])) : null,
@@ -90,10 +90,11 @@ export async function POST(
       await supabase.from('items').update({ unit_cost: null }).eq('id', itemId);
     }
 
+    const row = data as unknown as Record<string, unknown>;
     return NextResponse.json({
-      id: data.id,
-      effectiveDate: data.effective_date,
-      value: data[valueCol] != null ? parseFloat(data[valueCol]) : value,
+      id: row.id,
+      effectiveDate: row.effective_date,
+      value: row[valueCol] != null ? parseFloat(String(row[valueCol])) : value,
     }, { status: 200 });
   } catch (error: unknown) {
     const err = error as { message?: string };

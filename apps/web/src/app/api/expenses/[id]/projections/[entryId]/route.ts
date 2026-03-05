@@ -118,7 +118,7 @@ export async function PUT(
               const newExpenseData = {
                 name: `${expenseData.name} - ${data.month}`,
                 category: expenseData.category,
-                amount: body.actualAmount || parseFloat(existingEntry.amount),
+                amount: body.actualAmount ?? parseFloat(data.amount),
                 subscription_id: null, // One-time expense, not linked to subscription
                 expense_date: body.paidDate || data.month + '-01',
                 description: body.notes || `Payment for expense: ${expenseData.name} - ${data.month}`,

@@ -35,7 +35,7 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
   
   const { data: actualPayments } = useActualPayments({
     paymentType: 'expense',
-    referenceId: projection.expenseId,
+    referenceId: String(projection.expenseId),
     month: projection.month,
   });
   

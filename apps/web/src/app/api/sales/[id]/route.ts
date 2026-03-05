@@ -5,7 +5,7 @@ import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Sale, UpdateSaleData, SaleLineItem } from '@kit/types';
 import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
 import { upsertSellingPrice, upsertCost } from '@/lib/items/price-history-upsert';
-import { getTaxRateFor } from '@/lib/tax-rate';
+import { getTaxRateForSaleLine } from '@/lib/tax-rules-resolve';
 
 function transformSale(row: any): Sale {
   return {
@@ -86,7 +86,7 @@ export async function GET(
       throw error;
     }
 
-    let sale = transformSale(data);
+    const sale = transformSale(data);
 
     const { data: lineItemsData } = await supabase
       .from('sale_line_items')
@@ -200,19 +200,24 @@ export async function PUT(
 
     const supabase = createServerSupabaseClient();
     const dateStr = body.date.split('T')[0] || body.date;
-    const taxRate = await getTaxRateFor(supabase, body.type, dateStr);
-    const lines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxAmount: number }> = [];
+    const lines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxRatePercent: number; taxAmount: number }> = [];
     for (let i = 0; i < body.lineItems!.length; i++) {
         const line = body.lineItems![i];
         let unitPrice = line.unitPrice;
         let unitCost = line.unitCost;
+        let priceLookupItemId: number | null = null;
+        let itemCategory: string | null = null;
         if (line.itemId && dateStr) {
-          let priceLookupItemId: number | null = null;
-          const { data: itemRow } = await supabase.from('items').select('id').eq('id', line.itemId).single();
-          if (itemRow) priceLookupItemId = itemRow.id;
-          else {
-            const { data: produced } = await supabase.from('items').select('id').eq('produced_from_recipe_id', line.itemId).single();
-            if (produced) priceLookupItemId = produced.id;
+          const { data: itemRow } = await supabase.from('items').select('id, category').eq('id', line.itemId).single();
+          if (itemRow) {
+            priceLookupItemId = itemRow.id;
+            itemCategory = itemRow.category ?? null;
+          } else {
+            const { data: produced } = await supabase.from('items').select('id, category').eq('produced_from_recipe_id', line.itemId).single();
+            if (produced) {
+              priceLookupItemId = produced.id;
+              itemCategory = produced.category ?? null;
+            }
           }
           if (priceLookupItemId) {
             if (unitPrice == null) {
@@ -227,9 +232,11 @@ export async function PUT(
             if (unitCost != null) await upsertCost(supabase, priceLookupItemId, dateStr, unitCost);
           }
         }
+        let lineTaxRate = await getTaxRateForSaleLine(supabase, priceLookupItemId ?? line.itemId ?? null, itemCategory, body.type, dateStr);
+        if (line.taxRatePercent != null) lineTaxRate = line.taxRatePercent;
         const qty = typeof line.quantity === 'number' ? line.quantity : parseFloat(String(line.quantity));
         const lineTotal = Math.round(qty * (unitPrice ?? 0) * 100) / 100;
-        const taxAmount = Math.round(lineTotal * (taxRate / 100) * 100) / 100;
+        const taxAmount = Math.round(lineTotal * (lineTaxRate / 100) * 100) / 100;
         lines.push({
           itemId: line.itemId,
           quantity: qty,
@@ -237,6 +244,7 @@ export async function PUT(
           unitPrice: unitPrice ?? 0,
           unitCost,
           lineTotal,
+          taxRatePercent: lineTaxRate,
           taxAmount,
         });
     }
@@ -282,7 +290,7 @@ export async function PUT(
         unit_id: l.unitId ?? null,
         unit_price: l.unitPrice,
         unit_cost: l.unitCost ?? null,
-        tax_rate_percent: taxRate,
+        tax_rate_percent: l.taxRatePercent,
         tax_amount: l.taxAmount,
         line_total: l.lineTotal,
         sort_order: i,

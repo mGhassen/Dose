@@ -231,7 +231,12 @@ export async function POST(
                 notes: body.notes || null,
               });
 
-            const amount = body.actualAmount || body.amount;
+            const subTotal = body.actualAmount ?? body.amount;
+            const taxRate = subscriptionData.default_tax_rate_percent != null ? parseFloat(String(subscriptionData.default_tax_rate_percent)) : 0;
+            const taxAmount = Math.round(subTotal * (taxRate / 100) * 100) / 100;
+            const totalTax = taxAmount;
+            const amount = Math.round((subTotal + totalTax) * 100) / 100;
+
             const { data: expenseRow, error: expenseErr } = await supabase
               .from('expenses')
               .insert({
@@ -243,8 +248,8 @@ export async function POST(
                 description: body.notes || `Payment for subscription: ${subscriptionData.name} - ${body.month}`,
                 vendor: subscriptionData.vendor || null,
                 start_date: body.paidDate || `${body.month}-01`,
-                subtotal: amount,
-                total_tax: 0,
+                subtotal: subTotal,
+                total_tax: totalTax,
                 total_discount: 0,
                 is_active: true,
               })
@@ -258,11 +263,11 @@ export async function POST(
                 subscription_id: parseInt(id),
                 quantity: 1,
                 unit_id: null,
-                unit_price: amount,
+                unit_price: subTotal,
                 unit_cost: null,
-                tax_rate_percent: 0,
-                tax_amount: 0,
-                line_total: amount,
+                tax_rate_percent: taxRate,
+                tax_amount: taxAmount,
+                line_total: subTotal,
                 sort_order: 0,
               });
             }

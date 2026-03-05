@@ -126,7 +126,7 @@ export async function GET(
 
     const paymentsResponse: SquareListPaymentsResponse = {
       payments: allPayments,
-      cursor: null,
+      cursor: undefined,
     };
 
     return NextResponse.json(paymentsResponse);

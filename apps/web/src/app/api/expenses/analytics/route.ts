@@ -6,19 +6,18 @@ import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Expense } from '@kit/types';
 
 function transformExpense(row: any): Expense {
-  return {
+  const base = {
     id: row.id,
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
-    startDate: row.start_date,
-    endDate: row.end_date,
+    expenseDate: row.expense_date ?? row.start_date,
     description: row.description,
     vendor: row.vendor,
-    isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+  return { ...base, startDate: row.start_date, endDate: row.end_date, isActive: row.is_active } as Expense;
 }
 
 export async function GET(request: NextRequest) {
@@ -73,14 +72,8 @@ export async function GET(request: NextRequest) {
     // Debug logging (remove in production if needed)
     if (expenseProjections.length === 0 && expenses.length > 0) {
       console.warn(`[Expenses Analytics] No projections generated for year ${year} despite ${expenses.length} expenses`);
-      console.warn('Sample expense:', expenses[0] ? {
-        id: expenses[0].id,
-        name: expenses[0].name,
-        startDate: expenses[0].startDate,
-        endDate: expenses[0].endDate,
-        recurrence: expenses[0].recurrence,
-        isActive: expenses[0].isActive
-      } : 'No expenses');
+      const sample = expenses[0] as unknown as Record<string, unknown>;
+      console.warn('Sample expense:', expenses[0] ? { id: sample.id, name: sample.name, startDate: sample.startDate, endDate: sample.endDate, recurrence: sample.recurrence, isActive: sample.isActive } : 'No expenses');
     }
 
     // Format monthly data for chart
@@ -122,7 +115,7 @@ export async function GET(request: NextRequest) {
       })),
       summary: {
         totalExpenses: expenses.length,
-        totalActiveExpenses: expenses.filter(e => e.isActive).length,
+        totalActiveExpenses: expenses.length,
         totalMonthly: Object.values(monthlyData).reduce((sum, m) => sum + m.total, 0) / 12,
         totalAnnual,
       },

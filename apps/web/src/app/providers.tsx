@@ -31,15 +31,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
               return false;
             },
             retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-            // Suppress AbortError from being logged
-            onError: (error) => {
-              // Silently handle AbortErrors - they're expected when queries are cancelled
-              if (error instanceof Error && (error.name === 'AbortError' || (error as any).isAbortError)) {
-                return; // Don't log AbortErrors
-              }
-              // Log other errors for debugging
-              console.error('Query error:', error);
-            },
           },
           mutations: {
             retry: false,

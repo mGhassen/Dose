@@ -35,7 +35,7 @@ export default function ExpiryDatesContent() {
       accessorKey: "itemId",
       header: "Item",
       cell: ({ row }) => {
-        const itemId = row.original.itemId || row.original.ingredientId;
+        const itemId = row.original.itemId ?? (row.original as { ingredientId?: number }).ingredientId;
         if (itemId && itemMap.has(itemId)) {
           return itemMap.get(itemId);
         }
@@ -118,7 +118,7 @@ export default function ExpiryDatesContent() {
     const csv = [
       ['Ingredient', 'Quantity', 'Unit', 'Expiry Date', 'Location', 'Status', 'Disposed Date'].join(','),
       ...expiryDatesToCopy.map(expiry => [
-        itemMap.get(expiry.itemId || expiry.ingredientId) || '',
+        itemMap.get(expiry.itemId ?? (expiry as { ingredientId?: number }).ingredientId) || '',
         expiry.quantity,
         expiry.unit,
         expiry.expiryDate,
@@ -138,7 +138,7 @@ export default function ExpiryDatesContent() {
     const csv = [
       ['Ingredient', 'Quantity', 'Unit', 'Expiry Date', 'Location', 'Status', 'Disposed Date'].join(','),
       ...expiryDatesToExport.map(expiry => [
-        itemMap.get(expiry.itemId || expiry.ingredientId) || '',
+        itemMap.get(expiry.itemId ?? (expiry as { ingredientId?: number }).ingredientId) || '',
         expiry.quantity,
         expiry.unit,
         expiry.expiryDate,

@@ -55,11 +55,8 @@ const AppConfigSchema = z
   .refine(
     (schema) => {
       const isCI = process.env.NEXT_PUBLIC_CI;
-
-      if (isCI ?? !schema.production) {
-        return true;
-      }
-
+      if (isCI ?? !schema.production) return true;
+      if (schema.url.includes('localhost')) return true;
       return !schema.url.startsWith('http:');
     },
     {

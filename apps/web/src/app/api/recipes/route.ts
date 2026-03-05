@@ -137,8 +137,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Also support legacy 'ingredients' field for backward compatibility
-    if (body.ingredients && body.ingredients.length > 0) {
-      const recipeItems = body.ingredients.map(ing => ({
+    const legacyIngredients = (body as { ingredients?: Array<{ ingredientId: number; quantity: number; unit: string; unitId?: number; notes?: string }> }).ingredients;
+    if (legacyIngredients && legacyIngredients.length > 0) {
+      const recipeItems = legacyIngredients.map(ing => ({
         recipe_id: recipeData.id,
         item_id: ing.ingredientId,
         quantity: ing.quantity,

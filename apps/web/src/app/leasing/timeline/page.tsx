@@ -13,7 +13,8 @@ import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatMonthYear } from "@kit/lib/date-format";
 import { projectLeasingPayment, projectLeasingPaymentsForRange } from "@/lib/calculations/leasing-timeline";
-import type { LeasingPayment, LeasingTimelineEntry } from "@/lib/calculations/leasing-timeline";
+import type { LeasingTimelineEntry } from "@/lib/calculations/leasing-timeline";
+import type { LeasingPayment } from "@kit/types";
 import { EditableLeasingTimelineRow } from "../[id]/timeline/leasing-timeline-editable";
 import { useQueryClient } from "@tanstack/react-query";
 import {

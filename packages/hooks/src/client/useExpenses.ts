@@ -23,12 +23,13 @@ export function useExpenses(params?: { page?: number; limit?: number; category?:
         }
         // If result is already an array (fallback for backward compatibility)
         if (Array.isArray(result)) {
+          const arr = result as Expense[];
           return {
-            data: result,
+            data: arr,
             pagination: {
               page: 1,
-              limit: result.length,
-              total: result.length,
+              limit: arr.length,
+              total: arr.length,
               totalPages: 1,
               hasMore: false,
             },

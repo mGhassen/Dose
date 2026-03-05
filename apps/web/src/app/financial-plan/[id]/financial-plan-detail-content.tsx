@@ -95,7 +95,7 @@ export default function FinancialPlanDetailContent({ params }: FinancialPlanDeta
     }
 
     try {
-      await deleteMutation.mutateAsync(Number(resolvedParams.id));
+      await deleteMutation.mutateAsync(String(resolvedParams.id));
       toast.success("Financial plan deleted successfully");
       router.push('/financial-plan');
     } catch (error) {

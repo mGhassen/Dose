@@ -234,15 +234,15 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="font-medium">
-                              {(item.itemId ?? item.ingredientId) ? (
+                              {(item.itemId ?? (item as { ingredientId?: number }).ingredientId) ? (
                                 <Link
-                                  href={`/items/${item.itemId ?? item.ingredientId}`}
+                                  href={`/items/${item.itemId ?? (item as { ingredientId?: number }).ingredientId}`}
                                   className="text-primary hover:underline"
                                 >
-                                  {item.item?.name || item.ingredient?.name || `Item #${item.itemId || item.ingredientId}`}
+                                  {item.item?.name || (item as { ingredient?: { name?: string } }).ingredient?.name || `Item #${item.itemId ?? (item as { ingredientId?: number }).ingredientId}`}
                                 </Link>
                               ) : (
-                                item.item?.name || item.ingredient?.name || `Item #${item.itemId || item.ingredientId}`
+                                item.item?.name || (item as { ingredient?: { name?: string } }).ingredient?.name || `Item #${item.itemId ?? (item as { ingredientId?: number }).ingredientId}`
                               )}
                             </div>
                             <div className="text-sm text-muted-foreground mt-1">
@@ -307,16 +307,16 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
                   return (
                     <div key={receiveItem.itemId} className="p-4 border rounded-lg space-y-3">
                       <div className="font-medium">
-                        {(orderItem.itemId ?? orderItem.ingredientId) ? (
+                        {(orderItem.itemId ?? (orderItem as { ingredientId?: number }).ingredientId) ? (
                           <Link
-                            href={`/items/${orderItem.itemId ?? orderItem.ingredientId}`}
+                            href={`/items/${orderItem.itemId ?? (orderItem as { ingredientId?: number }).ingredientId}`}
                             className="text-primary hover:underline"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {orderItem.item?.name || orderItem.ingredient?.name || `Item #${orderItem.itemId || orderItem.ingredientId}`}
+                            {orderItem.item?.name || (orderItem as { ingredient?: { name?: string } }).ingredient?.name || `Item #${orderItem.itemId ?? (orderItem as { ingredientId?: number }).ingredientId}`}
                           </Link>
                         ) : (
-                          orderItem.item?.name || orderItem.ingredient?.name || `Item #${orderItem.itemId || orderItem.ingredientId}`
+                          orderItem.item?.name || (orderItem as { ingredient?: { name?: string } }).ingredient?.name || `Item #${orderItem.itemId ?? (orderItem as { ingredientId?: number }).ingredientId}`
                         )}
                       </div>
                       <div className="grid grid-cols-2 gap-4">

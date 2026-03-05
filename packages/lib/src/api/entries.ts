@@ -1,5 +1,8 @@
 import { apiRequest } from './api';
 import type { PaginatedResponse, PaginationParams } from '@kit/types';
+import type { Payment } from './payments';
+
+export type { Payment } from './payments';
 
 export interface Entry {
   id: number;
@@ -20,19 +23,6 @@ export interface Entry {
   createdAt: string;
   updatedAt: string;
   payments?: Payment[];
-}
-
-export interface Payment {
-  id: number;
-  entryId: number;
-  paymentDate: string;
-  amount: number;
-  isPaid: boolean;
-  paidDate?: string;
-  paymentMethod?: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface CreateEntryData {

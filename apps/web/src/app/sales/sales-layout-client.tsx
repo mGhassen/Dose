@@ -38,11 +38,12 @@ export default function SalesLayoutClient({
   const leftWidth = showSidebar ? (rightWidth === "60%" ? "40%" : "60%") : "100%";
 
   const handleDeleted = () => router.push("/sales");
+  const setIsFormViewCb = useCallback((v: boolean) => setIsFormView(v), []);
 
   if (isListOrDetail) {
     return (
       <SalesPanelViewContext.Provider
-        value={{ setIsFormView: useCallback((v: boolean) => setIsFormView(v), []) }}
+        value={{ setIsFormView: setIsFormViewCb }}
       >
         <AppLayout>
           <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">

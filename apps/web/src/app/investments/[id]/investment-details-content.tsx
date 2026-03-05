@@ -100,7 +100,7 @@ export default function InvestmentDetailsContent({ investmentId }: InvestmentDet
     }
 
     try {
-      await deleteMutation.mutateAsync(Number(investmentId));
+      await deleteMutation.mutateAsync(String(investmentId));
       toast.success("Investment deleted successfully");
       router.push('/investments');
     } catch (error) {

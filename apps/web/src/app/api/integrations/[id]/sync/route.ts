@@ -111,7 +111,7 @@ async function syncSquareIntegration(
       let totalCatalogItems = 0;
 
       do {
-        const catalogResponse = await fetch(`${SQUARE_API_BASE}/v2/catalog/search`, {
+        const catalogResponse: Response = await fetch(`${SQUARE_API_BASE}/v2/catalog/search`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,

@@ -70,8 +70,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const allItems = allItemsResponse?.data ?? [];
   
   // Fetch stock levels for all recipe items when dialog is open
-  const recipeItemIds = recipe?.items?.map(ri => ri.itemId?.toString()).filter(Boolean) || 
-                        recipe?.ingredients?.map((ri: any) => ri.itemId?.toString() || ri.ingredientId?.toString()).filter(Boolean) || [];
+  const recipeItemIds = recipe?.items?.map(ri => ri.itemId?.toString()).filter(Boolean) ||
+                        (recipe as { ingredients?: { itemId?: number; ingredientId?: number }[] })?.ingredients?.map((ri) => ri.itemId?.toString() || ri.ingredientId?.toString()).filter(Boolean) || [];
   const { data: allStockLevelsResponse } = useStockLevels({ 
     limit: 1000 
   });
@@ -128,8 +128,9 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
         notes: recipe.notes || "",
         isActive: recipe.isActive,
       });
-      if (recipe.items || recipe.ingredients) {
-        const recipeItems = recipe.items || recipe.ingredients || [];
+      const legacyIngredients = (recipe as { ingredients?: unknown[] }).ingredients;
+      if (recipe.items || legacyIngredients) {
+        const recipeItems = recipe.items || legacyIngredients || [];
         setItems(recipeItems.map((ri: any) => ({
           itemId: ri.itemId || ri.ingredientId,
           quantity: ri.quantity,
@@ -228,7 +229,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     const multiplier = parseFloat(produceQuantity) / (recipe.servingSize || 1);
     const issues: Array<{ itemId: number; itemName: string; required: number; available: number; unit: string }> = [];
     
-    const recipeItems = recipe.items || recipe.ingredients || [];
+    const recipeItems = recipe.items || (recipe as { ingredients?: unknown[] }).ingredients || [];
     for (const ri of recipeItems) {
       const itemId = ri.itemId || (ri as any).ingredientId;
       if (!itemId) continue;
@@ -295,7 +296,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
             <div className="flex space-x-2">
               <Button
                 onClick={() => setProduceDialogOpen(true)}
-                disabled={!recipe?.isActive || (!recipe?.items && !recipe?.ingredients) || ((recipe.items?.length || recipe.ingredients?.length || 0) === 0)}
+                disabled={!recipe?.isActive || (!recipe?.items && !(recipe as { ingredients?: unknown[] })?.ingredients) || ((recipe.items?.length || (recipe as { ingredients?: unknown[] }).ingredients?.length || 0) === 0)}
               >
                 <ChefHat className="mr-2 h-4 w-4" />
                 Produce Recipe
@@ -373,7 +374,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                           />
                           <UnifiedSelector
                             type="unit"
-                            items={units.map(u => ({ id: u.id, name: u.name, symbol: u.symbol, ...u }))}
+                            items={units.map(u => ({ ...u, name: u.name || u.symbol || String(u.id) }))}
                             selectedId={formData.unitId ?? undefined}
                             onSelect={(sel) => {
                               const u = units.find(x => x.id === sel.id);
@@ -503,7 +504,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                                 <Label>Unit</Label>
                                 <UnifiedSelector
                                   type="unit"
-                                  items={units.map(u => ({ id: u.id, name: u.name, symbol: u.symbol, ...u }))}
+                                  items={units.map(u => ({ ...u, name: u.name || u.symbol || String(u.id) }))}
                                   selectedId={item.unitId ?? undefined}
                                   onSelect={(sel) => {
                                     const u = units.find(x => x.id === sel.id);
@@ -744,7 +745,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                 </div>
 
                 {/* Right Column: Items Section */}
-                {((recipe.items || recipe.ingredients) && (recipe.items?.length || recipe.ingredients?.length || 0) > 0) && (
+                {((recipe.items || (recipe as { ingredients?: unknown[] }).ingredients) && (recipe.items?.length || (recipe as { ingredients?: unknown[] }).ingredients?.length || 0) > 0) && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold">Items</h3>
@@ -769,11 +770,11 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                       )}
                     </div>
                     <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                      {(recipe.items || recipe.ingredients || []).map((ri: any, index: number) => {
+                      {(recipe.items || (recipe as { ingredients?: unknown[] }).ingredients || []).map((ri: any, index: number) => {
                         const itemId = ri.itemId || ri.ingredientId;
                         const item = ri.item || ri.ingredient;
-                        const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingredientId) === itemId) || 
-                                        costData?.items?.find((ci: any) => ci.itemId === itemId);
+const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingredientId) === itemId) ||
+                                        (costData as { items?: { itemId?: number }[] })?.items?.find((ci: any) => ci.itemId === itemId);
                         return (
                           <div key={index} className="p-4 border rounded-lg bg-card">
                             <div className="flex items-start justify-between">
@@ -793,12 +794,12 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                                 <div className="text-sm text-muted-foreground mb-2">
                                   {ri.quantity} {ri.unit}
                                 </div>
-                                {costItem && costItem.hasPrice && (
+                                {costItem && (costItem as { hasPrice?: boolean }).hasPrice && (
                                   <div className="text-sm text-muted-foreground">
-                                    {formatCurrency(costItem.unitPrice)}/{ri.unit} • {formatCurrency(costItem.totalCost)} total
+                                    {formatCurrency((costItem as { unitPrice?: number }).unitPrice ?? 0)}/{ri.unit} • {formatCurrency((costItem as { totalCost?: number }).totalCost ?? 0)} total
                                   </div>
                                 )}
-                                {costItem && !costItem.hasPrice && (
+                                {costItem && !(costItem as { hasPrice?: boolean }).hasPrice && (
                                   <div className="text-xs text-muted-foreground">
                                     No price data available
                                   </div>
@@ -862,11 +863,11 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                 rows={3}
               />
             </div>
-            {((recipe?.items || recipe?.ingredients) && (recipe.items?.length || recipe.ingredients?.length || 0) > 0) && (
+            {((recipe?.items || (recipe as { ingredients?: unknown[] })?.ingredients) && (recipe.items?.length || (recipe as { ingredients?: unknown[] }).ingredients?.length || 0) > 0) && (
               <div className="border rounded-lg p-4 bg-muted space-y-3">
                 <Label className="text-sm font-semibold">Items to be deducted:</Label>
                 <div className="mt-2 space-y-2">
-                  {(recipe.items || recipe.ingredients || []).map((ri: any, idx: number) => {
+                  {(recipe.items || (recipe as { ingredients?: unknown[] }).ingredients || []).map((ri: any, idx: number) => {
                     const multiplier = (parseFloat(produceQuantity) || 0) / (recipe?.servingSize || 1);
                     const quantityToDeduct = ri.quantity * multiplier;
                     const item = ri.item || ri.ingredient;

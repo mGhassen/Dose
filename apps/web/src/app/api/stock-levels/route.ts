@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       query = query.eq('location', location);
     }
 
-    const countQuery = query.select('*', { count: 'exact', head: true });
+    const countQuery = (query as any).select('*', { count: 'exact', head: true });
     const dataQuery = query.range(offset, offset + limit - 1);
 
     const [{ data, error }, { count, error: countError }] = await Promise.all([

@@ -131,17 +131,22 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!subscriptionError && subscription) {
+        const subTotal = body.amount;
+        const taxRate = subscription.default_tax_rate_percent != null ? parseFloat(String(subscription.default_tax_rate_percent)) : 0;
+        const taxAmount = Math.round(subTotal * (taxRate / 100) * 100) / 100;
+        const amount = Math.round((subTotal + taxAmount) * 100) / 100;
+
         const expenseData = {
           name: `${subscription.name} - Payment ${body.month}`,
           category: subscription.category,
-          amount: body.amount,
+          amount,
           subscription_id: body.referenceId,
           expense_date: body.paymentDate,
           description: body.notes || `Payment for subscription: ${subscription.name}`,
           vendor: subscription.vendor || null,
           start_date: body.paymentDate,
-          subtotal: body.amount,
-          total_tax: 0,
+          subtotal: subTotal,
+          total_tax: taxAmount,
           total_discount: 0,
           is_active: true,
         };
@@ -159,11 +164,11 @@ export async function POST(request: NextRequest) {
             subscription_id: body.referenceId,
             quantity: 1,
             unit_id: null,
-            unit_price: body.amount,
+            unit_price: subTotal,
             unit_cost: null,
-            tax_rate_percent: 0,
-            tax_amount: 0,
-            line_total: body.amount,
+            tax_rate_percent: taxRate,
+            tax_amount: taxAmount,
+            line_total: subTotal,
             sort_order: 0,
           });
         } else if (expenseError) {

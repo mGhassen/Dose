@@ -84,7 +84,7 @@ export default function StockMovementsContent() {
     // Get top 5 items by movement count
     const itemCounts = new Map<number, number>();
     movements.forEach(m => {
-      const itemId = m.itemId || m.ingredientId;
+      const itemId = m.itemId ?? (m as { ingredientId?: number }).ingredientId;
       if (itemId) {
         itemCounts.set(itemId, (itemCounts.get(itemId) || 0) + 1);
       }
@@ -99,7 +99,7 @@ export default function StockMovementsContent() {
     const dailyItemMap = new Map<string, Map<number, { in: number; out: number }>>();
     
     movements.forEach(m => {
-      const itemId = m.itemId || m.ingredientId;
+      const itemId = m.itemId ?? (m as { ingredientId?: number }).ingredientId;
       if (!itemId || !topItemIds.includes(itemId)) return;
       
       const date = new Date(m.movementDate).toISOString().split('T')[0];
@@ -162,7 +162,7 @@ export default function StockMovementsContent() {
     const itemStatsMap = new Map<number, { name: string; count: number; in: number; out: number }>();
     
     movements.forEach(m => {
-      const itemId = m.itemId || m.ingredientId;
+      const itemId = m.itemId ?? (m as { ingredientId?: number }).ingredientId;
       if (!itemId) return;
       
       const itemName = itemMap.get(itemId) || `Item ${itemId}`;
@@ -207,7 +207,7 @@ export default function StockMovementsContent() {
       accessorKey: "itemId",
       header: "Item",
       cell: ({ row }) => {
-        const itemId = row.original.itemId || row.original.ingredientId;
+        const itemId = row.original.itemId ?? (row.original as { ingredientId?: number }).ingredientId;
         if (itemId && itemMap.has(itemId)) {
           return itemMap.get(itemId);
         }
@@ -275,7 +275,7 @@ export default function StockMovementsContent() {
     const csv = [
       ['Item', 'Type', 'Quantity', 'Unit', 'Location', 'Date', 'Reference'].join(','),
       ...movementsToCopy.map(movement => [
-        itemMap.get(movement.itemId || movement.ingredientId) || '',
+        itemMap.get(movement.itemId ?? (movement as { ingredientId?: number }).ingredientId) || '',
         movement.movementType,
         movement.quantity,
         movement.unit,
@@ -295,7 +295,7 @@ export default function StockMovementsContent() {
     const csv = [
       ['Item', 'Type', 'Quantity', 'Unit', 'Location', 'Date', 'Reference'].join(','),
       ...movementsToExport.map(movement => [
-        itemMap.get(movement.itemId || movement.ingredientId) || '',
+        itemMap.get(movement.itemId ?? (movement as { ingredientId?: number }).ingredientId) || '',
         movement.movementType,
         movement.quantity,
         movement.unit,
@@ -457,7 +457,7 @@ export default function StockMovementsContent() {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"

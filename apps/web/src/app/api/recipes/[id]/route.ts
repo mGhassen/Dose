@@ -196,7 +196,7 @@ export async function PUT(
 
 
     // Update items if provided (supports both 'items' and legacy 'ingredients')
-    const itemsToUpdate = body.items || body.ingredients;
+    const itemsToUpdate = body.items || (body as { ingredients?: typeof body.items }).ingredients;
     if (itemsToUpdate !== undefined) {
       // Delete existing items
       await supabase

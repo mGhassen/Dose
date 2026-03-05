@@ -330,7 +330,7 @@ export default function BudgetsPage() {
         });
       } catch (createError) {
         console.error('Error saving budget entry:', createError);
-        toast.error('Failed to save budget entry');
+        toast({ title: 'Failed to save budget entry', variant: 'destructive' });
       }
     } finally {
       setIsSaving(false);
@@ -339,7 +339,7 @@ export default function BudgetsPage() {
 
   const handleSaveBudget = useCallback(async () => {
     if (!budgetName || !fiscalYear) {
-      toast.error('Budget name and fiscal year are required');
+      toast({ title: 'Budget name and fiscal year are required', variant: 'destructive' });
       return;
     }
 
@@ -356,7 +356,7 @@ export default function BudgetsPage() {
             reportingTagId: reportingTag ? undefined : null,
           },
         });
-        toast.success('Budget saved successfully');
+        toast({ title: 'Budget saved successfully', variant: 'success' });
       } else {
         // Create new budget
         const newBudget = await createBudget.mutateAsync({
@@ -366,11 +366,11 @@ export default function BudgetsPage() {
           reportingTagId: reportingTag ? undefined : null,
         });
         setCurrentBudgetId(newBudget.id);
-        toast.success('Budget created successfully');
+        toast({ title: 'Budget created successfully', variant: 'success' });
       }
     } catch (error: any) {
       console.error('Error saving budget:', error);
-      toast.error('Failed to save budget');
+      toast({ title: 'Failed to save budget', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
@@ -378,7 +378,7 @@ export default function BudgetsPage() {
 
   const handleAddAccount = useCallback(async () => {
     if (!currentBudgetId) {
-      toast.error('Please save the budget first');
+      toast({ title: 'Please save the budget first', variant: 'destructive' });
       return;
     }
 
@@ -403,22 +403,22 @@ export default function BudgetsPage() {
           displayOrder: 0,
         },
       });
-      toast.success('Account added successfully');
+      toast({ title: 'Account added successfully', variant: 'success' });
     } catch (error: any) {
       console.error('Error adding account:', error);
-      toast.error('Failed to add account');
+      toast({ title: 'Failed to add account', variant: 'destructive' });
     }
   }, [currentBudgetId, activeTab, createAccount]);
 
   const handlePreFillFromPrevious = useCallback(async () => {
     if (!currentBudgetId) {
-      toast.error('Please save the budget first');
+      toast({ title: 'Please save the budget first', variant: 'destructive' });
       return;
     }
 
     // TODO: Implement pre-fill logic
     // This would fetch actuals from previous years and populate the budget
-    toast.info('Pre-fill feature coming soon');
+    toast({ title: 'Pre-fill feature coming soon' });
   }, [currentBudgetId]);
 
   return (
@@ -483,7 +483,7 @@ export default function BudgetsPage() {
                 { id: 'yearly', name: 'Yearly' },
               ]}
               selectedId={budgetPeriod || undefined}
-              onSelect={(item) => setBudgetPeriod(String(item.id))}
+              onSelect={(item) => setBudgetPeriod(String(item.id) as 'monthly' | 'quarterly' | 'yearly')}
               placeholder="Select period"
             />
             <div className="flex items-end gap-2">

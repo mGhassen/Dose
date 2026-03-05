@@ -1,7 +1,8 @@
 // Depreciation Calculation Service
 // Calculates depreciation schedules for investments
 
-import type { Investment, DepreciationEntry, DepreciationMethod } from '@kit/types';
+import type { Investment, DepreciationEntry } from '@kit/types';
+import { DepreciationMethod } from '@kit/types';
 
 /**
  * Calculate depreciation schedule for an investment

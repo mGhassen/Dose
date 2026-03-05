@@ -22,6 +22,7 @@ export * from './client/usePersonnelAnalytics';
 export * from './client/useLeasing';
 export * from './client/useLeasingAnalytics';
 export * from './client/useVariables';
+export * from './client/useTaxRules';
 export * from './client/useInvestments';
 export * from './client/useInvestmentsAnalytics';
 export * from './client/useProfitLoss';

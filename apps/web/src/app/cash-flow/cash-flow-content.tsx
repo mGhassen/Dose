@@ -26,7 +26,8 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
-  ComposedChart
+  ComposedChart,
+  Cell
 } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, ArrowUpRight, ArrowDownRight, Wallet } from "lucide-react";
 import { useDashboardPeriod } from "@/components/dashboard-period-provider";
@@ -322,13 +323,9 @@ export default function CashFlowContent() {
                       <XAxis dataKey="month" />
                       <YAxis />
                       <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                      <Bar 
-                        dataKey="netCashFlow" 
-                        fill={(entry: any) => entry.netCashFlow >= 0 ? '#22c55e' : '#ef4444'}
-                        name="Net Cash Flow"
-                      >
+                      <Bar dataKey="netCashFlow" fill="#22c55e" name="Net Cash Flow">
                         {filteredCashFlow.map((entry, index) => (
-                          <Bar key={index} fill={entry.netCashFlow >= 0 ? '#22c55e' : '#ef4444'} />
+                          <Cell key={index} fill={entry.netCashFlow >= 0 ? '#22c55e' : '#ef4444'} />
                         ))}
                       </Bar>
                     </BarChart>

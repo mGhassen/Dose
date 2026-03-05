@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { token, password } = await request.json();
+    await request.json();
     
     // Mock implementation - replace with real API when backend is ready
     

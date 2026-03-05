@@ -89,6 +89,8 @@ export function projectPersonnelSalary(
       netPaymentDate,
       taxesPaymentDate,
       isProjected: isFuture,
+      isNetPaid: false,
+      isTaxesPaid: false,
     });
 
     // Move to next month

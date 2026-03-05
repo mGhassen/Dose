@@ -14,6 +14,7 @@ function transformPersonnel(row: any): Personnel {
     position: row.position,
     type: row.type,
     baseSalary: parseFloat(row.base_salary),
+    salaryFrequency: row.salary_frequency || 'monthly',
     employerCharges: parseFloat(row.employer_charges),
     employerChargesType: row.employer_charges_type,
     startDate: row.start_date,

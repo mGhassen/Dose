@@ -519,11 +519,11 @@ export default function BudgetProjectionsAgendaPage() {
                       <YAxis />
                       <Tooltip formatter={(value: number) => formatCurrency(value)} />
                       <Legend />
-                      <Bar 
-                        dataKey="total" 
-                        fill={(entry: any) => entry.total >= 0 ? '#22c55e' : '#ef4444'}
-                        name="Net Total"
-                      />
+                      <Bar dataKey="total" fill="#22c55e" name="Net Total">
+                        {chartData.map((entry, index) => (
+                          <Cell key={index} fill={entry.total >= 0 ? '#22c55e' : '#ef4444'} />
+                        ))}
+                      </Bar>
                       <Line 
                         type="monotone" 
                         dataKey="total" 
@@ -562,7 +562,7 @@ export default function BudgetProjectionsAgendaPage() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                      label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(1)}%`}
                       outerRadius={100}
                       fill="#8884d8"
                       dataKey="value"

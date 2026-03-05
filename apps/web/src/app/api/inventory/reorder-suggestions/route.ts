@@ -8,20 +8,22 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createServerSupabaseClient();
     
-    // Get stock levels that are below minimum
-    const { data: stockLevels, error } = await supabase
+    const { data: rows, error } = await supabase
       .from('stock_levels')
       .select(`
         *,
         item:items(id, name, unit, category)
       `)
       .not('minimum_stock_level', 'is', null)
-      .lte('quantity', supabase.raw('minimum_stock_level'))
       .order('quantity', { ascending: true });
 
     if (error) throw error;
 
-    const suggestions = (stockLevels || []).map(sl => {
+    const stockLevels = (rows || []).filter(
+      (sl: any) => parseFloat(sl.quantity) <= parseFloat(sl.minimum_stock_level)
+    );
+
+    const suggestions = stockLevels.map((sl: any) => {
       const minLevel = parseFloat(sl.minimum_stock_level);
       const current = parseFloat(sl.quantity);
       const deficit = minLevel - current;

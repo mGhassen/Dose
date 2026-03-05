@@ -31,6 +31,7 @@ export * from './api/items';
 export * from './api/leasing';
 export * from './api/loans';
 export * from './api/variables';
+export * from './api/tax-rules';
 export * from './api/personnel';
 export * from './api/sales';
 export * from './api/investments';
@@ -46,9 +47,8 @@ export * from './api/actual-payments';
 export * from './api/entries';
 export * from './api/payments';
 
-// Export inventory management API modules
+// Export inventory management API modules (ingredientsApi is legacy alias from items)
 export * from './api/items';
-export * from './api/ingredients'; // Legacy alias
 export * from './api/recipes';
 export * from './api/inventory-suppliers';
 export * from './api/supplier-orders';

@@ -21,16 +21,15 @@ export function projectExpense(
   end.setMonth(end.getMonth() + 1); // Set to first day of next month for comparison
   end.setDate(0); // Then go back to last day of target month
   
-  const expenseStart = new Date(expense.startDate);
-  const expenseEnd = expense.endDate ? new Date(expense.endDate) : null;
+  const exp = expense as Expense & { startDate?: string; endDate?: string; isActive?: boolean; recurrence?: ExpenseRecurrence };
+  const expenseStart = new Date(exp.startDate ?? exp.expenseDate);
+  const expenseEnd = exp.endDate ? new Date(exp.endDate) : null;
 
-  // Only project active expenses
-  if (!expense.isActive) {
+  if (exp.isActive === false) {
     return projections;
   }
 
-  // Expenses are always one-time (recurrence lives on subscriptions)
-  if (!expense.recurrence || expense.recurrence === ExpenseRecurrence.ONE_TIME) {
+  if (!exp.recurrence || exp.recurrence === ExpenseRecurrence.ONE_TIME) {
     const expenseMonth = expenseStart.toISOString().slice(0, 7); // YYYY-MM
     if (expenseMonth >= startMonth && expenseMonth <= endMonth) {
       // Check if expense date is within range
@@ -77,7 +76,7 @@ export function projectExpense(
     let shouldInclude = false;
     const amount = expense.amount;
 
-    switch (expense.recurrence) {
+    switch (exp.recurrence) {
       case ExpenseRecurrence.MONTHLY:
         // Include every month
         shouldInclude = true;

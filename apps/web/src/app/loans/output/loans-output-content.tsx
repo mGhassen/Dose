@@ -255,9 +255,8 @@ export default function LoansOutputContent() {
               required
               type="loan"
               items={loans?.map((loan: Loan) => ({
-                id: loan.id,
-                name: `${loan.name} (${loan.loanNumber}) - ${formatCurrency(loan.principalAmount)}`,
                 ...loan,
+                name: `${loan.name} (${loan.loanNumber}) - ${formatCurrency(loan.principalAmount)}`,
               })) ?? []}
               selectedId={selectedLoanId || undefined}
               onSelect={(item) => setSelectedLoanId(item.id === 0 ? undefined : item.id)}

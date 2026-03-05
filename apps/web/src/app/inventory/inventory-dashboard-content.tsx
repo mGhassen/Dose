@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useItems, useRecipes, useStockLevels, useStockMovements, useSupplierOrders, useInventorySuppliers } from "@kit/hooks";
-import { Card, CardContent, CardHeader, CardTitle } from "@kit/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { Badge } from "@kit/ui/badge";
 import { Button } from "@kit/ui/button";
 import { formatDate } from "@kit/lib/date-format";
@@ -174,7 +174,7 @@ export default function InventoryDashboardContent() {
             ) : (
               <div className="space-y-2">
                 {lowStockItems.map((level) => {
-                  const itemName = itemMap.get(level.itemId || level.ingredientId) || 'Unknown';
+                  const itemName = itemMap.get(level.itemId ?? (level as { ingredientId?: number }).ingredientId) || 'Unknown';
                   return (
                     <div key={level.id} className="flex items-center justify-between p-2 rounded-md bg-orange-50 border border-orange-200">
                       <div className="flex-1">
@@ -227,7 +227,7 @@ export default function InventoryDashboardContent() {
             ) : (
               <div className="space-y-2">
                 {outOfStockItems.map((level) => {
-                  const itemName = itemMap.get(level.itemId || level.ingredientId) || 'Unknown';
+                  const itemName = itemMap.get(level.itemId ?? (level as { ingredientId?: number }).ingredientId) || 'Unknown';
                   return (
                     <div key={level.id} className="flex items-center justify-between p-2 rounded-md bg-red-50 border border-red-200">
                       <div className="flex-1">
@@ -339,7 +339,7 @@ export default function InventoryDashboardContent() {
           ) : (
             <div className="space-y-2">
               {recentMovements.map((movement) => {
-                const itemName = itemMap.get(movement.itemId || movement.ingredientId) || 'Unknown';
+                const itemName = itemMap.get(movement.itemId ?? (movement as { ingredientId?: number }).ingredientId) || 'Unknown';
                 const isIn = movement.movementType === 'in';
                 return (
                   <div key={movement.id} className="flex items-center justify-between p-3 rounded-md border">

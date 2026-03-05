@@ -14,12 +14,13 @@ export function useItems(params?: { page?: number; limit?: number; itemType?: st
           return result;
         }
         if (Array.isArray(result)) {
+          const arr = result as import('@kit/types').Item[];
           return {
-            data: result,
+            data: arr,
             pagination: {
               page: 1,
-              limit: result.length,
-              total: result.length,
+              limit: arr.length,
+              total: arr.length,
               totalPages: 1,
               hasMore: false,
             },

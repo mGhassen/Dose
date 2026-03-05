@@ -47,7 +47,7 @@ export default function CreateStockLevelPage() {
         itemId: parseInt(formData.itemId),
         quantity: parseFloat(formData.quantity),
         unitId: formData.unitId,
-        unit: (unitsData || []).find((u) => u.id === formData.unitId)?.symbol,
+        unit: (unitsData || []).find((u) => u.id === formData.unitId)?.symbol ?? '',
         location: formData.location || undefined,
         minimumStockLevel: formData.minimumStockLevel ? parseFloat(formData.minimumStockLevel) : undefined,
         maximumStockLevel: formData.maximumStockLevel ? parseFloat(formData.maximumStockLevel) : undefined,
@@ -66,7 +66,7 @@ export default function CreateStockLevelPage() {
     if (field === 'itemId' && value) {
       const selectedItem = items.find(i => i.id === parseInt(value));
       if (selectedItem?.unitId != null) {
-        setFormData(prev => ({ ...prev, unitId: selectedItem.unitId }));
+        setFormData(prev => ({ ...prev, unitId: selectedItem.unitId ?? null }));
       }
     }
   };

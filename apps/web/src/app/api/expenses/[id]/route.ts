@@ -74,17 +74,21 @@ async function updateExpenseAsTransaction(
     discount?: { type: 'amount' | 'percent'; value: number };
   }
 ) {
-  const { getTaxRateFor } = await import('@/lib/tax-rate');
+  const { getTaxRateForExpenseLine } = await import('@/lib/tax-rules-resolve');
   const dateStr = body.expenseDate.split('T')[0] || body.expenseDate;
-  const categoryTaxRate = await getTaxRateFor(supabase, body.category, dateStr);
 
   const lines: Array<{ itemId?: number; subscriptionId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxRatePercent: number; taxAmount: number }> = [];
   for (let i = 0; i < body.lineItems.length; i++) {
     const line = body.lineItems[i];
-    let taxRate = categoryTaxRate;
-    if (line.itemId && !line.subscriptionId) {
-      const { data: itemRow } = await supabase.from('items').select('default_tax_rate_percent').eq('id', line.itemId).single();
-      if (itemRow?.default_tax_rate_percent != null) taxRate = parseFloat(String(itemRow.default_tax_rate_percent));
+    let taxRate: number;
+    if (line.subscriptionId) {
+      const { data: sub } = await supabase.from('subscriptions').select('default_tax_rate_percent').eq('id', line.subscriptionId).maybeSingle();
+      taxRate = sub?.default_tax_rate_percent != null ? parseFloat(String(sub.default_tax_rate_percent)) : 0;
+    } else if (line.itemId) {
+      const { data: itemRow } = await supabase.from('items').select('category').eq('id', line.itemId).maybeSingle();
+      taxRate = await getTaxRateForExpenseLine(supabase, line.itemId, itemRow?.category ?? null, dateStr);
+    } else {
+      taxRate = await getTaxRateForExpenseLine(supabase, null, null, dateStr);
     }
     if (line.taxRatePercent != null) taxRate = line.taxRatePercent;
     const qty = typeof line.quantity === 'number' ? line.quantity : parseFloat(String(line.quantity));

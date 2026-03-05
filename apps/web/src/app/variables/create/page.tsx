@@ -96,6 +96,7 @@ export default function CreateVariablePage() {
                   items={[
                     { id: 'cost', name: 'Cost' },
                     { id: 'tax', name: 'Tax' },
+                    { id: 'transaction_tax', name: 'Transaction tax' },
                     { id: 'inflation', name: 'Inflation' },
                     { id: 'exchange_rate', name: 'Exchange Rate' },
                     { id: 'other', name: 'Other' },

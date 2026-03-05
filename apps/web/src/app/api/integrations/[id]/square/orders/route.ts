@@ -159,7 +159,7 @@ export async function GET(
     // Return all orders in the same format as Square API
     const listResult: SquareListOrdersResponse = {
       orders: allOrders,
-      cursor: null, // No more pages
+      cursor: undefined,
     };
 
     console.log('[Square Orders] Fetched all orders:', {

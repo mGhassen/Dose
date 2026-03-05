@@ -20,12 +20,13 @@ export function useSubscriptions(params?: { page?: number; limit?: number; categ
         }
         // If result is already an array (fallback for backward compatibility)
         if (Array.isArray(result)) {
+          const arr = result as import('@kit/types').Subscription[];
           return {
-            data: result,
+            data: arr,
             pagination: {
               page: 1,
-              limit: result.length,
-              total: result.length,
+              limit: arr.length,
+              total: arr.length,
               totalPages: 1,
               hasMore: false,
             },

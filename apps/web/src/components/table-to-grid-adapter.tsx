@@ -36,6 +36,8 @@ export default function TableToGridAdapter<T extends Record<string, any>>({
         type = 'currency';
       } else if (accessorKey.toLowerCase().includes('date')) {
         type = 'date';
+      } else if (accessorKey.toLowerCase().includes('quantity') || accessorKey.toLowerCase().includes('id')) {
+        type = 'number';
       } else if (col.cell && typeof col.cell === 'function') {
         // Try to infer from cell renderer
         const cellStr = col.cell.toString();

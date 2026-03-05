@@ -125,7 +125,7 @@ export default function WorkingCapitalContent() {
     if (!confirm("Are you sure you want to delete this working capital entry?")) return;
     
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(String(id));
       toast.success("Working capital entry deleted successfully");
     } catch (error) {
       toast.error("Failed to delete working capital entry");
@@ -137,7 +137,7 @@ export default function WorkingCapitalContent() {
     if (!confirm(`Are you sure you want to delete ${ids.length} working capital entry(ies)?`)) return;
     
     try {
-      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
+      await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} working capital entry(ies) deleted successfully`);
     } catch (error) {
       toast.error("Failed to delete working capital entries");

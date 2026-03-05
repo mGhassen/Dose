@@ -14,6 +14,7 @@ function transformPersonnel(row: any): Personnel {
     position: row.position,
     type: row.type,
     baseSalary: parseFloat(row.base_salary),
+    salaryFrequency: row.salary_frequency || 'monthly',
     employerCharges: parseFloat(row.employer_charges),
     employerChargesType: row.employer_charges_type,
     startDate: row.start_date,
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
     end.setDate(0);
 
     // Initialize all months
-    let current = new Date(start);
+    const current = new Date(start);
     while (current <= end) {
       const month = current.toISOString().slice(0, 7);
       projections[month] = {
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
       const personStart = new Date(person.startDate);
       const personEnd = person.endDate ? new Date(person.endDate) : null;
 
-      let current = new Date(Math.max(start.getTime(), personStart.getTime()));
+      const current = new Date(Math.max(start.getTime(), personStart.getTime()));
       const finalDate = personEnd ? new Date(Math.min(end.getTime(), personEnd.getTime())) : end;
 
       while (current <= finalDate) {

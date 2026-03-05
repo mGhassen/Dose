@@ -12,7 +12,7 @@ import { InputGroupAttached } from "@/components/input-group";
 import { Checkbox } from "@kit/ui/checkbox";
 import { ScrollArea } from "@kit/ui/scroll-area";
 import { Save, X, Plus, Trash2 } from "lucide-react";
-import { useCreateExpense, useInventorySuppliers, useItems, useUnits, useVariablesByType } from "@kit/hooks";
+import { useCreateExpense, useInventorySuppliers, useItems, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseCategory } from "@kit/types";
 import type { ExpenseLineItemInput } from "@kit/types";
@@ -34,7 +34,8 @@ const CATEGORY_ITEMS = [
   { id: "other", name: "Other" },
 ];
 
-import { getEffectiveTransactionTaxRate, lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
+import { lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
+import { taxRulesApi } from "@kit/lib";
 
 export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateContentProps) {
   const router = useRouter();
@@ -45,7 +46,6 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
   const items = itemsResponse?.data ?? [];
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
-  const { data: taxVariables } = useVariablesByType('transaction_tax');
 
   const [formData, setFormData] = useState({
     name: "",
@@ -61,10 +61,14 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
     Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string; taxInclusive: boolean }>
   >([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
 
-  const taxRate = useMemo(
-    () => getEffectiveTransactionTaxRate(taxVariables, formData.category, formData.expenseDate),
-    [taxVariables, formData.category, formData.expenseDate]
-  );
+  const [defaultTaxRate, setDefaultTaxRate] = useState(0);
+  useEffect(() => {
+    if (!formData.expenseDate) {
+      setDefaultTaxRate(0);
+      return;
+    }
+    taxRulesApi.resolve({ context: 'expense', date: formData.expenseDate }).then((r) => setDefaultTaxRate(r.rate)).catch(() => setDefaultTaxRate(0));
+  }, [formData.expenseDate]);
 
   const hasAnyItem = lineItems.some((l) => l.itemId !== "");
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
@@ -73,7 +77,7 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
     for (const line of lineItems) {
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
-      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.category ? taxRate : 0);
+      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : defaultTaxRate;
       const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, line.taxInclusive);
       sub += lineTotalNet;
       tax += taxAmount;
@@ -86,7 +90,7 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
     }
     const tot = Math.round((sub + tax - disc) * 100) / 100;
     return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
-  }, [lineItems, taxRate, formData.category, formData.discountType, formData.discountValue]);
+  }, [lineItems, defaultTaxRate, formData.discountType, formData.discountValue]);
 
   const addLine = () => {
     setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
@@ -123,7 +127,7 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
         const price = item?.unit_cost ?? item?.unitCost ?? item?.unit_price ?? item?.unitPrice;
         line.unitPrice = price != null ? String(price) : "";
         line.unitCost = item?.unitCost != null ? String(item.unitCost) : (item?.unit_cost != null ? String(item.unit_cost) : "");
-        line.taxRatePercent = item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : (formData.category ? String(taxRate) : "");
+        line.taxRatePercent = item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : String(defaultTaxRate);
       }
       next[index] = line;
       return next;
@@ -145,7 +149,7 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
         toast.error(`Line ${i + 1}: quantity (positive) and unit price are required`);
         return;
       }
-      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : taxRate;
+      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : defaultTaxRate;
       const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, lineRate) : price;
       payloadLines.push({
         itemId: line.itemId ? parseInt(line.itemId, 10) : undefined,
@@ -224,11 +228,9 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
             </div>
           </div>
 
-          {formData.category && (
-            <p className="text-xs text-muted-foreground pl-3">
-              Default tax: {taxRate.toFixed(1)}% (from Settings). Item default tax is used when set.
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground pl-3">
+            Tax: {defaultTaxRate.toFixed(1)}% (from tax rules; not tied to category).
+          </p>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -301,9 +303,9 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
                               step="0.01"
                               min="0"
                               className="text-sm tabular-nums"
-                              value={line.taxRatePercent !== "" ? line.taxRatePercent : (formData.category ? String(taxRate) : "")}
+                              value={line.taxRatePercent !== "" ? line.taxRatePercent : String(defaultTaxRate)}
                               onChange={(e) => updateLine(index, "taxRatePercent", e.target.value)}
-                              placeholder={formData.category ? String(taxRate) : "—"}
+                              placeholder={String(defaultTaxRate)}
                             />
                           }
                           addon={
@@ -383,7 +385,7 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
                   <span className="tabular-nums">{subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tax {taxRate > 0 && `(${taxRate.toFixed(1)}%)`}</span>
+                  <span className="text-muted-foreground">Tax {defaultTaxRate > 0 && `(${defaultTaxRate.toFixed(1)}%)`}</span>
                   <span className="tabular-nums">{totalTax.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">

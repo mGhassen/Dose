@@ -43,6 +43,7 @@ function transformPersonnel(row: any): Personnel {
     position: row.position,
     type: row.type,
     baseSalary: parseFloat(row.base_salary),
+    salaryFrequency: row.salary_frequency || 'monthly',
     employerCharges: parseFloat(row.employer_charges),
     employerChargesType: row.employer_charges_type,
     startDate: row.start_date,
@@ -132,9 +133,10 @@ export async function POST(request: NextRequest) {
     const endDate = endDateObj.toISOString().split('T')[0];
 
     // Fetch all related data
-    const [salesResult, expensesResult, personnelResult, leasingResult, depreciationResult, loansResult, variablesResult, actualPaymentsResult] = await Promise.all([
+    const [salesResult, expensesResult, subscriptionsResult, personnelResult, leasingResult, depreciationResult, loansResult, variablesResult, actualPaymentsResult] = await Promise.all([
       supabase.from('sales').select('*').gte('date', startDate).lte('date', endDate),
       supabase.from('expenses').select('*'),
+      supabase.from('subscriptions').select('*').eq('is_active', true),
       supabase.from('personnel').select('*').eq('is_active', true),
       supabase.from('leasing_payments').select('*').eq('is_active', true),
       supabase.from('depreciation_entries').select('*').eq('month', month),

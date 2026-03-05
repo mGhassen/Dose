@@ -5,6 +5,8 @@ import type { User, UpdateUserData } from '@kit/lib/api/users';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
+type AccountRow = { id: string; is_admin?: boolean; profiles?: { id: unknown } | null };
+
 // Helper to convert UUID to numeric ID (same as in route.ts)
 function uuidToNumber(uuid: string): number {
   let hash = 0;
@@ -136,8 +138,8 @@ export async function GET(
         `);
 
       if (allAccounts) {
-        for (const acc of allAccounts) {
-          const accNumericId = acc.profiles?.id ? Number(acc.profiles.id) : uuidToNumber(acc.id);
+        for (const acc of allAccounts as unknown as AccountRow[]) {
+          const accNumericId = acc.profiles?.id != null ? Number(acc.profiles.id) : uuidToNumber(acc.id);
           if (accNumericId === numericId) {
             account = acc;
             profile = acc.profiles;
@@ -249,8 +251,8 @@ export async function PUT(
         `);
 
       if (allAccounts) {
-        for (const acc of allAccounts) {
-          const accNumericId = acc.profiles?.id ? Number(acc.profiles.id) : uuidToNumber(acc.id);
+        for (const acc of allAccounts as unknown as AccountRow[]) {
+          const accNumericId = acc.profiles?.id != null ? Number(acc.profiles.id) : uuidToNumber(acc.id);
           if (accNumericId === numericId) {
             account = acc;
             profile = acc.profiles;
@@ -374,8 +376,8 @@ export async function DELETE(
         .select('id, is_admin, profile_id, profiles(id)');
 
       if (allAccounts) {
-        for (const acc of allAccounts) {
-          const accNumericId = acc.profiles?.id ? Number(acc.profiles.id) : uuidToNumber(acc.id);
+        for (const acc of allAccounts as unknown as AccountRow[]) {
+          const accNumericId = acc.profiles?.id != null ? Number(acc.profiles.id) : uuidToNumber(acc.id);
           if (accNumericId === numericId) {
             account = acc;
             break;

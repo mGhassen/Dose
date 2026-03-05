@@ -136,7 +136,7 @@ export default function CreateRecipePage() {
                         />
                         <UnifiedSelector
                           type="unit"
-                          items={units.map(u => ({ id: u.id, name: u.name, symbol: u.symbol, ...u }))}
+                          items={units.map(u => ({ ...u, name: u.name || u.symbol || String(u.id) }))}
                           selectedId={formData.unitId ?? undefined}
                           onSelect={(sel) => {
                             const u = units.find(x => x.id === sel.id);
@@ -273,7 +273,7 @@ export default function CreateRecipePage() {
                               <Label>Unit</Label>
                               <UnifiedSelector
                                 type="unit"
-                                items={units.map(u => ({ id: u.id, name: u.name, symbol: u.symbol, ...u }))}
+                                items={units.map(u => ({ ...u, name: u.name || u.symbol || String(u.id) }))}
                                 selectedId={item.unitId ?? undefined}
                                 onSelect={(sel) => {
                                   const u = units.find(x => x.id === sel.id);

@@ -34,7 +34,7 @@ function transformStockLevel(row: any): StockLevel {
 function transformToSnakeCase(data: UpdateStockLevelData): any {
   const result: any = {};
   if (data.itemId !== undefined) result.item_id = data.itemId;
-  if (data.ingredientId !== undefined) result.item_id = data.ingredientId; // Backward compat
+  if ((data as { ingredientId?: number }).ingredientId !== undefined) result.item_id = (data as { ingredientId: number }).ingredientId; // Backward compat
   if (data.quantity !== undefined) result.quantity = data.quantity;
   if (data.unit !== undefined) result.unit = data.unit;
   if (data.unitId !== undefined) result.unit_id = data.unitId;

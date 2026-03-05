@@ -121,7 +121,7 @@ export default function LeasingContent() {
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(String(id));
       toast.success("Leasing payment deleted successfully");
     } catch (error) {
       toast.error("Failed to delete leasing payment");
@@ -131,7 +131,7 @@ export default function LeasingContent() {
 
   const handleBulkDelete = async (ids: number[]) => {
     try {
-      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
+      await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} leasing payment(s) deleted successfully`);
     } catch (error) {
       toast.error("Failed to delete leasing payments");

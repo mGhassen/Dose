@@ -53,7 +53,7 @@ export default function CreateStockMovementPage() {
         movementType: formData.movementType,
         quantity: parseFloat(formData.quantity),
         unitId: formData.unitId,
-        unit: (unitsData || []).find((u) => u.id === formData.unitId)?.symbol,
+        unit: (unitsData || []).find((u) => u.id === formData.unitId)?.symbol ?? '',
         location: formData.location || undefined,
         notes: formData.notes || undefined,
         movementDate: formData.movementDate,
@@ -72,7 +72,7 @@ export default function CreateStockMovementPage() {
     if (field === 'itemId' && value) {
       const selectedItem = items.find(i => i.id === parseInt(value));
       if (selectedItem?.unitId != null) {
-        setFormData(prev => ({ ...prev, unitId: selectedItem.unitId }));
+        setFormData(prev => ({ ...prev, unitId: selectedItem.unitId ?? null }));
       }
     }
   };

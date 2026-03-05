@@ -84,7 +84,7 @@ export default function FinancialPlanContent() {
     if (!confirm("Are you sure you want to delete this financial plan?")) return;
     
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(String(id));
       toast.success("Financial plan deleted successfully");
     } catch (error) {
       toast.error("Failed to delete financial plan");
@@ -96,7 +96,7 @@ export default function FinancialPlanContent() {
     if (!confirm(`Are you sure you want to delete ${ids.length} financial plan(s)?`)) return;
     
     try {
-      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
+      await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} financial plan(s) deleted successfully`);
     } catch (error) {
       toast.error("Failed to delete financial plans");

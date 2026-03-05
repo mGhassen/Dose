@@ -212,7 +212,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
     }
 
     try {
-      await deleteMutation.mutateAsync(Number(loanId));
+      await deleteMutation.mutateAsync(String(loanId));
       toast.success("Loan deleted successfully");
       router.push('/loans');
     } catch (error) {

@@ -43,7 +43,8 @@ function transformToSnakeCase(data: UpdateSupplierOrderData): any {
   if (data.orderNumber !== undefined) result.order_number = data.orderNumber;
   if (data.orderDate !== undefined) result.order_date = data.orderDate;
   if (data.expectedDeliveryDate !== undefined) result.expected_delivery_date = data.expectedDeliveryDate;
-  if (data.actualDeliveryDate !== undefined) result.actual_delivery_date = data.actualDeliveryDate;
+  const ext = data as { actualDeliveryDate?: string };
+  if (ext.actualDeliveryDate !== undefined) result.actual_delivery_date = ext.actualDeliveryDate;
   if (data.status !== undefined) result.status = data.status;
   if (data.notes !== undefined) result.notes = data.notes;
   return result;

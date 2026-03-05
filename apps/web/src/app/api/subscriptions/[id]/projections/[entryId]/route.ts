@@ -132,7 +132,11 @@ export async function PUT(
               .single();
 
             if (subscriptionData) {
-              const amount = body.actualAmount || parseFloat(existingEntry.amount);
+              const subTotal = body.actualAmount ?? parseFloat(existingEntry.amount);
+              const taxRate = subscriptionData.default_tax_rate_percent != null ? parseFloat(String(subscriptionData.default_tax_rate_percent)) : 0;
+              const taxAmount = Math.round(subTotal * (taxRate / 100) * 100) / 100;
+              const amount = Math.round((subTotal + taxAmount) * 100) / 100;
+
               const expenseData = {
                 name: `${subscriptionData.name} - ${data.month}`,
                 category: subscriptionData.category,
@@ -142,8 +146,8 @@ export async function PUT(
                 description: body.notes || `Payment for subscription: ${subscriptionData.name} - ${data.month}`,
                 vendor: subscriptionData.vendor || null,
                 start_date: body.paidDate || data.month + '-01',
-                subtotal: amount,
-                total_tax: 0,
+                subtotal: subTotal,
+                total_tax: taxAmount,
                 total_discount: 0,
                 is_active: true,
               };
@@ -161,11 +165,11 @@ export async function PUT(
                   subscription_id: parseInt(id),
                   quantity: 1,
                   unit_id: null,
-                  unit_price: amount,
+                  unit_price: subTotal,
                   unit_cost: null,
-                  tax_rate_percent: 0,
-                  tax_amount: 0,
-                  line_total: amount,
+                  tax_rate_percent: taxRate,
+                  tax_amount: taxAmount,
+                  line_total: subTotal,
                   sort_order: 0,
                 });
               } else if (expenseError) {

@@ -147,7 +147,7 @@ export default function SquareCsvImport({ integrationId, onImportComplete }: Squ
           { id: 'catalog', name: 'Catalog Items' },
         ]}
         selectedId={importType || undefined}
-        onSelect={(item) => setImportType(String(item.id))}
+        onSelect={(item) => setImportType(String(item.id) as 'orders' | 'payments' | 'catalog')}
         placeholder="Select import type"
       />
 

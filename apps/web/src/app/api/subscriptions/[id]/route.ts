@@ -17,6 +17,7 @@ function transformSubscription(row: any): Subscription {
     description: row.description,
     vendor: row.vendor, // Keep for backward compatibility
     supplierId: row.supplier_id || undefined,
+    defaultTaxRatePercent: row.default_tax_rate_percent != null ? parseFloat(String(row.default_tax_rate_percent)) : undefined,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -34,6 +35,7 @@ function transformToSnakeCase(data: UpdateSubscriptionData): any {
   if (data.description !== undefined) result.description = data.description;
   if (data.vendor !== undefined) result.vendor = data.vendor; // Keep for backward compatibility
   if (data.supplierId !== undefined) result.supplier_id = data.supplierId || null;
+  if (data.defaultTaxRatePercent !== undefined) result.default_tax_rate_percent = data.defaultTaxRatePercent ?? null;
   if (data.isActive !== undefined) result.is_active = data.isActive;
 
   result.updated_at = new Date().toISOString();

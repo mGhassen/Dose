@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
-import type { Supplier, CreateSupplierData, PaginatedResponse } from '@kit/types';
+import type { Supplier, CreateSupplierData } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
 function transformSupplier(row: any): Supplier {

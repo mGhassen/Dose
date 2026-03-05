@@ -28,7 +28,7 @@ export interface CreatePaymentData {
   notes?: string;
 }
 
-export interface UpdatePaymentData extends Partial<CreatePaymentData> {}
+export type UpdatePaymentData = Partial<CreatePaymentData>;
 
 function transformPayment(row: any): Payment {
   return {

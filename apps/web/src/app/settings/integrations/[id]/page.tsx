@@ -17,6 +17,7 @@ import {
 } from '@kit/ui/dropdown-menu';
 import { 
   Square, 
+  Settings,
   RefreshCw, 
   CheckCircle2, 
   XCircle, 

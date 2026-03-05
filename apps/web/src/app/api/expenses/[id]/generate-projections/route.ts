@@ -6,19 +6,18 @@ import { projectExpense } from '@/lib/calculations/expense-projections';
 import type { Expense } from '@kit/types';
 
 function transformExpense(row: any): Expense {
-  return {
+  const base = {
     id: row.id,
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
-    startDate: row.start_date,
-    endDate: row.end_date,
+    expenseDate: row.expense_date ?? row.start_date,
     description: row.description,
     vendor: row.vendor,
-    isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+  return { ...base, startDate: row.start_date, endDate: row.end_date, isActive: row.is_active } as Expense;
 }
 
 export async function POST(
@@ -95,7 +94,7 @@ export async function POST(
         due_date: `${proj.month}-01`,
         reference_id: parseInt(id),
         schedule_entry_id: proj.id,
-        is_active: expense.isActive,
+        is_active: (expense as { isActive?: boolean }).isActive ?? true,
       }));
 
       const { error: entryError } = await supabase

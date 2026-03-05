@@ -8,6 +8,7 @@ function transformActualPayment(row: any): ActualPayment {
   return {
     id: row.id,
     paymentType: row.payment_type,
+    direction: row.direction || 'output',
     referenceId: row.reference_id,
     scheduleEntryId: row.schedule_entry_id,
     month: row.month,

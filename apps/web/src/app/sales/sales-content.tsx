@@ -120,7 +120,7 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(String(id));
       toast.success("Sale deleted successfully");
     } catch (error) {
       toast.error("Failed to delete sale");
@@ -130,7 +130,7 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
 
   const handleBulkDelete = async (ids: number[]) => {
     try {
-      await Promise.all(ids.map(id => deleteMutation.mutateAsync(id)));
+      await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} sale(s) deleted successfully`);
     } catch (error) {
       toast.error("Failed to delete sales");

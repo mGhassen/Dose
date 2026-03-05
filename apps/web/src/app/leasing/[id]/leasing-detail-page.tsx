@@ -394,7 +394,7 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
     }
 
     try {
-      await deleteMutation.mutateAsync(Number(resolvedParams.id));
+      await deleteMutation.mutateAsync(String(resolvedParams.id));
       toast.success("Leasing payment deleted successfully");
       router.push('/leasing');
     } catch (error) {

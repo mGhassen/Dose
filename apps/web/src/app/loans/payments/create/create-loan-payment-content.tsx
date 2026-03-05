@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate } from "@kit/lib/date-format";
-import type { Loan, LoanScheduleEntry } from "@kit/lib";
+import type { Loan, LoanScheduleEntry } from "@kit/types";
 
 export default function CreateLoanPaymentPage() {
   const router = useRouter();
@@ -125,9 +125,14 @@ export default function CreateLoanPaymentPage() {
       }
     }
 
+    if (entryId == null) {
+      toast.error("Missing schedule entry");
+      return;
+    }
+
     try {
       await createPayment.mutateAsync({
-        entryId: entryId,
+        entryId,
         paymentDate: paymentDate,
         amount: amount,
         isPaid: true,
@@ -179,9 +184,8 @@ export default function CreateLoanPaymentPage() {
                   required
                   type="loan"
                   items={loans?.map((loan: Loan) => ({
-                    id: loan.id,
-                    name: `${loan.name} (${loan.loanNumber}) - ${formatCurrency(loan.principalAmount)}`,
                     ...loan,
+                    name: `${loan.name} (${loan.loanNumber}) - ${formatCurrency(loan.principalAmount)}`,
                   })) ?? []}
                   selectedId={selectedLoanId}
                   onSelect={(item) => setSelectedLoanId(item.id === 0 ? undefined : item.id)}

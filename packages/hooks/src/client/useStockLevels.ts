@@ -14,12 +14,13 @@ export function useStockLevels(params?: { page?: number; limit?: number; itemId?
           return result;
         }
         if (Array.isArray(result)) {
+          const arr = result as import('@kit/types').StockLevel[];
           return {
-            data: result,
+            data: arr,
             pagination: {
               page: 1,
-              limit: result.length,
-              total: result.length,
+              limit: arr.length,
+              total: arr.length,
               totalPages: 1,
               hasMore: false,
             },
