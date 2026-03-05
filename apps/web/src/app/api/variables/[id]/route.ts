@@ -40,7 +40,7 @@ function transformToSnakeCase(data: UpdateVariableData): any {
   if (data.endDate !== undefined) result.end_date = data.endDate;
   if (data.description !== undefined) result.description = data.description;
   if (data.isActive !== undefined) result.is_active = data.isActive;
-  if (data.payload !== undefined) result.payload = data.payload;
+  if (data.payload !== undefined) result.payload = data.payload ?? {};
   result.updated_at = new Date().toISOString();
   return result;
 }

@@ -393,11 +393,14 @@ export const updateItemPriceHistorySchema = z
 export type UpdateItemPriceHistoryInput = z.infer<typeof updateItemPriceHistorySchema>;
 
 const variableTypeEnum = z.enum(VARIABLE_TYPE_NAMES);
-const variablePayloadSchema = z.record(z.string(), z.unknown()).optional();
+const variablePayloadSchema = z.record(z.string(), z.unknown()).optional().nullable();
 export const createVariableSchema = z
   .object({
     name: z.string().min(1, "Name is required"),
-    type: variableTypeEnum,
+    type: z.preprocess(
+      (s) => (typeof s === "string" ? s.toLowerCase().trim() : s),
+      variableTypeEnum
+    ),
     value: z.number().optional(),
     unitId: z.number().int().positive().nullable().optional(),
     unit: z.string().optional(),
