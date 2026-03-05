@@ -374,12 +374,10 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                   </span>
                   <span className="tabular-nums">{totalTax.toFixed(2)}</span>
                 </div>
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Discount</span>
-                    <span className="tabular-nums">-{discountAmount.toFixed(2)}</span>
-                  </div>
-                )}
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Discount</span>
+                  <span className="tabular-nums">-{discountAmount.toFixed(2)}</span>
+                </div>
                 <div className="flex justify-between font-semibold pt-2 border-t">
                   <span>Total</span>
                   <span className="tabular-nums">{total.toFixed(2)}</span>

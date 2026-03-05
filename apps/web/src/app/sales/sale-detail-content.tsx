@@ -496,7 +496,7 @@ export function SaleDetailContent({ saleId, onClose, onDeleted }: SaleDetailCont
                 <>
                   <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="tabular-nums">{subtotal.toFixed(2)}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Tax ({effectiveTaxRate.toFixed(1)}%)</span><span className="tabular-nums">{totalTax.toFixed(2)}</span></div>
-                  {discountAmount > 0 && <div className="flex justify-between text-muted-foreground"><span>Discount</span><span className="tabular-nums">-{discountAmount.toFixed(2)}</span></div>}
+                  <div className="flex justify-between text-muted-foreground"><span>Discount</span><span className="tabular-nums">-{discountAmount.toFixed(2)}</span></div>
                   <div className="flex justify-between font-semibold pt-2 border-t"><span>Total</span><span className="tabular-nums">{total.toFixed(2)}</span></div>
                 </>
               ) : (
