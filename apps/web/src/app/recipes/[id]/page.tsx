@@ -1103,7 +1103,6 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      </div>
     </AppLayout>
   );
 }
