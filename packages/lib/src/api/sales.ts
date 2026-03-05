@@ -2,12 +2,14 @@ import { apiRequest } from './api';
 import type { Sale, SalesSummary, CreateSaleData, UpdateSaleData, PaginatedResponse, PaginationParams } from '@kit/types';
 
 export const salesApi = {
-  getAll: (params?: PaginationParams & { month?: string; year?: string; type?: string }) => {
+  getAll: (params?: PaginationParams & { month?: string; year?: string; type?: string; startDate?: string; endDate?: string }) => {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.month) searchParams.append('month', params.month);
     if (params?.year) searchParams.append('year', params.year);
+    if (params?.startDate) searchParams.append('startDate', params.startDate);
+    if (params?.endDate) searchParams.append('endDate', params.endDate);
     if (params?.type) searchParams.append('type', params.type);
     const query = searchParams.toString();
     return apiRequest<PaginatedResponse<Sale>>('GET', `/api/sales${query ? `?${query}` : ''}`);

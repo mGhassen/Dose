@@ -33,6 +33,9 @@ import {
 } from "lucide-react";
 import { DatePicker } from "@kit/ui/date-picker";
 import { UnifiedSelector } from "@/components/unified-selector";
+import { InputGroupAttached } from "@/components/input-group";
+import { Checkbox } from "@kit/ui/checkbox";
+import { useExpensesPanelFormView } from "../expenses-layout-client";
 import {
   useExpenseById,
   useUpdateExpense,
@@ -126,20 +129,27 @@ export function ExpenseDetailContent({
     discountValue: "",
   });
   const [lineItems, setLineItems] = useState<
-    Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxInclusive: boolean }>
-  >([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxInclusive: false }]);
+    Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string; taxInclusive: boolean }>
+  >([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
+  const { setIsFormView } = useExpensesPanelFormView();
+
+  useEffect(() => {
+    setIsFormView(isEditing);
+  }, [isEditing, setIsFormView]);
 
   const taxRate = useMemo(
     () => getEffectiveTransactionTaxRate(taxVariables, formData.category, formData.expenseDate),
     [taxVariables, formData.category, formData.expenseDate]
   );
+  const hasAnyItem = lineItems.some((l) => l.itemId !== "");
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
     let sub = 0;
     let tax = 0;
     for (const line of lineItems) {
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, taxRate, line.taxInclusive);
+      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.category ? taxRate : 0);
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, line.taxInclusive);
       sub += lineTotalNet;
       tax += taxAmount;
     }
@@ -151,7 +161,7 @@ export function ExpenseDetailContent({
     }
     const tot = Math.round((sub + tax - disc) * 100) / 100;
     return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
-  }, [lineItems, taxRate, formData.discountType, formData.discountValue]);
+  }, [lineItems, taxRate, formData.category, formData.discountType, formData.discountValue]);
 
   useEffect(() => {
     if (expense) {
@@ -165,21 +175,22 @@ export function ExpenseDetailContent({
         discountValue: expense.totalDiscount && expense.totalDiscount > 0 ? String(expense.totalDiscount) : "",
       });
       const lines = expense.lineItems?.length
-        ? expense.lineItems.map((li) => ({
+        ? expense.lineItems.map((li: { itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; taxRatePercent?: number }) => ({
             itemId: li.itemId?.toString() ?? "",
             quantity: String(li.quantity),
             unitId: li.unitId ?? null,
             unitPrice: String(li.unitPrice),
             unitCost: li.unitCost != null ? String(li.unitCost) : "",
+            taxRatePercent: li.taxRatePercent != null ? String(li.taxRatePercent) : "",
             taxInclusive: false,
           }))
-        : [{ itemId: "", quantity: "1", unitId: null, unitPrice: String(expense.amount), unitCost: "", taxInclusive: false }];
+        : [{ itemId: "", quantity: "1", unitId: null, unitPrice: String(expense.amount), unitCost: "", taxRatePercent: "", taxInclusive: false }];
       setLineItems(lines);
     }
   }, [expense]);
 
   const addLine = () => {
-    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxInclusive: false }]);
+    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
   };
   const removeLine = (index: number) => {
     if (lineItems.length <= 1) return;
@@ -193,23 +204,27 @@ export function ExpenseDetailContent({
     });
   };
   const handleItemSelect = (index: number, itemId: string) => {
-    updateLine(index, "itemId", itemId);
-    if (!itemId) return;
-    const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10));
-    if (item) {
-      const price = (item as { unitCost?: number; unitPrice?: number }).unitCost ?? (item as { unitPrice?: number }).unitPrice;
-      const cost = (item as { unitCost?: number }).unitCost;
-      setLineItems((prev) => {
-        const next = [...prev];
-        next[index] = {
-          ...next[index],
-          itemId,
-          unitPrice: price != null ? String(price) : next[index].unitPrice,
-          unitCost: cost != null ? String(cost) : next[index].unitCost,
-        };
-        return next;
-      });
-    }
+    setLineItems((prev) => {
+      const next = [...prev];
+      const line = { ...next[index] };
+      line.itemId = itemId;
+      if (!itemId) {
+        line.quantity = "1";
+        line.unitId = null;
+        line.unitPrice = "";
+        line.taxRatePercent = "";
+      } else {
+        const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; unit_cost?: number; unitCost?: number; unit_price?: number; unitPrice?: number; defaultTaxRatePercent?: number } | undefined;
+        line.quantity = "1";
+        line.unitId = item?.unitId ?? null;
+        const price = item?.unit_cost ?? item?.unitCost ?? item?.unit_price ?? item?.unitPrice;
+        line.unitPrice = price != null ? String(price) : "";
+        line.unitCost = item?.unitCost != null ? String(item.unitCost) : (item?.unit_cost != null ? String(item.unit_cost) : "");
+        line.taxRatePercent = item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : (formData.category ? String(taxRate) : "");
+      }
+      next[index] = line;
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -218,7 +233,7 @@ export function ExpenseDetailContent({
       toast.error("Name, category and date are required");
       return;
     }
-    const payloadLines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number }> = [];
+    const payloadLines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; taxRatePercent?: number }> = [];
     for (let i = 0; i < lineItems.length; i++) {
       const line = lineItems[i];
       const qty = parseFloat(line.quantity);
@@ -227,13 +242,15 @@ export function ExpenseDetailContent({
         toast.error(`Line ${i + 1}: quantity and unit price required`);
         return;
       }
-      const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, taxRate) : price;
+      const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : taxRate;
+      const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, lineRate) : price;
       payloadLines.push({
         itemId: line.itemId ? parseInt(line.itemId, 10) : undefined,
         quantity: qty,
         unitId: line.unitId ?? undefined,
         unitPrice: unitPriceNet,
         unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
+        taxRatePercent: line.taxRatePercent !== "" ? lineRate : undefined,
       });
     }
     const payload = {
@@ -324,20 +341,20 @@ export function ExpenseDetailContent({
 
   if (isEditing) {
     return (
-      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col h-full">
         <ScrollArea className="min-h-0 flex-1 pr-2">
-          <div className="space-y-4 pb-6 pr-1">
+          <div className="space-y-6 pb-6 pr-1">
             <div>
               <h2 className="text-lg font-semibold">Edit expense</h2>
               <p className="text-sm text-muted-foreground">Update line items and totals</p>
             </div>
             <Separator />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">Name *</Label>
                 <Input id="name" value={formData.name} onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))} required />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 sm:col-span-2">
                 <Label>Category *</Label>
                 <UnifiedSelector
                   type="category"
@@ -355,8 +372,9 @@ export function ExpenseDetailContent({
                   onSelect={(item) => setFormData((p) => ({ ...p, category: item.id === 0 ? "" : String(item.id) }))}
                   placeholder="Category"
                 />
+                <p className="text-xs text-muted-foreground pl-3">Default tax: {taxRate.toFixed(1)}% (from Settings). Item default tax is used when set.</p>
               </div>
-              <div className="space-y-2 col-span-2">
+              <div className="space-y-2">
                 <Label>Date *</Label>
                 <DatePicker
                   value={formData.expenseDate ? new Date(formData.expenseDate) : undefined}
@@ -375,7 +393,7 @@ export function ExpenseDetailContent({
               <div className="space-y-3 border rounded-md p-3 bg-muted/30">
                 {lineItems.map((line, index) => (
                   <div key={index} className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-4">
+                    <div className="col-span-3">
                       <UnifiedSelector
                         label=""
                         type="item"
@@ -385,87 +403,163 @@ export function ExpenseDetailContent({
                         onCreateNew={() => router.push("/items/create")}
                         placeholder="Item (optional)"
                         getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}`}
+                        className="h-10"
                       />
                     </div>
-                    <div className="col-span-2">
-                      <Label className="text-xs">Qty</Label>
-                      <Input type="number" step="0.01" min="0.01" value={line.quantity} onChange={(e) => updateLine(index, "quantity", e.target.value)} />
-                    </div>
-                    <div className="col-span-2">
-                      <UnifiedSelector
-                        label=""
-                        type="unit"
-                        items={unitItems}
-                        selectedId={line.unitId ?? undefined}
-                        onSelect={(item) => updateLine(index, "unitId", item.id === 0 ? null : (item.id as number))}
-                        placeholder="Unit"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-xs">{line.taxInclusive ? "Price (incl. tax)" : "Price (excl. tax)"}</Label>
-                      <Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(index, "unitPrice", e.target.value)} />
-                    </div>
-                    <div className="col-span-1 flex flex-col gap-1 items-end justify-end pb-2">
-                      <Label className="text-xs opacity-0 pointer-events-none">Tax</Label>
-                      <select
-                        className="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-xs w-full min-w-0"
-                        value={line.taxInclusive ? "incl" : "excl"}
-                        onChange={(e) => updateLine(index, "taxInclusive", e.target.value === "incl")}
-                        title="Tax"
-                      >
-                        <option value="excl">Excl.</option>
-                        <option value="incl">Incl.</option>
-                      </select>
-                    </div>
-                    <div className="col-span-1 flex items-end pb-2">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
-                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </div>
+                    {line.itemId ? (
+                      <>
+                        <div className="col-span-4">
+                          <InputGroupAttached
+                            label="Qty / Unit"
+                            input={
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                className="text-sm tabular-nums"
+                                value={line.quantity}
+                                onChange={(e) => updateLine(index, "quantity", e.target.value)}
+                              />
+                            }
+                            addon={
+                              <UnifiedSelector
+                                type="unit"
+                                items={unitItems}
+                                selectedId={line.unitId ?? undefined}
+                                onSelect={(item) => updateLine(index, "unitId", item.id === 0 ? null : (item.id as number))}
+                                placeholder="—"
+                                className="!min-w-0 w-20"
+                              />
+                            }
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Label className="text-xs text-muted-foreground">{line.taxInclusive ? "Price (incl. tax)" : "Price (excl. tax)"}</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="text-sm tabular-nums"
+                            value={line.unitPrice}
+                            onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <InputGroupAttached
+                            label="Tax % / Incl. tax"
+                            addonStyle="default"
+                            input={
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="text-sm tabular-nums"
+                                value={line.taxRatePercent !== "" ? line.taxRatePercent : (formData.category ? String(taxRate) : "")}
+                                onChange={(e) => updateLine(index, "taxRatePercent", e.target.value)}
+                                placeholder={formData.category ? String(taxRate) : "—"}
+                              />
+                            }
+                            addon={
+                              <div className="flex h-full min-h-10 items-center justify-center leading-none" title="Price includes tax">
+                                <Checkbox
+                                  id={`exp-edit-tax-incl-${index}`}
+                                  checked={line.taxInclusive}
+                                  onCheckedChange={(checked) => updateLine(index, "taxInclusive", checked === true)}
+                                  aria-label="Price includes tax"
+                                />
+                              </div>
+                            }
+                          />
+                        </div>
+                        <div className="col-span-1 flex h-10 items-center">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="col-span-4">
+                          <Label className="text-xs">Amount</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={line.unitPrice}
+                            onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="col-span-4 flex h-10 items-center">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Label>Discount</Label>
-              <div className="flex gap-2">
-                <select
-                  className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                  value={formData.discountType}
-                  onChange={(e) => setFormData((p) => ({ ...p, discountType: e.target.value as "amount" | "percent" }))}
-                >
-                  <option value="amount">Amount</option>
-                  <option value="percent">Percent</option>
-                </select>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.discountValue}
-                  onChange={(e) => setFormData((p) => ({ ...p, discountValue: e.target.value }))}
-                  placeholder="0"
-                />
+            {hasAnyItem && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Discount</Label>
+                  <div className="flex gap-2">
+                    <select
+                      className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                      value={formData.discountType}
+                      onChange={(e) => setFormData((p) => ({ ...p, discountType: e.target.value as "amount" | "percent" }))}
+                    >
+                      <option value="amount">Amount</option>
+                      <option value="percent">Percent</option>
+                    </select>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.discountValue}
+                      onChange={(e) => setFormData((p) => ({ ...p, discountValue: e.target.value }))}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
             <div className="rounded-md border bg-muted/50 p-3 space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>{subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Tax ({taxRate.toFixed(1)}%)</span>
-                <span>{totalTax.toFixed(2)}</span>
-              </div>
-              {discountAmount > 0 && (
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Discount</span>
-                  <span>-{discountAmount.toFixed(2)}</span>
+              {hasAnyItem ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="tabular-nums">{subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tax {taxRate > 0 && `(${taxRate.toFixed(1)}%)`}</span>
+                    <span className="tabular-nums">{totalTax.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Discount</span>
+                    <span className="tabular-nums">-{discountAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold pt-2 border-t">
+                    <span>Total</span>
+                    <span className="tabular-nums">{total.toFixed(2)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between font-semibold">
+                  <span>Total</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="h-10 w-24 text-right tabular-nums"
+                    value={lineItems[0]?.unitPrice ?? ""}
+                    onChange={(e) => updateLine(0, "unitPrice", e.target.value)}
+                    placeholder="0"
+                  />
                 </div>
               )}
-              <div className="flex justify-between font-semibold pt-2 border-t">
-                <span>Total</span>
-                <span>{total.toFixed(2)}</span>
-              </div>
             </div>
             <div className="space-y-2">
               <Label>Vendor</Label>
@@ -487,7 +581,7 @@ export function ExpenseDetailContent({
           <Button type="button" variant="outline" onClick={() => setIsEditing(false)} className="flex-1">
             Cancel
           </Button>
-          <Button type="submit" disabled={updateExpense.isPending || total <= 0} className="flex-1">
+          <Button type="submit" disabled={updateExpense.isPending || (hasAnyItem ? total <= 0 : (parseFloat(lineItems[0]?.unitPrice ?? "0") || 0) <= 0)} className="flex-1">
             {updateExpense.isPending ? "Saving…" : "Save changes"}
           </Button>
         </div>
@@ -499,6 +593,7 @@ export function ExpenseDetailContent({
     expense.subscriptionId && subscriptions.length
       ? subscriptions.find((s: { id: number }) => s.id === expense.subscriptionId)?.name
       : null;
+  const effectiveTaxRateView = getEffectiveTransactionTaxRate(taxVariables ?? [], expense.category, expense.expenseDate?.split?.("T")[0] ?? expense.expenseDate ?? "");
 
   return (
     <div className="flex h-full flex-col">
@@ -612,25 +707,19 @@ export function ExpenseDetailContent({
                 </table>
               </div>
               <div className="mt-2 space-y-1 text-sm">
-                {expense.subtotal != null && (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Subtotal</span>
-                    <span className="tabular-nums">{formatCurrency(expense.subtotal)}</span>
-                  </div>
-                )}
-                {expense.totalTax != null && expense.totalTax > 0 && (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Tax</span>
-                    <span className="tabular-nums">{formatCurrency(expense.totalTax)}</span>
-                  </div>
-                )}
-                {expense.totalDiscount != null && expense.totalDiscount > 0 && (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Discount</span>
-                    <span className="tabular-nums">-{formatCurrency(expense.totalDiscount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-medium pt-1">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className="tabular-nums">{formatCurrency(expense.subtotal ?? 0)}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Tax {effectiveTaxRateView > 0 && `(${effectiveTaxRateView.toFixed(1)}%)`}</span>
+                  <span className="tabular-nums">{formatCurrency(expense.totalTax ?? 0)}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Discount</span>
+                  <span className="tabular-nums">-{formatCurrency(expense.totalDiscount ?? 0)}</span>
+                </div>
+                <div className="flex justify-between font-medium border-t mt-1 pt-2">
                   <span>Total</span>
                   <span className="tabular-nums">{formatCurrency(expense.amount)}</span>
                 </div>

@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
+import { useDashboardPeriod } from "@/components/dashboard-period-provider";
 import { useSales, useDeleteSale } from "@kit/hooks";
 import type { Sale, SalesType } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
@@ -17,12 +18,19 @@ interface SalesContentProps {
 
 export default function SalesContent({ selectedSaleId }: SalesContentProps) {
   const router = useRouter();
+  const { dateRange } = useDashboardPeriod();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+
+  useEffect(() => {
+    setPage(1);
+  }, [dateRange.startDate, dateRange.endDate]);
 
   const { data: salesResponse, isLoading } = useSales({
     page,
     limit: pageSize,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
   });
   
   const sales = salesResponse?.data || [];

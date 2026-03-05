@@ -15,7 +15,8 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const isSalesSplitView =
-    pathname === "/sales" || /^\/sales\/\d+$/.test(pathname);
+    pathname === "/sales" || /^\/sales\/\d+$/.test(pathname) || 
+    pathname === "/expenses" || /^\/expenses\/\d+$/.test(pathname);
   const isSplitView = isSalesSplitView;
 
   return (

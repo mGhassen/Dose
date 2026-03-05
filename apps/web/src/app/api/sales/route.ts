@@ -75,47 +75,41 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month');
     const year = searchParams.get('year');
+    const startDateParam = searchParams.get('startDate');
+    const endDateParam = searchParams.get('endDate');
     const type = searchParams.get('type');
     const { page, limit, offset } = getPaginationParams(searchParams);
 
     const supabase = createServerSupabaseClient();
     
-    // Build count query
     let countQuery = supabase
       .from('sales')
       .select('*', { count: 'exact', head: true });
 
-    // Build data query (items will be fetched manually since there's no FK)
     let query = supabase
       .from('sales')
       .select('*')
       .order('date', { ascending: false });
 
-    if (year) {
-      const startDate = `${year}-01-01`;
-      const endDate = `${year}-12-31`;
-      
-      query = query
-        .gte('date', startDate)
-        .lte('date', endDate);
-      countQuery = countQuery
-        .gte('date', startDate)
-        .lte('date', endDate);
-    }
-
-    if (month) {
-      const startOfMonth = `${month}-01`;
-      const endOfMonth = new Date(`${month}-01`);
-      endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-      endOfMonth.setDate(0);
-      const endDate = endOfMonth.toISOString().split('T')[0];
-      
-      query = query
-        .gte('date', startOfMonth)
-        .lte('date', endDate);
-      countQuery = countQuery
-        .gte('date', startOfMonth)
-        .lte('date', endDate);
+    if (startDateParam && endDateParam) {
+      query = query.gte('date', startDateParam).lte('date', endDateParam);
+      countQuery = countQuery.gte('date', startDateParam).lte('date', endDateParam);
+    } else {
+      if (year) {
+        const startDate = `${year}-01-01`;
+        const endDate = `${year}-12-31`;
+        query = query.gte('date', startDate).lte('date', endDate);
+        countQuery = countQuery.gte('date', startDate).lte('date', endDate);
+      }
+      if (month) {
+        const startOfMonth = `${month}-01`;
+        const endOfMonth = new Date(`${month}-01`);
+        endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+        endOfMonth.setDate(0);
+        const endDate = endOfMonth.toISOString().split('T')[0];
+        query = query.gte('date', startOfMonth).lte('date', endDate);
+        countQuery = countQuery.gte('date', startOfMonth).lte('date', endDate);
+      }
     }
 
     if (type) {
