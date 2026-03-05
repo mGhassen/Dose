@@ -13,7 +13,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { StatusPin } from "@/components/status-pin";
 import { Save, X, Trash2, Plus, ChefHat, MoreVertical, Edit2, AlertTriangle, CheckCircle, Package, Link2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useCreateProducedItem, useItems, useUnits, useUpdateItem, useProduceRecipe, useRecipeCost, useStockLevels } from "@kit/hooks";
+import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useCreateProducedItem, useItems, useUnits, useProduceRecipe, useRecipeCost, useStockLevels } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
 import { formatCurrency } from "@kit/lib/config";
@@ -56,6 +56,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const [produceQuantity, setProduceQuantity] = useState("1");
   const [produceLocation, setProduceLocation] = useState("");
   const [produceNotes, setProduceNotes] = useState("");
+  const [produceItemName, setProduceItemName] = useState("");
+  const [produceSelectedItemId, setProduceSelectedItemId] = useState<number | null>(null);
   const { data: recipe, isLoading, refetch: refetchRecipe } = useRecipeById(resolvedParams?.id || "");
   const { data: itemsResponse } = useItems({ limit: 1000 });
   const { data: units = [] } = useUnits();
@@ -63,12 +65,9 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const updateRecipe = useUpdateRecipe();
   const deleteMutation = useDeleteRecipe();
   const createProducedItem = useCreateProducedItem();
-  const updateItemMutation = useUpdateItem();
   const produceRecipe = useProduceRecipe();
   const [linkItemDialogOpen, setLinkItemDialogOpen] = useState(false);
   const [linkItemId, setLinkItemId] = useState<number | null>(null);
-  const [linkItemDialogOpenForm, setLinkItemDialogOpenForm] = useState(false);
-  const [linkItemIdForm, setLinkItemIdForm] = useState<number | null>(null);
   const { data: allItemsResponse } = useItems({ limit: 1000 });
   const allItems = allItemsResponse?.data ?? [];
   
@@ -101,7 +100,6 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     category: "",
     unit: "",
     unitId: null as number | null,
-    producedItemId: null as number | null,
     servingSize: "",
     preparationTime: "",
     cookingTime: "",
@@ -123,7 +121,6 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
         category: recipe.category || "",
         unit: recipe.unit || "",
         unitId: recipe.unitId ?? null,
-        producedItemId: (recipe as any).producedItemId ?? null,
         servingSize: recipe.servingSize?.toString() || "",
         preparationTime: recipe.preparationTime?.toString() || "",
         cookingTime: recipe.cookingTime?.toString() || "",
@@ -164,7 +161,6 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           category: formData.category || undefined,
           unit: formData.unit || undefined,
           unitId: formData.unitId ?? undefined,
-          producedItemId: formData.producedItemId ?? undefined,
           servingSize: formData.servingSize ? parseInt(formData.servingSize) : undefined,
           preparationTime: formData.preparationTime ? parseInt(formData.preparationTime) : undefined,
           cookingTime: formData.cookingTime ? parseInt(formData.cookingTime) : undefined,
@@ -321,7 +317,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => {
-                        setLinkItemId((recipe as any).producedItemId ?? null);
+                        setLinkItemId(null);
                         setLinkItemDialogOpen(true);
                       }}
                     >
@@ -603,94 +599,62 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                     </div>
                   )}
 
-                  {/* Item Information (produced item) */}
                   <div className="pt-4 border-t">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between gap-2">
-                        <label className="text-sm font-medium">Produced Item Information</label>
+                        <label className="text-sm font-medium">Produced Items</label>
                         <div className="flex items-center gap-1">
-                          {(recipe as any).producedItem ? (
-                            <Link href={`/items/${(recipe as any).producedItem.id}`}>
-                              <Button variant="outline" size="sm">
-                                View Item
-                              </Button>
-                            </Link>
-                          ) : null}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => { setLinkItemId(null); setLinkItemDialogOpen(true); }}
+                          >
+                            <Link2 className="mr-2 h-4 w-4" />
+                            Link to existing item
+                          </Button>
                         </div>
                       </div>
-                      {!(recipe as any).producedItem && (
+                      {((recipe as any).producedItems?.length ?? 0) === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                          Create an item now or link an existing item as this recipe&apos;s output. Otherwise an item will be created when you first produce the recipe.
+                          Link items above or enter a name when you produce. If empty, you will be asked for the item name on first produce.
                         </p>
-                      )}
-                      {(recipe as any).producedItem ? (
-                        (() => {
-                          const pi = (recipe as any).producedItem;
-                          return (
-                            <>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                <div>
-                                  <label className="text-sm font-medium text-muted-foreground">Name</label>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <StatusPin active={pi.isActive} title={pi.isActive ? "Active" : "Inactive"} />
-                                    <p className="text-base font-medium">{pi.name || "—"}</p>
-                                  </div>
-                                </div>
-                                <div>
-                                  <label className="text-sm font-medium text-muted-foreground">Category</label>
-                                  <p className="text-base mt-1">{pi.category || recipe.category || "—"}</p>
-                                </div>
-                                <div>
-                                  <label className="text-sm font-medium text-muted-foreground">Unit</label>
-                                  <p className="text-base mt-1">{pi.unit || recipe.unit || "—"}</p>
-                                </div>
-                                {pi.sku != null && pi.sku !== "" && (
-                                  <div>
-                                    <label className="text-sm font-medium text-muted-foreground">SKU</label>
-                                    <p className="text-sm mt-1 font-mono">{pi.sku}</p>
-                                  </div>
-                                )}
-                                {pi.unitPrice != null && (
-                                  <div>
-                                    <label className="text-sm font-medium text-muted-foreground">Unit price</label>
-                                    <p className="text-base mt-1">{formatCurrency(pi.unitPrice)}</p>
-                                  </div>
-                                )}
-                              </div>
-                              {pi.description && (
-                                <div>
-                                  <label className="text-sm font-medium text-muted-foreground">Description</label>
-                                  <p className="text-base mt-1 text-muted-foreground whitespace-pre-wrap">{pi.description}</p>
-                                </div>
-                              )}
-                              {pi.notes && (
-                                <div>
-                                  <label className="text-sm font-medium text-muted-foreground">Notes</label>
-                                  <p className="text-base mt-1 text-muted-foreground whitespace-pre-wrap">{pi.notes}</p>
-                                </div>
-                              )}
-                              <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
-                                <div>
-                                  <span className="font-medium">Item created:</span> {formatDate(pi.createdAt)}
-                                </div>
-                                <div>
-                                  <span className="font-medium">Item updated:</span> {formatDate(pi.updatedAt)}
-                                </div>
-                              </div>
-                              <div className="p-3 bg-muted rounded-lg">
-                                <p className="text-sm text-muted-foreground mb-2">
-                                  This item can be sold in sales, used as an ingredient in other recipes, and tracked in inventory.
-                                </p>
-                              </div>
-                            </>
-                          );
-                        })()
                       ) : (
-                        <div className="p-3 bg-muted rounded-lg">
-                          <p className="text-sm text-muted-foreground">
-                            This recipe will create an item when produced. The item will use the recipe's category ({recipe.category || "—"}) and unit ({recipe.unit || "—"}).
-                          </p>
-                        </div>
+                        <ul className="space-y-2">
+                          {((recipe as any).producedItems ?? []).map((pi: { id: number; name: string }) => (
+                            <li key={pi.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-0">
+                              <Link href={`/items/${pi.id}`} className="font-medium text-primary hover:underline">
+                                {pi.name || `Item #${pi.id}`}
+                              </Link>
+                              <div className="flex items-center gap-1">
+                                <Link href={`/items/${pi.id}`}>
+                                  <Button variant="outline" size="sm">View Item</Button>
+                                </Link>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive"
+                                  disabled={updateRecipe.isPending}
+                                  onClick={async () => {
+                                    const currentIds = (recipe as any).producedItems?.map((p: { id: number }) => p.id) ?? [];
+                                    const nextIds = currentIds.filter((id: number) => id !== pi.id);
+                                    try {
+                                      await updateRecipe.mutateAsync({
+                                        id: resolvedParams?.id!,
+                                        data: { producedItemIds: nextIds },
+                                      });
+                                      await refetchRecipe();
+                                      toast.success("Item unlinked");
+                                    } catch (e: any) {
+                                      toast.error(e?.message || "Failed to unlink");
+                                    }
+                                  }}
+                                >
+                                  Unlink
+                                </Button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
                       )}
                     </div>
                   </div>
@@ -782,7 +746,16 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
       </div>
 
       {/* Produce Recipe Dialog */}
-      <Dialog open={produceDialogOpen} onOpenChange={setProduceDialogOpen}>
+      <Dialog
+        open={produceDialogOpen}
+        onOpenChange={(open) => {
+          setProduceDialogOpen(open);
+          if (open) {
+            setProduceItemName("");
+            setProduceSelectedItemId(null);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Produce Recipe</DialogTitle>
@@ -826,6 +799,33 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
                 rows={3}
               />
             </div>
+            {(recipe as any).producedItems?.length === 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="produceItemName">Name of the item product *</Label>
+                <Input
+                  id="produceItemName"
+                  value={produceItemName}
+                  onChange={(e) => setProduceItemName(e.target.value)}
+                  placeholder="e.g. Single Espresso"
+                  required
+                />
+              </div>
+            )}
+            {(recipe as any).producedItems?.length >= 2 && (
+              <div className="space-y-2">
+                <Label>Which item to produce? *</Label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  value={produceSelectedItemId ?? ""}
+                  onChange={(e) => setProduceSelectedItemId(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Select item</option>
+                  {((recipe as any).producedItems ?? []).map((item: { id: number; name: string }) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {((recipe?.items || (recipe as { ingredients?: unknown[] })?.ingredients) && (recipe.items?.length || (recipe as { ingredients?: unknown[] }).ingredients?.length || 0) > 0) && (
               <div className="border rounded-lg p-4 bg-muted space-y-3">
                 <Label className="text-sm font-semibold">Items to be deducted:</Label>
@@ -910,6 +910,15 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
                   toast.error("Please enter a valid quantity");
                   return;
                 }
+                const producedItems = (recipe as any).producedItems ?? [];
+                if (producedItems.length === 0 && !produceItemName.trim()) {
+                  toast.error("Please enter the name of the item product");
+                  return;
+                }
+                if (producedItems.length >= 2 && !produceSelectedItemId) {
+                  toast.error("Please select which item to produce");
+                  return;
+                }
                 if (!stockAvailability.canProduce) {
                   toast.error("Cannot produce recipe: insufficient stock for one or more ingredients");
                   return;
@@ -921,6 +930,8 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
                       quantity: parseFloat(produceQuantity),
                       location: produceLocation || undefined,
                       notes: produceNotes || undefined,
+                      ...(producedItems.length === 0 && produceItemName.trim() ? { producedItemName: produceItemName.trim() } : {}),
+                      ...(producedItems.length >= 2 && produceSelectedItemId ? { producedItemId: produceSelectedItemId } : {}),
                     },
                   });
                   toast.success("Recipe produced successfully! Items deducted from stock.");
@@ -928,6 +939,9 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
                   setProduceQuantity("1");
                   setProduceLocation("");
                   setProduceNotes("");
+                  setProduceItemName("");
+                  setProduceSelectedItemId(null);
+                  refetchRecipe();
                 } catch (error: any) {
                   toast.error(error?.message || "Failed to produce recipe");
                 }
@@ -964,12 +978,19 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
                 Cancel
               </Button>
               <Button
-                disabled={!linkItemId || updateRecipe.isPending || updateItemMutation.isPending}
+                disabled={!linkItemId || updateRecipe.isPending}
                 onClick={async () => {
                   if (!resolvedParams?.id || !linkItemId) return;
+                  const currentIds = (recipe as any).producedItems?.map((p: { id: number }) => p.id) ?? [];
+                  if (currentIds.includes(linkItemId)) {
+                    toast.error("Item already linked");
+                    return;
+                  }
                   try {
-                    await updateRecipe.mutateAsync({ id: resolvedParams.id, data: { producedItemId: linkItemId } });
-                    await updateItemMutation.mutateAsync({ id: String(linkItemId), data: { producedFromRecipeId: Number(resolvedParams.id) } });
+                    await updateRecipe.mutateAsync({
+                      id: resolvedParams.id,
+                      data: { producedItemIds: [...currentIds, linkItemId] },
+                    });
                     await refetchRecipe();
                     setLinkItemDialogOpen(false);
                     setLinkItemId(null);
@@ -977,53 +998,6 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
                   } catch (e: any) {
                     toast.error(e?.message || "Failed to link item");
                   }
-                }}
-              >
-                Link
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={linkItemDialogOpenForm} onOpenChange={(open) => { setLinkItemDialogOpenForm(open); if (!open) setLinkItemIdForm(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Link to existing item</DialogTitle>
-            <DialogDescription>
-              Select an item to use as this recipe&apos;s output. Save the recipe to apply.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <UnifiedSelector
-              label="Item"
-              type="item"
-              items={allItems.filter(i => i.itemType === 'item')}
-              selectedId={linkItemIdForm ?? undefined}
-              onSelect={(sel) => setLinkItemIdForm(sel.id === 0 ? null : Number(sel.id))}
-              placeholder="Select item"
-              getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}${(i as { category?: string }).category ? ` (${(i as { category?: string }).category})` : ''}`}
-            />
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setLinkItemDialogOpenForm(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setFormData(prev => ({ ...prev, producedItemId: null }));
-                  setLinkItemDialogOpenForm(false);
-                  setLinkItemIdForm(null);
-                }}
-              >
-                Clear
-              </Button>
-              <Button
-                disabled={!linkItemIdForm}
-                onClick={() => {
-                  if (linkItemIdForm) setFormData(prev => ({ ...prev, producedItemId: linkItemIdForm }));
-                  setLinkItemDialogOpenForm(false);
-                  setLinkItemIdForm(null);
                 }}
               >
                 Link

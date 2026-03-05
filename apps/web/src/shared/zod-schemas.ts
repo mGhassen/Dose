@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
+import { isConvertibleDimension } from "@/lib/units/dimensions";
 
 export async function parseRequestBody<T>(
   request: Request,
@@ -397,7 +398,7 @@ export const createVariableSchema = z
   .object({
     name: z.string().min(1, "Name is required"),
     type: variableTypeEnum,
-    value: z.number(),
+    value: z.number().optional(),
     unitId: z.number().int().positive().nullable().optional(),
     unit: z.string().optional(),
     effectiveDate: z.string().nullable().optional(),
@@ -407,10 +408,22 @@ export const createVariableSchema = z
     payload: variablePayloadSchema,
   })
   .superRefine((data, ctx) => {
-    if (data.type === "unit") {
-      const payload = data.payload as Record<string, unknown> | undefined;
-      if (!payload?.symbol || typeof payload.symbol !== "string" || !payload.symbol.trim()) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Unit type requires payload.symbol", path: ["payload"] });
+    if (data.type !== "unit") {
+      const v = data.value;
+      if (v === undefined || typeof v !== "number" || Number.isNaN(v)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Value is required", path: ["value"] });
+      }
+      return;
+    }
+    const payload = data.payload as Record<string, unknown> | undefined;
+    if (!payload?.symbol || typeof payload.symbol !== "string" || !payload.symbol.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Unit type requires payload.symbol", path: ["payload"] });
+    }
+    const dimension = typeof payload?.dimension === "string" ? payload.dimension : undefined;
+    if (isConvertibleDimension(dimension)) {
+      const v = data.value;
+      if (v === undefined || typeof v !== "number" || Number.isNaN(v)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Factor to base is required for this dimension", path: ["value"] });
       }
     }
   });
@@ -807,6 +820,7 @@ export const createRecipeSchema = z.object({
   notes: z.string().optional(),
   isActive: z.boolean().optional(),
   producedItemId: z.number().nullable().optional(),
+  producedItemIds: z.array(z.number()).optional(),
   items: z.array(recipeItemSchema).optional(),
 });
 export type CreateRecipeInput = z.infer<typeof createRecipeSchema>;
@@ -817,6 +831,8 @@ export const produceRecipeSchema = z.object({
   quantity: z.number().min(0.000001, "Quantity must be greater than 0"),
   location: z.string().optional(),
   notes: z.string().optional(),
+  producedItemId: z.number().optional(),
+  producedItemName: z.string().optional(),
 });
 export type ProduceRecipeInput = z.infer<typeof produceRecipeSchema>;
 

@@ -5,6 +5,7 @@ import { supabaseServer } from '@kit/lib/supabase';
 import type { Variable, CreateVariableData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createVariableSchema } from '@/shared/zod-schemas';
+import { isConvertibleDimension } from '@/lib/units/dimensions';
 
 function transformVariable(row: any, unitLabel?: string | null): Variable {
   return {
@@ -115,6 +116,14 @@ export async function POST(request: NextRequest) {
     const parsed = await parseRequestBody(request, createVariableSchema);
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateVariableData;
+
+    if (body.type === 'unit' && body.value === undefined) {
+      const payload = body.payload as { dimension?: string } | undefined;
+      const dimension = typeof payload?.dimension === 'string' ? payload.dimension : undefined;
+      if (!isConvertibleDimension(dimension)) {
+        body.value = 1;
+      }
+    }
 
     const supabase = supabaseServer();
     const { data, error } = await supabase

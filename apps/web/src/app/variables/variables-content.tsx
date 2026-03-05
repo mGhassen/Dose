@@ -50,11 +50,14 @@ export default function VariablesContent({ selectedVariableId }: VariablesConten
       header: "Value",
       cell: ({ row }) => {
         const variable = row.original;
+        if (variable.type === "unit") {
+          const payload = variable.payload as { symbol?: string } | undefined;
+          return payload?.symbol ?? "—";
+        }
         if (!variable.unit) {
           return variable.value.toString();
         }
-        // Convert "percentage" to "%" for display
-        const displayUnit = variable.unit === 'percentage' ? '%' : variable.unit;
+        const displayUnit = variable.unit === "percentage" ? "%" : variable.unit;
         return `${variable.value} ${displayUnit}`;
       },
     },

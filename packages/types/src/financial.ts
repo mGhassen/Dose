@@ -1056,6 +1056,8 @@ export type UpdateIngredientData = UpdateItemData;
 export type Recipe = Item & {
   itemType: 'recipe';
   producedItemId?: number | null;
+  /** Linked output items (from recipe_produced_items). Use this for produce-dialog logic. */
+  producedItems?: Item[];
 };
 
 export interface RecipeItem {
@@ -1089,6 +1091,7 @@ export interface CreateRecipeData {
   notes?: string;
   isActive?: boolean;
   producedItemId?: number | null;
+  producedItemIds?: number[];
   items?: Array<{
     itemId: number; // Can be item or recipe ID
     quantity: number;
@@ -1099,6 +1102,17 @@ export interface CreateRecipeData {
 }
 
 export interface UpdateRecipeData extends Partial<CreateRecipeData> {}
+
+/** Payload for POST /api/recipes/[id]/produce */
+export interface ProduceRecipeData {
+  quantity: number;
+  location?: string;
+  notes?: string;
+  /** Required when recipe has multiple linked produced items. */
+  producedItemId?: number;
+  /** Required when recipe has 0 linked items (name for the new item to create). */
+  producedItemName?: string;
+}
 
 export interface CreateRecipeItemData {
   recipeId: number;

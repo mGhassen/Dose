@@ -2,13 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import type { ProduceRecipeData } from '@kit/types';
 import { produceRecipe } from '@/lib/stock/produce-recipe';
-
-interface ProduceRecipeData {
-  quantity: number;
-  location?: string;
-  notes?: string;
-}
 
 export async function POST(
   request: NextRequest,
@@ -27,6 +22,8 @@ export async function POST(
       quantity: body.quantity,
       location: body.location || null,
       notes: body.notes,
+      producedItemId: body.producedItemId,
+      producedItemName: body.producedItemName,
     });
 
     const { data: recipeData } = await supabase

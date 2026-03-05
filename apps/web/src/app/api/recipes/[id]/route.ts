@@ -57,6 +57,24 @@ function transformToSnakeCase(data: UpdateRecipeData): any {
   return result;
 }
 
+function transformItem(row: any): any {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    unit: row.unit,
+    unitId: row.unit_id,
+    category: row.category,
+    itemType: row.item_type || 'item',
+    isActive: row.is_active,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    producedFromRecipeId: row.produced_from_recipe_id,
+    sku: row.sku,
+    notes: row.notes,
+  };
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -91,27 +109,25 @@ export async function GET(
 
     if (itemsError) throw itemsError;
 
-    // Get the produced item: by produced_item_id if set, else by produced_from_recipe_id
-    let producedItemData: any = null;
-    if (recipeData.produced_item_id) {
-      const { data, error } = await supabase
+    const { data: producedLinks } = await supabase
+      .from('recipe_produced_items')
+      .select('item_id')
+      .eq('recipe_id', id);
+    const producedItemIds = (producedLinks || []).map((r: any) => r.item_id).filter(Boolean);
+    let producedItemsData: any[] = [];
+    if (producedItemIds.length > 0) {
+      const { data: itemsRows } = await supabase
         .from('items')
         .select('*')
-        .eq('id', recipeData.produced_item_id)
-        .single();
-      if (!error) producedItemData = data;
+        .in('id', producedItemIds);
+      producedItemsData = itemsRows || [];
     }
-    if (!producedItemData) {
-      const { data, error: producedItemError } = await supabase
-        .from('items')
-        .select('*')
-        .eq('produced_from_recipe_id', id)
-        .single();
-      if (!producedItemError) producedItemData = data;
-    }
+    const producedItems = producedItemsData.map(transformItem);
+    const producedItemData: any = producedItemsData[0] ?? null;
 
     const recipe: RecipeWithItems = {
       ...transformRecipe(recipeData),
+      producedItems: producedItems.length > 0 ? producedItems : undefined,
       items: (itemsData || []).map(ri => ({
         ...transformRecipeItem(ri),
         item: ri.item ? {
@@ -136,25 +152,12 @@ export async function GET(
       ingredient: item.item,
     }));
 
-    // Include produced item information if it exists
     if (producedItemData) {
       const todayStr = new Date().toISOString().split('T')[0];
       const resolvedPrice = await getItemSellingPriceAsOf(supabase, producedItemData.id, todayStr);
       (recipe as any).producedItem = {
-        id: producedItemData.id,
-        name: producedItemData.name,
-        description: producedItemData.description,
-        unit: producedItemData.unit,
-        unitId: producedItemData.unit_id,
-        category: producedItemData.category,
-        itemType: producedItemData.item_type || 'item',
-        isActive: producedItemData.is_active,
-        createdAt: producedItemData.created_at,
-        updatedAt: producedItemData.updated_at,
-        producedFromRecipeId: producedItemData.produced_from_recipe_id,
-        sku: producedItemData.sku,
+        ...transformItem(producedItemData),
         unitPrice: resolvedPrice ?? undefined,
-        notes: producedItemData.notes,
       };
     }
 
@@ -202,13 +205,7 @@ export async function PUT(
     // Update items if provided (supports both 'items' and legacy 'ingredients')
     const itemsToUpdate = body.items || (body as { ingredients?: typeof body.items }).ingredients;
     if (itemsToUpdate !== undefined) {
-      // Delete existing items
-      await supabase
-        .from('recipe_items')
-        .delete()
-        .eq('recipe_id', id);
-
-      // Insert new items
+      await supabase.from('recipe_items').delete().eq('recipe_id', id);
       if (itemsToUpdate.length > 0) {
         const recipeItems = itemsToUpdate.map(item => ({
           recipe_id: Number(id),
@@ -218,12 +215,18 @@ export async function PUT(
           unit_id: item.unitId,
           notes: item.notes,
         }));
-
-        const { error: itemsError } = await supabase
-          .from('recipe_items')
-          .insert(recipeItems);
-
+        const { error: itemsError } = await supabase.from('recipe_items').insert(recipeItems);
         if (itemsError) throw itemsError;
+      }
+    }
+
+    if (body.producedItemIds !== undefined) {
+      await supabase.from('recipe_produced_items').delete().eq('recipe_id', id);
+      if (body.producedItemIds.length > 0) {
+        const { error: linkError } = await supabase.from('recipe_produced_items').insert(
+          body.producedItemIds.map((itemId: number) => ({ recipe_id: Number(id), item_id: itemId }))
+        );
+        if (linkError) throw linkError;
       }
     }
 

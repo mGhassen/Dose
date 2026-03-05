@@ -6,6 +6,10 @@ export interface ProduceRecipeOptions {
   quantity: number;
   location?: string | null;
   notes?: string;
+  /** Required when recipe has multiple linked produced items. */
+  producedItemId?: number;
+  /** Required when recipe has 0 linked items (name for the new item to create). */
+  producedItemName?: string;
 }
 
 export async function produceRecipe(
@@ -13,7 +17,7 @@ export async function produceRecipe(
   recipeId: string,
   options: ProduceRecipeOptions
 ): Promise<{ producedItemId: number }> {
-  const { quantity, location = null, notes } = options;
+  const { quantity, location = null, notes, producedItemId: requestedItemId, producedItemName } = options;
 
   const { data: unitVariables } = await supabase.from('variables').select('id, value').eq('type', 'unit');
   const factorMap = buildFactorMap((unitVariables || []).map((u: any) => ({ id: u.id, factorToBase: parseFloat(u.value ?? 1) })));
@@ -65,45 +69,82 @@ export async function produceRecipe(
     if (movementError) throw movementError;
   }
 
+  const { data: linkRows } = await supabase
+    .from('recipe_produced_items')
+    .select('item_id')
+    .eq('recipe_id', recipeId);
+  const linkedItemIds = (linkRows || []).map((r: any) => r.item_id).filter(Boolean);
+
   let producedItem: any = null;
-  if (recipeData.produced_item_id) {
-    const { data, error } = await supabase
-      .from('items')
-      .select('*')
-      .eq('id', recipeData.produced_item_id)
-      .single();
+
+  if (linkedItemIds.length >= 2) {
+    if (requestedItemId == null) throw new Error('Which item to produce is required when the recipe has multiple linked items.');
+    if (!linkedItemIds.includes(requestedItemId)) throw new Error('Selected item is not linked to this recipe.');
+    const { data, error } = await supabase.from('items').select('*').eq('id', requestedItemId).single();
+    if (error) throw error;
+    producedItem = data;
+  } else if (linkedItemIds.length === 1) {
+    const { data, error } = await supabase.from('items').select('*').eq('id', linkedItemIds[0]).single();
     if (!error) producedItem = data;
   }
-  if (!producedItem) {
-    const { data: existingItem, error: itemCheckError } = await supabase
+
+  if (!producedItem && linkedItemIds.length === 0) {
+    const name = (producedItemName ?? recipeData.name ?? '').trim();
+    if (!name) throw new Error('Name of the item product is required when the recipe has no linked items.');
+    const { data: newItem, error: itemCreateError } = await supabase
       .from('items')
-      .select('*')
-      .eq('produced_from_recipe_id', Number(recipeId))
+      .insert({
+        name,
+        description: recipeData.description || `Produced from recipe: ${recipeData.name}`,
+        category: recipeData.category,
+        unit: recipeData.unit || 'serving',
+        unit_id: recipeData.unit_id,
+        produced_from_recipe_id: Number(recipeId),
+        item_type: 'item',
+        is_active: true,
+      })
+      .select()
       .single();
+    if (itemCreateError) throw itemCreateError;
+    if (!newItem) throw new Error('Failed to create produced item');
+    producedItem = newItem;
+    await supabase.from('recipe_produced_items').insert({ recipe_id: Number(recipeId), item_id: newItem.id });
+  }
 
-    if (itemCheckError && itemCheckError.code === 'PGRST116') {
-      const { data: newItem, error: itemCreateError } = await supabase
+  if (!producedItem) {
+    const legacyId = recipeData.produced_item_id;
+    if (legacyId) {
+      const { data, error } = await supabase.from('items').select('*').eq('id', legacyId).single();
+      if (!error) producedItem = data;
+    }
+    if (!producedItem) {
+      const { data: existingItem, error: itemCheckError } = await supabase
         .from('items')
-        .insert({
-          name: recipeData.name,
-          description: recipeData.description || `Produced from recipe: ${recipeData.name}`,
-          category: recipeData.category,
-          unit: recipeData.unit || 'serving',
-          unit_id: recipeData.unit_id,
-          produced_from_recipe_id: Number(recipeId),
-          item_type: 'item',
-          is_active: true,
-        })
-        .select()
+        .select('*')
+        .eq('produced_from_recipe_id', Number(recipeId))
         .single();
-
-      if (itemCreateError) throw itemCreateError;
-      if (!newItem) throw new Error('Failed to create produced item');
-      producedItem = newItem;
-    } else if (itemCheckError) {
-      throw itemCheckError;
-    } else {
-      producedItem = existingItem;
+      if (!itemCheckError && existingItem) producedItem = existingItem;
+      else if (itemCheckError?.code === 'PGRST116' && (producedItemName ?? recipeData.name)) {
+        const name = (producedItemName ?? recipeData.name ?? '').trim();
+        const { data: newItem, error: createErr } = await supabase
+          .from('items')
+          .insert({
+            name,
+            description: recipeData.description || `Produced from recipe: ${recipeData.name}`,
+            category: recipeData.category,
+            unit: recipeData.unit || 'serving',
+            unit_id: recipeData.unit_id,
+            produced_from_recipe_id: Number(recipeId),
+            item_type: 'item',
+            is_active: true,
+          })
+          .select()
+          .single();
+        if (!createErr && newItem) {
+          producedItem = newItem;
+          await supabase.from('recipe_produced_items').insert({ recipe_id: Number(recipeId), item_id: newItem.id });
+        }
+      }
     }
   }
 

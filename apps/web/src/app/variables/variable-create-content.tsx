@@ -14,6 +14,7 @@ import { useCreateVariable, useUnits, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import type { VariableType } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
+import { isConvertibleDimension } from "@/lib/units/dimensions";
 
 export interface VariableCreateContentProps {
   onClose: () => void;
@@ -25,6 +26,8 @@ export function VariableCreateContent({ onClose, onCreated }: VariableCreateCont
   const { data: units = [] } = useUnits();
   const { data: variableTypeValues = [], isError: variableTypeError, isLoading: variableTypeLoading } = useMetadataEnum("VariableType");
   const typeItems = variableTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const { data: dimensionValues = [] } = useMetadataEnum("UnitDimension");
+  const dimensionItems = dimensionValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [formData, setFormData] = useState({
     name: "",
     type: "" as VariableType | "",
@@ -40,6 +43,8 @@ export function VariableCreateContent({ onClose, onCreated }: VariableCreateCont
   });
 
   const isUnitType = formData.type === "unit";
+  const unitDimension = formData.payloadDimension || "other";
+  const unitRequiresFactor = isUnitType && isConvertibleDimension(unitDimension);
   const isTaxOrTransactionTax = formData.type === "tax" || formData.type === "transaction_tax";
   const isTimeRelevantType = ["tax", "transaction_tax", "inflation", "exchange_rate"].includes(formData.type);
   const isRateType = ["cost", "tax", "transaction_tax", "inflation", "exchange_rate", "other"].includes(formData.type) && !isUnitType;
@@ -50,8 +55,13 @@ export function VariableCreateContent({ onClose, onCreated }: VariableCreateCont
       toast.error("Name and type are required");
       return;
     }
-    if (formData.value === "" || isNaN(parseFloat(formData.value))) {
-      toast.error("Value is required and must be a number");
+    if (!isUnitType) {
+      if (formData.value === "" || isNaN(parseFloat(formData.value))) {
+        toast.error("Value is required and must be a number");
+        return;
+      }
+    } else if (unitRequiresFactor && (formData.value === "" || isNaN(parseFloat(formData.value)))) {
+      toast.error("Factor to base is required for this dimension");
       return;
     }
     if (isUnitType && !formData.payloadSymbol?.trim()) {
@@ -69,11 +79,14 @@ export function VariableCreateContent({ onClose, onCreated }: VariableCreateCont
           base_unit_id: formData.payloadBaseUnitId ?? null,
         }
       : undefined;
+    const numValue = isUnitType && !unitRequiresFactor
+      ? 1
+      : parseFloat(formData.value);
     try {
       const created = await createVariable.mutateAsync({
         name: formData.name,
         type: formData.type as VariableType,
-        value: parseFloat(formData.value),
+        value: numValue,
         unitId: formData.unitId ?? undefined,
         effectiveDate: isUnitType ? undefined : formData.effectiveDate || undefined,
         endDate: formData.endDate || undefined,
@@ -149,26 +162,42 @@ export function VariableCreateContent({ onClose, onCreated }: VariableCreateCont
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="payloadDimension">Dimension</Label>
-                      <Input
-                        id="payloadDimension"
-                        value={formData.payloadDimension}
-                        onChange={(e) => handleInputChange("payloadDimension", e.target.value)}
-                        placeholder="mass, volume, count, other"
+                      <Label>Dimension</Label>
+                      <UnifiedSelector
+                        type="dimension"
+                        items={dimensionItems}
+                        selectedId={formData.payloadDimension || undefined}
+                        onSelect={(item) => handleInputChange("payloadDimension", item.id === 0 ? "other" : String(item.id))}
+                        placeholder="Select dimension"
                       />
                     </div>
-                    <div className="space-y-2 col-span-2">
-                      <Label htmlFor="value">Factor to base *</Label>
-                      <Input
-                        id="value"
-                        type="number"
-                        step="0.0001"
-                        value={formData.value}
-                        onChange={(e) => handleInputChange("value", e.target.value)}
-                        placeholder="1"
-                      />
-                      <p className="text-xs text-muted-foreground">e.g. 1000 for kg (1 kg = 1000 g)</p>
-                    </div>
+                    {unitRequiresFactor && (
+                      <div className="space-y-2 col-span-2">
+                        <Label htmlFor="value">Factor to base *</Label>
+                        <Input
+                          id="value"
+                          type="number"
+                          step="0.0001"
+                          value={formData.value}
+                          onChange={(e) => handleInputChange("value", e.target.value)}
+                          placeholder="1"
+                        />
+                        <p className="text-xs text-muted-foreground">e.g. 1000 for kg (1 kg = 1000 g)</p>
+                      </div>
+                    )}
+                    {unitRequiresFactor && (
+                      <div className="space-y-2 col-span-2">
+                        <Label>Base unit</Label>
+                        <p className="text-sm text-muted-foreground">
+                          {formData.payloadBaseUnitId != null
+                            ? (() => {
+                                const base = units.find((u) => u.id === formData.payloadBaseUnitId);
+                                return base ? `Base: ${base.symbol}` : `Base unit (id ${formData.payloadBaseUnitId})`;
+                              })()
+                            : "— (base)"}
+                        </p>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>

@@ -104,7 +104,7 @@ export function useProduceRecipe() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { quantity: number; location?: string; notes?: string } }) => 
+    mutationFn: ({ id, data }: { id: string; data: import('@kit/types').ProduceRecipeData }) =>
       recipesApi.produce(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });

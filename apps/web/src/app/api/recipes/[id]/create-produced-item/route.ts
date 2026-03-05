@@ -50,6 +50,8 @@ export async function POST(
     if (insertError) throw insertError;
     if (!newItem) return NextResponse.json({ error: 'Failed to create item' }, { status: 500 });
 
+    await supabase.from('recipe_produced_items').insert({ recipe_id: Number(recipeId), item_id: newItem.id });
+
     return NextResponse.json({
       id: newItem.id,
       name: newItem.name,

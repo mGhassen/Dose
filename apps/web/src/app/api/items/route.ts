@@ -69,11 +69,16 @@ export async function GET(request: NextRequest) {
     }
 
     if (producedOnly) {
-      const { data: recipeLinks } = await supabase
+      const { data: junctionLinks } = await supabase
+        .from('recipe_produced_items')
+        .select('item_id');
+      const fromJunction = [...new Set((junctionLinks || []).map((r: any) => r.item_id).filter(Boolean))];
+      const { data: legacyLinks } = await supabase
         .from('recipes')
         .select('produced_item_id')
         .not('produced_item_id', 'is', null);
-      const linkedIds = [...new Set((recipeLinks || []).map((r: any) => r.produced_item_id).filter(Boolean))];
+      const fromLegacy = [...new Set((legacyLinks || []).map((r: any) => r.produced_item_id).filter(Boolean))];
+      const linkedIds = [...new Set([...fromJunction, ...fromLegacy])];
       if (linkedIds.length > 0) {
         itemsQuery = itemsQuery.or(`produced_from_recipe_id.not.is.null,id.in.(${linkedIds.join(',')})`);
       } else {

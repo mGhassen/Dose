@@ -1,5 +1,5 @@
 import { apiRequest } from './api';
-import type { Recipe, RecipeWithIngredients, CreateRecipeData, UpdateRecipeData, PaginatedResponse, PaginationParams } from '@kit/types';
+import type { Recipe, RecipeWithIngredients, CreateRecipeData, UpdateRecipeData, ProduceRecipeData, PaginatedResponse, PaginationParams } from '@kit/types';
 
 export const recipesApi = {
   getAll: (params?: PaginationParams) => {
@@ -13,8 +13,8 @@ export const recipesApi = {
   create: (data: CreateRecipeData) => apiRequest<Recipe>('POST', '/api/recipes', data),
   update: (id: string, data: UpdateRecipeData) => apiRequest<Recipe>('PUT', `/api/recipes/${id}`, data),
   delete: (id: string) => apiRequest<void>('DELETE', `/api/recipes/${id}`),
-  produce: (id: string, data: { quantity: number; location?: string; notes?: string }) =>
-    apiRequest<{ success: boolean; message: string; movements: Array<{ ingredientId: number; quantity: number }>; recipe: { id: number; name: string; quantityProduced: number } }>('POST', `/api/recipes/${id}/produce`, data),
+  produce: (id: string, data: ProduceRecipeData) =>
+    apiRequest<{ success: boolean; message: string; producedItem?: { id: number; name: string; quantity: number }; recipe: { id: string; name: string; quantityProduced: number } }>('POST', `/api/recipes/${id}/produce`, data),
   createProducedItem: (id: string) =>
     apiRequest<{ id: number; name: string; description?: string; unit: string; unitId?: number; category?: string; itemType: string; isActive: boolean; createdAt: string; updatedAt: string; producedFromRecipeId?: number }>('POST', `/api/recipes/${id}/create-produced-item`),
   getCost: (id: string) => 

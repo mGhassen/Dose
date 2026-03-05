@@ -27,6 +27,7 @@ import { formatDate } from "@kit/lib/date-format";
 import { dateToYYYYMMDD } from "@kit/lib";
 import type { VariableType } from "@kit/types";
 import { DatePicker } from "@kit/ui/date-picker";
+import { isConvertibleDimension } from "@/lib/units/dimensions";
 import { TaxVariableDetail } from "./tax-variable-detail";
 import { TaxVariableEditSection } from "./tax-variable-edit-section";
 
@@ -90,6 +91,8 @@ export function VariableDetailContent({
   const { data: units = [] } = useUnits();
 
   const isUnitType = formData.type === "unit";
+  const unitDimension = formData.payloadDimension || "other";
+  const unitRequiresFactor = isUnitType && isConvertibleDimension(unitDimension);
   const isTaxOrTransactionTax = formData.type === "tax" || formData.type === "transaction_tax";
   const isTimeRelevantType = ["tax", "transaction_tax", "inflation", "exchange_rate"].includes(formData.type);
   const isRateType = ["cost", "tax", "transaction_tax", "inflation", "exchange_rate", "other"].includes(formData.type) && !isUnitType;
@@ -123,9 +126,13 @@ export function VariableDetailContent({
       toast.error("Name and type are required");
       return;
     }
-    const numValue = parseFloat(formData.value);
-    if (formData.value === "" || isNaN(numValue)) {
-      toast.error("Value is required and must be a number");
+    if (!isUnitType) {
+      if (formData.value === "" || isNaN(parseFloat(formData.value))) {
+        toast.error("Value is required and must be a number");
+        return;
+      }
+    } else if (unitRequiresFactor && (formData.value === "" || isNaN(parseFloat(formData.value)))) {
+      toast.error("Factor to base is required for this dimension");
       return;
     }
     if (isUnitType && !formData.payloadSymbol?.trim()) {
@@ -158,6 +165,7 @@ export function VariableDetailContent({
       : !isNowTax
         ? null
         : undefined;
+    const numValue = isUnitType && !unitRequiresFactor ? 1 : parseFloat(formData.value);
     const updateData = {
       name: formData.name.trim(),
       type: formData.type as VariableType,
@@ -316,17 +324,32 @@ export function VariableDetailContent({
                           placeholder="Select dimension"
                         />
                       </div>
-                      <div className="space-y-2 col-span-2">
-                        <Label htmlFor="value">Factor to base *</Label>
-                        <Input
-                          id="value"
-                          type="number"
-                          step="0.0001"
-                          value={formData.value}
-                          onChange={(e) => handleInputChange("value", e.target.value)}
-                          placeholder="1"
-                        />
-                      </div>
+                      {unitRequiresFactor && (
+                        <div className="space-y-2 col-span-2">
+                          <Label htmlFor="value">Factor to base *</Label>
+                          <Input
+                            id="value"
+                            type="number"
+                            step="0.0001"
+                            value={formData.value}
+                            onChange={(e) => handleInputChange("value", e.target.value)}
+                            placeholder="1"
+                          />
+                        </div>
+                      )}
+                      {unitRequiresFactor && (
+                        <div className="space-y-2 col-span-2">
+                          <Label>Base unit</Label>
+                          <p className="text-sm text-muted-foreground">
+                            {formData.payloadBaseUnitId != null
+                              ? (() => {
+                                  const base = units.find((u) => u.id === formData.payloadBaseUnitId);
+                                  return base ? `Base: ${base.symbol}` : `Base unit (id ${formData.payloadBaseUnitId})`;
+                                })()
+                              : "— (base)"}
+                          </p>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>
@@ -427,16 +450,18 @@ export function VariableDetailContent({
   const isUnitTypeView = variable.type === "unit";
   const isTimeRelevantView = ["tax", "transaction_tax", "inflation", "exchange_rate"].includes(variable.type);
   const isRateTypeView = ["cost", "tax", "transaction_tax", "inflation", "exchange_rate", "other"].includes(variable.type);
-  const payloadView = variable.payload as { symbol?: string; dimension?: string } | undefined;
+  const payloadView = variable.payload as { symbol?: string; dimension?: string; base_unit_id?: number | null } | undefined;
+  const unitDimensionView = payloadView?.dimension ?? "other";
+  const unitConvertibleView = isUnitTypeView && isConvertibleDimension(unitDimensionView);
   const showDateRange = !isUnitTypeView && (isTimeRelevantView || isRateTypeView);
 
   const displayValue = isUnitTypeView
-    ? (payloadView?.symbol ? `${variable.value} ${payloadView.symbol}` : String(variable.value))
+    ? (payloadView?.symbol ?? "—")
     : variable.unit === "percentage"
       ? `${variable.value}%`
       : `${variable.value} ${variable.unit || ""}`.trim() || String(variable.value);
 
-  const valueSubtitle = isUnitTypeView ? "Unit · factor to base" : "Current value";
+  const valueSubtitle = isUnitTypeView ? (unitConvertibleView ? "Unit · factor to base" : "Unit") : "Current value";
 
   return (
     <div className="flex h-full flex-col">
@@ -497,7 +522,23 @@ export function VariableDetailContent({
               <>
                 <KeyValue label="Symbol" value={payloadView?.symbol ?? "—"} />
                 <KeyValue label="Dimension" value={payloadView?.dimension ?? "—"} />
-                <KeyValue label="Factor to base" value={variable.value} />
+                {unitConvertibleView && <KeyValue label="Factor to base" value={variable.value} />}
+                {unitConvertibleView && (
+                  <KeyValue
+                    label="Base unit"
+                    value={
+                      payloadView?.base_unit_id != null
+                        ? (() => {
+                            const base = units.find((u) => u.id === payloadView.base_unit_id!);
+                            return base ? `Base: ${base.symbol}` : "—";
+                          })()
+                        : "— (base)"
+                    }
+                  />
+                )}
+                {isUnitTypeView && !unitConvertibleView && (
+                  <KeyValue label="Base unit" value="— N/A" />
+                )}
               </>
             ) : (
               <>
