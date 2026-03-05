@@ -9,15 +9,7 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { UnifiedSelector } from "@/components/unified-selector";
-import { Save, X, Plus, Trash2, Link2 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@kit/ui/dialog";
+import { Save, X, Plus, Trash2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateRecipe, useItems, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
@@ -41,8 +33,6 @@ export default function CreateRecipePage() {
     isActive: true,
   });
   const [items, setItems] = useState<Array<{ itemId: number; quantity: number; unit: string; unitId?: number; notes?: string }>>([]);
-  const [linkItemDialogOpen, setLinkItemDialogOpen] = useState(false);
-  const [linkItemId, setLinkItemId] = useState<number | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,22 +160,6 @@ export default function CreateRecipePage() {
                         placeholder="30"
                       />
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Item produced (optional)</Label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground flex-1 min-w-0 truncate">
-                        {formData.producedItemId
-                          ? itemsResponse?.data?.find(i => i.id === formData.producedItemId)?.name ?? `Item #${formData.producedItemId}`
-                          : "No item linked"}
-                      </span>
-                      <Button type="button" variant="outline" size="sm" onClick={() => { setLinkItemId(formData.producedItemId); setLinkItemDialogOpen(true); }}>
-                        <Link2 className="mr-2 h-4 w-4" />
-                        Link to existing item
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">If empty, an item will be created automatically when you first produce this recipe.</p>
                   </div>
 
                   <div className="space-y-2">
@@ -339,52 +313,6 @@ export default function CreateRecipePage() {
         </Card>
       </div>
 
-      <Dialog open={linkItemDialogOpen} onOpenChange={(open) => { setLinkItemDialogOpen(open); if (!open) setLinkItemId(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Link to existing item</DialogTitle>
-            <DialogDescription>
-              Select an item to use as this recipe&apos;s output. The item will be marked as produced by this recipe when you save.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <UnifiedSelector
-              label="Item"
-              type="item"
-              items={itemsResponse?.data?.filter(i => i.itemType === 'item') ?? []}
-              selectedId={linkItemId ?? undefined}
-              onSelect={(sel) => setLinkItemId(sel.id === 0 ? null : Number(sel.id))}
-              placeholder="Select item"
-              getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}${(i as { category?: string }).category ? ` (${(i as { category?: string }).category})` : ''}`}
-            />
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setLinkItemDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setFormData(prev => ({ ...prev, producedItemId: null }));
-                  setLinkItemDialogOpen(false);
-                  setLinkItemId(null);
-                }}
-              >
-                Clear
-              </Button>
-              <Button
-                disabled={!linkItemId}
-                onClick={() => {
-                  if (linkItemId) setFormData(prev => ({ ...prev, producedItemId: linkItemId }));
-                  setLinkItemDialogOpen(false);
-                  setLinkItemId(null);
-                }}
-              >
-                Link
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
       </div>
     </AppLayout>
   );

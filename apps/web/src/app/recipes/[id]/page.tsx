@@ -285,54 +285,66 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
 
   return (
     <AppLayout>
-      <div className="min-h-0 flex-1 overflow-auto">
-        <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col flex-1 min-h-0">
+        <div className="flex-shrink-0 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 min-w-0">
             <StatusPin active={recipe.isActive} title={recipe.isActive ? "Active" : "Inactive"} />
-            <h1 className="text-2xl font-bold">
-              {isEditing ? "Edit Recipe" : recipe.name}
-            </h1>
-          </div>
-            <p className="text-muted-foreground">
-              {isEditing ? "Update recipe information" : "Recipe details and information"}
-            </p>
-          </div>
-          {!isEditing && (
-            <div className="flex space-x-2">
-              <Button
-                onClick={() => setProduceDialogOpen(true)}
-                disabled={!recipe?.isActive || (!recipe?.items && !(recipe as { ingredients?: unknown[] })?.ingredients) || ((recipe.items?.length || (recipe as { ingredients?: unknown[] }).ingredients?.length || 0) === 0)}
-              >
-                <ChefHat className="mr-2 h-4 w-4" />
-                Produce Recipe
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                    <Edit2 className="mr-2 h-4 w-4" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                    disabled={deleteMutation.isPending}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    {deleteMutation.isPending ? "Deleting..." : "Delete"}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold truncate">
+                {isEditing ? "Edit Recipe" : recipe.name}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {isEditing ? "Update recipe information" : "Recipe details and information"}
+              </p>
             </div>
-          )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {!isEditing ? (
+              <>
+                <Button
+                  onClick={() => setProduceDialogOpen(true)}
+                  disabled={!recipe?.isActive || (!recipe?.items && !(recipe as { ingredients?: unknown[] })?.ingredients) || ((recipe.items?.length || (recipe as { ingredients?: unknown[] }).ingredients?.length || 0) === 0)}
+                >
+                  <ChefHat className="mr-2 h-4 w-4" />
+                  Produce Recipe
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                      <Edit2 className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setLinkItemId((recipe as any).producedItemId ?? null);
+                        setLinkItemDialogOpen(true);
+                      }}
+                    >
+                      <Link2 className="mr-2 h-4 w-4" />
+                      Link to existing item
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setIsDeleteDialogOpen(true)}
+                      disabled={deleteMutation.isPending}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : null}
+          </div>
         </div>
 
+        <div className="flex-1 min-h-0 overflow-auto mt-6">
         <Card>
           <CardHeader>
             <CardTitle>{isEditing ? "Edit Recipe" : "Recipe Information"}</CardTitle>
@@ -401,27 +413,6 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                           onChange={(e) => handleInputChange('preparationTime', e.target.value)}
                         />
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Item produced (optional)</Label>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground flex-1 min-w-0 truncate">
-                          {formData.producedItemId
-                            ? itemsResponse?.data?.find(i => i.id === formData.producedItemId)?.name ?? `Item #${formData.producedItemId}`
-                            : "No item linked"}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => { setLinkItemIdForm(formData.producedItemId); setLinkItemDialogOpenForm(true); }}
-                        >
-                          <Link2 className="mr-2 h-4 w-4" />
-                          Link to existing item
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">If empty, an item will be created when you first produce this recipe.</p>
                     </div>
 
                     <div className="space-y-2">
@@ -625,45 +616,6 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                               </Button>
                             </Link>
                           ) : null}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="icon">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {(recipe as any).producedItem ? (
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/items/${(recipe as any).producedItem.id}`}>
-                                    View Item
-                                  </Link>
-                                </DropdownMenuItem>
-                              ) : (
-                                <>
-                                  <DropdownMenuItem
-                                    onClick={async () => {
-                                      if (!resolvedParams?.id) return;
-                                      try {
-                                        await createProducedItem.mutateAsync(resolvedParams.id);
-                                        await refetchRecipe();
-                                        toast.success("Produced item created");
-                                      } catch (e: any) {
-                                        toast.error(e?.message || "Failed to create produced item");
-                                      }
-                                    }}
-                                    disabled={createProducedItem.isPending}
-                                  >
-                                    <Package className="mr-2 h-4 w-4" />
-                                    Create produced item
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setLinkItemDialogOpen(true)}>
-                                    <Link2 className="mr-2 h-4 w-4" />
-                                    Link to existing item
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
                         </div>
                       </div>
                       {!(recipe as any).producedItem && (
@@ -1103,6 +1055,7 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </AppLayout>
   );
 }

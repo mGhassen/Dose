@@ -6,6 +6,7 @@ import {
   prefetchProfitChart,
   prefetchCashFlowChart,
 } from '@kit/hooks/server/prefetchDashboard';
+import { prefetchEnumValues } from '@kit/hooks';
 import DashboardContent from './dashboard-content';
 
 export default async function Page() {
@@ -14,6 +15,7 @@ export default async function Page() {
   await prefetchExpensesChart(queryClient);
   await prefetchProfitChart(queryClient);
   await prefetchCashFlowChart(queryClient);
+  await prefetchEnumValues('GlobalDateFilterPreset', queryClient);
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <DashboardContent />

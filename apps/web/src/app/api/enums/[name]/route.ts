@@ -19,7 +19,8 @@ export async function GET(
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const authHeader = request.headers.get('authorization');
+    const supabase = createServerSupabaseClient(authHeader);
     
     // First, get the enum definition
     const { data: enumData, error: enumError } = await supabase

@@ -1,7 +1,10 @@
 import { QueryClient } from '@tanstack/react-query';
 import { makeQueryClient } from '@kit/lib/queryClient.server';
-import { getAllMetadataEnums, getMetadataEnumById } from '@kit/lib/api/metadata-enums';
-import { getEnumValues } from '@kit/lib/api/metadata-enums';
+import {
+  getAllMetadataEnums,
+  getMetadataEnumById,
+  getEnumValuesByEnumName,
+} from '@kit/lib/api/metadata-enums';
 
 export async function prefetchMetadataEnums(queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
@@ -16,48 +19,45 @@ export async function prefetchMetadataEnums(queryClient?: QueryClient) {
   return qc;
 }
 
+/** Prefetch a single metadata enum by ID (for management/detail page). */
 export async function prefetchMetadataEnum(id: number, queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
-  
-  // Check if we have an auth token before prefetching
-  // If no token, skip prefetch and let client handle it
   try {
     const { cookies } = await import('next/headers');
     const cookieStore = await cookies();
     const token = cookieStore.get('access_token')?.value;
-    
-    if (!token) {
-      // No token available, skip prefetch - client will handle it
-      return qc;
-    }
+    if (!token) return qc;
   } catch {
-    // Cookies not available, skip prefetch
     return qc;
   }
-  
-  // Token exists, proceed with prefetch
   try {
     await qc.prefetchQuery({
       queryKey: ['metadataEnums', 'byId', id],
       queryFn: () => getMetadataEnumById(id),
     });
-  } catch (error) {
-    // Prefetch failed (e.g., no auth), but don't throw - let client retry
-    console.warn('[prefetchMetadataEnum] Prefetch failed, client will retry:', error);
+  } catch {
+    // Client will retry
   }
-  
   return qc;
 }
 
+/**
+ * Prefetch enum values by enum name (same as useMetadataEnum(enumName)).
+ * Server-safe: uses apiRequest with cookie auth. Use in layout/page like other prefetches.
+ */
 export async function prefetchEnumValues(enumName: string, queryClient?: QueryClient) {
   const qc = queryClient || makeQueryClient();
-  await qc.prefetchQuery({
-    queryKey: ['metadataEnums', enumName],
-    queryFn: async () => {
-      const response = await getEnumValues(enumName);
-      return response || [];
-    },
-  });
+  try {
+    await qc.prefetchQuery({
+      queryKey: ['metadataEnums', enumName],
+      queryFn: () => getEnumValuesByEnumName(enumName),
+    });
+  } catch {
+    // Client will fetch
+  }
   return qc;
 }
+
+/** Alias for prefetchEnumValues – prefetch metadata enum values by name. */
+export const prefetchMetadataEnumByName = prefetchEnumValues;
 

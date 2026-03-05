@@ -37,12 +37,19 @@ export interface CreateMetadataEnumData {
 export interface UpdateMetadataEnumData extends Partial<CreateMetadataEnumData> {}
 
 /**
- * Fetch enum values for a specific enum name
- * @param enumName - The name of the enum (e.g., 'ExpenseCategory', 'ExpenseRecurrence')
- * @returns Array of enum values
+ * Fetch enum values for a specific enum name (client-side, uses apiFetch).
  */
 export async function getEnumValues(enumName: string): Promise<MetadataEnumValue[]> {
   return apiFetch<MetadataEnumValue[]>(`/enums/${enumName}`);
+}
+
+/**
+ * Fetch enum values by enum name (server-safe, uses apiRequest with cookie auth).
+ * Use in server prefetch; same endpoint as getEnumValues.
+ */
+export async function getEnumValuesByEnumName(enumName: string): Promise<MetadataEnumValue[]> {
+  const res = await apiRequest<MetadataEnumValue[]>('GET', `/api/enums/${enumName}`);
+  return res ?? [];
 }
 
 /**

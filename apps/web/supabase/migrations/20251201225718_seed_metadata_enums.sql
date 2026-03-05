@@ -477,7 +477,7 @@ CROSS JOIN (VALUES
 WHERE e.name = 'PersonnelPosition'
 ON CONFLICT (enum_id, name) DO NOTHING;
 
--- GlobalDateFilterPreset
+-- GlobalDateFilterPreset (matches DatePeriodPreset + custom for dashboard filter)
 INSERT INTO metadata_enums (name, label, description, is_active) VALUES
 ('GlobalDateFilterPreset', 'Global Date Filter Preset', 'Dashboard/global date range preset', true)
 ON CONFLICT (name) DO NOTHING;
@@ -485,12 +485,64 @@ INSERT INTO metadata_enum_values (enum_id, name, label, description, display_ord
 SELECT e.id, v.name, v.label, v.description, v.display_order, true
 FROM metadata_enums e
 CROSS JOIN (VALUES
-  ('this_month', 'This Month', 'Current month', 1),
-  ('this_quarter', 'This Quarter', 'Current quarter', 2),
-  ('this_year', 'This Year', 'Current year', 3),
-  ('custom', 'Custom', 'Custom date range', 4)
+  ('today', 'Today', 'Today', 1),
+  ('yesterday', 'Yesterday', 'Yesterday', 2),
+  ('this_week', 'This week', 'This week', 3),
+  ('last_week', 'Last week', 'Last week', 4),
+  ('this_month', 'This Month', 'Current month', 5),
+  ('last_month', 'Last month', 'Last month', 6),
+  ('this_quarter', 'This Quarter', 'Current quarter', 7),
+  ('last_quarter', 'Last quarter', 'Last quarter', 8),
+  ('this_year', 'This Year', 'Current year', 9),
+  ('last_year', 'Last year', 'Last year', 10),
+  ('custom', 'Custom', 'Custom date range', 11)
 ) AS v(name, label, description, display_order)
 WHERE e.name = 'GlobalDateFilterPreset'
 ON CONFLICT (enum_id, name) DO NOTHING;
 
 
+
+-- Add missing VariableType values (transaction_tax, unit) and Role enum for app-wide metadata enum usage
+
+-- ============================================================================
+-- VARIABLE TYPE: add transaction_tax and unit
+-- ============================================================================
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT
+  e.id,
+  v.name,
+  v.label,
+  v.description,
+  v.display_order,
+  true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('transaction_tax', 'Transaction Tax', 'Transaction/sales tax rates', 6),
+  ('unit', 'Unit', 'Unit of measure', 7)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'VariableType'
+ON CONFLICT (enum_id, name) DO NOTHING;
+
+-- ============================================================================
+-- ROLE: move from hardcoded API to metadata_enums
+-- ============================================================================
+INSERT INTO metadata_enums (name, label, description, is_active) VALUES
+('Role', 'Role', 'User roles', true)
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT
+  e.id,
+  v.name,
+  v.label,
+  v.description,
+  v.display_order,
+  true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('member', 'Member', 'Member role', 1),
+  ('manager', 'Manager', 'Manager role', 2),
+  ('administrator', 'Administrator', 'Administrator role', 3)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'Role'
+ON CONFLICT (enum_id, name) DO NOTHING;

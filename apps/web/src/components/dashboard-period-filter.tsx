@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   getDateRangeForPreset,
   type DatePeriodPreset,
@@ -29,7 +29,12 @@ export interface DashboardPeriodFilterProps {
 }
 
 export function DashboardPeriodFilter({ value, onChange }: DashboardPeriodFilterProps) {
-  const { data: presets = [] } = useMetadataEnum("GlobalDateFilterPreset");
+  const { data: presetsFromApi = [], isLoading } = useMetadataEnum("GlobalDateFilterPreset");
+  const presets = useMemo(
+    () => presetsFromApi.map((p) => ({ name: p.name, label: p.label ?? p.name })),
+    [presetsFromApi]
+  );
+
   const detectPreset = (range: DateRange): string => {
     for (const p of presets) {
       if (p.name === CUSTOM_VALUE) continue;
@@ -44,17 +49,29 @@ export function DashboardPeriodFilter({ value, onChange }: DashboardPeriodFilter
   };
 
   const [preset, setPreset] = useState<string>(() => detectPreset(value));
+
+  useEffect(() => {
+    const next = detectPreset(value);
+    setPreset((prev) => (prev !== next ? next : prev));
+  }, [value.startDate, value.endDate, presets]);
+
   type CalendarRange = { from?: Date; to?: Date };
   const [customRange, setCustomRange] = useState<CalendarRange>({
     from: value.startDate ? new Date(value.startDate) : undefined,
     to: value.endDate ? new Date(value.endDate) : undefined,
   });
+  useEffect(() => {
+    setCustomRange({
+      from: value.startDate ? new Date(value.startDate) : undefined,
+      to: value.endDate ? new Date(value.endDate) : undefined,
+    });
+  }, [value.startDate, value.endDate]);
   const [rangePopoverOpen, setRangePopoverOpen] = useState(false);
 
   const selectLabel =
     preset === CUSTOM_VALUE
-      ? `${formatShortDate(value.startDate)} – ${formatShortDate(value.endDate)}`
-      : presets.find((p) => p.name === preset)?.label ?? "This year";
+      ? presets.find((p) => p.name === CUSTOM_VALUE)?.label ?? "Custom"
+      : presets.find((p) => p.name === preset)?.label ?? (presets.length > 0 ? presets[0].label : "Period");
 
   const handlePresetChange = (v: string) => {
     setPreset(v);
@@ -86,10 +103,16 @@ export function DashboardPeriodFilter({ value, onChange }: DashboardPeriodFilter
 
   return (
     <div className="flex items-center gap-2">
-      <Select value={preset} onValueChange={handlePresetChange}>
+      <Select
+        value={preset}
+        onValueChange={handlePresetChange}
+        disabled={isLoading || presets.length === 0}
+      >
         <SelectTrigger className="w-[160px] h-9">
           <CalendarIcon className="h-4 w-4 text-muted-foreground mr-2" />
-          <SelectValue>{selectLabel}</SelectValue>
+          <SelectValue placeholder={isLoading ? "Loading…" : undefined}>
+            {selectLabel}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {presets.map((p) => (
