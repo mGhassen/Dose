@@ -1,7 +1,7 @@
 // Stock Movements API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { StockMovement, CreateStockMovementData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     const itemId = searchParams.get('itemId') || searchParams.get('ingredientId'); // Support both for backward compat
     const movementType = searchParams.get('movementType');
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     let query = supabase
       .from('stock_movements')
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateStockMovementData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('stock_movements')
       .insert(transformToSnakeCase(body))

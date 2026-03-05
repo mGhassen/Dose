@@ -1,7 +1,7 @@
 // Update/Delete Actual Payment API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { ActualPayment, CreateActualPaymentData } from '../route';
 
 function transformActualPayment(row: any): ActualPayment {
@@ -34,7 +34,7 @@ export async function PUT(
     if (!parsed.success) return parsed.response;
     const body = parsed.data;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const updateData: any = {};
     if (body.paymentDate !== undefined) updateData.payment_date = body.paymentDate;
@@ -82,7 +82,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // First, fetch the payment to check if it's a subscription payment
     const { data: payment, error: fetchError } = await supabase

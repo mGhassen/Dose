@@ -1,7 +1,7 @@
 // Update/Delete Personnel Salary Projection Entry API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 function transformProjectionEntry(row: any) {
   return {
@@ -50,7 +50,7 @@ export async function PUT(
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Verify the entry belongs to this personnel
     const { data: existing, error: fetchError } = await supabase
@@ -110,7 +110,7 @@ export async function DELETE(
   try {
     const { id, entryId } = await params;
     
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Verify the entry belongs to this personnel
     const { data: existing, error: fetchError } = await supabase

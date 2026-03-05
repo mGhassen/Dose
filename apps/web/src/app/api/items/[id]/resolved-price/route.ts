@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
 
 export async function GET(
@@ -17,7 +17,7 @@ export async function GET(
     if (Number.isNaN(itemId)) {
       return NextResponse.json({ error: 'Invalid item id' }, { status: 400 });
     }
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const [unitPrice, unitCost] = await Promise.all([
       getItemSellingPriceAsOf(supabase, itemId, dateStr),
       getItemCostAsOf(supabase, itemId, dateStr),

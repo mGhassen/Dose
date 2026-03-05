@@ -2,7 +2,7 @@
 // Calculates cash flow projections based on other financial data
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { CashFlowEntry, Sale, Expense, LeasingPayment, Personnel, LoanScheduleEntry } from '@kit/types';
 
 function transformSale(row: any): Sale {
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch all related data for the date range
     const startDate = `${startMonth}-01`;

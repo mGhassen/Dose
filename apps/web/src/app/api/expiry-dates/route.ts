@@ -1,7 +1,7 @@
 // Expiry Dates API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { ExpiryDate, CreateExpiryDateData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     const itemId = searchParams.get('itemId') || searchParams.get('ingredientId'); // Support both for backward compat
     const isExpired = searchParams.get('isExpired');
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     let query = supabase
       .from('expiry_dates')
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateExpiryDateData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('expiry_dates')
       .insert(transformToSnakeCase(body))

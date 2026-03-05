@@ -2,7 +2,7 @@
 // This endpoint only updates affected entries, doesn't regenerate everything
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 export async function POST(
   request: NextRequest,
@@ -17,7 +17,7 @@ export async function POST(
       return NextResponse.json({ error: 'entryId is required' }, { status: 400 });
     }
     
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch leasing to get totalAmount
     const { data: leasingData, error: leasingError } = await supabase

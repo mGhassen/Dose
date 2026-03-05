@@ -2,7 +2,7 @@
 // Provides data for charts and visualizations
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Investment, DepreciationEntry } from '@kit/types';
 
 function transformInvestment(row: any): Investment {
@@ -34,7 +34,7 @@ function transformDepreciationEntry(row: any): DepreciationEntry {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     // Fetch all investments
     const { data: investmentsData, error: investmentsError } = await supabase

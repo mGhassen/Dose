@@ -2,7 +2,7 @@
 // Marks order as delivered and creates stock movements for received items
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { SupplierOrderStatus, StockMovementType, StockMovementReferenceType } from '@kit/types';
 import { getItemTotalStock } from '@/lib/stock/get-item-stock';
 
@@ -26,7 +26,7 @@ export async function POST(
     );
     if (!parsed.success) return parsed.response;
     const body = parsed.data as ReceiveOrderData;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Get order and items
     const { data: orderData, error: orderError } = await supabase

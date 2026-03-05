@@ -1,7 +1,7 @@
 // Get recipes that use a specific item
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 export async function GET(
   request: NextRequest,
@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Get recipes that use this item
     const { data: recipeItems, error } = await supabase

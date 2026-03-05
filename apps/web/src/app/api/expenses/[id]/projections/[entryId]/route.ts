@@ -1,7 +1,7 @@
 // Update Expense Projection Entry API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 function transformProjectionEntry(row: any) {
   return {
@@ -27,7 +27,7 @@ export async function PUT(
     const { id, entryId } = await params;
     const body = await request.json();
     
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const updateData: any = {};
     if (body.month !== undefined) updateData.month = body.month;

@@ -1,7 +1,7 @@
 // Vendor by ID API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Vendor, UpdateVendorData } from '@kit/types';
 import { parseRequestBody, updateVendorSchema } from '@/shared/zod-schemas';
 
@@ -39,7 +39,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { data, error } = await supabase
       .from('vendors')
@@ -74,7 +74,7 @@ export async function PUT(
     if (!parsed.success) return parsed.response;
     const body = parsed.data as UpdateVendorData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('vendors')
       .update(transformToSnakeCase(body))
@@ -105,7 +105,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { error } = await supabase
       .from('vendors')

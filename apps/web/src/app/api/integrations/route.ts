@@ -1,7 +1,7 @@
 // Integrations API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Integration, CreateIntegrationData } from '@kit/types';
 import { parseRequestBody, createIntegrationSchema } from '@/shared/zod-schemas';
 
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
 
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     // Get current user's account
     const { data: { user } } = await supabase.auth.getUser();
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
 
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     // Get current user's account
     const { data: { user } } = await supabase.auth.getUser();

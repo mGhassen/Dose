@@ -1,7 +1,7 @@
 // Get Leasing Timeline Entries API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 function transformTimelineEntry(row: any) {
   return {
@@ -31,7 +31,7 @@ export async function GET(
     const startMonth = searchParams.get('startMonth');
     const endMonth = searchParams.get('endMonth');
     
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     let query = supabase
       .from('leasing_timeline_entries')
@@ -71,7 +71,7 @@ export async function POST(
     const { id } = await params;
     const body = await request.json();
     
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const insertData: any = {
       leasing_id: parseInt(id),

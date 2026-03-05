@@ -2,7 +2,7 @@
 // Returns total personnel cost for a specific month
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Personnel } from '@kit/types';
 
 function transformPersonnel(row: any): Personnel {
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch all active personnel
     const { data, error } = await supabase

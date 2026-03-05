@@ -2,7 +2,7 @@
 // Returns annual summary with totals and averages
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { projectExpensesForYear, calculateAnnualBudgetSummary } from '@/lib/calculations/expense-projections';
 import type { Expense, ExpenseProjectionSummary } from '@kit/types';
 
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch all active expenses
     const { data, error } = await supabase

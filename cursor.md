@@ -1446,12 +1446,12 @@ CREATE TABLE loan_schedules (
 ```typescript
 // apps/web/src/app/api/[entity]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Expense, CreateExpenseData } from '@kit/types';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
@@ -1475,7 +1475,7 @@ export async function POST(request: NextRequest) {
     // Validation with Zod
     // Business logic here
     
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('expenses')
       .insert(transformToSnakeCase(body))
@@ -1530,7 +1530,7 @@ For entities that auto-calculate (Cash Flow, P&L, Balance Sheet, BFR, Financial 
 ```typescript
 // apps/web/src/app/api/profit-loss/calculate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { ProfitAndLoss } from '@kit/types';
 
 export async function POST(request: NextRequest) {
@@ -1542,7 +1542,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Month parameter required' }, { status: 400 });
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch all related data
     const [sales, expenses, personnel, leasing, investments, loans, variables] = await Promise.all([

@@ -1,7 +1,7 @@
 // Produce Recipe API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { produceRecipe } from '@/lib/stock/produce-recipe';
 
 interface ProduceRecipeData {
@@ -21,7 +21,7 @@ export async function POST(
     );
     if (!parsed.success) return parsed.response;
     const body = parsed.data as ProduceRecipeData;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     const { producedItemId } = await produceRecipe(supabase, id, {
       quantity: body.quantity,

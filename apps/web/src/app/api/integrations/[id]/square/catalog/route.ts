@@ -1,7 +1,7 @@
 // Square Catalog Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { SquareListCatalogResponse } from '@kit/types';
 import { getIntegrationWithValidToken } from '../_utils';
 
@@ -23,7 +23,7 @@ export async function GET(
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
 
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     const result = await getIntegrationWithValidToken(supabase, id, authHeader);
     

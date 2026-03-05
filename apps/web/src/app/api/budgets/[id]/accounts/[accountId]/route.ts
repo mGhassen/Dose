@@ -1,7 +1,7 @@
 // Budget Account API Route (single account)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { BudgetAccount, UpdateBudgetAccountData } from '@kit/types';
 
 function transformBudgetAccount(row: any): BudgetAccount {
@@ -32,7 +32,7 @@ export async function PUT(
     if (!parsed.success) return parsed.response;
     const body = parsed.data as UpdateBudgetAccountData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const updateData: any = {};
 
     if (body.accountPath !== undefined) updateData.account_path = body.accountPath;
@@ -70,7 +70,7 @@ export async function DELETE(
   try {
     const { id, accountId } = await params;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { error } = await supabase
       .from('budget_accounts')
       .delete()

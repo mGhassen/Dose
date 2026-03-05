@@ -2,7 +2,7 @@
 // Tracks real payments vs projections for loans, leasing, expenses
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 export interface ActualPayment {
   id: number;
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     const scheduleEntryId = searchParams.get('scheduleEntryId');
     const month = searchParams.get('month');
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     let query = supabase.from('actual_payments').select('*');
 
     if (paymentType) {
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateActualPaymentData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Create the actual payment record
     const { data: paymentData, error: paymentError } = await supabase

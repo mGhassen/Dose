@@ -2,7 +2,7 @@
 // Handles CRUD operations for entries (inputs/outputs)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
 export interface Entry {
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
     const includePayments = searchParams.get('includePayments') === 'true';
     const { page, limit, offset } = getPaginationParams(searchParams);
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Build base query for counting
     let countQuery = supabase
@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateEntryData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('entries')
       .insert(transformToSnakeCase(body))

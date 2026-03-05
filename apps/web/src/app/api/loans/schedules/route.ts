@@ -2,7 +2,7 @@
 // Fetches loan schedules across all loans for a date range
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { LoanScheduleEntry } from '@kit/types';
 
 export interface LoanScheduleEntryWithLoan extends LoanScheduleEntry {
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     endDateObj.setDate(0);
     const endDate = endDateObj.toISOString().split('T')[0];
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     const { data: scheduleRows, error } = await supabase
       .from('loan_schedules')

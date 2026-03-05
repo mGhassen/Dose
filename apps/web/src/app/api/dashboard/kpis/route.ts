@@ -2,7 +2,7 @@
 // Returns financial KPIs for the dashboard
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { getMonthsInRange } from '@kit/lib/date-periods';
 
 function transformSale(row: any) {
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     const firstMonth = monthsInRange[0] || `${year}-01`;
     const lastMonth = monthsInRange[monthsInRange.length - 1] || `${year}-12`;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     const [salesResult, expensesResult, personnelResult, loansResult, cashFlowResult, workingCapitalResult, profitLossResult] = await Promise.all([
       supabase.from('sales').select('date, amount').gte('date', startDate).lte('date', endDate),

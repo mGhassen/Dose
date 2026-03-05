@@ -1,7 +1,7 @@
 // Ingredients API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Ingredient, CreateIngredientData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createIngredientSchema } from '@/shared/zod-schemas';
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const { page, limit, offset } = getPaginationParams(searchParams);
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Count query
     const countQuery = supabase
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateIngredientData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('ingredients')
       .insert(transformToSnakeCase(body))

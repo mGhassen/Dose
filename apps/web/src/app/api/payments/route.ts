@@ -2,7 +2,7 @@
 // Handles CRUD operations for payments linked to entries
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createPaymentSchema } from '@/shared/zod-schemas';
 
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     const month = searchParams.get('month');
     const { page, limit, offset } = getPaginationParams(searchParams);
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // If filtering by loanId, first get all entry IDs for that loan
     let entryIds: number[] | null = null;
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
     const body = parsed.data as CreatePaymentData;
 
     // Verify entry exists
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data: entry, error: entryError } = await supabase
       .from('entries')
       .select('id')

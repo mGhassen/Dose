@@ -1,7 +1,7 @@
 // Square CSV Import Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 async function getIntegrationAndVerifyAccess(
   supabase: any,
@@ -59,7 +59,7 @@ export async function POST(
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
 
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
     

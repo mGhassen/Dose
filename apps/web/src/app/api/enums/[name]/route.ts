@@ -2,7 +2,7 @@
 // Handles fetching enum values for a specific enum name
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { MetadataEnumValue } from '@kit/hooks';
 
 export async function GET(
@@ -20,7 +20,7 @@ export async function GET(
     }
 
     const authHeader = request.headers.get('authorization');
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     // First, get the enum definition
     const { data: enumData, error: enumError } = await supabase

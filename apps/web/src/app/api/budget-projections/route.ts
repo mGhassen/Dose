@@ -2,7 +2,7 @@
 // Handles saving and retrieving monthly budget projections
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     // Use upsert to handle both insert and update
     const { data, error } = await supabase
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     const startMonth = searchParams.get('startMonth');
     const endMonth = searchParams.get('endMonth');
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     let query = supabase.from('budget_projections').select('*');
 
     if (projectionType) {
@@ -95,7 +95,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     let query = supabase.from('budget_projections').delete();
 
     query = query.eq('projection_type', projectionType);

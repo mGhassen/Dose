@@ -1,7 +1,7 @@
 // Sales API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Sale, CreateSaleData, CreateTransactionPayload, SaleLineItem, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { StockMovementType, StockMovementReferenceType } from '@kit/types';
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type');
     const { page, limit, offset } = getPaginationParams(searchParams);
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     let countQuery = supabase
       .from('sales')
@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
       const dateStr = body.date.split('T')[0] || body.date;
       const lines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxRatePercent: number; taxAmount: number }> = [];
       for (let i = 0; i < body.lineItems.length; i++) {

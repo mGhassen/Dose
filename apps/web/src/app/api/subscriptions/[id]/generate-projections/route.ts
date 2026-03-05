@@ -1,7 +1,7 @@
 // Generate and Store Subscription Projections API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { projectSubscription } from '@/lib/calculations/subscription-projections';
 import type { Subscription } from '@kit/types';
 
@@ -36,7 +36,7 @@ export async function POST(
       return date.toISOString().slice(0, 7);
     })();
     
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch subscription
     const { data: subscriptionData, error: subscriptionError } = await supabase

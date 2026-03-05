@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 const SQUARE_APP_ID = process.env.SQUARE_APPLICATION_ID;
 const SQUARE_APP_SECRET = process.env.SQUARE_APPLICATION_SECRET;
@@ -17,7 +17,7 @@ export async function POST(
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
 
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {

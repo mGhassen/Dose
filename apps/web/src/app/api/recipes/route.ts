@@ -1,7 +1,7 @@
 // Recipes API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Recipe, CreateRecipeData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const { page, limit, offset } = getPaginationParams(searchParams);
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Count query - recipes are stored in the recipes table
     const countQuery = supabase
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateRecipeData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Insert recipe into recipes table
     const { data: recipeData, error: recipeError } = await supabase

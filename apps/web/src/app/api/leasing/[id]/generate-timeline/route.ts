@@ -1,7 +1,7 @@
 // Generate and Store Leasing Timeline API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { projectLeasingPayment } from '@/lib/calculations/leasing-timeline';
 import type { LeasingPayment } from '@kit/types';
 
@@ -33,7 +33,7 @@ export async function POST(
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const changedEntryId = searchParams.get('entryId'); // Optional: ID of the entry that was just changed
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch leasing payment first to get the actual start date
     const { data: leasingData, error: leasingError } = await supabase

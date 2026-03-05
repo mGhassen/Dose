@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { User } from '@kit/lib/api/users';
 
 // Helper to convert UUID to numeric ID (simple hash)

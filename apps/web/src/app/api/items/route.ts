@@ -3,7 +3,7 @@
 // Recipes are NOT items - they're separate in recipes table
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Item, CreateItemData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createItemSchema } from '@/shared/zod-schemas';
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     const includeRecipes = searchParams.get('includeRecipes') === 'true';
     const producedOnly = searchParams.get('producedOnly') === 'true';
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     let itemsQuery = supabase
       .from('items')
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateItemData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data: itemData, error } = await supabase
       .from('items')
       .insert(transformToSnakeCase(body))

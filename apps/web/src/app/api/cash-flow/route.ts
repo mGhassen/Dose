@@ -1,7 +1,7 @@
 // Cash Flow API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { CashFlowEntry, CreateCashFlowEntryData } from '@kit/types';
 
 function transformCashFlow(row: any): CashFlowEntry {
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month');
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     let query = supabase
       .from('cash_flow')
       .select('*')
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateCashFlowEntryData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('cash_flow')
       .insert(transformToSnakeCase(body))

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { parseRequestBody, updateItemPriceHistorySchema } from '@/shared/zod-schemas';
 
 type HistoryType = 'sell' | 'cost';
@@ -18,7 +18,7 @@ export async function PATCH(
     const parsed = await parseRequestBody(request, updateItemPriceHistorySchema);
     if (!parsed.success) return parsed.response;
     const { effectiveDate, value } = parsed.data;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const table = type === 'sell' ? 'item_selling_price_history' : 'item_cost_history';
     const valueCol = type === 'sell' ? 'unit_price' : 'unit_cost';
 
@@ -61,7 +61,7 @@ export async function DELETE(
     if (type !== 'sell' && type !== 'cost') {
       return NextResponse.json({ error: 'Missing or invalid type (sell|cost)' }, { status: 400 });
     }
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const table = type === 'sell' ? 'item_selling_price_history' : 'item_cost_history';
 
     const { error } = await supabase

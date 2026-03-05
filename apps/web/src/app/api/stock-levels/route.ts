@@ -1,7 +1,7 @@
 // Stock Levels API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { StockLevel, CreateStockLevelData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     const itemId = searchParams.get('itemId') || searchParams.get('ingredientId'); // Support both for backward compat
     const location = searchParams.get('location');
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     let query = supabase
       .from('stock_levels')
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateStockLevelData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('stock_levels')
       .insert(transformToSnakeCase(body))

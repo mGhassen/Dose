@@ -1,7 +1,7 @@
 // Suppliers API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Supplier, CreateSupplierData } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createSupplierSchema } from '@/shared/zod-schemas';
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const { page, limit, offset } = getPaginationParams(searchParams);
     const supplierType = searchParams.get('supplierType'); // Filter by type: 'supplier' or 'vendor'
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     let countQuery = supabase
       .from('suppliers')
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateSupplierData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('suppliers')
       .insert(transformToSnakeCase(body))

@@ -2,7 +2,7 @@
 // Auto-calculates P&L from all financial data
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { calculateProfitAndLoss } from '@/lib/calculations/financial-statements';
 import type { ProfitAndLoss, Sale, Expense, Personnel, LeasingPayment, DepreciationEntry, LoanScheduleEntry, Variable, ExpenseCategory } from '@kit/types';
 
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Month parameter required (YYYY-MM)' }, { status: 400 });
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Get date range for the month
     const startDate = `${month}-01`;

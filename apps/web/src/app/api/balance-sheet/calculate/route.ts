@@ -2,7 +2,7 @@
 // Auto-calculates balance sheet from other financial data
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { calculateBalanceSheet } from '@/lib/calculations/financial-statements';
 import type { WorkingCapital, Investment, Loan, ProfitAndLoss } from '@kit/types';
 
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Month parameter required (YYYY-MM)' }, { status: 400 });
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch all related data
     const [workingCapitalResult, investmentsResult, loansResult, profitLossResult, previousBalanceSheetResult] = await Promise.all([

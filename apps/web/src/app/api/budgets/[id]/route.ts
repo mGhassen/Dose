@@ -1,7 +1,7 @@
 // Budget API Route (single budget)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Budget, UpdateBudgetData, BudgetAccount, BudgetEntry } from '@kit/types';
 import { parseRequestBody, updateBudgetSchema } from '@/shared/zod-schemas';
 
@@ -55,7 +55,7 @@ export async function GET(
     const includeAccounts = searchParams.get('includeAccounts') !== 'false';
     const includeEntries = searchParams.get('includeEntries') !== 'false';
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Get budget
     const { data: budgetData, error: budgetError } = await supabase
@@ -117,7 +117,7 @@ export async function PUT(
     if (!parsed.success) return parsed.response;
     const body = parsed.data as UpdateBudgetData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const updateData: any = {};
 
     if (body.name !== undefined) updateData.name = body.name;
@@ -151,7 +151,7 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { error } = await supabase
       .from('budgets')
       .delete()

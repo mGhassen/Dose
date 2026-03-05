@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Unit } from '../route';
 import { parseRequestBody, updateUnitSchema } from '@/shared/zod-schemas';
 
@@ -23,7 +23,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('variables')
       .select('*')
@@ -50,7 +50,7 @@ export async function PATCH(
     const parsed = await parseRequestBody(request, updateUnitSchema);
     if (!parsed.success) return parsed.response;
     const body = parsed.data;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     const { data: existing, error: fetchError } = await supabase
       .from('variables')
@@ -105,7 +105,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { error } = await supabase.from('variables').delete().eq('id', id).eq('type', 'unit');
     if (error) {
       if (error.code === '23503') return NextResponse.json({ error: 'Unit is in use and cannot be deleted' }, { status: 409 });

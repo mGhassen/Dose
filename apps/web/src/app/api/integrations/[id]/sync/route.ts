@@ -1,7 +1,7 @@
 // Integration Sync Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { IntegrationSyncData } from '@kit/types';
 
 const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
@@ -191,7 +191,7 @@ export async function POST(
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
 
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
     
@@ -288,7 +288,7 @@ export async function GET(
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
 
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
     

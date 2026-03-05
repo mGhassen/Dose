@@ -1,7 +1,7 @@
 // Generate Loan Schedule API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { calculateLoanSchedule } from '@/lib/calculations/loans';
 import type { Loan, LoanScheduleEntry } from '@kit/types';
 
@@ -43,7 +43,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch loan
     const { data: loanData, error: loanError } = await supabase

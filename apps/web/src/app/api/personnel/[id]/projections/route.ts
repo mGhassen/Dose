@@ -1,7 +1,7 @@
 // Get Personnel Salary Projection Entries API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 function transformProjectionEntry(row: any) {
   return {
@@ -37,7 +37,7 @@ export async function GET(
     const startMonth = searchParams.get('startMonth');
     const endMonth = searchParams.get('endMonth');
     
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     let query = supabase
       .from('personnel_salary_projections')
@@ -98,7 +98,7 @@ export async function POST(
     if (!parsed.success) return parsed.response;
     const body = parsed.data;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Check if entry already exists
     const { data: existing } = await supabase

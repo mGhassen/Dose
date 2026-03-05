@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { getTaxRateForSaleLine, getTaxRateForExpenseLine } from '@/lib/tax-rules-resolve';
 
 export async function GET(request: NextRequest) {
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     const context = searchParams.get('context');
     const dateStr = searchParams.get('date') || new Date().toISOString().slice(0, 10);
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     if (context === 'sale') {
       const salesType = searchParams.get('salesType') || '';

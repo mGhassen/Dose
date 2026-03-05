@@ -1,7 +1,7 @@
 // Get Loan Schedule API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { LoanScheduleEntry } from '@kit/types';
 
 function transformScheduleEntry(row: any): LoanScheduleEntry {
@@ -25,7 +25,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch schedule entries
     const { data, error } = await supabase

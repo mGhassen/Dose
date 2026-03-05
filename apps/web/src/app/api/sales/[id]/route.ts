@@ -1,7 +1,7 @@
 // Sale by ID API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Sale, UpdateSaleData, SaleLineItem } from '@kit/types';
 import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
 import { upsertSellingPrice, upsertCost } from '@/lib/items/price-history-upsert';
@@ -72,7 +72,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { data, error } = await supabase
       .from('sales')
@@ -201,7 +201,7 @@ export async function PUT(
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const dateStr = ((body.date ?? '').split('T')[0]) || (body.date ?? '');
     const lines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxRatePercent: number; taxAmount: number }> = [];
     for (let i = 0; i < body.lineItems.length; i++) {
@@ -324,7 +324,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { error } = await supabase
       .from('sales')

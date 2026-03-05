@@ -2,7 +2,7 @@
 // Handles GET, PUT, DELETE operations for a single metadata enum
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { parseRequestBody, updateMetadataEnumSchema } from '@/shared/zod-schemas';
 
 export interface MetadataEnum {
@@ -46,7 +46,7 @@ export async function GET(
   try {
     const { id } = await params;
     const authHeader = request.headers.get('authorization');
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
 
     // First try to get the enum (including inactive ones)
     const { data, error } = await supabase
@@ -90,7 +90,7 @@ export async function PUT(
     const body = parsed.data;
 
     const authHeader = request.headers.get('authorization');
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('metadata_enums')
       .update(transformToSnakeCase(body as Partial<MetadataEnum>))
@@ -129,7 +129,7 @@ export async function DELETE(
   try {
     const { id } = await params;
     const authHeader = request.headers.get('authorization');
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     // Soft delete by setting is_active to false
     const { error } = await supabase

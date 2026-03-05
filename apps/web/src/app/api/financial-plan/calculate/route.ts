@@ -2,7 +2,7 @@
 // Auto-calculates financial plan from other data
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { calculateFinancialPlan } from '@/lib/calculations/financial-statements';
 import type { Loan, Investment, WorkingCapital, LoanScheduleEntry } from '@kit/types';
 
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Month parameter required (YYYY-MM)' }, { status: 400 });
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Get date range for the month
     const startDate = `${month}-01`;

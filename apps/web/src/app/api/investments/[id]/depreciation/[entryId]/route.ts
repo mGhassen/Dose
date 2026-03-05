@@ -1,7 +1,7 @@
 // Update Depreciation Entry API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { DepreciationEntry } from '@kit/types';
 
 function transformDepreciationEntry(row: any): DepreciationEntry {
@@ -23,7 +23,7 @@ export async function PUT(
     const { id, entryId } = await params;
     const body = await request.json();
     
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Build update object
     const updateData: any = {};

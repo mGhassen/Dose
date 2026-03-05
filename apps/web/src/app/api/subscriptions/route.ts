@@ -2,7 +2,7 @@
 // Handles CRUD operations for subscriptions
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Subscription, CreateSubscriptionData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createSubscriptionSchema } from '@/shared/zod-schemas';
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const isActive = searchParams.get('isActive');
     const { page, limit, offset } = getPaginationParams(searchParams);
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Build count query
     let countQuery = supabase
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateSubscriptionData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('subscriptions')
       .insert(transformToSnakeCase(body))

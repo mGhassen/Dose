@@ -2,12 +2,12 @@
 // Calculates total inventory value based on average ingredient costs
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { getItemCostAsOf } from '@/lib/items/price-resolve';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { data: stockLevels, error: stockError } = await supabase
       .from('stock_levels')

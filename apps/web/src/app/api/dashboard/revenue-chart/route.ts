@@ -1,7 +1,7 @@
 // Dashboard Revenue Chart API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { getMonthsInRange } from '@kit/lib/date-periods';
 
 export async function GET(request: NextRequest) {
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate') || `${year}-12-31`;
 
     const monthsInRange = getMonthsInRange(startDate, endDate);
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     let allSales: any[] = [];
     let page = 0;

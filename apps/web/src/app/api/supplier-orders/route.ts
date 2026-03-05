@@ -1,7 +1,7 @@
 // Supplier Orders API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { dateToYYYYMMDD } from '@kit/lib';
 import type { SupplierOrder, CreateSupplierOrderData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     const supplierId = searchParams.get('supplierId');
     const status = searchParams.get('status');
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     let countQuery = supabase
       .from('supplier_orders')
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateSupplierOrderData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Calculate total amount
     const totalAmount = body.items.reduce((sum, item) => {

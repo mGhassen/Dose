@@ -2,7 +2,7 @@
 // Handles CRUD operations for enum values
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { MetadataEnumValue } from '@kit/hooks';
 import { parseRequestBody, createMetadataEnumValueSchema } from '@/shared/zod-schemas';
 
@@ -44,7 +44,7 @@ export async function GET(
     }
 
     const authHeader = request.headers.get('authorization');
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     const { data, error } = await supabase
       .from('metadata_enum_values')
@@ -87,7 +87,7 @@ export async function POST(
     const body = parsed.data;
 
     const authHeader = request.headers.get('authorization');
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('metadata_enum_values')
       .insert({

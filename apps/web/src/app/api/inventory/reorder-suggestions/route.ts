@@ -2,11 +2,11 @@
 // Returns ingredients that are below minimum stock levels
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { data: rows, error } = await supabase
       .from('stock_levels')

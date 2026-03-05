@@ -2,7 +2,7 @@
 // Provides data for charts and visualizations
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Expense } from '@kit/types';
 
 function transformExpense(row: any): Expense {
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const year = searchParams.get('year') || new Date().getFullYear().toString();
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     // Fetch all active expenses
     const { data, error } = await supabase

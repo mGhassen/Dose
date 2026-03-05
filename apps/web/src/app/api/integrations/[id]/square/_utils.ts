@@ -1,6 +1,6 @@
 // Shared utilities for Square API routes
 
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 const SQUARE_APP_ID = process.env.SQUARE_APPLICATION_ID;
 const SQUARE_APP_SECRET = process.env.SQUARE_APPLICATION_SECRET;
@@ -147,7 +147,7 @@ async function refreshSquareToken(
         error: errorText,
       });
 
-      const supabase = createServerSupabaseClient(authHeader);
+      const supabase = supabaseServer();
       await supabase
         .from('integrations')
         .update({
@@ -189,7 +189,7 @@ async function refreshSquareToken(
     }
 
     // Update the integration in the database
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     const { data: updatedIntegration, error: updateError } = await supabase
       .from('integrations')
       .update({

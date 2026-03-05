@@ -2,7 +2,7 @@
 // Calculates expense projections for annual budgeting
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { projectExpensesForYear, calculateAnnualBudgetSummary, expenseProjectionsToBudgetProjections } from '@/lib/calculations/expense-projections';
 import type { Expense, ExpenseProjection, ExpenseProjectionSummary } from '@kit/types';
 
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch all active expenses
     const { data, error } = await supabase

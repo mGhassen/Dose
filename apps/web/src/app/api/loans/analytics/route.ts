@@ -2,7 +2,7 @@
 // Provides data for charts and visualizations
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Loan, LoanScheduleEntry } from '@kit/types';
 
 function transformLoan(row: any): Loan {
@@ -39,7 +39,7 @@ function transformLoanSchedule(row: any): LoanScheduleEntry {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     // Fetch all loans
     const { data: loansData, error: loansError } = await supabase

@@ -2,7 +2,7 @@
 // Calculates the cost of a recipe based on ingredient prices from supplier orders
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { buildFactorMap, convertQuantity } from '@/lib/units/convert';
 import { getItemCostAsOf } from '@/lib/items/price-resolve';
 
@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     const { data: unitVariables } = await supabase.from('variables').select('id, value').eq('type', 'unit');
     const factorMap = buildFactorMap((unitVariables || []).map((u: any) => ({ id: u.id, factorToBase: parseFloat(u.value ?? 1) })));

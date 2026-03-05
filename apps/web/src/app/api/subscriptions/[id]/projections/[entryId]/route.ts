@@ -1,7 +1,7 @@
 // Update Subscription Projection Entry API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 export interface UpdateSubscriptionProjectionEntryData {
   amount?: number;
@@ -48,7 +48,7 @@ export async function PUT(
     );
     if (!parsed.success) return parsed.response;
     const body = parsed.data as UpdateSubscriptionProjectionEntryData;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Verify the projection entry belongs to this subscription
     const { data: existingEntry, error: checkError } = await supabase
@@ -244,7 +244,7 @@ export async function DELETE(
   try {
     const { id, entryId } = await params;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Verify the projection entry belongs to this subscription
     const { data: existingEntry } = await supabase

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { parseRequestBody, createItemPriceHistorySchema } from '@/shared/zod-schemas';
 
 type HistoryType = 'sell' | 'cost';
@@ -15,7 +15,7 @@ export async function GET(
     if (type !== 'sell' && type !== 'cost') {
       return NextResponse.json({ error: 'Missing or invalid type (sell|cost)' }, { status: 400 });
     }
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const itemId = parseInt(id, 10);
     if (Number.isNaN(itemId)) {
       return NextResponse.json({ error: 'Invalid item id' }, { status: 400 });
@@ -57,7 +57,7 @@ export async function POST(
     const parsed = await parseRequestBody(request, createItemPriceHistorySchema);
     if (!parsed.success) return parsed.response;
     const { type, effectiveDate, value } = parsed.data;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const itemId = parseInt(id, 10);
     if (Number.isNaN(itemId)) {
       return NextResponse.json({ error: 'Invalid item id' }, { status: 400 });

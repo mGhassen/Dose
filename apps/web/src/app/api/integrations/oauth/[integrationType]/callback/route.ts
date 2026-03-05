@@ -1,7 +1,7 @@
 // OAuth Callback Route (for any integration type)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Integration } from '@kit/types';
 
 const SQUARE_APP_ID = process.env.SQUARE_APPLICATION_ID;
@@ -193,7 +193,7 @@ export async function POST(
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
 
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     // Get current user's account
     const { data: { user } } = await supabase.auth.getUser();

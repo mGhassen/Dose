@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 export async function GET(
   request: NextRequest,
@@ -11,7 +11,7 @@ export async function GET(
     if (Number.isNaN(itemId)) {
       return NextResponse.json({ error: 'Invalid item id' }, { status: 400 });
     }
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     const { data: rows, error } = await supabase
       .from('supplier_order_items')

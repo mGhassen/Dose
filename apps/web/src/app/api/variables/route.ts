@@ -1,7 +1,7 @@
 // Variables API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Variable, CreateVariableData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createVariableSchema } from '@/shared/zod-schemas';
@@ -24,7 +24,7 @@ function transformVariable(row: any, unitLabel?: string | null): Variable {
   };
 }
 
-async function resolveUnitLabels(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>, rows: any[]): Promise<Map<number, string>> {
+async function resolveUnitLabels(supabase: ReturnType<typeof supabaseServer>, rows: any[]): Promise<Map<number, string>> {
   const unitIds = [...new Set((rows || []).map((r) => r.unit_id).filter(Boolean))] as number[];
   if (unitIds.length === 0) return new Map();
   const { data } = await supabase.from('variables').select('id, name, payload').in('id', unitIds);
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type');
     const { page, limit, offset } = getPaginationParams(searchParams);
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Build count query
     let countQuery = supabase
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateVariableData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('variables')
       .insert(transformToSnakeCase(body))

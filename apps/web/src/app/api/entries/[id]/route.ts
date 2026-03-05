@@ -1,7 +1,7 @@
 // Entry by ID API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Entry, UpdateEntryData } from '../route';
 
 function transformEntry(row: any, payments?: any[]): Entry {
@@ -64,7 +64,7 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const includePayments = searchParams.get('includePayments') !== 'false';
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { data, error } = await supabase
       .from('entries')
@@ -116,7 +116,7 @@ export async function PUT(
     if (!parsed.success) return parsed.response;
     const body = parsed.data as UpdateEntryData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('entries')
       .update(transformToSnakeCase(body))
@@ -149,7 +149,7 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { error } = await supabase
       .from('entries')
       .delete()

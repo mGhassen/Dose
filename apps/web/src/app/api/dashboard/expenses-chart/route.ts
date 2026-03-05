@@ -1,7 +1,7 @@
 // Dashboard Expenses Chart API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { getMonthsInRange } from '@kit/lib/date-periods';
 
 function transformExpense(row: any) {
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate') || `${year}-12-31`;
 
     const monthsInRange = getMonthsInRange(startDate, endDate);
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     const { data, error } = await supabase
       .from('expenses')

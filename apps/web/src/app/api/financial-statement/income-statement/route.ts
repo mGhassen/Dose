@@ -2,7 +2,7 @@
 // Aggregates actual data from database for income statement
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { ExpenseCategory, SalesType } from '@kit/types';
 
 interface IncomeStatementData {
@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Determine date range
     let startDate: string;

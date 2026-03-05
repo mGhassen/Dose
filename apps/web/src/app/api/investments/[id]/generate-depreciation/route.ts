@@ -1,7 +1,7 @@
 // Generate Investment Depreciation API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { calculateDepreciation } from '@/lib/calculations/depreciation';
 import type { Investment, DepreciationEntry } from '@kit/types';
 
@@ -37,7 +37,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch investment
     const { data: investmentData, error: investmentError } = await supabase

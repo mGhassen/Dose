@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { parseRequestBody, createUnitSchema } from '@/shared/zod-schemas';
 
 export interface Unit {
@@ -29,7 +29,7 @@ function variableRowToUnit(row: any): Unit {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { searchParams } = new URL(request.url);
     const dimension = searchParams.get('dimension');
 
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       is_active: true,
       payload,
     };
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data: existing } = await supabase
       .from('variables')
       .select('id')

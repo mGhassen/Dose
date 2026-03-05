@@ -2,7 +2,7 @@
 // Handles listing all metadata enums
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { parseRequestBody, createMetadataEnumSchema } from '@/shared/zod-schemas';
 
 export interface MetadataEnum {
@@ -42,7 +42,7 @@ function transformToSnakeCase(data: Partial<MetadataEnum>): any {
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     // Get all metadata enums
     const { data: enums, error: enumsError } = await supabase
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     const body = parsed.data;
 
     const authHeader = request.headers.get('authorization');
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('metadata_enums')
       .insert({

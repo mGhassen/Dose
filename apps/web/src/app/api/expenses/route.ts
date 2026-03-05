@@ -2,7 +2,7 @@
 // Handles CRUD operations for expenses
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Expense, CreateExpenseData, PaginatedResponse, ExpenseLineItem } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { z } from "zod";
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
     const { page, limit, offset } = getPaginationParams(searchParams);
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Build base query for counting
     let countQuery = supabase
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
 
     if ('lineItems' in body && Array.isArray(body.lineItems) && body.lineItems.length > 0) {
       const txBody = body as import('@/shared/zod-schemas').CreateExpenseTransactionInput;
-      const supabase = createServerSupabaseClient();
+      const supabase = supabaseServer();
       const { getTaxRateForExpenseLine } = await import('@/lib/tax-rules-resolve');
       const dateStr = (txBody.expenseDate || '').split('T')[0] || txBody.expenseDate;
 
@@ -272,7 +272,7 @@ export async function POST(request: NextRequest) {
 
     const bodyLegacy = body as unknown as CreateExpenseData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('expenses')
       .insert(transformToSnakeCase(bodyLegacy))

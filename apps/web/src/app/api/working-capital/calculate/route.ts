@@ -2,7 +2,7 @@
 // Auto-calculates BFR from other data
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { calculateWorkingCapital } from '@/lib/calculations/financial-statements';
 import type { WorkingCapital, Sale } from '@kit/types';
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Month parameter required (YYYY-MM)' }, { status: 400 });
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Get date range for the month
     const startDate = `${month}-01`;

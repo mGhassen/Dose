@@ -1,7 +1,7 @@
 // Financial Plan API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { FinancialPlan, CreateFinancialPlanData } from '@kit/types';
 
 function transformFinancialPlan(row: any): FinancialPlan {
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month');
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     let query = supabase
       .from('financial_plan')
       .select('*')
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateFinancialPlanData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('financial_plan')
       .insert(transformToSnakeCase(body))

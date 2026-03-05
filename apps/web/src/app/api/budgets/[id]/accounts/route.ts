@@ -1,7 +1,7 @@
 // Budget Accounts API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { BudgetAccount, CreateBudgetAccountData, UpdateBudgetAccountData } from '@kit/types';
 
 function transformBudgetAccount(row: any): BudgetAccount {
@@ -40,7 +40,7 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('budget_accounts')
       .select('*')
@@ -72,7 +72,7 @@ export async function POST(
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateBudgetAccountData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const accountData = {
       ...transformToSnakeCase(body),
       budget_id: parseInt(id),

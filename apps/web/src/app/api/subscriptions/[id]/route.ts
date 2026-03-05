@@ -2,7 +2,7 @@
 // Handles GET, PUT, DELETE operations for a specific subscription
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Subscription, UpdateSubscriptionData } from '@kit/types';
 import { parseRequestBody, updateSubscriptionSchema } from '@/shared/zod-schemas';
 
@@ -49,7 +49,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { data, error } = await supabase
       .from('subscriptions')
@@ -83,7 +83,7 @@ export async function PUT(
     const parsed = await parseRequestBody(request, updateSubscriptionSchema);
     if (!parsed.success) return parsed.response;
     const body = parsed.data as UpdateSubscriptionData;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('subscriptions')
       .update(transformToSnakeCase(body))
@@ -114,7 +114,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { error } = await supabase
       .from('subscriptions')

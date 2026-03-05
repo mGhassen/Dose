@@ -1,7 +1,7 @@
 // Generate and Store Expense Projections API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import { projectExpense } from '@/lib/calculations/expense-projections';
 import type { Expense } from '@kit/types';
 
@@ -34,7 +34,7 @@ export async function POST(
       return date.toISOString().slice(0, 7);
     })();
     
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch expense
     const { data: expenseData, error: expenseError } = await supabase

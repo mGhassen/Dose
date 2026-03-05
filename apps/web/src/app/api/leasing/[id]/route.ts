@@ -1,7 +1,7 @@
 // Leasing Payment by ID API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { LeasingPayment, UpdateLeasingPaymentData } from '@kit/types';
 
 function transformLeasing(row: any): LeasingPayment {
@@ -58,7 +58,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { data, error } = await supabase
       .from('leasing_payments')
@@ -95,7 +95,7 @@ export async function PUT(
     if (!parsed.success) return parsed.response;
     const body = parsed.data as UpdateLeasingPaymentData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('leasing_payments')
       .update(transformToSnakeCase(body))
@@ -126,7 +126,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { error } = await supabase
       .from('leasing_payments')

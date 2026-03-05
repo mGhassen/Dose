@@ -2,7 +2,7 @@
 // Handles update and delete operations for a single enum value
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { MetadataEnumValue } from '@kit/hooks';
 import { parseRequestBody, updateMetadataEnumValueSchema } from '@/shared/zod-schemas';
 
@@ -48,7 +48,7 @@ export async function PUT(
     const body = parsed.data;
 
     const authHeader = request.headers.get('authorization');
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('metadata_enum_values')
       .update(transformToSnakeCase(body as Partial<MetadataEnumValue>))
@@ -84,7 +84,7 @@ export async function DELETE(
     }
 
     const authHeader = request.headers.get('authorization');
-    const supabase = createServerSupabaseClient(authHeader);
+    const supabase = supabaseServer();
     
     // Soft delete by setting is_active to false
     const { error } = await supabase

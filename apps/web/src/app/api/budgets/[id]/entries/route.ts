@@ -1,7 +1,7 @@
 // Budget Entries API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { BudgetEntry, CreateBudgetEntryData, UpdateBudgetEntryData } from '@kit/types';
 
 function transformBudgetEntry(row: any): BudgetEntry {
@@ -35,7 +35,7 @@ export async function GET(
     const accountPath = searchParams.get('accountPath');
     const month = searchParams.get('month');
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     let query = supabase
       .from('budget_entries')
       .select('*')
@@ -72,7 +72,7 @@ export async function POST(
     const { id } = await params;
     const body: CreateBudgetEntryData | CreateBudgetEntryData[] = await request.json();
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     // Handle both single entry and bulk insert
     const entries = Array.isArray(body) ? body : [body];
@@ -117,7 +117,7 @@ export async function PUT(
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const updateData: any = {};
 
     if (body.amount !== undefined) updateData.amount = body.amount;
@@ -160,7 +160,7 @@ export async function DELETE(
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { error } = await supabase
       .from('budget_entries')
       .delete()

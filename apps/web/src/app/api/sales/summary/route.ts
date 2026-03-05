@@ -2,7 +2,7 @@
 // Returns monthly sales summaries by type
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { SalesSummary, Sale, SalesType } from '@kit/types';
 
 function transformSale(row: any): Sale {
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Fetch all sales in the date range
     const startDate = `${startMonth}-01`;

@@ -1,7 +1,7 @@
 // Cash Flow Entry by ID API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { CashFlowEntry, UpdateCashFlowEntryData } from '@kit/types';
 
 function transformCashFlow(row: any): CashFlowEntry {
@@ -46,7 +46,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { data, error } = await supabase
       .from('cash_flow')
@@ -83,7 +83,7 @@ export async function PUT(
     if (!parsed.success) return parsed.response;
     const body = parsed.data as UpdateCashFlowEntryData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Get current entry to calculate if needed
     const { data: currentData } = await supabase
@@ -124,7 +124,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { error } = await supabase
       .from('cash_flow')

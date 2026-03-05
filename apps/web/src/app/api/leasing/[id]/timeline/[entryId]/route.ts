@@ -1,7 +1,7 @@
 // Update Leasing Timeline Entry API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 
 function transformTimelineEntry(row: any) {
   return {
@@ -29,7 +29,7 @@ export async function PUT(
     const { id, entryId } = await params;
     const body = await request.json();
     
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const updateData: any = {};
     if (body.paymentDate !== undefined) updateData.payment_date = body.paymentDate;

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { TaxRule, CreateTaxRuleData } from '@kit/types';
 import { parseRequestBody, createTaxRuleSchema } from '@/shared/zod-schemas';
 
@@ -48,7 +48,7 @@ function toSnakeCase(data: CreateTaxRuleData): any {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { searchParams } = new URL(request.url);
     const variableId = searchParams.get('variableId');
     let query = supabase.from('tax_rules').select('*').order('priority', { ascending: true });
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateTaxRuleData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data: row, error } = await supabase
       .from('tax_rules')
       .insert(toSnakeCase(body))

@@ -1,7 +1,7 @@
 // Profit and Loss API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { ProfitAndLoss, CreateProfitAndLossData } from '@kit/types';
 
 function transformProfitAndLoss(row: any): ProfitAndLoss {
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     console.log('[ProfitLoss API] month param:', month);
 
     console.log('[ProfitLoss API] Creating Supabase client...');
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     console.log('[ProfitLoss API] Supabase client created successfully');
     
     let query = supabase
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data as CreateProfitAndLossData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('profit_and_loss')
       .insert(transformToSnakeCase(body))

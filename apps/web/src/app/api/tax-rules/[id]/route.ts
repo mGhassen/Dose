@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { TaxRule, UpdateTaxRuleData } from '@kit/types';
 import { parseRequestBody, updateTaxRuleSchema } from '@/shared/zod-schemas';
 
@@ -51,7 +51,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { data: row, error } = await supabase
       .from('tax_rules')
       .select('*')
@@ -90,7 +90,7 @@ export async function PUT(
     const parsed = await parseRequestBody(request, updateTaxRuleSchema);
     if (!parsed.success) return parsed.response;
     const body = parsed.data as UpdateTaxRuleData;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     const payload = toSnakeCase(body);
     if (Object.keys(payload).length === 0) {
@@ -127,7 +127,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     const { error } = await supabase.from('tax_rules').delete().eq('id', id);
 
     if (error) throw error;

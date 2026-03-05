@@ -1,7 +1,7 @@
 // Recipe by ID API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Recipe, RecipeWithItems, UpdateRecipeData, RecipeItem } from '@kit/types';
 import { getItemSellingPriceAsOf } from '@/lib/items/price-resolve';
 
@@ -63,7 +63,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Get recipe from recipes table
     const { data: recipeData, error: recipeError } = await supabase
@@ -179,7 +179,7 @@ export async function PUT(
     );
     if (!parsed.success) return parsed.response;
     const body = parsed.data as UpdateRecipeData;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Update recipe in recipes table
     const updateData = transformToSnakeCase(body);
@@ -243,7 +243,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Recipe items will be deleted via CASCADE
     const { error } = await supabase

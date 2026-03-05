@@ -1,7 +1,7 @@
 // Update Loan Schedule Entry API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { LoanScheduleEntry } from '@kit/types';
 
 function transformScheduleEntry(row: any): LoanScheduleEntry {
@@ -27,7 +27,7 @@ export async function PUT(
     const { id, scheduleId } = await params;
     const body = await request.json();
     
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Build update object
     const updateData: any = {};

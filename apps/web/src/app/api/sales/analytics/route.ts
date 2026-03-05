@@ -2,7 +2,7 @@
 // Provides data for charts and visualizations
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Sale } from '@kit/types';
 
 function transformSale(row: any): Sale {
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const startDate = `${year}-01-01`;
     const endDate = `${year}-12-31`;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
 
     // Fetch all sales for the year (with pagination to get all records)
     let allSales: any[] = [];

@@ -1,7 +1,7 @@
 // Items API Route - Get, Update, Delete by ID
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { supabaseServer } from '@kit/lib/supabase';
 import type { Item, UpdateItemData } from '@kit/types';
 import { parseRequestBody, updateItemSchema } from '@/shared/zod-schemas';
 
@@ -52,7 +52,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     // Try to find in items table first
     let { data: itemData, error: itemError } = await supabase
@@ -162,7 +162,7 @@ export async function PUT(
     if (!parsed.success) return parsed.response;
     const body = parsed.data as UpdateItemData;
 
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { data: itemData, error: itemError } = await supabase
       .from('items')
@@ -189,7 +189,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseServer();
     
     const { error } = await supabase
       .from('items')
