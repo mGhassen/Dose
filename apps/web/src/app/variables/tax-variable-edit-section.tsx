@@ -193,18 +193,20 @@ export function TaxVariableEditSection({ variableId, variable }: TaxVariableEdit
                     <label
                       key={cat}
                       className={cn(
-                        "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm border cursor-pointer shrink-0",
+                        "inline-flex items-center rounded-full px-3 py-1.5 text-sm border cursor-pointer shrink-0",
                         applicationCategories.includes(cat) ? "border-primary bg-primary/10" : "border-border"
                       )}
                     >
-                      <Checkbox
+                      <input
+                        type="checkbox"
                         checked={applicationCategories.includes(cat)}
-                        onCheckedChange={(c) =>
+                        onChange={(e) =>
                           setApplicationCategories((prev) =>
-                            c ? [...prev, cat] : prev.filter((x) => x !== cat)
+                            e.target.checked ? [...prev, cat] : prev.filter((x) => x !== cat)
                           )
                         }
                         className="sr-only"
+                        aria-label={cat}
                       />
                       {cat}
                     </label>
