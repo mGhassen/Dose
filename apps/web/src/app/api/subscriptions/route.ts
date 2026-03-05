@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Subscription, CreateSubscriptionData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
+import { parseRequestBody, createSubscriptionSchema } from '@/shared/zod-schemas';
 
 function transformSubscription(row: any): Subscription {
   return {
@@ -105,15 +106,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateSubscriptionData = await request.json();
-    
-    // Basic validation
-    if (!body.name || !body.category || !body.amount || !body.recurrence || !body.startDate) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseRequestBody(request, createSubscriptionSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateSubscriptionData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

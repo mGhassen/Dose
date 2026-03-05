@@ -239,15 +239,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateEntryData = await request.json();
-    
-    // Basic validation
-    if (!body.direction || !body.entryType || !body.name || !body.amount || !body.entryDate) {
-      return NextResponse.json(
-        { error: 'Missing required fields: direction, entryType, name, amount, entryDate' },
-        { status: 400 }
-      );
-    }
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.createEntrySchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateEntryData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Payment, UpdatePaymentData } from '../route';
+import { parseRequestBody, updatePaymentSchema } from '@/shared/zod-schemas';
 
 function transformPayment(row: any): Payment {
   return {
@@ -69,7 +70,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdatePaymentData = await request.json();
+    const parsed = await parseRequestBody(request, updatePaymentSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as UpdatePaymentData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

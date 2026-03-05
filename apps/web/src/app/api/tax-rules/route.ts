@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { TaxRule, CreateTaxRuleData } from '@kit/types';
+import { parseRequestBody, createTaxRuleSchema } from '@/shared/zod-schemas';
 
 function transformRule(row: any, variable?: any): TaxRule {
   return {
@@ -66,10 +67,9 @@ export async function GET(_request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateTaxRuleData = await request.json();
-    if (body.variableId == null) {
-      return NextResponse.json({ error: 'variableId is required' }, { status: 400 });
-    }
+    const parsed = await parseRequestBody(request, createTaxRuleSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateTaxRuleData;
 
     const supabase = createServerSupabaseClient();
     const { data: row, error } = await supabase

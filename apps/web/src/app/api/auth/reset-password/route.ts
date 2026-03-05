@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { token, password } = await request.json();
-    
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.resetPasswordSchema)
+    );
+    if (!parsed.success) return parsed.response;
+
     return NextResponse.json({
       message: 'Password reset successful'
     });

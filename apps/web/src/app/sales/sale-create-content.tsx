@@ -34,6 +34,7 @@ const TYPE_OPTIONS = [
 
 import { lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
+import { createSaleTransactionSchema } from "@/shared/zod-schemas";
 
 export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps) {
   const router = useRouter();
@@ -175,8 +176,13 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
           ? { type: formData.discountType as "amount" | "percent", value: parseFloat(formData.discountValue) }
           : undefined,
     };
+    const parsed = createSaleTransactionSchema.safeParse(payload);
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Validation failed");
+      return;
+    }
     try {
-      const sale = await createSale.mutateAsync(payload as any);
+      const sale = await createSale.mutateAsync(parsed.data as unknown as import("@kit/types").CreateSaleData);
       toast.success("Transaction created");
       if (onCreated && sale?.id) onCreated(sale.id);
       else onClose();

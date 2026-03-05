@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Integration, CreateIntegrationData } from '@kit/types';
+import { parseRequestBody, createIntegrationSchema } from '@/shared/zod-schemas';
 
 function transformIntegration(row: any): Integration {
   return {
@@ -90,14 +91,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateIntegrationData = await request.json();
-    
-    if (!body.integration_type || !body.name) {
-      return NextResponse.json(
-        { error: 'Missing required fields: integration_type, name' },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseRequestBody(request, createIntegrationSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateIntegrationData;
 
     const authHeader = request.headers.get('authorization');
     

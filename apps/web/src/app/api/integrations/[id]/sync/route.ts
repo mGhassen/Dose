@@ -179,8 +179,11 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
-    const syncType = body.sync_type || 'full';
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.syncBodySchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const syncType = parsed.data.sync_type || 'full';
 
     const authHeader = request.headers.get('authorization');
     

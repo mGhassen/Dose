@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Budget, UpdateBudgetData, BudgetAccount, BudgetEntry } from '@kit/types';
+import { parseRequestBody, updateBudgetSchema } from '@/shared/zod-schemas';
 
 function transformBudget(row: any): Budget {
   return {
@@ -112,7 +113,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateBudgetData = await request.json();
+    const parsed = await parseRequestBody(request, updateBudgetSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as UpdateBudgetData;
 
     const supabase = createServerSupabaseClient();
     const updateData: any = {};

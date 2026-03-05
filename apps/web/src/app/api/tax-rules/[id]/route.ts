@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { TaxRule, UpdateTaxRuleData } from '@kit/types';
+import { parseRequestBody, updateTaxRuleSchema } from '@/shared/zod-schemas';
 
 function transformRule(row: any, variable?: any): TaxRule {
   return {
@@ -76,7 +77,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateTaxRuleData = await request.json();
+    const parsed = await parseRequestBody(request, updateTaxRuleSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as UpdateTaxRuleData;
     const supabase = createServerSupabaseClient();
 
     const payload = toSnakeCase(body);

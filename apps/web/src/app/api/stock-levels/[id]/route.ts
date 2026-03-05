@@ -82,8 +82,12 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateStockLevelData = await request.json();
-    
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.updateStockLevelSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as UpdateStockLevelData;
+
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from('stock_levels')

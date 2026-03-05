@@ -86,14 +86,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateStockMovementData = await request.json();
-    
-    if (!body.itemId || !body.movementType || body.quantity === undefined || (body.unit == null && body.unitId == null)) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.createStockMovementSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateStockMovementData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

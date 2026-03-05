@@ -111,14 +111,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreatePersonnelData = await request.json();
-    
-    if (!body.firstName || !body.lastName || !body.position || !body.type || !body.baseSalary || !body.startDate) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.createPersonnelSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreatePersonnelData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

@@ -21,7 +21,11 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const body: ReceiveOrderData = await request.json();
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.receiveOrderSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as ReceiveOrderData;
     const supabase = createServerSupabaseClient();
     
     // Get order and items

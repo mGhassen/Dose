@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Subscription, UpdateSubscriptionData } from '@kit/types';
+import { parseRequestBody, updateSubscriptionSchema } from '@/shared/zod-schemas';
 
 function transformSubscription(row: any): Subscription {
   return {
@@ -79,7 +80,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateSubscriptionData = await request.json();
+    const parsed = await parseRequestBody(request, updateSubscriptionSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as UpdateSubscriptionData;
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from('subscriptions')

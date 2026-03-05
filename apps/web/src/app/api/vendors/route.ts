@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Vendor, CreateVendorData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
+import { parseRequestBody, createVendorSchema } from '@/shared/zod-schemas';
 
 function transformVendor(row: any): Vendor {
   return {
@@ -82,14 +83,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateVendorData = await request.json();
-    
-    if (!body.name) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseRequestBody(request, createVendorSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateVendorData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

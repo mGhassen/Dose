@@ -16,15 +16,12 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const body: ProduceRecipeData = await request.json();
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.produceRecipeSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as ProduceRecipeData;
     const supabase = createServerSupabaseClient();
-
-    if (!body.quantity || body.quantity <= 0) {
-      return NextResponse.json(
-        { error: 'Quantity must be greater than 0' },
-        { status: 400 }
-      );
-    }
 
     const { producedItemId } = await produceRecipe(supabase, id, {
       quantity: body.quantity,

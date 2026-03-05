@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
+import { parseRequestBody, createPaymentSchema } from '@/shared/zod-schemas';
 
 export interface Payment {
   id: number;
@@ -163,15 +164,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreatePaymentData = await request.json();
-    
-    // Basic validation
-    if (!body.entryId || !body.paymentDate || !body.amount) {
-      return NextResponse.json(
-        { error: 'Missing required fields: entryId, paymentDate, amount' },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseRequestBody(request, createPaymentSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreatePaymentData;
 
     // Verify entry exists
     const supabase = createServerSupabaseClient();

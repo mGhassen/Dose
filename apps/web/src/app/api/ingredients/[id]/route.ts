@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Ingredient, UpdateIngredientData } from '@kit/types';
+import { parseRequestBody, updateIngredientSchema } from '@/shared/zod-schemas';
 
 function transformIngredient(row: any): Ingredient {
   return {
@@ -66,8 +67,10 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateIngredientData = await request.json();
-    
+    const parsed = await parseRequestBody(request, updateIngredientSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as UpdateIngredientData;
+
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from('ingredients')

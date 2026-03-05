@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Item, CreateItemData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
+import { parseRequestBody, createItemSchema } from '@/shared/zod-schemas';
 
 function transformItem(row: any): Item {
   return {
@@ -186,20 +187,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateItemData = await request.json();
-    
-    if (!body.name) {
-      return NextResponse.json(
-        { error: 'Missing required field: name' },
-        { status: 400 }
-      );
-    }
-    if (body.unitId == null && body.unit == null) {
-      return NextResponse.json(
-        { error: 'Provide either unit or unitId' },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseRequestBody(request, createItemSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateItemData;
 
     const supabase = createServerSupabaseClient();
     const { data: itemData, error } = await supabase

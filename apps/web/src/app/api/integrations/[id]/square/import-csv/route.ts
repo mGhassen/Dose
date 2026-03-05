@@ -47,15 +47,11 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
-    const { import_type, data } = body;
-
-    if (!import_type || !data || !Array.isArray(data)) {
-      return NextResponse.json(
-        { error: 'Missing required fields: import_type, data' },
-        { status: 400 }
-      );
-    }
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.importCsvSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const { import_type, data } = parsed.data;
 
     const authHeader = request.headers.get('authorization');
     

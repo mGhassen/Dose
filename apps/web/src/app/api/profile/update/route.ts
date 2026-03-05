@@ -23,9 +23,12 @@ export async function PUT(request: NextRequest) {
       );
     }
     
-    const updateData = await request.json();
-    
-    // Update the user data (only allow certain fields to be updated)
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.profileUpdateSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const updateData = parsed.data;
+
     const allowedFields = [
       'firstName', 
       'lastName', 
@@ -38,8 +41,8 @@ export async function PUT(request: NextRequest) {
     
     const updatedUser = { ...mockUsers[userIndex] };
     
-    // Update only allowed fields
-    allowedFields.forEach(field => {
+    const allowedKeys = allowedFields as (keyof typeof updateData)[];
+    allowedKeys.forEach((field) => {
       if (updateData[field] !== undefined) {
         (updatedUser as any)[field] = updateData[field];
       }

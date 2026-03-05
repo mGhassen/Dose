@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Supplier, UpdateSupplierData } from '@kit/types';
+import { parseRequestBody, updateSupplierSchema } from '@/shared/zod-schemas';
 
 function transformSupplier(row: any): Supplier {
   return {
@@ -73,8 +74,10 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateSupplierData = await request.json();
-    
+    const parsed = await parseRequestBody(request, updateSupplierSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as UpdateSupplierData;
+
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from('suppliers')

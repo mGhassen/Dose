@@ -92,14 +92,11 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
-    
-    if (!body.month || body.bruteSalary === undefined || body.netSalary === undefined) {
-      return NextResponse.json(
-        { error: 'Missing required fields: month, bruteSalary, netSalary' },
-        { status: 400 }
-      );
-    }
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.createPersonnelProjectionSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data;
 
     const supabase = createServerSupabaseClient();
     

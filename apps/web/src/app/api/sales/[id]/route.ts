@@ -6,6 +6,7 @@ import type { Sale, UpdateSaleData, SaleLineItem } from '@kit/types';
 import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
 import { upsertSellingPrice, upsertCost } from '@/lib/items/price-history-upsert';
 import { getTaxRateForSaleLine } from '@/lib/tax-rules-resolve';
+import { parseRequestBody, updateSaleTransactionSchema } from '@/shared/zod-schemas';
 
 function transformSale(row: any): Sale {
   return {
@@ -183,7 +184,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateSaleData & { lineItems?: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number }>; discount?: { type: 'amount' | 'percent'; value: number } } = await request.json();
+    const parsed = await parseRequestBody(request, updateSaleTransactionSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data;
 
     if (!Array.isArray(body.lineItems) || body.lineItems.length === 0) {
       return NextResponse.json(
@@ -199,10 +202,10 @@ export async function PUT(
     }
 
     const supabase = createServerSupabaseClient();
-    const dateStr = body.date.split('T')[0] || body.date;
+    const dateStr = ((body.date ?? '').split('T')[0]) || (body.date ?? '');
     const lines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxRatePercent: number; taxAmount: number }> = [];
-    for (let i = 0; i < body.lineItems!.length; i++) {
-        const line = body.lineItems![i];
+    for (let i = 0; i < body.lineItems.length; i++) {
+        const line = body.lineItems[i];
         let unitPrice = line.unitPrice;
         let unitCost = line.unitCost;
         let priceLookupItemId: number | null = null;

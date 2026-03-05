@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Unit } from '../route';
+import { parseRequestBody, updateUnitSchema } from '@/shared/zod-schemas';
 
 function transformUnit(row: any): Unit {
   return {
@@ -50,7 +51,9 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
+    const parsed = await parseRequestBody(request, updateUnitSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data;
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase.from('units').update(toSnakeCase(body)).eq('id', id).select().single();
     if (error) {

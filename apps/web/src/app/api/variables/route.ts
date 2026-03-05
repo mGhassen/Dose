@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Variable, CreateVariableData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
+import { parseRequestBody, createVariableSchema } from '@/shared/zod-schemas';
 
 function transformVariable(row: any): Variable {
   return {
@@ -92,14 +93,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateVariableData = await request.json();
-    
-    if (!body.name || !body.type || body.value === undefined || !body.effectiveDate) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, type, value, effectiveDate' },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseRequestBody(request, createVariableSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateVariableData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

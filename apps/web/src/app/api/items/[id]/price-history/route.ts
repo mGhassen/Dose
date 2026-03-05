@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { parseRequestBody, createItemPriceHistorySchema } from '@/shared/zod-schemas';
 
 type HistoryType = 'sell' | 'cost';
 
@@ -53,19 +54,9 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
-    const type = body.type as HistoryType;
-    const effectiveDate = body.effectiveDate as string | undefined;
-    const value = body.value as number | undefined;
-    if (type !== 'sell' && type !== 'cost') {
-      return NextResponse.json({ error: 'Invalid type (sell|cost)' }, { status: 400 });
-    }
-    if (!effectiveDate || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
-      return NextResponse.json({ error: 'effectiveDate required (YYYY-MM-DD)' }, { status: 400 });
-    }
-    if (value == null || typeof value !== 'number' || value < 0) {
-      return NextResponse.json({ error: 'value required (non-negative number)' }, { status: 400 });
-    }
+    const parsed = await parseRequestBody(request, createItemPriceHistorySchema);
+    if (!parsed.success) return parsed.response;
+    const { type, effectiveDate, value } = parsed.data;
     const supabase = createServerSupabaseClient();
     const itemId = parseInt(id, 10);
     if (Number.isNaN(itemId)) {

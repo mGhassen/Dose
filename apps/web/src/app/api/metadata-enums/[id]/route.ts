@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { parseRequestBody, updateMetadataEnumSchema } from '@/shared/zod-schemas';
 
 export interface MetadataEnum {
   id: number;
@@ -84,13 +85,15 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
+    const parsed = await parseRequestBody(request, updateMetadataEnumSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data;
 
     const authHeader = request.headers.get('authorization');
     const supabase = createServerSupabaseClient(authHeader);
     const { data, error } = await supabase
       .from('metadata_enums')
-      .update(transformToSnakeCase(body))
+      .update(transformToSnakeCase(body as Partial<MetadataEnum>))
       .eq('id', id)
       .select()
       .single();

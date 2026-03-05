@@ -94,14 +94,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateRecipeData = await request.json();
-    
-    if (!body.name) {
-      return NextResponse.json(
-        { error: 'Missing required field: name' },
-        { status: 400 }
-      );
-    }
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.createRecipeSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateRecipeData;
 
     const supabase = createServerSupabaseClient();
     

@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Expense, UpdateExpenseData, ExpenseLineItem } from '@kit/types';
+import { parseRequestBody, updateExpenseSchema } from '@/shared/zod-schemas';
 
 function transformLineItem(row: any): ExpenseLineItem {
   const subscription = row.subscription;
@@ -213,20 +214,16 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body = await request.json();
+    const parsed = await parseRequestBody(request, updateExpenseSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data;
 
     if (Array.isArray(body.lineItems) && body.lineItems.length > 0) {
-      if (!body.name || !body.category || !body.expenseDate) {
-        return NextResponse.json(
-          { error: 'Missing required fields: name, category, expenseDate' },
-          { status: 400 }
-        );
-      }
       const supabase = createServerSupabaseClient();
       const updated = await updateExpenseAsTransaction(supabase, id, {
-        name: body.name,
-        category: body.category,
-        expenseDate: body.expenseDate,
+        name: body.name!,
+        category: body.category!,
+        expenseDate: body.expenseDate!,
         description: body.description,
         supplierId: body.supplierId,
         lineItems: body.lineItems,

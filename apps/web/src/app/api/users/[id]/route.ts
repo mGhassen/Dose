@@ -174,7 +174,11 @@ export async function PUT(
   try {
     const { id } = await params;
     const numericId = parseInt(id, 10);
-    const body: UpdateUserData = await request.json();
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.updateUserSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body: UpdateUserData = parsed.data as UpdateUserData;
 
     if (isNaN(numericId)) {
       return NextResponse.json(

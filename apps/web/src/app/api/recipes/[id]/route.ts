@@ -174,7 +174,11 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateRecipeData = await request.json();
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.updateRecipeSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as UpdateRecipeData;
     const supabase = createServerSupabaseClient();
     
     // Update recipe in recipes table

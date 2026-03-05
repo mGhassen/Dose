@@ -27,25 +27,19 @@ function transformIntegration(row: any): Integration {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { integration_type, access_token, merchant_id, location_id } = body;
-    
-    // Trim whitespace from token
-    const cleanAccessToken = access_token?.trim();
-    
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.manualConnectSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const { integration_type, access_token, merchant_id, location_id } = parsed.data;
+    const cleanAccessToken = access_token.trim();
+
     console.log('[Manual Connect] Received token:', {
-      originalLength: access_token?.length || 0,
-      cleanedLength: cleanAccessToken?.length || 0,
-      tokenPrefix: cleanAccessToken?.substring(0, 15) + '...' || 'N/A',
+      originalLength: access_token.length,
+      cleanedLength: cleanAccessToken.length,
+      tokenPrefix: cleanAccessToken.substring(0, 15) + '...',
       hasWhitespace: cleanAccessToken !== access_token,
     });
-
-    if (!integration_type || !access_token) {
-      return NextResponse.json(
-        { error: 'Missing required fields: integration_type, access_token' },
-        { status: 400 }
-      );
-    }
 
     const authHeader = request.headers.get('authorization');
     

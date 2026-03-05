@@ -43,7 +43,11 @@ export async function PUT(
 ) {
   try {
     const { id, entryId } = await params;
-    const body: UpdateSubscriptionProjectionEntryData = await request.json();
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.updateSubscriptionProjectionEntrySchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as UpdateSubscriptionProjectionEntryData;
     const supabase = createServerSupabaseClient();
     
     // Verify the projection entry belongs to this subscription

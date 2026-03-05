@@ -3,8 +3,11 @@ import { mockUsers } from '@kit/mocks/data';
 
 export async function POST(request: NextRequest) {
   try {
-    const { googleToken } = await request.json();
-    
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.googleAuthSchema)
+    );
+    if (!parsed.success) return parsed.response;
+
     const mockGoogleUser = {
       id: mockUsers.length + 1,
       first_name: 'Google',

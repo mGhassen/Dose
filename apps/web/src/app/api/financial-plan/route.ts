@@ -84,14 +84,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateFinancialPlanData = await request.json();
-    
-    if (!body.month) {
-      return NextResponse.json(
-        { error: 'Missing required field: month' },
-        { status: 400 }
-      );
-    }
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.createFinancialPlanSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateFinancialPlanData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

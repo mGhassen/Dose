@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { MetadataEnumValue } from '@kit/hooks';
+import { parseRequestBody, updateMetadataEnumValueSchema } from '@/shared/zod-schemas';
 
 function transformEnumValue(row: any): MetadataEnumValue {
   return {
@@ -42,13 +43,15 @@ export async function PUT(
       );
     }
 
-    const body = await request.json();
+    const parsed = await parseRequestBody(request, updateMetadataEnumValueSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data;
+
     const authHeader = request.headers.get('authorization');
     const supabase = createServerSupabaseClient(authHeader);
-    
     const { data, error } = await supabase
       .from('metadata_enum_values')
-      .update(transformToSnakeCase(body))
+      .update(transformToSnakeCase(body as Partial<MetadataEnumValue>))
       .eq('id', valueIdNum)
       .select()
       .single();

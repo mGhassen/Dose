@@ -6,15 +6,12 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export async function POST(request: NextRequest) {
   try {
-    const { refresh_token } = await request.json();
-    
-    if (!refresh_token) {
-      return NextResponse.json(
-        { error: 'Refresh token is required' },
-        { status: 400 }
-      );
-    }
-    
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.refreshTokenSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const { refresh_token } = parsed.data;
+
     if (!supabaseUrl || !supabaseAnonKey) {
       return NextResponse.json(
         { error: 'Supabase configuration missing' },

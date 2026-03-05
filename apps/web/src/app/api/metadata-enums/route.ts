@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { parseRequestBody, createMetadataEnumSchema } from '@/shared/zod-schemas';
 
 export interface MetadataEnum {
   id: number;
@@ -80,14 +81,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    
-    if (!body.name || !body.label) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, label' },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseRequestBody(request, createMetadataEnumSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data;
 
     const authHeader = request.headers.get('authorization');
     const supabase = createServerSupabaseClient(authHeader);
@@ -96,7 +92,7 @@ export async function POST(request: NextRequest) {
       .insert({
         name: body.name,
         label: body.label,
-        description: body.description || null,
+        description: body.description ?? null,
         is_active: body.isActive ?? true,
       })
       .select()

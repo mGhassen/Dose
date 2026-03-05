@@ -85,14 +85,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateSupplierOrderData = await request.json();
-    
-    if (!body.supplierId || !body.items || body.items.length === 0) {
-      return NextResponse.json(
-        { error: 'Missing required fields: supplierId and items are required' },
-        { status: 400 }
-      );
-    }
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.createSupplierOrderSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateSupplierOrderData;
 
     const supabase = createServerSupabaseClient();
     

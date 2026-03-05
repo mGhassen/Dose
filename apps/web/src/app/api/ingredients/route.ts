@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Ingredient, CreateIngredientData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
+import { parseRequestBody, createIngredientSchema } from '@/shared/zod-schemas';
 
 function transformIngredient(row: any): Ingredient {
   return {
@@ -79,14 +80,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateIngredientData = await request.json();
-    
-    if (!body.name || !body.unit) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name and unit are required' },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseRequestBody(request, createIngredientSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateIngredientData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

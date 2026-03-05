@@ -110,30 +110,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateLeasingPaymentData = await request.json();
-    
-    if (!body.name || !body.type || !body.frequency || !body.startDate) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
-
-    // Either amount or totalAmount must be provided
-    if (!body.amount && !body.totalAmount) {
-      return NextResponse.json(
-        { error: 'Either amount or totalAmount must be provided' },
-        { status: 400 }
-      );
-    }
-
-    // If totalAmount is provided, endDate is required
-    if (body.totalAmount && !body.endDate) {
-      return NextResponse.json(
-        { error: 'End date is required when using totalAmount' },
-        { status: 400 }
-      );
-    }
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.createLeasingSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateLeasingPaymentData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Budget, CreateBudgetData, BudgetAccount, BudgetEntry, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
+import { parseRequestBody, createBudgetSchema } from '@/shared/zod-schemas';
 
 function transformBudget(row: any): Budget {
   return {
@@ -143,14 +144,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateBudgetData = await request.json();
-
-    if (!body.name || !body.fiscalYearStart) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, fiscalYearStart' },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseRequestBody(request, createBudgetSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateBudgetData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

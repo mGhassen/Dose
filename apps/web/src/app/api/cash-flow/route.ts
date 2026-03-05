@@ -67,14 +67,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateCashFlowEntryData = await request.json();
-    
-    if (!body.month || body.openingBalance === undefined || body.cashInflows === undefined || body.cashOutflows === undefined) {
-      return NextResponse.json(
-        { error: 'Missing required fields: month, openingBalance, cashInflows, cashOutflows' },
-        { status: 400 }
-      );
-    }
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.createCashFlowEntrySchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateCashFlowEntryData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { parseRequestBody, createUnitSchema } from '@/shared/zod-schemas';
 
 export interface Unit {
   id: number;
@@ -54,18 +55,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { name, symbol, dimension, baseUnitId, factorToBase } = body;
-    if (!name || !symbol) {
-      return NextResponse.json({ error: 'Missing required fields: name, symbol' }, { status: 400 });
-    }
+    const parsed = await parseRequestBody(request, createUnitSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data;
     const supabase = createServerSupabaseClient();
     const insert = {
-      name: String(name).trim(),
-      symbol: String(symbol).trim(),
-      dimension: dimension ? String(dimension).trim() : 'other',
-      base_unit_id: baseUnitId != null ? Number(baseUnitId) : null,
-      factor_to_base: factorToBase != null ? Number(factorToBase) : 1,
+      name: body.name.trim(),
+      symbol: body.symbol.trim(),
+      dimension: body.dimension?.trim() ?? 'other',
+      base_unit_id: body.baseUnitId ?? null,
+      factor_to_base: body.factorToBase ?? 1,
       updated_at: new Date().toISOString(),
     };
     const { data, error } = await supabase.from('units').insert(insert).select().single();

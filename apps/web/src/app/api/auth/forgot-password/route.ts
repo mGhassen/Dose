@@ -3,8 +3,12 @@ import { mockUsers } from '@kit/mocks/data';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json();
-    
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.forgotPasswordSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const { email } = parsed.data;
+
     const user = mockUsers.find(u => u.email === email);
     if (!user) {
       return NextResponse.json(

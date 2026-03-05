@@ -14,8 +14,7 @@ import { ScrollArea } from "@kit/ui/scroll-area";
 import { Save, X, Plus, Trash2 } from "lucide-react";
 import { useCreateExpense, useInventorySuppliers, useItems, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
-import type { ExpenseCategory } from "@kit/types";
-import type { ExpenseLineItemInput } from "@kit/types";
+import type { CreateExpenseData, ExpenseCategory, ExpenseLineItemInput } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
 
 export interface ExpenseCreateContentProps {
@@ -36,6 +35,7 @@ const CATEGORY_ITEMS = [
 
 import { lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
+import { createExpenseTransactionSchema } from "@/shared/zod-schemas";
 
 export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateContentProps) {
   const router = useRouter();
@@ -172,8 +172,13 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
           ? { type: formData.discountType as "amount" | "percent", value: parseFloat(formData.discountValue) }
           : undefined,
     };
+    const parsed = createExpenseTransactionSchema.safeParse(payload);
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Validation failed");
+      return;
+    }
     try {
-      const expense = await createExpense.mutateAsync(payload as any);
+      const expense = await createExpense.mutateAsync(parsed.data as unknown as CreateExpenseData & { lineItems?: ExpenseLineItemInput[]; discount?: { type: "amount" | "percent"; value: number } });
       toast.success("Expense created");
       if (onCreated && expense?.id) onCreated(expense.id);
       else onClose();

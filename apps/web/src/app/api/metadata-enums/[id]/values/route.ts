@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { MetadataEnumValue } from '@kit/hooks';
+import { parseRequestBody, createMetadataEnumValueSchema } from '@/shared/zod-schemas';
 
 function transformEnumValue(row: any): MetadataEnumValue {
   return {
@@ -81,20 +82,16 @@ export async function POST(
       );
     }
 
-    const body = await request.json();
-    if (!body.name || !body.label) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, label' },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseRequestBody(request, createMetadataEnumValueSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data;
 
     const authHeader = request.headers.get('authorization');
     const supabase = createServerSupabaseClient(authHeader);
     const { data, error } = await supabase
       .from('metadata_enum_values')
       .insert({
-        ...transformToSnakeCase(body),
+        ...transformToSnakeCase(body as Partial<MetadataEnumValue>),
         enum_id: enumIdNum,
       })
       .select()

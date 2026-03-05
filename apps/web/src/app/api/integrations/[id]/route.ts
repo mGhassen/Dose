@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Integration, UpdateIntegrationData } from '@kit/types';
+import { parseRequestBody, updateIntegrationSchema } from '@/shared/zod-schemas';
 
 function transformIntegration(row: any): Integration {
   return {
@@ -97,8 +98,10 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateIntegrationData = await request.json();
-    
+    const parsed = await parseRequestBody(request, updateIntegrationSchema);
+    if (!parsed.success) return parsed.response;
+    const body: UpdateIntegrationData = parsed.data as UpdateIntegrationData;
+
     const authHeader = request.headers.get('authorization');
     
     if (!authHeader) {

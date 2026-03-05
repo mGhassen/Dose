@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { DatePicker } from "@kit/ui/date-picker";
@@ -14,60 +15,62 @@ import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateSubscription, useInventorySuppliers } from "@kit/hooks";
 import { toast } from "sonner";
-import type { ExpenseCategory, ExpenseRecurrence } from "@kit/types";
+import type { ExpenseRecurrence } from "@kit/types";
 import Link from "next/link";
 import { dateToYYYYMMDD } from "@kit/lib";
+import {
+  createSubscriptionFormSchema,
+  type CreateSubscriptionFormInput,
+} from "@/shared/zod-schemas";
 
 export default function CreateSubscriptionPage() {
   const router = useRouter();
   const createSubscription = useCreateSubscription();
-  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: "vendor" });
   const suppliers = suppliersResponse?.data || [];
-  const [formData, setFormData] = useState({
-    name: "",
-    category: "" as ExpenseCategory | "",
-    amount: "",
-    recurrence: "monthly" as ExpenseRecurrence,
-    startDate: dateToYYYYMMDD(new Date()),
-    endDate: "",
-    description: "",
-    vendor: "",
-    supplierId: "",
-    defaultTaxRatePercent: "",
-    isActive: true,
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<CreateSubscriptionFormInput>({
+    resolver: zodResolver(createSubscriptionFormSchema) as import("react-hook-form").Resolver<CreateSubscriptionFormInput>,
+    defaultValues: {
+      name: "",
+      category: undefined,
+      amount: 0,
+      recurrence: "monthly",
+      startDate: dateToYYYYMMDD(new Date()),
+      endDate: "",
+      description: "",
+      vendor: "",
+      supplierId: undefined,
+      defaultTaxRatePercent: undefined,
+      isActive: true,
+    },
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.name || !formData.category || !formData.amount || !formData.startDate) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
+  const onSubmit = async (data: CreateSubscriptionFormInput) => {
     try {
       await createSubscription.mutateAsync({
-        name: formData.name,
-        category: formData.category as ExpenseCategory,
-        amount: parseFloat(formData.amount),
-        recurrence: formData.recurrence,
-        startDate: formData.startDate,
-        endDate: formData.endDate || undefined,
-        description: formData.description || undefined,
-        vendor: formData.vendor || undefined,
-        supplierId: formData.supplierId ? parseInt(formData.supplierId) : undefined,
-        defaultTaxRatePercent: formData.defaultTaxRatePercent ? parseFloat(formData.defaultTaxRatePercent) : undefined,
-        isActive: formData.isActive,
+        name: data.name,
+        category: data.category! as import("@kit/types").ExpenseCategory,
+        amount: data.amount,
+        recurrence: data.recurrence as import("@kit/types").ExpenseRecurrence,
+        startDate: data.startDate,
+        endDate: data.endDate || undefined,
+        description: data.description || undefined,
+        vendor: data.vendor || undefined,
+        supplierId: data.supplierId,
+        defaultTaxRatePercent: data.defaultTaxRatePercent,
+        isActive: data.isActive ?? true,
       });
       toast.success("Subscription created successfully");
-      router.push('/subscriptions');
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to create subscription");
+      router.push("/subscriptions");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to create subscription");
     }
-  };
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -84,151 +87,213 @@ export default function CreateSubscriptionPage() {
             <CardDescription>Enter the details for this subscription</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Name */}
                 <div className="space-y-2">
                   <Label htmlFor="name">Name *</Label>
                   <Input
                     id="name"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    {...register("name")}
                     placeholder="e.g., Office Rent"
-                    required
                   />
+                  {errors.name && (
+                    <p className="text-sm text-destructive">{errors.name.message}</p>
+                  )}
                 </div>
 
-                <UnifiedSelector
-                  label="Category"
-                  required
-                  type="category"
-                  items={[
-                    { id: 'rent', name: 'Rent' },
-                    { id: 'utilities', name: 'Utilities' },
-                    { id: 'supplies', name: 'Supplies' },
-                    { id: 'marketing', name: 'Marketing' },
-                    { id: 'insurance', name: 'Insurance' },
-                    { id: 'maintenance', name: 'Maintenance' },
-                    { id: 'professional_services', name: 'Professional Services' },
-                    { id: 'other', name: 'Other' },
-                  ]}
-                  selectedId={formData.category || undefined}
-                  onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
-                  placeholder="Select category"
-                />
+                <div className="space-y-2">
+                  <Controller
+                    name="category"
+                    control={control}
+                    render={({ field }) => (
+                      <UnifiedSelector
+                        label="Category"
+                        required
+                        type="category"
+                        items={[
+                          { id: "rent", name: "Rent" },
+                          { id: "utilities", name: "Utilities" },
+                          { id: "supplies", name: "Supplies" },
+                          { id: "marketing", name: "Marketing" },
+                          { id: "insurance", name: "Insurance" },
+                          { id: "maintenance", name: "Maintenance" },
+                          { id: "professional_services", name: "Professional Services" },
+                          { id: "other", name: "Other" },
+                        ]}
+                        selectedId={field.value ?? undefined}
+                        onSelect={(item) =>
+                          field.onChange(item.id === 0 ? undefined : String(item.id))
+                        }
+                        placeholder="Select category"
+                      />
+                    )}
+                  />
+                  {errors.category && (
+                    <p className="text-sm text-destructive">{errors.category.message}</p>
+                  )}
+                </div>
 
-                {/* Amount */}
                 <div className="space-y-2">
                   <Label htmlFor="amount">Amount *</Label>
                   <Input
                     id="amount"
                     type="number"
                     step="0.01"
-                    value={formData.amount}
-                    onChange={(e) => handleInputChange('amount', e.target.value)}
+                    {...register("amount", { valueAsNumber: true })}
                     placeholder="0.00"
-                    required
                   />
+                  {errors.amount && (
+                    <p className="text-sm text-destructive">{errors.amount.message}</p>
+                  )}
                 </div>
 
-                <UnifiedSelector
-                  label="Recurrence"
-                  required
-                  type="recurrence"
-                  items={[
-                    { id: 'monthly', name: 'Monthly' },
-                    { id: 'quarterly', name: 'Quarterly' },
-                    { id: 'yearly', name: 'Yearly' },
-                    { id: 'custom', name: 'Custom' },
-                  ]}
-                  selectedId={formData.recurrence || undefined}
-                  onSelect={(item) => handleInputChange('recurrence', String(item.id) as ExpenseRecurrence)}
-                  placeholder="Select recurrence"
-                />
+                <div className="space-y-2">
+                  <Controller
+                    name="recurrence"
+                    control={control}
+                    render={({ field }) => (
+                      <UnifiedSelector
+                        label="Recurrence"
+                        required
+                        type="recurrence"
+                        items={[
+                          { id: "monthly", name: "Monthly" },
+                          { id: "quarterly", name: "Quarterly" },
+                          { id: "yearly", name: "Yearly" },
+                          { id: "custom", name: "Custom" },
+                        ]}
+                        selectedId={field.value ?? undefined}
+                        onSelect={(item) =>
+                          field.onChange(String(item.id) as ExpenseRecurrence)
+                        }
+                        placeholder="Select recurrence"
+                      />
+                    )}
+                  />
+                  {errors.recurrence && (
+                    <p className="text-sm text-destructive">{errors.recurrence.message}</p>
+                  )}
+                </div>
 
-                {/* Start Date */}
                 <div className="space-y-2">
                   <Label htmlFor="startDate">Start Date *</Label>
-                  <DatePicker
-                    id="startDate"
-                    value={formData.startDate ? new Date(formData.startDate) : undefined}
-                    onChange={(d) => handleInputChange("startDate", d ? dateToYYYYMMDD(d) : "")}
-                    placeholder="Pick a date"
+                  <Controller
+                    name="startDate"
+                    control={control}
+                    render={({ field }) => (
+                      <DatePicker
+                        id="startDate"
+                        value={field.value ? new Date(field.value) : undefined}
+                        onChange={(d) =>
+                          field.onChange(d ? dateToYYYYMMDD(d) : "")
+                        }
+                        placeholder="Pick a date"
+                      />
+                    )}
                   />
+                  {errors.startDate && (
+                    <p className="text-sm text-destructive">{errors.startDate.message}</p>
+                  )}
                 </div>
 
-                {/* End Date */}
                 <div className="space-y-2">
                   <Label htmlFor="endDate">End Date (Optional)</Label>
-                  <DatePicker
-                    id="endDate"
-                    value={formData.endDate ? new Date(formData.endDate) : undefined}
-                    onChange={(d) => handleInputChange("endDate", d ? dateToYYYYMMDD(d) : "")}
-                    placeholder="Pick a date"
+                  <Controller
+                    name="endDate"
+                    control={control}
+                    render={({ field }) => (
+                      <DatePicker
+                        id="endDate"
+                        value={field.value ? new Date(field.value) : undefined}
+                        onChange={(d) =>
+                          field.onChange(d ? dateToYYYYMMDD(d) : "")
+                        }
+                        placeholder="Pick a date"
+                      />
+                    )}
                   />
                   <p className="text-xs text-muted-foreground">
                     Leave empty for ongoing subscriptions
                   </p>
                 </div>
 
-                {/* Tax */}
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="defaultTaxRatePercent">Default tax rate % (optional)</Label>
                   <Input
                     id="defaultTaxRatePercent"
                     type="number"
                     step="0.01"
-                    min="0"
-                    max="100"
-                    value={formData.defaultTaxRatePercent}
-                    onChange={(e) => handleInputChange('defaultTaxRatePercent', e.target.value)}
+                    min={0}
+                    max={100}
+                    {...register("defaultTaxRatePercent", { valueAsNumber: true })}
                     placeholder="e.g. 10"
                   />
-                  <p className="text-xs text-muted-foreground">Applied when this subscription generates expense lines (e.g. when a payment is marked paid).</p>
+                  <p className="text-xs text-muted-foreground">
+                    Applied when this subscription generates expense lines (e.g. when a payment is
+                    marked paid).
+                  </p>
                 </div>
 
-                {/* Supplier/Vendor */}
                 <div className="space-y-2">
-                  <UnifiedSelector
-                    label="Vendor"
-                    type="vendor"
-                    items={suppliers}
-                    selectedId={formData.supplierId ? parseInt(formData.supplierId) : undefined}
-                    onSelect={(item) => handleInputChange('supplierId', item.id === 0 ? '' : String(item.id))}
-                    placeholder="Select vendor"
-                    manageLink={formData.supplierId ? { href: `/inventory-suppliers/${formData.supplierId}`, text: "View vendor details →" } : undefined}
+                  <Controller
+                    name="supplierId"
+                    control={control}
+                    render={({ field }) => (
+                      <UnifiedSelector
+                        label="Vendor"
+                        type="vendor"
+                        items={suppliers}
+                        selectedId={field.value ?? undefined}
+                        onSelect={(item) =>
+                          field.onChange(item.id === 0 ? undefined : item.id)
+                        }
+                        placeholder="Select vendor"
+                        manageLink={
+                          field.value
+                            ? {
+                                href: `/inventory-suppliers/${field.value}`,
+                                text: "View vendor details →",
+                              }
+                            : undefined
+                        }
+                      />
+                    )}
                   />
                 </div>
 
-                {/* Is Active */}
                 <div className="space-y-2 flex items-center space-x-2 pt-6">
-                  <Checkbox
-                    id="isActive"
-                    checked={formData.isActive}
-                    onCheckedChange={(checked) => handleInputChange('isActive', checked)}
+                  <Controller
+                    name="isActive"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="isActive"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
                   />
-                  <Label htmlFor="isActive" className="cursor-pointer">Active</Label>
+                  <Label htmlFor="isActive" className="cursor-pointer">
+                    Active
+                  </Label>
                 </div>
               </div>
 
-              {/* Description */}
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  {...register("description")}
                   placeholder="Additional notes about this subscription"
                   rows={3}
                 />
               </div>
 
-              {/* Actions */}
               <div className="flex justify-end space-x-4 pt-6">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => router.push('/subscriptions')}
+                  onClick={() => router.push("/subscriptions")}
                 >
                   <X className="mr-2 h-4 w-4" />
                   Cancel
@@ -245,4 +310,3 @@ export default function CreateSubscriptionPage() {
     </AppLayout>
   );
 }
-

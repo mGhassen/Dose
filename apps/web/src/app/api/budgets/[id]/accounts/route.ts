@@ -66,14 +66,11 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const body: CreateBudgetAccountData = await request.json();
-
-    if (!body.accountPath || !body.accountLabel || !body.accountType) {
-      return NextResponse.json(
-        { error: 'Missing required fields: accountPath, accountLabel, accountType' },
-        { status: 400 }
-      );
-    }
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.createBudgetAccountSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateBudgetAccountData;
 
     const supabase = createServerSupabaseClient();
     const accountData = {

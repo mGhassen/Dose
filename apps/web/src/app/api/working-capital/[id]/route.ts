@@ -81,7 +81,11 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateWorkingCapitalData = await request.json();
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.updateWorkingCapitalSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as UpdateWorkingCapitalData;
 
     const supabase = createServerSupabaseClient();
     

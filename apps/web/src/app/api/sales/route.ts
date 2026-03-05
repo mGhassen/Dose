@@ -10,6 +10,7 @@ import { produceRecipe } from '@/lib/stock/produce-recipe';
 import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
 import { upsertSellingPrice, upsertCost } from '@/lib/items/price-history-upsert';
 import { getTaxRateForSaleLine } from '@/lib/tax-rules-resolve';
+import { parseRequestBody, createSaleTransactionSchema } from '@/shared/zod-schemas';
 
 function transformSale(row: any): Sale {
   return {
@@ -229,35 +230,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateSaleData & { lineItems?: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number }>; discount?: { type: 'amount' | 'percent'; value: number } } = await request.json();
-
-    if (!Array.isArray(body.lineItems) || body.lineItems.length === 0) {
-      return NextResponse.json(
-        { error: 'lineItems (at least one line) is required' },
-        { status: 400 }
-      );
-    }
-    if (!body.date || !body.type) {
-      return NextResponse.json(
-        { error: 'Missing required fields: date, type' },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseRequestBody(request, createSaleTransactionSchema);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data;
 
     const supabase = createServerSupabaseClient();
-    for (let i = 0; i < body.lineItems!.length; i++) {
-        const line = body.lineItems![i];
-        if (line.quantity == null || line.quantity <= 0 || line.unitPrice == null) {
-          return NextResponse.json(
-            { error: `Line ${i + 1}: quantity (positive) and unitPrice are required` },
-            { status: 400 }
-          );
-        }
-      }
       const dateStr = body.date.split('T')[0] || body.date;
       const lines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxRatePercent: number; taxAmount: number }> = [];
-      for (let i = 0; i < body.lineItems!.length; i++) {
-        const line = body.lineItems![i];
+      for (let i = 0; i < body.lineItems.length; i++) {
+        const line = body.lineItems[i];
         let unitPrice = line.unitPrice;
         let unitCost = line.unitCost;
         let priceLookupItemId: number | null = null;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
+import { parseRequestBody, updateItemPriceHistorySchema } from '@/shared/zod-schemas';
 
 type HistoryType = 'sell' | 'cost';
 
@@ -14,29 +15,16 @@ export async function PATCH(
     if (type !== 'sell' && type !== 'cost') {
       return NextResponse.json({ error: 'Missing or invalid type (sell|cost)' }, { status: 400 });
     }
-    const body = await request.json();
-    const effectiveDate = body.effectiveDate as string | undefined;
-    const value = body.value as number | undefined;
+    const parsed = await parseRequestBody(request, updateItemPriceHistorySchema);
+    if (!parsed.success) return parsed.response;
+    const { effectiveDate, value } = parsed.data;
     const supabase = createServerSupabaseClient();
     const table = type === 'sell' ? 'item_selling_price_history' : 'item_cost_history';
     const valueCol = type === 'sell' ? 'unit_price' : 'unit_cost';
 
     const updates: Record<string, unknown> = {};
-    if (effectiveDate !== undefined) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
-        return NextResponse.json({ error: 'effectiveDate must be YYYY-MM-DD' }, { status: 400 });
-      }
-      updates.effective_date = effectiveDate;
-    }
-    if (value !== undefined) {
-      if (typeof value !== 'number' || value < 0) {
-        return NextResponse.json({ error: 'value must be non-negative number' }, { status: 400 });
-      }
-      updates[valueCol] = value;
-    }
-    if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ error: 'No updates provided' }, { status: 400 });
-    }
+    if (effectiveDate !== undefined) updates.effective_date = effectiveDate;
+    if (value !== undefined) updates[valueCol] = value;
 
     const { data, error } = await supabase
       .from(table)

@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    await request.json();
-    
-    // Mock implementation - replace with real API when backend is ready
-    
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.acceptInvitationSchema)
+    );
+    if (!parsed.success) return parsed.response;
+
     return NextResponse.json({
       message: 'Invitation accepted successfully'
     });

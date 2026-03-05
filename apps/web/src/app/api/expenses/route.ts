@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@kit/lib/supabase';
 import type { Expense, CreateExpenseData, PaginatedResponse, ExpenseLineItem } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
+import { z } from "zod";
+import { parseBody, createExpenseTransactionSchema, createExpenseSchema, type CreateExpenseTransactionInput, type CreateExpenseInput } from '@/shared/zod-schemas';
 
 function transformLineItem(row: any): ExpenseLineItem {
   const subscription = row.subscription;
@@ -152,28 +154,28 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    let raw: unknown;
+    try {
+      raw = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const schema = Array.isArray((raw as any)?.lineItems) && (raw as any).lineItems.length > 0
+      ? createExpenseTransactionSchema
+      : createExpenseSchema;
+    const parsed = parseBody(raw, schema as z.ZodType<CreateExpenseTransactionInput | CreateExpenseInput>);
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data;
 
-    if (Array.isArray(body.lineItems) && body.lineItems.length > 0) {
-      if (!body.name || !body.category || !body.expenseDate) {
-        return NextResponse.json(
-          { error: 'Missing required fields: name, category, expenseDate' },
-          { status: 400 }
-        );
-      }
+    if ('lineItems' in body && Array.isArray(body.lineItems) && body.lineItems.length > 0) {
+      const txBody = body as import('@/shared/zod-schemas').CreateExpenseTransactionInput;
       const supabase = createServerSupabaseClient();
       const { getTaxRateForExpenseLine } = await import('@/lib/tax-rules-resolve');
-      const dateStr = (body.expenseDate || '').split('T')[0] || body.expenseDate;
+      const dateStr = (txBody.expenseDate || '').split('T')[0] || txBody.expenseDate;
 
       const lines: Array<{ itemId?: number; subscriptionId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxRatePercent: number; taxAmount: number }> = [];
-      for (let i = 0; i < body.lineItems.length; i++) {
-        const line = body.lineItems[i];
-        if (line.quantity == null || line.quantity <= 0 || line.unitPrice == null) {
-          return NextResponse.json(
-            { error: `Line ${i + 1}: quantity (positive) and unitPrice are required` },
-            { status: 400 }
-          );
-        }
+      for (let i = 0; i < txBody.lineItems.length; i++) {
+        const line = txBody.lineItems[i];
         let taxRate: number;
         if (line.subscriptionId) {
           const { data: sub } = await supabase.from('subscriptions').select('default_tax_rate_percent').eq('id', line.subscriptionId).maybeSingle();
@@ -204,11 +206,11 @@ export async function POST(request: NextRequest) {
       const subtotal = Math.round(lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100;
       const totalTax = Math.round(lines.reduce((s, l) => s + l.taxAmount, 0) * 100) / 100;
       let discountAmount = 0;
-      if (body.discount?.value != null && body.discount.value > 0) {
-        if (body.discount.type === 'percent') {
-          discountAmount = Math.round(subtotal * (body.discount.value / 100) * 100) / 100;
+      if (txBody.discount?.value != null && txBody.discount.value > 0) {
+        if (txBody.discount.type === 'percent') {
+          discountAmount = Math.round(subtotal * (txBody.discount.value / 100) * 100) / 100;
         } else {
-          discountAmount = Math.round(body.discount.value * 100) / 100;
+          discountAmount = Math.round(txBody.discount.value * 100) / 100;
         }
       }
       const amount = Math.round((subtotal + totalTax - discountAmount) * 100) / 100;
@@ -216,12 +218,12 @@ export async function POST(request: NextRequest) {
       const { data: expenseRow, error: insertError } = await supabase
         .from('expenses')
         .insert({
-          name: body.name,
-          category: body.category,
-          expense_date: body.expenseDate,
-          description: body.description ?? null,
-          supplier_id: body.supplierId ?? null,
-          start_date: body.expenseDate,
+          name: txBody.name,
+          category: txBody.category,
+          expense_date: txBody.expenseDate,
+          description: txBody.description ?? null,
+          supplier_id: txBody.supplierId ?? null,
+          start_date: txBody.expenseDate,
           amount,
           subtotal,
           total_tax: totalTax,
@@ -252,12 +254,12 @@ export async function POST(request: NextRequest) {
       const { error: entryError } = await supabase.from('entries').insert({
         direction: 'output',
         entry_type: 'expense',
-        name: body.name,
+        name: txBody.name,
         amount,
-        description: body.description,
-        category: body.category,
-        supplier_id: body.supplierId ?? null,
-        entry_date: body.expenseDate,
+        description: txBody.description,
+        category: txBody.category,
+        supplier_id: txBody.supplierId ?? null,
+        entry_date: txBody.expenseDate,
         reference_id: expenseRow.id,
         is_active: true,
       });
@@ -268,13 +270,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(transformExpense(expenseRow, lineItems), { status: 201 });
     }
 
-    const bodyLegacy: CreateExpenseData = body;
-    if (!bodyLegacy.name || !bodyLegacy.category || !bodyLegacy.amount || !bodyLegacy.expenseDate) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    const bodyLegacy = body as unknown as CreateExpenseData;
 
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase

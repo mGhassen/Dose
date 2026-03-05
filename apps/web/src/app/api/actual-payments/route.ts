@@ -108,7 +108,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateActualPaymentData = await request.json();
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.createActualPaymentSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as CreateActualPaymentData;
 
     const supabase = createServerSupabaseClient();
     

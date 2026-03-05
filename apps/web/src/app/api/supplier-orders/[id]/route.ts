@@ -119,7 +119,11 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const body: UpdateSupplierOrderData = await request.json();
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.updateSupplierOrderSchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const body = parsed.data as UpdateSupplierOrderData;
     const supabase = createServerSupabaseClient();
     
     // Update order

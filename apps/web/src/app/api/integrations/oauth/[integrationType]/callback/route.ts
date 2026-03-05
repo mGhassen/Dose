@@ -181,15 +181,11 @@ export async function POST(
       );
     }
 
-    const body = await request.json();
-    const { code, state } = body;
-
-    if (!code) {
-      return NextResponse.json(
-        { error: 'Missing authorization code' },
-        { status: 400 }
-      );
-    }
+    const parsed = await import('@/shared/zod-schemas').then((m) =>
+      m.parseRequestBody(request, m.oauthCallbackBodySchema)
+    );
+    if (!parsed.success) return parsed.response;
+    const { code, state } = parsed.data;
 
     const authHeader = request.headers.get('authorization');
     
