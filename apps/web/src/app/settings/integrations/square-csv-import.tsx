@@ -5,7 +5,7 @@ import { Button } from '@kit/ui/button';
 import { Label } from '@kit/ui/label';
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Upload, FileText, Loader2, CheckCircle2, XCircle } from 'lucide-react';
-import { useToast } from '@kit/hooks';
+import { useToast, useMetadataEnum } from '@kit/hooks';
 import Papa from 'papaparse';
 
 interface SquareCsvImportProps {
@@ -19,6 +19,8 @@ export default function SquareCsvImport({ integrationId, onImportComplete }: Squ
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success: number; errors: number } | null>(null);
   const { toast } = useToast();
+  const { data: syncTypeValues = [] } = useMetadataEnum("SyncType");
+  const syncTypeItems = syncTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -141,11 +143,7 @@ export default function SquareCsvImport({ integrationId, onImportComplete }: Squ
       <UnifiedSelector
         label="Import Type"
         type="type"
-        items={[
-          { id: 'orders', name: 'Orders' },
-          { id: 'payments', name: 'Payments' },
-          { id: 'catalog', name: 'Catalog Items' },
-        ]}
+        items={syncTypeItems}
         selectedId={importType || undefined}
         onSelect={(item) => setImportType(String(item.id) as 'orders' | 'payments' | 'catalog')}
         placeholder="Select import type"

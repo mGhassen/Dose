@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useEntries, useDeleteEntry, usePaymentsByEntry, useCreatePayment, useDeletePayment } from "@kit/hooks";
+import { useEntries, useDeleteEntry, usePaymentsByEntry, useCreatePayment, useDeletePayment, useMetadataEnum } from "@kit/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Entry } from "@kit/lib";
 import { Badge } from "@kit/ui/badge";
@@ -62,6 +62,8 @@ export default function LoansInputContent() {
   const { data: payments = [], refetch: refetchPayments } = usePaymentsByEntry(
     selectedEntry?.id?.toString() || ''
   );
+  const { data: paymentMethodValues = [] } = useMetadataEnum("PaymentMethod");
+  const paymentMethodItems = paymentMethodValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const createPayment = useCreatePayment();
   const deletePayment = useDeletePayment();
 
@@ -396,11 +398,7 @@ export default function LoansInputContent() {
                   label="Payment Method"
                   type="method"
                   id="paymentMethod"
-                  items={[
-                    { id: 'cash', name: 'Cash' },
-                    { id: 'card', name: 'Card' },
-                    { id: 'bank_transfer', name: 'Bank Transfer' },
-                  ]}
+                  items={paymentMethodItems}
                   selectedId={paymentMethod || undefined}
                   onSelect={(item) => setPaymentMethod(item.id === 0 ? 'bank_transfer' : String(item.id))}
                   placeholder="Select payment method"

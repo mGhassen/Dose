@@ -71,7 +71,9 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
   const deleteMutation = useDeleteLoan();
   const generateSchedule = useGenerateLoanSchedule();
   const { data: loanStatusValues = [] } = useMetadataEnum("LoanStatus");
+  const { data: paymentMethodValues = [] } = useMetadataEnum("PaymentMethod");
   const statusItems = loanStatusValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const paymentMethodItems = paymentMethodValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const statusLabels: Record<string, string> = Object.fromEntries(
     loanStatusValues.map((ev) => [ev.name, ev.label ?? ev.name])
   );
@@ -898,11 +900,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                     label="Payment Method"
                     type="method"
                     id="dialog-paymentMethod"
-                    items={[
-                      { id: 'cash', name: 'Cash' },
-                      { id: 'card', name: 'Card' },
-                      { id: 'bank_transfer', name: 'Bank Transfer' },
-                    ]}
+                    items={paymentMethodItems}
                     selectedId={paymentMethod || undefined}
                     onSelect={(item) => setPaymentMethod(item.id === 0 ? 'bank_transfer' : String(item.id))}
                     placeholder="Select payment method"

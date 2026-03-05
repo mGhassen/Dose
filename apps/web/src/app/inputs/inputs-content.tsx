@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useEntries, useDeleteEntry } from "@kit/hooks";
+import { useEntries, useDeleteEntry, useMetadataEnum } from "@kit/hooks";
 import type { Entry } from "@kit/lib";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
@@ -25,12 +25,10 @@ export default function InputsContent() {
 
   const entries = entriesData?.data || [];
   const totalCount = entriesData?.pagination?.total || 0;
-
-  const entryTypeLabels: Record<string, string> = {
-    sale: "Sale",
-    loan: "Loan",
-    leasing: "Leasing",
-  };
+  const { data: entryTypeValues = [] } = useMetadataEnum("EntryType");
+  const entryTypeLabels: Record<string, string> = Object.fromEntries(
+    entryTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
 
   const columns: ColumnDef<Entry>[] = useMemo(() => [
     {

@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
 import { Trash2, MoreVertical, Calendar } from "lucide-react";
-import { useUpdateSubscriptionProjectionEntry, useCreateOrUpdateSubscriptionProjectionEntry, useSubscriptionProjections, usePaymentsByEntry, useCreatePayment, useDeletePayment } from "@kit/hooks";
+import { useUpdateSubscriptionProjectionEntry, useCreateOrUpdateSubscriptionProjectionEntry, useSubscriptionProjections, usePaymentsByEntry, useCreatePayment, useDeletePayment, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { dateToYYYYMMDD } from "@kit/lib";
@@ -84,7 +84,9 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
   
   // Fetch all payments for this entry
   const { data: payments = [], refetch: refetchPayments } = usePaymentsByEntry(entryId || '');
-  
+  const { data: paymentMethodValues = [] } = useMetadataEnum("PaymentMethod");
+  const paymentMethodItems = paymentMethodValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+
   // Calculate total paid from all payments
   const totalPaid = payments.reduce((sum, payment) => sum + (payment.isPaid ? payment.amount : 0), 0);
   const isFullyPaid = totalPaid >= expectedAmount;
@@ -533,11 +535,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
                   label="Payment Method"
                   type="method"
                   id="paymentMethod"
-                  items={[
-                    { id: 'cash', name: 'Cash' },
-                    { id: 'card', name: 'Card' },
-                    { id: 'bank_transfer', name: 'Bank Transfer' },
-                  ]}
+                  items={paymentMethodItems}
                   selectedId={paymentMethod || undefined}
                   onSelect={(item) => setPaymentMethod(item.id === 0 ? 'bank_transfer' : String(item.id))}
                   placeholder="Select payment method"

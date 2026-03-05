@@ -27,7 +27,8 @@ import {
   useBudgetEntries,
   useCreateBudgetEntry,
   useUpdateBudgetEntry,
-  useCreateBudgetEntries
+  useCreateBudgetEntries,
+  useMetadataEnum
 } from "@kit/hooks";
 import type { BudgetAccount, BudgetEntry } from "@kit/types";
 import { toast } from "@kit/hooks";
@@ -78,6 +79,8 @@ export default function BudgetsPage() {
 
   // Load or create budget
   const { data: budgets } = useBudgets({ fiscalYear, includeAccounts: true, includeEntries: true });
+  const { data: budgetPeriodValues = [] } = useMetadataEnum("BudgetPeriod");
+  const budgetPeriodItems = budgetPeriodValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const { data: currentBudget, isLoading: isLoadingBudget } = useBudgetById(
     currentBudgetId || 0,
     { includeAccounts: true, includeEntries: true }
@@ -477,11 +480,7 @@ export default function BudgetsPage() {
               label="Budget Period"
               required
               type="period"
-              items={[
-                { id: 'monthly', name: 'Monthly' },
-                { id: 'quarterly', name: 'Quarterly' },
-                { id: 'yearly', name: 'Yearly' },
-              ]}
+              items={budgetPeriodItems}
               selectedId={budgetPeriod || undefined}
               onSelect={(item) => setBudgetPeriod(String(item.id) as 'monthly' | 'quarterly' | 'yearly')}
               placeholder="Select period"

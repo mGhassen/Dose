@@ -78,6 +78,15 @@ export const LOAN_STATUS_NAMES = ["active", "paid_off", "defaulted"] as const;
 export const INVESTMENT_TYPE_NAMES = ["equipment", "renovation", "technology", "vehicle", "other"] as const;
 export const DEPRECIATION_METHOD_NAMES = ["straight_line", "declining_balance", "units_of_production"] as const;
 export const STOCK_MOVEMENT_TYPE_NAMES = ["in", "out", "adjustment", "transfer", "waste", "expired"] as const;
+export const PAYMENT_METHOD_NAMES = ["cash", "card", "bank_transfer"] as const;
+export const SALARY_FREQUENCY_NAMES = ["yearly", "monthly", "weekly"] as const;
+export const BUDGET_PERIOD_NAMES = ["monthly", "quarterly", "yearly"] as const;
+export const SYNC_TYPE_NAMES = ["orders", "payments", "catalog", "locations", "full"] as const;
+export const UNIT_DIMENSION_NAMES = ["mass", "volume", "count", "other"] as const;
+export const ITEM_CATEGORY_NAMES = ["food", "beverage", "supplies", "other"] as const;
+export const SUPPLIER_PAYMENT_TERMS_NAMES = ["net_30", "net_15", "cod", "due_on_receipt", "net_60"] as const;
+export const SUPPLIER_TYPE_NAMES = ["supplier", "vendor"] as const;
+export const GLOBAL_DATE_FILTER_PRESET_NAMES = ["this_month", "this_quarter", "this_year", "custom"] as const;
 
 const expenseCategoryEnum = z.enum(EXPENSE_CATEGORY_NAMES);
 const expenseRecurrenceEnum = z.enum(EXPENSE_RECURRENCE_NAMES);
@@ -100,13 +109,14 @@ export type CreateSubscriptionInput = z.infer<typeof createSubscriptionSchema>;
 export const updateSubscriptionSchema = createSubscriptionSchema.partial();
 export type UpdateSubscriptionInput = z.infer<typeof updateSubscriptionSchema>;
 
+const paymentMethodEnum = z.enum(PAYMENT_METHOD_NAMES);
 export const createPaymentSchema = z.object({
   entryId: z.number().int().positive("Entry is required"),
   paymentDate: z.string().min(1, "Payment date is required"),
   amount: z.number(),
   isPaid: z.boolean().optional(),
   paidDate: z.string().optional(),
-  paymentMethod: z.string().optional(),
+  paymentMethod: paymentMethodEnum.optional(),
   notes: z.string().optional(),
 });
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>;
@@ -318,10 +328,11 @@ export const updateIngredientSchema = createIngredientSchema.partial().extend({
 });
 export type UpdateIngredientInput = z.infer<typeof updateIngredientSchema>;
 
+const unitDimensionEnum = z.enum(UNIT_DIMENSION_NAMES);
 export const createUnitSchema = z.object({
   name: z.string().min(1, "Name is required"),
   symbol: z.string().min(1, "Symbol is required"),
-  dimension: z.string().optional(),
+  dimension: unitDimensionEnum.optional(),
   baseUnitId: z.number().optional(),
   factorToBase: z.number().optional(),
 });
@@ -344,7 +355,8 @@ export type CreateVendorInput = z.infer<typeof createVendorSchema>;
 export const updateVendorSchema = createVendorSchema.partial();
 export type UpdateVendorInput = z.infer<typeof updateVendorSchema>;
 
-const supplierTypeArraySchema = z.array(z.enum(["supplier", "vendor"])).optional();
+const supplierTypeEnum = z.enum(SUPPLIER_TYPE_NAMES);
+const supplierTypeArraySchema = z.array(supplierTypeEnum).optional();
 
 export const createSupplierSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -431,7 +443,7 @@ export type UpdateTaxRuleInput = z.infer<typeof updateTaxRuleSchema>;
 export const createBudgetSchema = z.object({
   name: z.string().min(1, "Name is required"),
   fiscalYearStart: z.string().min(1, "Fiscal year start is required"),
-  budgetPeriod: z.enum(["monthly", "quarterly", "yearly"]).optional(),
+  budgetPeriod: z.enum(BUDGET_PERIOD_NAMES).optional(),
   reportingTagId: z.number().nullable().optional(),
 });
 export type CreateBudgetInput = z.infer<typeof createBudgetSchema>;
@@ -569,7 +581,7 @@ export const createPersonnelSchema = z.object({
   position: z.string().min(1),
   type: personnelTypeEnum,
   baseSalary: z.number(),
-  salaryFrequency: z.enum(["yearly", "monthly", "weekly"]),
+  salaryFrequency: z.enum(SALARY_FREQUENCY_NAMES),
   employerCharges: z.number(),
   employerChargesType: z.enum(["percentage", "fixed"]),
   startDate: z.string().min(1),
@@ -834,7 +846,7 @@ export const manualConnectSchema = z.object({
   merchant_id: z.string().optional(),
   location_id: z.string().optional(),
 });
-const syncTypeEnum = z.enum(["orders", "payments", "catalog", "locations", "full"]);
+const syncTypeEnum = z.enum(SYNC_TYPE_NAMES);
 export const syncBodySchema = z.object({
   sync_type: syncTypeEnum.optional(),
 });

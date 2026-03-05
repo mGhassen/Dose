@@ -16,7 +16,7 @@ import {
 } from "@kit/ui/dropdown-menu";
 import { Edit2, Check, X, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { UnifiedSelector } from "@/components/unified-selector";
-import { useUpdateLoanScheduleEntry, useCreatePayment, useDeletePayment } from "@kit/hooks";
+import { useUpdateLoanScheduleEntry, useCreatePayment, useDeletePayment, useMetadataEnum } from "@kit/hooks";
 import type { Entry } from "@kit/lib";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -42,6 +42,8 @@ export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], 
   const [showPayments, setShowPayments] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
   const [dialogPaymentDate, setDialogPaymentDate] = useState<Date>(() => new Date());
+  const { data: paymentMethodValues = [] } = useMetadataEnum("PaymentMethod");
+  const paymentMethodItems = paymentMethodValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [editData, setEditData] = useState({
     paymentDate: entry.paymentDate.split('T')[0],
     principalPayment: entry.principalPayment.toString(),
@@ -420,11 +422,7 @@ export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], 
               label="Payment Method"
               type="method"
               id="paymentMethod"
-              items={[
-                { id: 'cash', name: 'Cash' },
-                { id: 'card', name: 'Card' },
-                { id: 'bank_transfer', name: 'Bank Transfer' },
-              ]}
+              items={paymentMethodItems}
               selectedId={paymentMethod || undefined}
               onSelect={(item) => setPaymentMethod(item.id === 0 ? 'bank_transfer' : String(item.id))}
               placeholder="Select payment method"

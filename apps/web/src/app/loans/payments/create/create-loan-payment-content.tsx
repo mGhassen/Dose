@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@kit/ui/badge";
 import { Save, X, ChevronLeft, ChevronRight } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLoans, useLoanSchedule, useEntries, usePaymentsByEntry, useCreatePayment } from "@kit/hooks";
+import { useLoans, useLoanSchedule, useEntries, usePaymentsByEntry, useCreatePayment, useMetadataEnum } from "@kit/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -48,6 +48,8 @@ export default function CreateLoanPaymentPage() {
   const { data: payments = [] } = usePaymentsByEntry(
     scheduleEntryEntry?.id?.toString() || ''
   );
+  const { data: paymentMethodValues = [] } = useMetadataEnum("PaymentMethod");
+  const paymentMethodItems = paymentMethodValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const createPayment = useCreatePayment();
   
   const totalPaid = scheduleEntryEntry && payments ? (payments.reduce((sum, p) => sum + p.amount, 0)) : 0;
@@ -411,11 +413,7 @@ export default function CreateLoanPaymentPage() {
                         label="Payment Method"
                         type="method"
                         id="payment-method"
-                        items={[
-                          { id: 'cash', name: 'Cash' },
-                          { id: 'card', name: 'Card' },
-                          { id: 'bank_transfer', name: 'Bank Transfer' },
-                        ]}
+                        items={paymentMethodItems}
                         selectedId={paymentMethod || undefined}
                         onSelect={(item) => setPaymentMethod(item.id === 0 ? 'bank_transfer' : String(item.id))}
                         placeholder="Select payment method"

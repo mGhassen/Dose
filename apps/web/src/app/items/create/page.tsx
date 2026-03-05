@@ -11,7 +11,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateItem, useInventorySuppliers, useUnits } from "@kit/hooks";
+import { useCreateItem, useInventorySuppliers, useUnits, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 
 export default function CreateItemPage() {
@@ -19,7 +19,9 @@ export default function CreateItemPage() {
   const createItem = useCreateItem();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const { data: unitsData } = useUnits();
+  const { data: categoryValues = [] } = useMetadataEnum("ItemCategory");
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
+  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -107,12 +109,13 @@ export default function CreateItemPage() {
 
                 {/* Category */}
                 <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Input
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) => handleInputChange('category', e.target.value)}
-                    placeholder="e.g., Food, Supplies, Equipment"
+                  <UnifiedSelector
+                    label="Category"
+                    type="category"
+                    items={categoryItems}
+                    selectedId={formData.category || undefined}
+                    onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select category"
                   />
                 </div>
 

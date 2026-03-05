@@ -67,6 +67,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const produceRecipe = useProduceRecipe();
   const [linkItemDialogOpen, setLinkItemDialogOpen] = useState(false);
   const [linkItemId, setLinkItemId] = useState<number | null>(null);
+  const [linkItemDialogOpenForm, setLinkItemDialogOpenForm] = useState(false);
+  const [linkItemIdForm, setLinkItemIdForm] = useState<number | null>(null);
   const { data: allItemsResponse } = useItems({ limit: 1000 });
   const allItems = allItemsResponse?.data ?? [];
   
@@ -283,7 +285,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="min-h-0 flex-1 overflow-auto">
+        <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <StatusPin active={recipe.isActive} title={recipe.isActive ? "Active" : "Inactive"} />
@@ -402,13 +405,22 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
 
                     <div className="space-y-2">
                       <Label>Item produced (optional)</Label>
-                      <UnifiedSelector
-                        type="item"
-                        items={itemsResponse?.data?.filter(i => i.itemType === 'item') ?? []}
-                        selectedId={formData.producedItemId ?? undefined}
-                        onSelect={(sel) => setFormData(prev => ({ ...prev, producedItemId: sel.id === 0 ? null : Number(sel.id) }))}
-                        placeholder="Link to existing item (or leave empty to create when produced)"
-                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground flex-1 min-w-0 truncate">
+                          {formData.producedItemId
+                            ? itemsResponse?.data?.find(i => i.id === formData.producedItemId)?.name ?? `Item #${formData.producedItemId}`
+                            : "No item linked"}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setLinkItemIdForm(formData.producedItemId); setLinkItemDialogOpenForm(true); }}
+                        >
+                          <Link2 className="mr-2 h-4 w-4" />
+                          Link to existing item
+                        </Button>
+                      </div>
                       <p className="text-xs text-muted-foreground">If empty, an item will be created when you first produce this recipe.</p>
                     </div>
 
@@ -1022,6 +1034,53 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
         </DialogContent>
       </Dialog>
 
+      <Dialog open={linkItemDialogOpenForm} onOpenChange={(open) => { setLinkItemDialogOpenForm(open); if (!open) setLinkItemIdForm(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link to existing item</DialogTitle>
+            <DialogDescription>
+              Select an item to use as this recipe&apos;s output. Save the recipe to apply.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <UnifiedSelector
+              label="Item"
+              type="item"
+              items={allItems.filter(i => i.itemType === 'item')}
+              selectedId={linkItemIdForm ?? undefined}
+              onSelect={(sel) => setLinkItemIdForm(sel.id === 0 ? null : Number(sel.id))}
+              placeholder="Select item"
+              getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}${(i as { category?: string }).category ? ` (${(i as { category?: string }).category})` : ''}`}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setLinkItemDialogOpenForm(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setFormData(prev => ({ ...prev, producedItemId: null }));
+                  setLinkItemDialogOpenForm(false);
+                  setLinkItemIdForm(null);
+                }}
+              >
+                Clear
+              </Button>
+              <Button
+                disabled={!linkItemIdForm}
+                onClick={() => {
+                  if (linkItemIdForm) setFormData(prev => ({ ...prev, producedItemId: linkItemIdForm }));
+                  setLinkItemDialogOpenForm(false);
+                  setLinkItemIdForm(null);
+                }}
+              >
+                Link
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
@@ -1044,6 +1103,7 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </AppLayout>
   );
 }

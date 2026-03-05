@@ -310,5 +310,187 @@ WHERE e.name = 'StockMovementReferenceType'
 ON CONFLICT (enum_id, name) DO NOTHING;
 
 
+-- Add all domain-list metadata enums per plan: PaymentMethod, SalaryFrequency, BudgetPeriod,
+-- EntryType, SyncType, UnitDimension, ItemCategory, SupplierPaymentTerms, SupplierType,
+-- PersonnelPosition, GlobalDateFilterPreset
+
+-- PaymentMethod
+INSERT INTO metadata_enums (name, label, description, is_active) VALUES
+('PaymentMethod', 'Payment Method', 'Method of payment for payments/entries', true)
+ON CONFLICT (name) DO NOTHING;
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT e.id, v.name, v.label, v.description, v.display_order, true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('cash', 'Cash', 'Cash payment', 1),
+  ('card', 'Card', 'Card payment', 2),
+  ('bank_transfer', 'Bank Transfer', 'Bank transfer', 3)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'PaymentMethod'
+ON CONFLICT (enum_id, name) DO NOTHING;
+
+-- SalaryFrequency
+INSERT INTO metadata_enums (name, label, description, is_active) VALUES
+('SalaryFrequency', 'Salary Frequency', 'Salary package frequency', true)
+ON CONFLICT (name) DO NOTHING;
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT e.id, v.name, v.label, v.description, v.display_order, true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('yearly', 'Yearly', 'Annual salary', 1),
+  ('monthly', 'Monthly', 'Monthly salary', 2),
+  ('weekly', 'Weekly', 'Weekly salary', 3)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'SalaryFrequency'
+ON CONFLICT (enum_id, name) DO NOTHING;
+
+-- BudgetPeriod
+INSERT INTO metadata_enums (name, label, description, is_active) VALUES
+('BudgetPeriod', 'Budget Period', 'Budget period', true)
+ON CONFLICT (name) DO NOTHING;
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT e.id, v.name, v.label, v.description, v.display_order, true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('monthly', 'Monthly', 'Monthly budget', 1),
+  ('quarterly', 'Quarterly', 'Quarterly budget', 2),
+  ('yearly', 'Yearly', 'Yearly budget', 3)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'BudgetPeriod'
+ON CONFLICT (enum_id, name) DO NOTHING;
+
+-- EntryType (all values for inputs + outputs labels)
+INSERT INTO metadata_enums (name, label, description, is_active) VALUES
+('EntryType', 'Entry Type', 'Type of cash flow entry', true)
+ON CONFLICT (name) DO NOTHING;
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT e.id, v.name, v.label, v.description, v.display_order, true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('sale', 'Sale', 'Sale entry', 1),
+  ('loan', 'Loan', 'Loan entry', 2),
+  ('leasing', 'Leasing', 'Leasing entry', 3),
+  ('expense', 'Expense', 'Expense entry', 4),
+  ('subscription', 'Subscription', 'Subscription entry', 5),
+  ('subscription_payment', 'Subscription Payment', 'Subscription payment', 6),
+  ('loan_payment', 'Loan Payment', 'Loan payment', 7),
+  ('leasing_payment', 'Leasing Payment', 'Leasing payment', 8),
+  ('personnel', 'Personnel', 'Personnel entry', 9)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'EntryType'
+ON CONFLICT (enum_id, name) DO NOTHING;
+
+-- SyncType (Square import)
+INSERT INTO metadata_enums (name, label, description, is_active) VALUES
+('SyncType', 'Sync Type', 'Square sync/import type', true)
+ON CONFLICT (name) DO NOTHING;
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT e.id, v.name, v.label, v.description, v.display_order, true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('orders', 'Orders', 'Orders import', 1),
+  ('payments', 'Payments', 'Payments import', 2),
+  ('catalog', 'Catalog Items', 'Catalog items import', 3),
+  ('locations', 'Locations', 'Locations sync', 4),
+  ('full', 'Full', 'Full sync', 5)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'SyncType'
+ON CONFLICT (enum_id, name) DO NOTHING;
+
+-- UnitDimension (units and variable payload)
+INSERT INTO metadata_enums (name, label, description, is_active) VALUES
+('UnitDimension', 'Unit Dimension', 'Physical dimension of unit', true)
+ON CONFLICT (name) DO NOTHING;
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT e.id, v.name, v.label, v.description, v.display_order, true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('mass', 'Mass', 'Mass/weight', 1),
+  ('volume', 'Volume', 'Volume', 2),
+  ('count', 'Count', 'Count/quantity', 3),
+  ('other', 'Other', 'Other dimension', 4)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'UnitDimension'
+ON CONFLICT (enum_id, name) DO NOTHING;
+
+-- ItemCategory (items.category)
+INSERT INTO metadata_enums (name, label, description, is_active) VALUES
+('ItemCategory', 'Item Category', 'Category for items', true)
+ON CONFLICT (name) DO NOTHING;
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT e.id, v.name, v.label, v.description, v.display_order, true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('food', 'Food', 'Food items', 1),
+  ('beverage', 'Beverage', 'Beverages', 2),
+  ('supplies', 'Supplies', 'Supplies', 3),
+  ('other', 'Other', 'Other category', 4)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'ItemCategory'
+ON CONFLICT (enum_id, name) DO NOTHING;
+
+-- SupplierPaymentTerms
+INSERT INTO metadata_enums (name, label, description, is_active) VALUES
+('SupplierPaymentTerms', 'Supplier Payment Terms', 'Payment terms for suppliers', true)
+ON CONFLICT (name) DO NOTHING;
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT e.id, v.name, v.label, v.description, v.display_order, true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('net_30', 'Net 30', 'Payment due in 30 days', 1),
+  ('net_15', 'Net 15', 'Payment due in 15 days', 2),
+  ('cod', 'COD', 'Cash on delivery', 3),
+  ('due_on_receipt', 'Due on Receipt', 'Due on receipt', 4),
+  ('net_60', 'Net 60', 'Payment due in 60 days', 5)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'SupplierPaymentTerms'
+ON CONFLICT (enum_id, name) DO NOTHING;
+
+-- SupplierType
+INSERT INTO metadata_enums (name, label, description, is_active) VALUES
+('SupplierType', 'Supplier Type', 'Type of supplier', true)
+ON CONFLICT (name) DO NOTHING;
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT e.id, v.name, v.label, v.description, v.display_order, true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('supplier', 'Supplier', 'Supplier', 1),
+  ('vendor', 'Vendor', 'Vendor', 2)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'SupplierType'
+ON CONFLICT (enum_id, name) DO NOTHING;
+
+-- PersonnelPosition (seed a few; users can add via metadata-enums admin)
+INSERT INTO metadata_enums (name, label, description, is_active) VALUES
+('PersonnelPosition', 'Personnel Position', 'Job position / role', true)
+ON CONFLICT (name) DO NOTHING;
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT e.id, v.name, v.label, v.description, v.display_order, true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('manager', 'Manager', 'Manager', 1),
+  ('employee', 'Employee', 'Employee', 2),
+  ('contractor', 'Contractor', 'Contractor', 3),
+  ('intern', 'Intern', 'Intern', 4),
+  ('other', 'Other', 'Other position', 5)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'PersonnelPosition'
+ON CONFLICT (enum_id, name) DO NOTHING;
+
+-- GlobalDateFilterPreset
+INSERT INTO metadata_enums (name, label, description, is_active) VALUES
+('GlobalDateFilterPreset', 'Global Date Filter Preset', 'Dashboard/global date range preset', true)
+ON CONFLICT (name) DO NOTHING;
+INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
+SELECT e.id, v.name, v.label, v.description, v.display_order, true
+FROM metadata_enums e
+CROSS JOIN (VALUES
+  ('this_month', 'This Month', 'Current month', 1),
+  ('this_quarter', 'This Quarter', 'Current quarter', 2),
+  ('this_year', 'This Year', 'Current year', 3),
+  ('custom', 'Custom', 'Custom date range', 4)
+) AS v(name, label, description, display_order)
+WHERE e.name = 'GlobalDateFilterPreset'
+ON CONFLICT (enum_id, name) DO NOTHING;
 
 

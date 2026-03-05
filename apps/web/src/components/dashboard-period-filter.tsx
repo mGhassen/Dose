@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  DATE_PERIOD_PRESETS,
   getDateRangeForPreset,
   type DatePeriodPreset,
   type DateRange,
@@ -20,6 +19,7 @@ import { Button } from "@kit/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@kit/ui/popover";
 import { Calendar } from "@kit/ui/calendar";
 import { CalendarIcon } from "lucide-react";
+import { useMetadataEnum } from "@kit/hooks";
 
 const CUSTOM_VALUE = "custom";
 
@@ -29,12 +29,18 @@ export interface DashboardPeriodFilterProps {
 }
 
 export function DashboardPeriodFilter({ value, onChange }: DashboardPeriodFilterProps) {
+  const { data: presets = [] } = useMetadataEnum("GlobalDateFilterPreset");
   const detectPreset = (range: DateRange): string => {
-    const match = DATE_PERIOD_PRESETS.find((p) => {
-      const presetRange = getDateRangeForPreset(p.value as DatePeriodPreset);
-      return presetRange.startDate === range.startDate && presetRange.endDate === range.endDate;
-    });
-    return match?.value ?? CUSTOM_VALUE;
+    for (const p of presets) {
+      if (p.name === CUSTOM_VALUE) continue;
+      try {
+        const presetRange = getDateRangeForPreset(p.name as DatePeriodPreset);
+        if (presetRange.startDate === range.startDate && presetRange.endDate === range.endDate) return p.name;
+      } catch {
+        /* skip */
+      }
+    }
+    return CUSTOM_VALUE;
   };
 
   const [preset, setPreset] = useState<string>(() => detectPreset(value));
@@ -48,7 +54,7 @@ export function DashboardPeriodFilter({ value, onChange }: DashboardPeriodFilter
   const selectLabel =
     preset === CUSTOM_VALUE
       ? `${formatShortDate(value.startDate)} – ${formatShortDate(value.endDate)}`
-      : DATE_PERIOD_PRESETS.find((p) => p.value === preset)?.label ?? "This year";
+      : presets.find((p) => p.name === preset)?.label ?? "This year";
 
   const handlePresetChange = (v: string) => {
     setPreset(v);
@@ -86,12 +92,11 @@ export function DashboardPeriodFilter({ value, onChange }: DashboardPeriodFilter
           <SelectValue>{selectLabel}</SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {DATE_PERIOD_PRESETS.map((p) => (
-            <SelectItem key={p.value} value={p.value}>
-              {p.label}
+          {presets.map((p) => (
+            <SelectItem key={p.name} value={p.name}>
+              {p.label ?? p.name}
             </SelectItem>
           ))}
-          <SelectItem value={CUSTOM_VALUE}>Custom</SelectItem>
         </SelectContent>
       </Select>
 

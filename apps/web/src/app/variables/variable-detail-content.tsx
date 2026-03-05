@@ -69,7 +69,9 @@ export function VariableDetailContent({
   const { data: taxRules = [] } = useTaxRules({ variableId: variable?.id });
   const deleteTaxRule = useDeleteTaxRule();
   const { data: variableTypeValues = [], isError: variableTypeError, isLoading: variableTypeLoading } = useMetadataEnum("VariableType");
+  const { data: dimensionValues = [] } = useMetadataEnum("UnitDimension");
   const typeItems = variableTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const dimensionItems = dimensionValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const typeLabels: Record<string, string> = Object.fromEntries(variableTypeValues.map((ev) => [ev.name, ev.label ?? ev.name]));
 
   const [formData, setFormData] = useState({
@@ -305,12 +307,13 @@ export function VariableDetailContent({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="payloadDimension">Dimension</Label>
-                        <Input
-                          id="payloadDimension"
-                          value={formData.payloadDimension}
-                          onChange={(e) => handleInputChange("payloadDimension", e.target.value)}
-                          placeholder="mass, volume, count, other"
+                        <Label>Dimension</Label>
+                        <UnifiedSelector
+                          type="dimension"
+                          items={dimensionItems}
+                          selectedId={formData.payloadDimension || undefined}
+                          onSelect={(item) => handleInputChange("payloadDimension", item.id === 0 ? "other" : String(item.id))}
+                          placeholder="Select dimension"
                         />
                       </div>
                       <div className="space-y-2 col-span-2">

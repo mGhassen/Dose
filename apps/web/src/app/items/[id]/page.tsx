@@ -38,7 +38,7 @@ import {
   Area,
 } from 'recharts';
 import AppLayout from "@/components/app-layout";
-import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits } from "@kit/hooks";
+import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { dateToYYYYMMDD } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
@@ -444,7 +444,9 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     isActive: true,
   });
   const { data: unitsData } = useUnits();
+  const { data: categoryValues = [] } = useMetadataEnum("ItemCategory");
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
+  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
   const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null } | null>(null);
   const [sellHistory, setSellHistory] = useState<{ id: number; effectiveDate: string; value: number | null }[]>([]);
@@ -668,11 +670,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
                   {/* Category */}
                   <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Input
-                      id="category"
-                      value={formData.category}
-                      onChange={(e) => handleInputChange('category', e.target.value)}
+                    <UnifiedSelector
+                      label="Category"
+                      type="category"
+                      items={categoryItems}
+                      selectedId={formData.category || undefined}
+                      onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
+                      placeholder="Select category"
                     />
                   </div>
 

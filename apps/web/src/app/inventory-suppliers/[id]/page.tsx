@@ -11,6 +11,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
+import { UnifiedSelector } from "@/components/unified-selector";
 import { Separator } from "@kit/ui/separator";
 import {
   DropdownMenu,
@@ -21,7 +22,7 @@ import {
 } from "@kit/ui/dropdown-menu";
 import { Save, X, Trash2, MoreVertical, Edit2, ShoppingCart, DollarSign, Package, TrendingUp, Building2, Plus } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useInventorySupplierById, useUpdateInventorySupplier, useDeleteInventorySupplier, useSupplierOrders, useItems, useStockMovements, useExpenses, useSubscriptions, useLeasing, useLoans } from "@kit/hooks";
+import { useInventorySupplierById, useUpdateInventorySupplier, useDeleteInventorySupplier, useSupplierOrders, useItems, useStockMovements, useExpenses, useSubscriptions, useLeasing, useLoans, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
 import { formatCurrency } from "@kit/lib/config";
@@ -45,6 +46,9 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
   const { data: leasingResponse } = useLeasing();
   const updateSupplier = useUpdateInventorySupplier();
   const deleteMutation = useDeleteInventorySupplier();
+  const { data: paymentTermsValues = [] } = useMetadataEnum("SupplierPaymentTerms");
+  const { data: supplierTypeValues = [] } = useMetadataEnum("SupplierType");
+  const paymentTermsItems = paymentTermsValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
   // Check if supplier is a vendor
   const isVendor = useMemo(() => {
@@ -365,11 +369,13 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="paymentTerms">Payment Terms</Label>
-                    <Input
-                      id="paymentTerms"
-                      value={formData.paymentTerms}
-                      onChange={(e) => handleInputChange('paymentTerms', e.target.value)}
+                    <UnifiedSelector
+                      label="Payment Terms"
+                      type="payment_terms"
+                      items={paymentTermsItems}
+                      selectedId={formData.paymentTerms || undefined}
+                      onSelect={(item) => handleInputChange('paymentTerms', item.id === 0 ? '' : String(item.id))}
+                      placeholder="Select payment terms"
                     />
                   </div>
 
@@ -396,36 +402,23 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                   <div className="space-y-3 md:col-span-2">
                     <Label>Supplier Type</Label>
                     <div className="flex gap-4">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="type-supplier"
-                          checked={formData.supplierType.includes('supplier')}
-                          onCheckedChange={(checked) => {
-                            const newTypes = checked
-                              ? [...formData.supplierType.filter(t => t !== 'supplier'), 'supplier']
-                              : formData.supplierType.filter(t => t !== 'supplier');
-                            handleInputChange('supplierType', newTypes.length > 0 ? newTypes : ['vendor']);
-                          }}
-                        />
-                        <Label htmlFor="type-supplier" className="font-normal cursor-pointer">
-                          Supplier (for items/inventory)
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="type-vendor"
-                          checked={formData.supplierType.includes('vendor')}
-                          onCheckedChange={(checked) => {
-                            const newTypes = checked
-                              ? [...formData.supplierType.filter(t => t !== 'vendor'), 'vendor']
-                              : formData.supplierType.filter(t => t !== 'vendor');
-                            handleInputChange('supplierType', newTypes.length > 0 ? newTypes : ['supplier']);
-                          }}
-                        />
-                        <Label htmlFor="type-vendor" className="font-normal cursor-pointer">
-                          Vendor (for expenses/subscriptions/loans/leasing)
-                        </Label>
-                      </div>
+                      {supplierTypeValues.map((ev) => (
+                        <div key={ev.name} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`type-${ev.name}`}
+                            checked={formData.supplierType.includes(ev.name)}
+                            onCheckedChange={(checked) => {
+                              const newTypes = checked
+                                ? [...formData.supplierType.filter(t => t !== ev.name), ev.name]
+                                : formData.supplierType.filter(t => t !== ev.name);
+                              handleInputChange('supplierType', newTypes.length > 0 ? newTypes : [supplierTypeValues[0]?.name ?? 'supplier']);
+                            }}
+                          />
+                          <Label htmlFor={`type-${ev.name}`} className="font-normal cursor-pointer">
+                            {ev.label ?? ev.name}
+                          </Label>
+                        </div>
+                      ))}
                     </div>
                   </div>
 

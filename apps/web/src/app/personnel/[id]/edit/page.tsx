@@ -27,7 +27,11 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
   const { data: personnel, isLoading } = usePersonnelById(resolvedParams?.id || "");
   const updatePersonnel = useUpdatePersonnel();
   const { data: personnelTypeValues = [] } = useMetadataEnum("PersonnelType");
+  const { data: salaryFrequencyValues = [] } = useMetadataEnum("SalaryFrequency");
+  const { data: positionValues = [] } = useMetadataEnum("PersonnelPosition");
   const personnelTypeItems = personnelTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const salaryFrequencyItems = salaryFrequencyValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const positionItems = positionValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
   const { data: variables } = useVariables();
   const variablesList = variables ?? [];
@@ -206,13 +210,14 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
 
                 {/* Position */}
                 <div className="space-y-2">
-                  <Label htmlFor="position">Position *</Label>
-                  <Input
-                    id="position"
-                    value={formData.position}
-                    onChange={(e) => handleInputChange('position', e.target.value)}
-                    placeholder="e.g., Chef, Waiter, Manager"
+                  <UnifiedSelector
+                    label="Position"
                     required
+                    type="position"
+                    items={positionItems}
+                    selectedId={formData.position || undefined}
+                    onSelect={(item) => handleInputChange('position', item.id === 0 ? '' : String(item.id))}
+                    placeholder="Select position"
                   />
                 </div>
 
@@ -245,11 +250,7 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
                     label="Salary Package Frequency"
                     required
                     type="frequency"
-                    items={[
-                      { id: 'yearly', name: 'Yearly' },
-                      { id: 'monthly', name: 'Monthly' },
-                      { id: 'weekly', name: 'Weekly' },
-                    ]}
+                    items={salaryFrequencyItems}
                     selectedId={formData.salaryFrequency || undefined}
                     onSelect={(item) => handleInputChange('salaryFrequency', String(item.id))}
                     placeholder="Select frequency"

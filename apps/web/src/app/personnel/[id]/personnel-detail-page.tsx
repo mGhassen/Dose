@@ -318,7 +318,11 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   }
 
   const { data: personnelTypeValues = [] } = useMetadataEnum("PersonnelType");
+  const { data: salaryFrequencyValues = [] } = useMetadataEnum("SalaryFrequency");
+  const { data: positionValues = [] } = useMetadataEnum("PersonnelPosition");
   const personnelTypeItems = personnelTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const salaryFrequencyItems = salaryFrequencyValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const positionItems = positionValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const typeLabels: Record<string, string> = Object.fromEntries(
     personnelTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
   );
@@ -425,8 +429,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                     <Input id="email" type="email" value={formData.email} onChange={(e) => handleInputChange('email', e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="position">Position *</Label>
-                    <Input id="position" value={formData.position} onChange={(e) => handleInputChange('position', e.target.value)} required />
+                    <UnifiedSelector label="Position" required type="position" items={positionItems} selectedId={formData.position || undefined} onSelect={(item) => handleInputChange('position', item.id === 0 ? '' : String(item.id))} placeholder="Select position" />
                   </div>
                   <UnifiedSelector label="Type" required type="type" items={personnelTypeItems} selectedId={formData.type || undefined} onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))} placeholder="Select type" />
                   <div className="space-y-2">
@@ -434,9 +437,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                     <Input id="baseSalary" type="number" step="0.01" value={formData.baseSalary} onChange={(e) => handleInputChange('baseSalary', e.target.value)} required />
                   </div>
                   <div className="space-y-2">
-                    <UnifiedSelector label="Salary Package Frequency" required type="frequency" items={[
-                      { id: 'yearly', name: 'Yearly' }, { id: 'monthly', name: 'Monthly' }, { id: 'weekly', name: 'Weekly' },
-                    ]} selectedId={formData.salaryFrequency || undefined} onSelect={(item) => handleInputChange('salaryFrequency', String(item.id))} placeholder="Select frequency" />
+                    <UnifiedSelector label="Salary Package Frequency" required type="frequency" items={salaryFrequencyItems} selectedId={formData.salaryFrequency || undefined} onSelect={(item) => handleInputChange('salaryFrequency', String(item.id))} placeholder="Select frequency" />
                     <p className="text-xs text-muted-foreground">Select the frequency of the salary package</p>
                   </div>
                   <div className="space-y-2">

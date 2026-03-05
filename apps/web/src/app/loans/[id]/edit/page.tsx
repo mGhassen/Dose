@@ -10,7 +10,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLoanById, useUpdateLoan, useInventorySuppliers } from "@kit/hooks";
+import { useLoanById, useUpdateLoan, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { dateToYYYYMMDD } from "@kit/lib";
 import type { LoanStatus } from "@kit/types";
@@ -28,7 +28,8 @@ export default function EditLoanPage({ params }: EditLoanPageProps) {
   const updateLoan = useUpdateLoan();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
   const suppliers = suppliersResponse?.data || [];
-  
+  const { data: loanStatusValues = [] } = useMetadataEnum("LoanStatus");
+  const statusItems = loanStatusValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [formData, setFormData] = useState({
     name: "",
     loanNumber: "",
@@ -221,11 +222,7 @@ export default function EditLoanPage({ params }: EditLoanPageProps) {
                   label="Status"
                   required
                   type="status"
-                  items={[
-                    { id: 'active', name: 'Active' },
-                    { id: 'paid_off', name: 'Paid Off' },
-                    { id: 'defaulted', name: 'Defaulted' },
-                  ]}
+                  items={statusItems}
                   selectedId={formData.status || undefined}
                   onSelect={(item) => handleInputChange('status', item.id === 0 ? '' : String(item.id))}
                   placeholder="Select status"
