@@ -11,7 +11,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateItem, useInventorySuppliers, useUnits, useMetadataEnum } from "@kit/hooks";
+import { useCreateItem, useInventorySuppliers, useUnits, useMetadataEnum, useVariablesByType } from "@kit/hooks";
 import { toast } from "sonner";
 
 export default function CreateItemPage() {
@@ -20,8 +20,18 @@ export default function CreateItemPage() {
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const { data: unitsData } = useUnits();
   const { data: categoryValues = [] } = useMetadataEnum("ItemCategory");
+  const { data: taxVariables = [] } = useVariablesByType("transaction_tax");
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const defaultTaxItems = [
+    { id: 0, name: "None" },
+    ...taxVariables.map((v) => ({ id: v.id, name: `${v.name} (${v.value}%)`, value: v.value })),
+    { id: -1, name: "Custom" },
+  ];
+  const defaultTaxSelectedId =
+    formData.defaultTaxRatePercent === ""
+      ? 0
+      : taxVariables.find((v) => Math.abs(v.value - parseFloat(formData.defaultTaxRatePercent || "0")) < 0.01)?.id ?? -1;
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -148,17 +158,34 @@ export default function CreateItemPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="defaultTaxRatePercent">Default tax rate %</Label>
-                  <Input
-                    id="defaultTaxRatePercent"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={formData.defaultTaxRatePercent}
-                    onChange={(e) => handleInputChange('defaultTaxRatePercent', e.target.value)}
-                    placeholder="e.g. 10"
+                  <UnifiedSelector
+                    label="Default tax"
+                    type="tax"
+                    items={defaultTaxItems}
+                    selectedId={defaultTaxSelectedId}
+                    onSelect={(item) => {
+                      if (item.id === 0) handleInputChange("defaultTaxRatePercent", "");
+                      else if (typeof item.id === "number" && item.id > 0 && "value" in item && typeof item.value === "number")
+                        handleInputChange("defaultTaxRatePercent", String(item.value));
+                    }}
+                    placeholder="Select tax variable"
+                    manageLink={{ href: "/variables", text: "Variables" }}
                   />
+                  {defaultTaxSelectedId === -1 && (
+                    <>
+                      <Label htmlFor="defaultTaxRatePercent">Custom rate %</Label>
+                      <Input
+                        id="defaultTaxRatePercent"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={formData.defaultTaxRatePercent}
+                        onChange={(e) => handleInputChange("defaultTaxRatePercent", e.target.value)}
+                        placeholder="e.g. 10"
+                      />
+                    </>
+                  )}
                   <p className="text-xs text-muted-foreground">Pre-fills when item is added to a sale or expense line</p>
                 </div>
 

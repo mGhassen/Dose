@@ -38,12 +38,13 @@ import {
   Area,
 } from 'recharts';
 import AppLayout from "@/components/app-layout";
-import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum } from "@kit/hooks";
+import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum, useVariablesByType } from "@kit/hooks";
 import { toast } from "sonner";
-import { dateToYYYYMMDD } from "@kit/lib";
+import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { DatePicker } from "@kit/ui/date-picker";
+import { InputGroupAttached } from "@/components/input-group";
 
 interface ItemDetailPageProps {
   params: Promise<{ id: string }>;
@@ -76,6 +77,8 @@ function PriceCostHistorySection({
   onRefetch,
   formatCurrency,
   formatDate,
+  saleTaxPercent = 0,
+  expenseTaxPercent = 0,
 }: {
   itemId: string;
   sellHistory: PriceHistoryEntry[];
@@ -88,24 +91,31 @@ function PriceCostHistorySection({
   onRefetch: () => void;
   formatCurrency: (n: number) => string;
   formatDate: (d: string) => string;
+  saleTaxPercent?: number;
+  expenseTaxPercent?: number;
 }) {
   const [adding, setAdding] = useState<'sell' | 'cost' | null>(null);
   const [addDate, setAddDate] = useState('');
   const [addValue, setAddValue] = useState('');
+  const [addPriceInclusive, setAddPriceInclusive] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
 
   const handleAdd = async (type: 'sell' | 'cost') => {
     if (!addDate || addValue === '' || Number.isNaN(parseFloat(addValue))) return;
+    const raw = parseFloat(addValue);
+    const taxPct = type === 'sell' ? saleTaxPercent : expenseTaxPercent;
+    const value = addPriceInclusive && taxPct > 0 ? Math.round((raw / (1 + taxPct / 100)) * 100) / 100 : raw;
     try {
       const res = await fetch(`/api/items/${itemId}/price-history`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, effectiveDate: addDate, value: parseFloat(addValue) }),
+        body: JSON.stringify({ type, effectiveDate: addDate, value }),
       });
       if (res.ok) {
         setAdding(null);
         setAddDate('');
         setAddValue('');
+        setAddPriceInclusive(false);
         onRefetch();
         toast.success('Added');
       } else {
@@ -201,12 +211,23 @@ function PriceCostHistorySection({
                     <DatePicker value={addDate ? new Date(addDate) : undefined} onChange={(d) => setAddDate(d ? dateToYYYYMMDD(d) : "")} placeholder="Pick a date" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sell-price" className="text-muted-foreground font-normal">Price</Label>
-                    <Input id="sell-price" type="number" step="0.01" min="0" placeholder="0.00" value={addValue} onChange={(e) => setAddValue(e.target.value)} />
+                    <Label className="text-muted-foreground font-normal">Price</Label>
+                    <InputGroupAttached
+                      addonStyle="default"
+                      input={
+                        <Input id="sell-price" type="number" step="0.01" min="0" placeholder="0.00" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="border-0" />
+                      }
+                      addon={
+                        <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap text-xs text-muted-foreground">
+                          <Checkbox checked={addPriceInclusive} onCheckedChange={(c) => setAddPriceInclusive(c === true)} aria-label="Price includes tax" />
+                          <span>Incl. tax</span>
+                        </label>
+                      }
+                    />
                   </div>
                 </div>
                 <div className="flex justify-end gap-3 pt-1">
-                  <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); }}>Cancel</button>
+                  <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); setAddPriceInclusive(false); }}>Cancel</button>
                   <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => handleAdd('sell')}>Save</Button>
                 </div>
               </div>
@@ -268,12 +289,23 @@ function PriceCostHistorySection({
                     <DatePicker value={addDate ? new Date(addDate) : undefined} onChange={(d) => setAddDate(d ? dateToYYYYMMDD(d) : "")} placeholder="Pick a date" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="cost-value" className="text-muted-foreground font-normal">Cost</Label>
-                    <Input id="cost-value" type="number" step="0.01" min="0" placeholder="0.00" value={addValue} onChange={(e) => setAddValue(e.target.value)} />
+                    <Label className="text-muted-foreground font-normal">Cost</Label>
+                    <InputGroupAttached
+                      addonStyle="default"
+                      input={
+                        <Input id="cost-value" type="number" step="0.01" min="0" placeholder="0.00" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="border-0" />
+                      }
+                      addon={
+                        <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap text-xs text-muted-foreground">
+                          <Checkbox checked={addPriceInclusive} onCheckedChange={(c) => setAddPriceInclusive(c === true)} aria-label="Cost includes tax" />
+                          <span>Incl. tax</span>
+                        </label>
+                      }
+                    />
                   </div>
                 </div>
                 <div className="flex justify-end gap-3 pt-1">
-                  <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); }}>Cancel</button>
+                  <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); setAddPriceInclusive(false); }}>Cancel</button>
                   <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => handleAdd('cost')}>Save</Button>
                 </div>
               </div>
@@ -346,7 +378,19 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const { data: stockMovementsResponse } = useStockMovements({ itemId: resolvedParams?.id || "", limit: 1000 });
   const updateItem = useUpdateItem();
   const deleteMutation = useDeleteItem();
-  
+  const [resolvedTax, setResolvedTax] = useState<{ sale: number; expense: number } | null>(null);
+
+  useEffect(() => {
+    if (!resolvedParams?.id || !item?.id) return;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    Promise.all([
+      taxRulesApi.resolve({ context: 'sale', salesType: 'on_site', itemId: item.id, date: dateStr }),
+      taxRulesApi.resolve({ context: 'expense', itemId: item.id, date: dateStr }),
+    ])
+      .then(([saleRes, expenseRes]) => setResolvedTax({ sale: saleRes.rate, expense: expenseRes.rate }))
+      .catch(() => setResolvedTax(null));
+  }, [resolvedParams?.id, item?.id]);
+
   // Calculate stock level from movements (running balance)
   const calculatedStock = useMemo(() => {
     if (!stockMovementsResponse?.data) return { total: 0, byLocation: new Map() };
@@ -445,8 +489,18 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   });
   const { data: unitsData } = useUnits();
   const { data: categoryValues = [] } = useMetadataEnum("ItemCategory");
+  const { data: taxVariables = [] } = useVariablesByType("transaction_tax");
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const defaultTaxItems = [
+    { id: 0, name: "None" },
+    ...taxVariables.map((v) => ({ id: v.id, name: `${v.name} (${v.value}%)`, value: v.value })),
+    { id: -1, name: "Custom" },
+  ];
+  const defaultTaxSelectedId =
+    formData.defaultTaxRatePercent === ""
+      ? 0
+      : taxVariables.find((v) => Math.abs(v.value - parseFloat(formData.defaultTaxRatePercent || "0")) < 0.01)?.id ?? -1;
 
   const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null } | null>(null);
   const [sellHistory, setSellHistory] = useState<{ id: number; effectiveDate: string; value: number | null }[]>([]);
@@ -707,16 +761,35 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="defaultTaxRatePercent">Default tax rate %</Label>
-                    <Input
-                      id="defaultTaxRatePercent"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={formData.defaultTaxRatePercent}
-                      onChange={(e) => handleInputChange('defaultTaxRatePercent', e.target.value)}
+                    <UnifiedSelector
+                      label="Default tax"
+                      type="tax"
+                      items={defaultTaxItems}
+                      selectedId={defaultTaxSelectedId}
+                      onSelect={(item) => {
+                        if (item.id === 0) handleInputChange("defaultTaxRatePercent", "");
+                        else if (typeof item.id === "number" && item.id > 0 && "value" in item && typeof item.value === "number")
+                          handleInputChange("defaultTaxRatePercent", String(item.value));
+                      }}
+                      placeholder="Select tax variable"
+                      manageLink={{ href: "/variables", text: "Variables" }}
                     />
+                    {defaultTaxSelectedId === -1 && (
+                      <>
+                        <Label htmlFor="defaultTaxRatePercent">Custom rate %</Label>
+                        <Input
+                          id="defaultTaxRatePercent"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={formData.defaultTaxRatePercent}
+                          onChange={(e) => handleInputChange("defaultTaxRatePercent", e.target.value)}
+                          placeholder="e.g. 10"
+                        />
+                      </>
+                    )}
+                    <p className="text-xs text-muted-foreground">Pre-fills when item is added to a sale or expense line</p>
                   </div>
 
                   {/* Vendor */}
@@ -1063,6 +1136,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                           onRefetch={() => fetchPriceHistory(resolvedParams.id)}
                           formatCurrency={formatCurrency}
                           formatDate={formatDate}
+                          saleTaxPercent={resolvedTax?.sale ?? 0}
+                          expenseTaxPercent={resolvedTax?.expense ?? 0}
                         />
                       )}
                     </CardContent>
@@ -1122,6 +1197,17 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     </>
                   )}
 
+                  {/* Default tax rate */}
+                  <>
+                    <Separator />
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Default tax rate</label>
+                      <p className="text-sm mt-1">
+                        {item.defaultTaxRatePercent != null ? `${item.defaultTaxRatePercent}%` : '—'}
+                      </p>
+                    </div>
+                  </>
+
                   {/* Vendor */}
                   {supplierName && (
                     <>
@@ -1171,10 +1257,20 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Selling price (today)</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-semibold tabular-nums">
-                      {(resolvedPrice?.unitPrice ?? item.unitPrice) != null ? formatCurrency((resolvedPrice?.unitPrice ?? item.unitPrice)!) : '—'}
-                    </p>
+                  <CardContent className="space-y-1">
+                    {(() => {
+                      const excl = (resolvedPrice?.unitPrice ?? item.unitPrice) != null ? (resolvedPrice?.unitPrice ?? item.unitPrice)! : null;
+                      const rate = resolvedTax?.sale ?? 0;
+                      const incl = excl != null && rate > 0 ? Math.round(excl * (1 + rate / 100) * 100) / 100 : excl;
+                      return excl != null ? (
+                        <>
+                          <p className="text-xl font-semibold tabular-nums">{formatCurrency(excl)} <span className="text-xs font-normal text-muted-foreground">(excl. tax)</span></p>
+                          {rate > 0 && incl != null && <p className="text-sm tabular-nums text-muted-foreground">{formatCurrency(incl)} (incl. {rate}% tax)</p>}
+                        </>
+                      ) : (
+                        <p className="text-2xl font-semibold tabular-nums">—</p>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
                 <Card>
@@ -1183,13 +1279,41 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       Buying price (today)
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-semibold tabular-nums">
-                      {(resolvedPrice?.unitCost ?? item.unitCost) != null ? formatCurrency((resolvedPrice?.unitCost ?? item.unitCost)!) : '—'}
-                    </p>
+                  <CardContent className="space-y-1">
+                    {(() => {
+                      const excl = (resolvedPrice?.unitCost ?? item.unitCost) != null ? (resolvedPrice?.unitCost ?? item.unitCost)! : null;
+                      const rate = resolvedTax?.expense ?? 0;
+                      const incl = excl != null && rate > 0 ? Math.round(excl * (1 + rate / 100) * 100) / 100 : excl;
+                      return excl != null ? (
+                        <>
+                          <p className="text-xl font-semibold tabular-nums">{formatCurrency(excl)} <span className="text-xs font-normal text-muted-foreground">(excl. tax)</span></p>
+                          {rate > 0 && incl != null && <p className="text-sm tabular-nums text-muted-foreground">{formatCurrency(incl)} (incl. {rate}% tax)</p>}
+                        </>
+                      ) : (
+                        <p className="text-2xl font-semibold tabular-nums">—</p>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               </div>
+
+              {resolvedTax && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Applicable tax (from rules)</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Sales (on-site)</span>
+                      <span className="tabular-nums font-medium">{resolvedTax.sale}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Expense</span>
+                      <span className="tabular-nums font-medium">{resolvedTax.expense}%</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Description & Notes */}
               {(item.description || item.notes) && (

@@ -104,6 +104,117 @@ export async function getTaxRateForSaleLine(
   return getItemDefaultTaxRate(supabase, itemId);
 }
 
+export interface TaxRateAndRule {
+  rate: number;
+  variableName?: string;
+  conditionType?: string | null;
+  conditionValue?: string | null;
+  taxInclusive?: boolean;
+}
+
+export async function getTaxRateAndRuleForSaleLine(
+  supabase: SupabaseClient | any,
+  itemId: number | null,
+  itemCategory: string | null,
+  salesType: string,
+  dateStr: string
+): Promise<TaxRateAndRule> {
+  const { data: rules } = await supabase
+    .from('tax_rules')
+    .select(
+      'id, variable_id, condition_type, condition_value, condition_values, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date'
+    )
+    .eq('condition_type', 'sales_type')
+    .order('priority', { ascending: true });
+
+  if (!rules?.length) {
+    const rate = await getItemDefaultTaxRate(supabase, itemId);
+    return { rate };
+  }
+
+  const matching = (rules as (TaxRuleRow & { effective_date?: string; end_date?: string })[]).filter((r) =>
+    conditionMatchesSalesType(r, salesType)
+  );
+  if (!matching.length) {
+    const rate = await getItemDefaultTaxRate(supabase, itemId);
+    return { rate };
+  }
+
+  const variableIds = [...new Set(matching.map((r) => r.variable_id))];
+  const { data: variables } = await supabase
+    .from('variables')
+    .select('id, name, value, payload, is_active, effective_date, end_date')
+    .in('id', variableIds);
+  const varMap = new Map((variables || []).map((v: any) => [v.id, v]));
+
+  const date = dateStr.slice(0, 10);
+  for (const r of matching) {
+    if (!ruleValidAt(r, date)) continue;
+    const variable = varMap.get(r.variable_id);
+    const v = variable as { name?: string; payload?: { calculationType?: string } | null; is_active?: boolean; value?: unknown; effective_date?: string | null; end_date?: string | null };
+    if (!v?.is_active || !ruleValidAt(v, date)) continue;
+    if (!scopeMatches(r.scope_type, r.scope_item_ids, r.scope_categories, itemId, itemCategory)) continue;
+    const taxInclusive = v.payload?.calculationType === 'inclusive';
+    return {
+      rate: parseFloat(String(v.value)),
+      variableName: v.name,
+      conditionType: r.condition_type,
+      conditionValue: salesType,
+      taxInclusive,
+    };
+  }
+
+  const rate = await getItemDefaultTaxRate(supabase, itemId);
+  return { rate };
+}
+
+export async function getTaxRateAndRuleForExpenseLine(
+  supabase: SupabaseClient | any,
+  itemId: number | null,
+  itemCategory: string | null,
+  dateStr: string
+): Promise<TaxRateAndRule> {
+  const { data: rules } = await supabase
+    .from('tax_rules')
+    .select(
+      'id, variable_id, condition_type, condition_value, condition_values, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date'
+    )
+    .eq('condition_type', 'expense')
+    .order('priority', { ascending: true });
+
+  if (!rules?.length) {
+    const rate = await getItemDefaultTaxRate(supabase, itemId);
+    return { rate };
+  }
+
+  const variableIds = [...new Set((rules as { variable_id: number }[]).map((r) => r.variable_id))];
+  const { data: variables } = await supabase
+    .from('variables')
+    .select('id, name, value, payload, is_active, effective_date, end_date')
+    .in('id', variableIds);
+  const varMap = new Map((variables || []).map((v: any) => [v.id, v]));
+
+  const date = dateStr.slice(0, 10);
+  for (const r of rules as (TaxRuleRow & { effective_date?: string; end_date?: string })[]) {
+    if (!ruleValidAt(r, date)) continue;
+    const variable = varMap.get(r.variable_id);
+    const v = variable as { name?: string; payload?: { calculationType?: string } | null; is_active?: boolean; value?: unknown; effective_date?: string | null; end_date?: string | null };
+    if (!v?.is_active || !ruleValidAt(v, date)) continue;
+    if (!scopeMatches(r.scope_type, r.scope_item_ids, r.scope_categories, itemId, itemCategory)) continue;
+    const taxInclusive = v.payload?.calculationType === 'inclusive';
+    return {
+      rate: parseFloat(String(v.value)),
+      variableName: v.name,
+      conditionType: r.condition_type,
+      conditionValue: 'expense',
+      taxInclusive,
+    };
+  }
+
+  const rate = await getItemDefaultTaxRate(supabase, itemId);
+  return { rate };
+}
+
 export async function getTaxRateForExpenseLine(
   supabase: SupabaseClient | any,
   itemId: number | null,

@@ -31,17 +31,21 @@ function transformSale(row: any): Sale {
 }
 
 function transformLineItem(row: any): SaleLineItem {
+  const quantity = parseFloat(row.quantity) || 0;
+  const lineTotal = row.line_total != null ? parseFloat(row.line_total) : 0;
+  const rawUnitPrice = row.unit_price != null ? parseFloat(row.unit_price) : NaN;
+  const unitPrice = Number.isFinite(rawUnitPrice) ? rawUnitPrice : (quantity > 0 ? lineTotal / quantity : 0);
   return {
     id: row.id,
     saleId: row.sale_id,
     itemId: row.item_id ?? undefined,
-    quantity: parseFloat(row.quantity),
+    quantity,
     unitId: row.unit_id ?? undefined,
-    unitPrice: parseFloat(row.unit_price),
+    unitPrice,
     unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
     taxRatePercent: row.tax_rate_percent != null ? parseFloat(row.tax_rate_percent) : undefined,
     taxAmount: row.tax_amount != null ? parseFloat(row.tax_amount) : undefined,
-    lineTotal: parseFloat(row.line_total),
+    lineTotal,
     sortOrder: row.sort_order ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

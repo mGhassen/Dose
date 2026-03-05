@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@kit/ui/button";
 import {
   DropdownMenu,
@@ -14,7 +14,6 @@ import { DatePicker } from "@kit/ui/date-picker";
 import { TimePicker } from "@kit/ui/time-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
-import { Checkbox } from "@kit/ui/checkbox";
 import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
@@ -113,7 +112,59 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
     taxRulesApi.resolve({ context: 'sale', salesType: formData.type, date: formData.date }).then((r) => setDefaultTaxRate(r.rate)).catch(() => setDefaultTaxRate(0));
   }, [formData.type, formData.date]);
 
-  const [lineItems, setLineItems] = useState<Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string; taxInclusive: boolean }>>([]);
+  type LineItem = {
+    itemId: string;
+    quantity: string;
+    unitId: number | null;
+    unitPrice: string;
+    unitCost: string;
+    taxRatePercent: string;
+    taxInclusive: boolean;
+    taxVariableName?: string;
+    taxConditionType?: string;
+    taxConditionValue?: string;
+  };
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const lineItemsRef = useRef(lineItems);
+  lineItemsRef.current = lineItems;
+
+  useEffect(() => {
+    if (!formData.type || !formData.date) return;
+    const current = lineItemsRef.current;
+    const indicesWithItems = current.map((l, i) => (l.itemId ? i : -1)).filter((i) => i >= 0);
+    if (indicesWithItems.length === 0) return;
+    Promise.all(
+      indicesWithItems.map((index) =>
+        taxRulesApi
+          .resolve({
+            context: 'sale',
+            salesType: formData.type!,
+            itemId: parseInt(current[index].itemId!, 10),
+            date: formData.date!,
+          })
+          .then((r) => ({ index, r }))
+      )
+    )
+      .then((results) => {
+        setLineItems((prev) => {
+          const next = [...prev];
+          for (const { index, r } of results) {
+            if (next[index]?.itemId) {
+              next[index] = {
+                ...next[index],
+                taxRatePercent: r.rate.toString(),
+                taxVariableName: r.variableName,
+                taxConditionType: r.conditionType ?? undefined,
+                taxConditionValue: r.conditionValue ?? undefined,
+                taxInclusive: r.taxInclusive ?? false,
+              };
+            }
+          }
+          return next;
+        });
+      })
+      .catch(() => {});
+  }, [formData.type, formData.date]);
 
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
     let sub = 0;
@@ -122,7 +173,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, line.taxInclusive);
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, line.taxInclusive ?? false);
       sub += lineTotalNet;
       tax += taxAmount;
     }
@@ -149,6 +200,10 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
   const addLine = () => {
     setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
   };
+  const salesTypeLabelMap = useMemo(
+    () => Object.fromEntries(salesTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [salesTypeValues]
+  );
   const removeLine = (index: number) => {
     if (lineItems.length <= 1) return;
     setLineItems((prev) => prev.filter((_, i) => i !== index));
@@ -171,6 +226,10 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
         line.unitId = null;
         line.unitPrice = "";
         line.taxRatePercent = "";
+        line.taxInclusive = false;
+        line.taxVariableName = undefined;
+        line.taxConditionType = undefined;
+        line.taxConditionValue = undefined;
       } else {
         const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; unit_price?: number; unitPrice?: number; defaultTaxRatePercent?: number } | undefined;
         line.quantity = "1";
@@ -183,12 +242,24 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
       return next;
     });
     if (itemId && formData.type && formData.date) {
-      taxRulesApi.resolve({ context: 'sale', salesType: formData.type, itemId: parseInt(itemId, 10), date: formData.date })
-        .then((r) => setLineItems((prev) => {
-          const next = [...prev];
-          if (next[index]?.itemId === itemId) next[index] = { ...next[index], taxRatePercent: r.rate.toString() };
-          return next;
-        }))
+      taxRulesApi
+        .resolve({ context: 'sale', salesType: formData.type, itemId: parseInt(itemId, 10), date: formData.date })
+        .then((r) =>
+          setLineItems((prev) => {
+            const next = [...prev];
+            if (next[index]?.itemId === itemId) {
+              next[index] = {
+                ...next[index],
+                taxRatePercent: r.rate.toString(),
+                taxVariableName: r.variableName,
+                taxConditionType: r.conditionType ?? undefined,
+                taxConditionValue: r.conditionValue ?? undefined,
+                taxInclusive: r.taxInclusive ?? false,
+              };
+            }
+            return next;
+          })
+        )
         .catch(() => {});
     }
   };
@@ -208,18 +279,24 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
       });
       if (sale.lineItems?.length) {
         setLineItems(
-          sale.lineItems.map((l) => ({
-            itemId: l.itemId?.toString() ?? "",
-            quantity: String(l.quantity),
-            unitId: l.unitId ?? null,
-            unitPrice: String(l.unitPrice),
-            unitCost: l.unitCost != null ? String(l.unitCost) : "",
-            taxRatePercent: l.taxRatePercent != null ? String(l.taxRatePercent) : "",
-            taxInclusive: (l as { taxInclusive?: boolean }).taxInclusive ?? false,
-          }))
+          sale.lineItems.map((l) => {
+            const up = l.unitPrice;
+            const unitPriceStr = up != null && Number.isFinite(up) ? String(up) : (l.quantity && l.lineTotal != null ? String(Math.round((l.lineTotal / l.quantity) * 100) / 100) : "");
+            return {
+              itemId: l.itemId?.toString() ?? "",
+              quantity: String(l.quantity),
+              unitId: l.unitId ?? null,
+              unitPrice: unitPriceStr,
+              unitCost: l.unitCost != null ? String(l.unitCost) : "",
+              taxRatePercent: l.taxRatePercent != null ? String(l.taxRatePercent) : "",
+              taxInclusive: (l as { taxInclusive?: boolean }).taxInclusive ?? false,
+            };
+          })
         );
       } else {
-        setLineItems([{ itemId: sale.itemId?.toString() ?? "", quantity: String(sale.quantity ?? 1), unitId: sale.unitId ?? null, unitPrice: String(sale.unitPrice ?? sale.amount), unitCost: sale.unitCost != null ? String(sale.unitCost) : "", taxRatePercent: "", taxInclusive: false }]);
+        const fallbackPrice = sale.unitPrice ?? sale.amount;
+        const unitPriceStr = fallbackPrice != null && Number.isFinite(fallbackPrice) ? String(fallbackPrice) : "";
+        setLineItems([{ itemId: sale.itemId?.toString() ?? "", quantity: String(sale.quantity ?? 1), unitId: sale.unitId ?? null, unitPrice: unitPriceStr, unitCost: sale.unitCost != null ? String(sale.unitCost) : "", taxRatePercent: "", taxInclusive: false }]);
       }
     }
   }, [sale]);
@@ -419,7 +496,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                             }
                           />
                         </div>
-                        <div className="col-span-2">
+                        <div className="col-span-4 space-y-1">
                           <Label className="text-xs text-muted-foreground">{line.taxInclusive ? "Price (incl. tax)" : "Price (excl. tax)"}</Label>
                           <Input
                             type="number"
@@ -429,33 +506,12 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                             value={line.unitPrice}
                             onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
                           />
-                        </div>
-                        <div className="col-span-2">
-                          <InputGroupAttached
-                            label="Tax % / Incl. tax"
-                            addonStyle="default"
-                            input={
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className="text-sm tabular-nums"
-                                value={line.taxRatePercent !== "" ? line.taxRatePercent : (formData.type ? String(defaultTaxRate) : "")}
-                                onChange={(e) => updateLine(index, "taxRatePercent", e.target.value)}
-                                placeholder={formData.type ? String(defaultTaxRate) : "—"}
-                              />
-                            }
-                            addon={
-                              <div className="flex h-full min-h-10 items-center justify-center leading-none" title="Price includes tax">
-                                <Checkbox
-                                  id={`tax-incl-${index}`}
-                                  checked={line.taxInclusive}
-                                  onCheckedChange={(checked) => updateLine(index, "taxInclusive", checked === true)}
-                                  aria-label="Price includes tax"
-                                />
-                              </div>
-                            }
-                          />
+                          {line.unitPrice && (() => {
+                            const p = parseFloat(line.unitPrice) || 0;
+                            const rate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
+                            const incl = line.taxInclusive ? p : Math.round(p * (1 + rate / 100) * 100) / 100;
+                            return <p className="text-xs text-muted-foreground tabular-nums">Incl. tax: {formatCurrency(incl)}</p>;
+                          })()}
                         </div>
                         <div className="col-span-1 flex h-10 items-center">
                           <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>

@@ -1,6 +1,14 @@
 import { apiRequest } from './api';
 import type { TaxRule, CreateTaxRuleData, UpdateTaxRuleData } from '@kit/types';
 
+export interface TaxResolveResponse {
+  rate: number;
+  variableName?: string;
+  conditionType?: string | null;
+  conditionValue?: string | null;
+  taxInclusive?: boolean;
+}
+
 export const taxRulesApi = {
   getAll: (params?: { variableId?: number }) => {
     const search = params?.variableId != null ? `?variableId=${params.variableId}` : '';
@@ -17,6 +25,6 @@ export const taxRulesApi = {
     if (params.salesType) searchParams.set('salesType', params.salesType);
     if (params.itemId != null) searchParams.set('itemId', String(params.itemId));
     if (params.itemCategory) searchParams.set('itemCategory', params.itemCategory);
-    return apiRequest<{ rate: number }>('GET', `/api/tax-rules/resolve?${searchParams.toString()}`);
+    return apiRequest<TaxResolveResponse>('GET', `/api/tax-rules/resolve?${searchParams.toString()}`);
   },
 };
