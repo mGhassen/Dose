@@ -238,7 +238,7 @@ export async function GET(request: NextRequest) {
         .select('*')
         .eq('type', 'tax')
         .eq('is_active', true)
-        .lte('effective_date', endDate)
+        .or(`effective_date.is.null,effective_date.lte.${endDate}`)
         .or(`end_date.is.null,end_date.gte.${startDate}`),
       
       // Investments (for depreciation names)

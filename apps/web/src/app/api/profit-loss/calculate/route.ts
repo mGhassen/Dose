@@ -105,10 +105,11 @@ function transformVariable(row: any): Variable {
     type: row.type,
     value: parseFloat(row.value),
     unit: row.unit,
-    effectiveDate: row.effective_date,
-    endDate: row.end_date,
+    effectiveDate: row.effective_date ?? undefined,
+    endDate: row.end_date ?? undefined,
     description: row.description,
     isActive: row.is_active,
+    payload: row.payload,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
       supabase.from('leasing_payments').select('*').eq('is_active', true),
       supabase.from('depreciation_entries').select('*').eq('month', month),
       supabase.from('loan_schedules').select('*').gte('payment_date', startDate).lte('payment_date', endDate),
-      supabase.from('variables').select('*').eq('type', 'tax').eq('is_active', true).lte('effective_date', endDate).or(`end_date.is.null,end_date.gte.${startDate}`),
+      supabase.from('variables').select('*').eq('type', 'tax').eq('is_active', true).or(`effective_date.is.null,effective_date.lte.${endDate}`).or(`end_date.is.null,end_date.gte.${startDate}`),
       supabase.from('actual_payments').select('*').eq('month', month),
     ]);
 
@@ -169,9 +170,13 @@ export async function POST(request: NextRequest) {
     const loanPayments: LoanScheduleEntry[] = (loansResult.data || []).map(transformLoanSchedule);
     const taxVariables: Variable[] = (variablesResult.data || []).map(transformVariable);
 
-    // Get tax rate (use the most recent active tax variable)
-    const taxRate = taxVariables.length > 0 
-      ? taxVariables.sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0].value
+    // Get tax rate (use the most recent active tax variable; null effectiveDate = always valid, sort first)
+    const taxRate = taxVariables.length > 0
+      ? taxVariables.sort((a, b) => {
+          if (!a.effectiveDate) return -1;
+          if (!b.effectiveDate) return 1;
+          return new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime();
+        })[0].value
       : 0;
 
     // Get expenses for the month (one-time expenses only, subscriptions are handled separately)

@@ -14,8 +14,8 @@ export async function GET(
     const { id } = await params;
     const supabase = createServerSupabaseClient();
 
-    const { data: unitsRows } = await supabase.from('units').select('id, factor_to_base');
-    const factorMap = buildFactorMap((unitsRows || []).map((u: any) => ({ id: u.id, factorToBase: parseFloat(u.factor_to_base ?? 1) })));
+    const { data: unitVariables } = await supabase.from('variables').select('id, value').eq('type', 'unit');
+    const factorMap = buildFactorMap((unitVariables || []).map((u: any) => ({ id: u.id, factorToBase: parseFloat(u.value ?? 1) })));
     const getFactor = (unitId: number) => factorMap.get(unitId);
     
     // Get recipe with items from recipes table

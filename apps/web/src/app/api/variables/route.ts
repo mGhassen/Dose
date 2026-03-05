@@ -6,33 +6,49 @@ import type { Variable, CreateVariableData, PaginatedResponse } from '@kit/types
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createVariableSchema } from '@/shared/zod-schemas';
 
-function transformVariable(row: any): Variable {
+function transformVariable(row: any, unitLabel?: string | null): Variable {
   return {
     id: row.id,
     name: row.name,
     type: row.type,
     value: parseFloat(row.value),
-    unit: row.unit,
-    effectiveDate: row.effective_date,
-    endDate: row.end_date,
+    unitId: row.unit_id ?? undefined,
+    unit: unitLabel ?? row.unit ?? undefined,
+    effectiveDate: row.effective_date ?? undefined,
+    endDate: row.end_date ?? undefined,
     description: row.description,
     isActive: row.is_active,
+    payload: row.payload ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
+async function resolveUnitLabels(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>, rows: any[]): Promise<Map<number, string>> {
+  const unitIds = [...new Set((rows || []).map((r) => r.unit_id).filter(Boolean))] as number[];
+  if (unitIds.length === 0) return new Map();
+  const { data } = await supabase.from('variables').select('id, name, payload').in('id', unitIds);
+  const map = new Map<number, string>();
+  for (const u of data || []) {
+    const payload = u.payload as { symbol?: string } | null;
+    map.set(u.id, payload?.symbol ?? u.name ?? String(u.id));
+  }
+  return map;
+}
+
 function transformToSnakeCase(data: CreateVariableData): any {
-  return {
+  const out: any = {
     name: data.name,
     type: data.type,
     value: data.value,
-    unit: data.unit,
-    effective_date: data.effectiveDate,
-    end_date: data.endDate,
+    unit_id: data.unitId ?? null,
+    effective_date: data.effectiveDate ?? null,
+    end_date: data.endDate ?? null,
     description: data.description,
     is_active: data.isActive ?? true,
   };
+  if (data.payload !== undefined) out.payload = data.payload;
+  return out;
 }
 
 export async function GET(request: NextRequest) {
@@ -71,7 +87,10 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
     if (countError) throw countError;
 
-    const variables: Variable[] = (data || []).map(transformVariable);
+    const unitLabels = await resolveUnitLabels(supabase, data || []);
+    const variables: Variable[] = (data || []).map((row) =>
+      transformVariable(row, row.unit_id ? unitLabels.get(row.unit_id) : null)
+    );
     const total = count || 0;
     
     const response: PaginatedResponse<Variable> = createPaginatedResponse(
@@ -106,7 +125,9 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json(transformVariable(data), { status: 201 });
+    const unitLabels = data.unit_id ? await resolveUnitLabels(supabase, [data]) : new Map();
+    const unitLabel = data.unit_id ? unitLabels.get(data.unit_id) : null;
+    return NextResponse.json(transformVariable(data, unitLabel), { status: 201 });
   } catch (error: any) {
     console.error('Error creating variable:', error);
     return NextResponse.json(

@@ -57,6 +57,7 @@ export enum VariableType {
   TRANSACTION_TAX = 'transaction_tax',
   INFLATION = 'inflation',
   EXCHANGE_RATE = 'exchange_rate',
+  UNIT = 'unit',
   OTHER = 'other'
 }
 
@@ -364,16 +365,24 @@ export interface UpdateLoanData extends Partial<CreateLoanData> {}
 // VARIABLES (Variables de coût, taxes, inflation)
 // ============================================================================
 
+export interface VariablePayloadUnit {
+  symbol?: string;
+  dimension?: string;
+  base_unit_id?: number | null;
+}
+
 export interface Variable {
   id: number;
   name: string;
   type: VariableType;
   value: number;
-  unit?: string; // percentage, amount, etc.
-  effectiveDate: string;
-  endDate?: string;
+  unitId?: number | null;
+  unit?: string;
+  effectiveDate?: string | null;
+  endDate?: string | null;
   description?: string;
   isActive: boolean;
+  payload?: Record<string, unknown> | VariablePayloadUnit;
   createdAt: string;
   updatedAt: string;
 }
@@ -382,11 +391,13 @@ export interface CreateVariableData {
   name: string;
   type: VariableType;
   value: number;
+  unitId?: number | null;
   unit?: string;
-  effectiveDate: string;
-  endDate?: string;
+  effectiveDate?: string | null;
+  endDate?: string | null;
   description?: string;
   isActive?: boolean;
+  payload?: Record<string, unknown> | VariablePayloadUnit;
 }
 
 export interface UpdateVariableData extends Partial<CreateVariableData> {}

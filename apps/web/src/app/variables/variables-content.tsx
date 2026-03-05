@@ -10,7 +10,11 @@ import { Badge } from "@kit/ui/badge";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 
-export default function VariablesContent() {
+interface VariablesContentProps {
+  selectedVariableId?: number;
+}
+
+export default function VariablesContent({ selectedVariableId }: VariablesContentProps) {
   const router = useRouter();
   const { data: variables, isLoading } = useVariables();
   const deleteMutation = useDeleteVariable();
@@ -34,6 +38,7 @@ export default function VariablesContent() {
           transaction_tax: "Transaction tax",
           inflation: "Inflation",
           exchange_rate: "Exchange Rate",
+          unit: "Unit",
           other: "Other",
         };
         return (
@@ -59,7 +64,8 @@ export default function VariablesContent() {
     {
       accessorKey: "effectiveDate",
       header: "Effective Date",
-      cell: ({ row }) => formatDate(row.original.effectiveDate),
+      cell: ({ row }) =>
+        row.original.effectiveDate ? formatDate(row.original.effectiveDate) : <span className="text-muted-foreground">—</span>,
     },
     {
       accessorKey: "endDate",
@@ -112,7 +118,7 @@ export default function VariablesContent() {
         v.type,
         v.value,
         v.unit || '',
-        v.effectiveDate,
+        v.effectiveDate ?? '',
         v.endDate || '',
         v.description || '',
       ].join(','))
@@ -132,7 +138,7 @@ export default function VariablesContent() {
         v.type,
         v.value,
         v.unit || '',
-        v.effectiveDate,
+        v.effectiveDate ?? '',
         v.endDate || '',
         v.description || '',
       ].join(','))
@@ -156,7 +162,10 @@ export default function VariablesContent() {
       data={variables ?? []}
       columns={columns}
       loading={isLoading}
-      onRowClick={(variable) => router.push(`/variables/${variable.id}`)}
+      activeRowId={selectedVariableId}
+      onRowClick={(variable) => {
+        if (variable.id !== selectedVariableId) router.push(`/variables/${variable.id}`);
+      }}
       onDelete={handleDelete}
       onBulkDelete={handleBulkDelete}
       onBulkCopy={handleBulkCopy}

@@ -377,18 +377,31 @@ const variableTypeEnum = z.enum([
   "transaction_tax",
   "inflation",
   "exchange_rate",
+  "unit",
   "other",
 ]);
-export const createVariableSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  type: variableTypeEnum,
-  value: z.number(),
-  unit: z.string().optional(),
-  effectiveDate: z.string().min(1, "Effective date is required"),
-  endDate: z.string().optional(),
-  description: z.string().optional(),
-  isActive: z.boolean().optional(),
-});
+const variablePayloadSchema = z.record(z.string(), z.unknown()).optional();
+export const createVariableSchema = z
+  .object({
+    name: z.string().min(1, "Name is required"),
+    type: variableTypeEnum,
+    value: z.number(),
+    unitId: z.number().int().positive().nullable().optional(),
+    unit: z.string().optional(),
+    effectiveDate: z.string().nullable().optional(),
+    endDate: z.string().nullable().optional(),
+    description: z.string().optional(),
+    isActive: z.boolean().optional(),
+    payload: variablePayloadSchema,
+  })
+  .superRefine((data, ctx) => {
+    if (data.type === "unit") {
+      const payload = data.payload as Record<string, unknown> | undefined;
+      if (!payload?.symbol || typeof payload.symbol !== "string" || !payload.symbol.trim()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Unit type requires payload.symbol", path: ["payload"] });
+      }
+    }
+  });
 export type CreateVariableInput = z.infer<typeof createVariableSchema>;
 
 export const updateVariableSchema = createVariableSchema.partial();

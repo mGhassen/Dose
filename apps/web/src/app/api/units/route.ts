@@ -13,27 +13,18 @@ export interface Unit {
   updatedAt: string;
 }
 
-function transformUnit(row: any): Unit {
+function variableRowToUnit(row: any): Unit {
+  const payload = row.payload || {};
   return {
     id: row.id,
     name: row.name,
-    symbol: row.symbol,
-    dimension: row.dimension || 'other',
-    baseUnitId: row.base_unit_id,
-    factorToBase: parseFloat(row.factor_to_base ?? 1),
+    symbol: (payload.symbol as string) ?? '',
+    dimension: (payload.dimension as string) ?? 'other',
+    baseUnitId: (payload.base_unit_id as number) ?? null,
+    factorToBase: parseFloat(row.value ?? 1),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
-}
-
-function toSnakeCase(data: Partial<Unit>): any {
-  const result: any = { updated_at: new Date().toISOString() };
-  if (data.name !== undefined) result.name = data.name;
-  if (data.symbol !== undefined) result.symbol = data.symbol;
-  if (data.dimension !== undefined) result.dimension = data.dimension;
-  if (data.baseUnitId !== undefined) result.base_unit_id = data.baseUnitId;
-  if (data.factorToBase !== undefined) result.factor_to_base = data.factorToBase;
-  return result;
 }
 
 export async function GET(request: NextRequest) {
@@ -42,11 +33,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const dimension = searchParams.get('dimension');
 
-    let query = supabase.from('units').select('*').order('dimension', { ascending: true }).order('symbol', { ascending: true });
-    if (dimension) query = query.eq('dimension', dimension);
+    let query = supabase
+      .from('variables')
+      .select('*')
+      .eq('type', 'unit')
+      .order('payload->>dimension', { ascending: true })
+      .order('payload->>symbol', { ascending: true });
+    if (dimension) query = query.eq('payload->>dimension', dimension);
     const { data, error } = await query;
     if (error) throw error;
-    return NextResponse.json((data || []).map(transformUnit));
+    return NextResponse.json((data || []).map(variableRowToUnit));
   } catch (error: any) {
     console.error('Error fetching units:', error);
     return NextResponse.json({ error: 'Failed to fetch units', details: error.message }, { status: 500 });
@@ -58,21 +54,33 @@ export async function POST(request: NextRequest) {
     const parsed = await parseRequestBody(request, createUnitSchema);
     if (!parsed.success) return parsed.response;
     const body = parsed.data;
-    const supabase = createServerSupabaseClient();
-    const insert = {
-      name: body.name.trim(),
+    const payload = {
       symbol: body.symbol.trim(),
       dimension: body.dimension?.trim() ?? 'other',
       base_unit_id: body.baseUnitId ?? null,
-      factor_to_base: body.factorToBase ?? 1,
-      updated_at: new Date().toISOString(),
     };
-    const { data, error } = await supabase.from('units').insert(insert).select().single();
-    if (error) {
-      if (error.code === '23505') return NextResponse.json({ error: 'Unit with this symbol already exists' }, { status: 409 });
-      throw error;
-    }
-    return NextResponse.json(transformUnit(data));
+    const insert = {
+      name: body.name.trim(),
+      type: 'unit',
+      value: body.factorToBase ?? 1,
+      unit: null,
+      effective_date: null,
+      end_date: null,
+      description: null,
+      is_active: true,
+      payload,
+    };
+    const supabase = createServerSupabaseClient();
+    const { data: existing } = await supabase
+      .from('variables')
+      .select('id')
+      .eq('type', 'unit')
+      .eq('payload->>symbol', body.symbol.trim())
+      .maybeSingle();
+    if (existing) return NextResponse.json({ error: 'Unit with this symbol already exists' }, { status: 409 });
+    const { data, error } = await supabase.from('variables').insert(insert).select().single();
+    if (error) throw error;
+    return NextResponse.json(variableRowToUnit(data), { status: 201 });
   } catch (error: any) {
     console.error('Error creating unit:', error);
     return NextResponse.json({ error: 'Failed to create unit', details: error.message }, { status: 500 });

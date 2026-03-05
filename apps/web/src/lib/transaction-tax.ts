@@ -10,10 +10,14 @@ export function getEffectiveTransactionTaxRate(
   const valid = variables.filter(
     (v) =>
       v.name === code &&
-      new Date(v.effectiveDate) <= date &&
+      (v.effectiveDate == null || v.effectiveDate === '' || new Date(v.effectiveDate) <= date) &&
       (v.endDate == null || v.endDate === '' || new Date(v.endDate) >= date)
   );
-  valid.sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime());
+  valid.sort((a, b) => {
+    if (!a.effectiveDate) return -1;
+    if (!b.effectiveDate) return 1;
+    return new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime();
+  });
   return valid[0]?.value ?? 0;
 }
 
