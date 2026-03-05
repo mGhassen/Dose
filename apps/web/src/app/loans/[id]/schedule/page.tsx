@@ -51,7 +51,6 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
 
   const handleGenerateSchedule = async () => {
     if (!resolvedParams?.id) return;
-
     try {
       await generateSchedule.mutateAsync(resolvedParams.id);
       toast.success("Loan schedule generated successfully");
@@ -118,6 +117,8 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
   const totalPayments = schedule?.reduce((sum, entry) => sum + entry.totalPayment, 0) || 0;
   const paidCount = schedule?.filter(e => e.isPaid).length || 0;
   const pendingCount = schedule?.filter(e => !e.isPaid).length || 0;
+  const lastPaidEntry = schedule?.filter(e => e.isPaid).pop();
+  const summaryRemainingBalance = lastPaidEntry ? lastPaidEntry.remainingBalance : loan.principalAmount;
 
   return (
     <AppLayout>
@@ -197,7 +198,7 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Remaining Balance</label>
                   <p className="text-base font-semibold mt-1">
-                    {schedule.length > 0 ? formatCurrency(schedule[schedule.length - 1].remainingBalance) : formatCurrency(loan.principalAmount)}
+                    {formatCurrency(summaryRemainingBalance)}
                   </p>
                 </div>
               </div>
