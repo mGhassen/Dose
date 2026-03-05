@@ -30,10 +30,7 @@ export async function GET(
       .single();
 
     if (enumError || !enumData) {
-      return NextResponse.json(
-        { error: `Enum '${name}' not found` },
-        { status: 404 }
-      );
+      return NextResponse.json([]);
     }
 
     // Then, get all values for this enum

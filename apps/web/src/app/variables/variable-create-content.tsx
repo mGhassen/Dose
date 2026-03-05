@@ -23,7 +23,7 @@ export interface VariableCreateContentProps {
 export function VariableCreateContent({ onClose, onCreated }: VariableCreateContentProps) {
   const createVariable = useCreateVariable();
   const { data: units = [] } = useUnits();
-  const { data: variableTypeValues = [] } = useMetadataEnum("VariableType");
+  const { data: variableTypeValues = [], isError: variableTypeError, isLoading: variableTypeLoading } = useMetadataEnum("VariableType");
   const typeItems = variableTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [formData, setFormData] = useState({
     name: "",
@@ -116,12 +116,16 @@ export function VariableCreateContent({ onClose, onCreated }: VariableCreateCont
               </div>
               <div className="space-y-2">
                 <Label>Type *</Label>
+                {variableTypeError && (
+                  <p className="text-sm text-destructive">Could not load variable types. Check that VariableType is seeded in metadata enums.</p>
+                )}
                 <UnifiedSelector
                   type="type"
                   items={typeItems}
                   selectedId={formData.type || undefined}
                   onSelect={(item) => handleInputChange("type", item.id === 0 ? "" : String(item.id))}
-                  placeholder="Select type"
+                  placeholder={variableTypeLoading ? "Loading…" : "Select type"}
+                  disabled={variableTypeLoading || variableTypeError}
                 />
               </div>
             </div>

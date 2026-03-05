@@ -63,6 +63,7 @@ export const EXPENSE_CATEGORY_NAMES = [
 export const EXPENSE_RECURRENCE_NAMES = ["one_time", "monthly", "quarterly", "yearly", "custom"] as const;
 export const SALES_TYPE_NAMES = ["on_site", "delivery", "takeaway", "catering", "other"] as const;
 export const VARIABLE_TYPE_NAMES = [
+  "charge",
   "cost",
   "tax",
   "transaction_tax",

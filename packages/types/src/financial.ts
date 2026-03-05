@@ -52,6 +52,7 @@ export enum DepreciationMethod {
 }
 
 export enum VariableType {
+  CHARGE = 'charge',
   COST = 'cost',
   TAX = 'tax',
   TRANSACTION_TAX = 'transaction_tax',

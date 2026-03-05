@@ -21,7 +21,7 @@ import { Separator } from "@kit/ui/separator";
 import { ScrollArea } from "@kit/ui/scroll-area";
 import { Skeleton } from "@kit/ui/skeleton";
 import { Edit2, Trash2, MoreHorizontal, X } from "lucide-react";
-import { useVariableById, useUpdateVariable, useDeleteVariable, useUnits, useMetadataEnum } from "@kit/hooks";
+import { useVariableById, useUpdateVariable, useDeleteVariable, useUnits, useMetadataEnum, useTaxRules, useDeleteTaxRule } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
 import { dateToYYYYMMDD } from "@kit/lib";
@@ -66,11 +66,11 @@ export function VariableDetailContent({
   const { data: variable, isLoading } = useVariableById(variableId);
   const updateVariable = useUpdateVariable();
   const deleteMutation = useDeleteVariable();
-  const { data: variableTypeValues = [] } = useMetadataEnum("VariableType");
+  const { data: taxRules = [] } = useTaxRules({ variableId: variable?.id });
+  const deleteTaxRule = useDeleteTaxRule();
+  const { data: variableTypeValues = [], isError: variableTypeError, isLoading: variableTypeLoading } = useMetadataEnum("VariableType");
   const typeItems = variableTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
-  const typeLabels: Record<string, string> = Object.fromEntries(
-    variableTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
-  );
+  const typeLabels: Record<string, string> = Object.fromEntries(variableTypeValues.map((ev) => [ev.name, ev.label ?? ev.name]));
 
   const [formData, setFormData] = useState({
     name: "",
@@ -134,27 +134,43 @@ export function VariableDetailContent({
       toast.error("Effective date is required for this variable type");
       return;
     }
+
+    const wasTax = variable?.type === "tax" || variable?.type === "transaction_tax";
+    const isNowTax = formData.type === "tax" || formData.type === "transaction_tax";
+    if (wasTax && !isNowTax && taxRules.length > 0) {
+      const ok = window.confirm(
+        "This variable has tax rule(s). Changing type will make them inactive. Do you want to delete them?"
+      );
+      if (!ok) return;
+      for (const rule of taxRules) {
+        await deleteTaxRule.mutateAsync(String(rule.id));
+      }
+    }
+
     const payload = isUnitType
       ? {
           symbol: formData.payloadSymbol.trim(),
           dimension: formData.payloadDimension || "other",
           base_unit_id: formData.payloadBaseUnitId ?? null,
         }
-      : undefined;
+      : !isNowTax
+        ? null
+        : undefined;
+    const updateData = {
+      name: formData.name.trim(),
+      type: formData.type as VariableType,
+      value: numValue,
+      unitId: formData.unitId ?? undefined,
+      effectiveDate: isUnitType ? undefined : formData.effectiveDate || undefined,
+      endDate: formData.endDate?.trim() || undefined,
+      description: formData.description?.trim() || undefined,
+      isActive: formData.isActive,
+      ...(payload !== undefined ? { payload } : {}),
+    };
     try {
       await updateVariable.mutateAsync({
         id: variableId,
-        data: {
-          name: formData.name.trim(),
-          type: formData.type as VariableType,
-          value: numValue,
-          unitId: formData.unitId ?? undefined,
-          effectiveDate: isUnitType ? undefined : formData.effectiveDate || undefined,
-          endDate: formData.endDate?.trim() || undefined,
-          description: formData.description?.trim() || undefined,
-          isActive: formData.isActive,
-          payload,
-        },
+        data: updateData as Parameters<typeof updateVariable.mutateAsync>[0]["data"],
       });
       toast.success("Variable updated successfully");
       router.push(`/variables/${variableId}`);
@@ -257,12 +273,16 @@ export function VariableDetailContent({
                   </div>
                   <div className="space-y-2">
                     <Label>Type *</Label>
+                    {variableTypeError && (
+                      <p className="text-sm text-destructive">Could not load variable types. Check that VariableType is seeded in metadata enums.</p>
+                    )}
                     <UnifiedSelector
                       type="type"
                       items={typeItems}
                       selectedId={formData.type || undefined}
                       onSelect={(item) => handleInputChange("type", item.id === 0 ? "" : String(item.id))}
-                      placeholder="Select type"
+                      placeholder={variableTypeLoading ? "Loading…" : "Select type"}
+                      disabled={variableTypeLoading || variableTypeError}
                     />
                   </div>
                 </div>

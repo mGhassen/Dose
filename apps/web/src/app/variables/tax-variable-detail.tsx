@@ -12,8 +12,8 @@ import {
 } from "@kit/ui/dropdown-menu";
 import { StatusPin } from "@/components/status-pin";
 import { Edit2, Trash2, MoreHorizontal, X } from "lucide-react";
-import { useTaxRules, useDeleteVariable, useMetadataEnum } from "@kit/hooks";
-import type { Variable, TaxRule } from "@kit/types";
+import { useTaxRules, useDeleteVariable } from "@kit/hooks";
+import type { Variable } from "@kit/types";
 import type { VariablePayloadTax } from "@kit/types";
 import { toast } from "sonner";
 
@@ -33,33 +33,14 @@ export interface TaxVariableDetailProps {
   onDeleted: () => void;
 }
 
-function exemptionDescription(
-  r: TaxRule,
-  salesTypeOptions: { id: string; name: string }[]
-) {
-  if (r.description) return r.description;
-  const vals = r.conditionValues ?? (r.conditionValue ? [r.conditionValue] : []);
-  if (vals.length > 0) {
-    const labels = vals.map((v) => salesTypeOptions.find((o) => o.id === v)?.name ?? v);
-    return `Exempt when dining option is ${labels.join(", ")}`;
-  }
-  return "No conditions";
-}
-
 export function TaxVariableDetail({ variableId, variable, onClose, onDeleted }: TaxVariableDetailProps) {
   const router = useRouter();
   const deleteMutation = useDeleteVariable();
-  const { data: salesTypeValues = [] } = useMetadataEnum("SalesType");
-  const salesTypeOptions = salesTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
-  const { data: rules = [], isLoading: rulesLoading } = useTaxRules({ variableId: variable.id });
+  const { data: rules = [] } = useTaxRules({ variableId: variable.id });
 
   const payload = (variable.payload || {}) as VariablePayloadTax;
   const defaultRule = useMemo(
     () => rules.find((r) => r.conditionType === null) ?? null,
-    [rules]
-  );
-  const exemptions = useMemo(
-    () => rules.filter((r) => r.conditionType !== null),
     [rules]
   );
 
@@ -158,26 +139,6 @@ export function TaxVariableDetail({ variableId, variable, onClose, onDeleted }: 
                 ? "Tax is included in the price. Shown on receipts but not added to total."
                 : "Tax is added on top of unit price and shown as a separate line item."}
             </p>
-          </Section>
-
-          <Section title="Exemptions">
-            {rulesLoading ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : exemptions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No exemptions</p>
-            ) : (
-              <div className="space-y-3">
-                {exemptions.map((r) => (
-                  <div
-                    key={r.id}
-                    className="rounded-lg border bg-card p-4"
-                  >
-                    <p className="font-medium">{r.name || "Exemption"}</p>
-                    <p className="text-sm text-muted-foreground">{exemptionDescription(r, salesTypeOptions)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
           </Section>
         </div>
       </ScrollArea>

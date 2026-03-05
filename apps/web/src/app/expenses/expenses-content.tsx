@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useExpenses, useDeleteExpense, useSubscriptions, useInventorySuppliers } from "@kit/hooks";
+import { useExpenses, useDeleteExpense, useSubscriptions, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
 import Link from "next/link";
-import type { Expense, ExpenseCategory } from "@kit/types";
+import type { Expense } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -34,7 +34,12 @@ export default function ExpensesContent({ selectedExpenseId }: ExpensesContentPr
   const subscriptions = subscriptionsResponse?.data || [];
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const suppliers = suppliersResponse?.data || [];
-  
+  const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
+  const categoryLabels = useMemo(
+    () => Object.fromEntries(categoryValues.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [categoryValues]
+  );
+
   const expenses = expensesResponse?.data || [];
   const totalCount = expensesResponse?.pagination?.total || 0;
   const totalPages = expensesResponse?.pagination?.totalPages || 0;
@@ -69,24 +74,11 @@ export default function ExpensesContent({ selectedExpenseId }: ExpensesContentPr
     {
       accessorKey: "category",
       header: "Category",
-      cell: ({ row }) => {
-        const category = row.original.category;
-        const categoryLabels: Record<ExpenseCategory, string> = {
-          rent: "Rent",
-          utilities: "Utilities",
-          supplies: "Supplies",
-          marketing: "Marketing",
-          insurance: "Insurance",
-          maintenance: "Maintenance",
-          professional_services: "Professional Services",
-          other: "Other",
-        };
-        return (
-          <Badge variant="outline">
-            {categoryLabels[category] || category}
-          </Badge>
-        );
-      },
+      cell: ({ row }) => (
+        <Badge variant="outline">
+          {categoryLabels[row.original.category] ?? row.original.category}
+        </Badge>
+      ),
     },
     {
       accessorKey: "amount",
@@ -132,7 +124,7 @@ export default function ExpensesContent({ selectedExpenseId }: ExpensesContentPr
         return expense.vendor || <span className="text-muted-foreground">—</span>;
       },
     },
-  ], [subscriptionMap, supplierMap]);
+  ], [subscriptionMap, supplierMap, categoryLabels]);
 
   const handleDelete = async (id: number) => {
     try {
