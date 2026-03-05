@@ -177,6 +177,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
       sub += lineTotalNet;
       tax += taxAmount;
     }
+    tax = Math.round(tax * 10) / 10;
     let disc = 0;
     if (formData.discountValue) {
       const v = parseFloat(formData.discountValue) || 0;

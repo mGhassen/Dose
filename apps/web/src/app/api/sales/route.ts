@@ -243,16 +243,19 @@ export async function POST(request: NextRequest) {
         let unitCost = line.unitCost;
         let priceLookupItemId: number | null = null;
         let itemCategory: string | null = null;
+        let itemCreatedAt: string | null = null;
         if (line.itemId && dateStr) {
-          const { data: itemRow } = await supabase.from('items').select('id, default_tax_rate_percent, category').eq('id', line.itemId).single();
+          const { data: itemRow } = await supabase.from('items').select('id, default_tax_rate_percent, category, created_at').eq('id', line.itemId).single();
           if (itemRow) {
             priceLookupItemId = itemRow.id;
             itemCategory = itemRow.category ?? null;
+            itemCreatedAt = itemRow.created_at ?? null;
           } else {
-            const { data: produced } = await supabase.from('items').select('id, default_tax_rate_percent, category').eq('produced_from_recipe_id', line.itemId).single();
+            const { data: produced } = await supabase.from('items').select('id, default_tax_rate_percent, category, created_at').eq('produced_from_recipe_id', line.itemId).single();
             if (produced) {
               priceLookupItemId = produced.id;
               itemCategory = produced.category ?? null;
+              itemCreatedAt = produced.created_at ?? null;
             }
           }
           if (priceLookupItemId) {
@@ -268,7 +271,7 @@ export async function POST(request: NextRequest) {
             if (unitCost != null) await upsertCost(supabase, priceLookupItemId, dateStr, unitCost);
           }
         }
-        let lineTaxRate = await getTaxRateForSaleLine(supabase, priceLookupItemId ?? line.itemId ?? null, itemCategory, body.type, dateStr);
+        let lineTaxRate = await getTaxRateForSaleLine(supabase, priceLookupItemId ?? line.itemId ?? null, itemCategory, body.type, dateStr, itemCreatedAt);
         if (line.taxRatePercent != null) lineTaxRate = line.taxRatePercent;
         const qty = typeof line.quantity === 'number' ? line.quantity : parseFloat(String(line.quantity));
         const lineTotal = Math.round(qty * (unitPrice ?? 0) * 100) / 100;

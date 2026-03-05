@@ -434,6 +434,7 @@ export interface TaxRule {
   name: string | null;
   description: string | null;
   applyToCustomAmounts: boolean;
+  applyToFutureItems: boolean;
   ruleType: TaxRuleRuleType;
   createdAt: string;
   updatedAt: string;
@@ -454,6 +455,7 @@ export interface CreateTaxRuleData {
   name?: string | null;
   description?: string | null;
   applyToCustomAmounts?: boolean;
+  applyToFutureItems?: boolean;
   ruleType?: TaxRuleRuleType;
 }
 

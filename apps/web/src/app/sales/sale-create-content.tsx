@@ -87,6 +87,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
       sub += lineTotalNet;
       tax += taxAmount;
     }
+    tax = Math.round(tax * 10) / 10;
     let disc = 0;
     if (formData.discountValue) {
       const v = parseFloat(formData.discountValue) || 0;

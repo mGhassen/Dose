@@ -449,6 +449,7 @@ export const createTaxRuleSchema = z.object({
   name: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   applyToCustomAmounts: z.boolean().optional(),
+  applyToFutureItems: z.boolean().optional(),
   ruleType: z.enum(["exemption", "reduction"]).optional(),
 });
 export type CreateTaxRuleInput = z.infer<typeof createTaxRuleSchema>;

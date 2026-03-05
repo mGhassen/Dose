@@ -28,6 +28,17 @@ interface TaxRuleRow {
   scope_categories: string[] | null;
   priority: number;
   variable_value?: number;
+  apply_to_future_items?: boolean;
+  updated_at?: string;
+}
+
+function itemExcludedByExistingOnly(
+  applyToFutureItems: boolean | undefined,
+  ruleUpdatedAt: string | undefined,
+  itemCreatedAt: string | null | undefined
+): boolean {
+  if (applyToFutureItems !== false || !ruleUpdatedAt || !itemCreatedAt) return false;
+  return new Date(itemCreatedAt) > new Date(ruleUpdatedAt);
 }
 
 function scopeMatches(
@@ -67,12 +78,13 @@ export async function getTaxRateForSaleLine(
   itemId: number | null,
   itemCategory: string | null,
   salesType: string,
-  dateStr: string
+  dateStr: string,
+  itemCreatedAt?: string | null
 ): Promise<number> {
   const { data: rules } = await supabase
     .from('tax_rules')
     .select(
-      'id, variable_id, condition_type, condition_value, condition_values, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date'
+      'id, variable_id, condition_type, condition_value, condition_values, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date, apply_to_future_items, updated_at'
     )
     .eq('condition_type', 'sales_type')
     .order('priority', { ascending: true });
@@ -98,6 +110,7 @@ export async function getTaxRateForSaleLine(
     const v = variable as { is_active?: boolean; value?: unknown; effective_date?: string | null; end_date?: string | null };
     if (!v?.is_active || !ruleValidAt(v, date)) continue;
     if (!scopeMatches(r.scope_type, r.scope_item_ids, r.scope_categories, itemId, itemCategory)) continue;
+    if (itemExcludedByExistingOnly(r.apply_to_future_items, r.updated_at, itemCreatedAt)) continue;
     return parseFloat(String(v.value));
   }
 
@@ -117,12 +130,13 @@ export async function getTaxRateAndRuleForSaleLine(
   itemId: number | null,
   itemCategory: string | null,
   salesType: string,
-  dateStr: string
+  dateStr: string,
+  itemCreatedAt?: string | null
 ): Promise<TaxRateAndRule> {
   const { data: rules } = await supabase
     .from('tax_rules')
     .select(
-      'id, variable_id, condition_type, condition_value, condition_values, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date'
+      'id, variable_id, condition_type, condition_value, condition_values, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date, apply_to_future_items, updated_at'
     )
     .eq('condition_type', 'sales_type')
     .order('priority', { ascending: true });
@@ -154,6 +168,7 @@ export async function getTaxRateAndRuleForSaleLine(
     const v = variable as { name?: string; payload?: { calculationType?: string } | null; is_active?: boolean; value?: unknown; effective_date?: string | null; end_date?: string | null };
     if (!v?.is_active || !ruleValidAt(v, date)) continue;
     if (!scopeMatches(r.scope_type, r.scope_item_ids, r.scope_categories, itemId, itemCategory)) continue;
+    if (itemExcludedByExistingOnly(r.apply_to_future_items, r.updated_at, itemCreatedAt)) continue;
     const taxInclusive = v.payload?.calculationType === 'inclusive';
     return {
       rate: parseFloat(String(v.value)),
@@ -172,12 +187,13 @@ export async function getTaxRateAndRuleForExpenseLine(
   supabase: SupabaseClient | any,
   itemId: number | null,
   itemCategory: string | null,
-  dateStr: string
+  dateStr: string,
+  itemCreatedAt?: string | null
 ): Promise<TaxRateAndRule> {
   const { data: rules } = await supabase
     .from('tax_rules')
     .select(
-      'id, variable_id, condition_type, condition_value, condition_values, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date'
+      'id, variable_id, condition_type, condition_value, condition_values, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date, apply_to_future_items, updated_at'
     )
     .eq('condition_type', 'expense')
     .order('priority', { ascending: true });
@@ -201,6 +217,7 @@ export async function getTaxRateAndRuleForExpenseLine(
     const v = variable as { name?: string; payload?: { calculationType?: string } | null; is_active?: boolean; value?: unknown; effective_date?: string | null; end_date?: string | null };
     if (!v?.is_active || !ruleValidAt(v, date)) continue;
     if (!scopeMatches(r.scope_type, r.scope_item_ids, r.scope_categories, itemId, itemCategory)) continue;
+    if (itemExcludedByExistingOnly(r.apply_to_future_items, r.updated_at, itemCreatedAt)) continue;
     const taxInclusive = v.payload?.calculationType === 'inclusive';
     return {
       rate: parseFloat(String(v.value)),
@@ -219,12 +236,13 @@ export async function getTaxRateForExpenseLine(
   supabase: SupabaseClient | any,
   itemId: number | null,
   itemCategory: string | null,
-  dateStr: string
+  dateStr: string,
+  itemCreatedAt?: string | null
 ): Promise<number> {
   const { data: rules } = await supabase
     .from('tax_rules')
     .select(
-      'id, variable_id, condition_type, condition_value, condition_values, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date'
+      'id, variable_id, condition_type, condition_value, condition_values, scope_type, scope_item_ids, scope_categories, priority, effective_date, end_date, apply_to_future_items, updated_at'
     )
     .eq('condition_type', 'expense')
     .order('priority', { ascending: true });
@@ -245,6 +263,7 @@ export async function getTaxRateForExpenseLine(
     const v = variable as { is_active?: boolean; value?: unknown; effective_date?: string | null; end_date?: string | null };
     if (!v?.is_active || !ruleValidAt(v, date)) continue;
     if (!scopeMatches(r.scope_type, r.scope_item_ids, r.scope_categories, itemId, itemCategory)) continue;
+    if (itemExcludedByExistingOnly(r.apply_to_future_items, r.updated_at, itemCreatedAt)) continue;
     return parseFloat(String(v.value));
   }
 

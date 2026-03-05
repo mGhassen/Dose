@@ -15,11 +15,13 @@ export async function GET(request: NextRequest) {
       const itemIdParam = searchParams.get('itemId');
       const itemId = itemIdParam ? parseInt(itemIdParam, 10) : null;
       let itemCategory: string | null = null;
+      let itemCreatedAt: string | null = null;
       if (itemId) {
-        const { data: item } = await supabase.from('items').select('category').eq('id', itemId).maybeSingle();
+        const { data: item } = await supabase.from('items').select('category, created_at').eq('id', itemId).maybeSingle();
         itemCategory = item?.category ?? null;
+        itemCreatedAt = item?.created_at ?? null;
       }
-      const result = await getTaxRateAndRuleForSaleLine(supabase, itemId, itemCategory, salesType, dateStr);
+      const result = await getTaxRateAndRuleForSaleLine(supabase, itemId, itemCategory, salesType, dateStr, itemCreatedAt);
       return NextResponse.json({
         rate: result.rate,
         variableName: result.variableName,
@@ -33,7 +35,12 @@ export async function GET(request: NextRequest) {
       const itemIdParam = searchParams.get('itemId');
       const itemId = itemIdParam ? parseInt(itemIdParam, 10) : null;
       const itemCategory = searchParams.get('itemCategory') || null;
-      const result = await getTaxRateAndRuleForExpenseLine(supabase, itemId, itemCategory, dateStr);
+      let itemCreatedAt: string | null = null;
+      if (itemId) {
+        const { data: item } = await supabase.from('items').select('created_at').eq('id', itemId).maybeSingle();
+        itemCreatedAt = item?.created_at ?? null;
+      }
+      const result = await getTaxRateAndRuleForExpenseLine(supabase, itemId, itemCategory, dateStr, itemCreatedAt);
       return NextResponse.json({
         rate: result.rate,
         variableName: result.variableName,

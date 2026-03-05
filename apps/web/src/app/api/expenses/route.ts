@@ -181,9 +181,9 @@ export async function POST(request: NextRequest) {
           const { data: sub } = await supabase.from('subscriptions').select('default_tax_rate_percent').eq('id', line.subscriptionId).maybeSingle();
           taxRate = sub?.default_tax_rate_percent != null ? parseFloat(String(sub.default_tax_rate_percent)) : 0;
         } else if (line.itemId) {
-          const { data: itemRow } = await supabase.from('items').select('category').eq('id', line.itemId).maybeSingle();
+          const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', line.itemId).maybeSingle();
           const itemCategory = itemRow?.category ?? null;
-          taxRate = await getTaxRateForExpenseLine(supabase, line.itemId, itemCategory, dateStr);
+          taxRate = await getTaxRateForExpenseLine(supabase, line.itemId, itemCategory, dateStr, itemRow?.created_at ?? null);
         } else {
           taxRate = await getTaxRateForExpenseLine(supabase, null, null, dateStr);
         }
