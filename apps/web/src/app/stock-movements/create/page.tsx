@@ -151,7 +151,7 @@ export default function CreateStockMovementPage() {
                     selectedId={formData.unitId ?? undefined}
                     onSelect={(item) => handleInputChange('unitId', item.id === 0 ? null : (item.id as number))}
                     placeholder="Select unit"
-                    manageLink={{ href: '/settings/units', text: 'Manage units' }}
+                    manageLink={{ href: '/variables', text: 'Variables' }}
                   />
                 </div>
 

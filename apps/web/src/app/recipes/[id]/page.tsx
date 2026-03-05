@@ -384,7 +384,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                               setFormData(prev => ({ ...prev, unitId: u?.id ?? null, unit: u?.symbol ?? '' }));
                             }}
                             placeholder="Unit"
-                            manageLink={{ href: '/settings/units', text: 'Manage units' }}
+                            manageLink={{ href: '/variables', text: 'Variables' }}
                             getDisplayName={(item) => (item as any).symbol ?? item.name ?? String(item.id)}
                           />
                         </div>
@@ -516,7 +516,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                                     setItems(updated);
                                   }}
                                   placeholder="Unit"
-                                  manageLink={{ href: '/settings/units', text: 'Units' }}
+                                  manageLink={{ href: '/variables', text: 'Variables' }}
                                   getDisplayName={(x) => (x as any).symbol ?? x.name ?? String(x.id)}
                                 />
                               </div>

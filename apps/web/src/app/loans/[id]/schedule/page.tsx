@@ -231,17 +231,17 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
               </p>
             </div>
             <div className="flex-1 min-h-0 rounded-md border overflow-y-auto overflow-x-auto">
-              <table className="w-full min-w-[800px] caption-bottom text-sm">
+              <table className="w-full min-w-[800px] table-fixed caption-bottom text-sm">
                 <TableHeader className="sticky top-0 z-20 bg-background [&_tr]:border-b shadow-sm">
                   <TableRow>
-                    <TableHead>Month</TableHead>
-                    <TableHead>Payment Date</TableHead>
-                    <TableHead className="text-right">Principal</TableHead>
-                    <TableHead className="text-right">Interest</TableHead>
-                    <TableHead className="text-right">Total Payment</TableHead>
-                    <TableHead className="text-right">Remaining Balance</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="w-14">Month</TableHead>
+                    <TableHead className="w-40">Payment Date</TableHead>
+                    <TableHead className="text-right w-32">Principal</TableHead>
+                    <TableHead className="text-right w-32">Interest</TableHead>
+                    <TableHead className="text-right w-32">Total Payment</TableHead>
+                    <TableHead className="text-right w-32">Remaining Balance</TableHead>
+                    <TableHead className="w-24">Status</TableHead>
+                    <TableHead className="w-24">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

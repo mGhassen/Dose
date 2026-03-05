@@ -253,11 +253,6 @@ export const pathsConfig: NavigationConfig = {
           translationKey: "integrations"
         },
         {
-          title: "units",
-          url: "/settings/units",
-          translationKey: "units"
-        },
-        {
           title: "taxes",
           url: "/settings/taxes",
           translationKey: "taxes"

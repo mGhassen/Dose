@@ -187,57 +187,57 @@ export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], 
   if (isEditing) {
     return (
       <TableRow className="bg-muted/50">
-        <TableCell className="font-medium">{firstColumnContent}</TableCell>
-        <TableCell>
+        <TableCell className="font-medium w-14">{firstColumnContent}</TableCell>
+        <TableCell className="w-40">
           <DatePicker
             value={editData.paymentDate ? new Date(editData.paymentDate) : undefined}
             onChange={(d) => setEditData(prev => ({ ...prev, paymentDate: d ? dateToYYYYMMDD(d) : "" }))}
-            className="w-40"
+            className="w-full"
             placeholder="Pick a date"
           />
         </TableCell>
-        <TableCell>
+        <TableCell className="text-right w-32">
           <Input
             type="number"
             step="0.01"
             value={editData.principalPayment}
             onChange={(e) => setEditData(prev => ({ ...prev, principalPayment: e.target.value }))}
-            className="w-32 text-right"
+            className="w-full text-right"
           />
         </TableCell>
-        <TableCell>
+        <TableCell className="text-right w-32">
           <Input
             type="number"
             step="0.01"
             value={editData.interestPayment}
             onChange={(e) => setEditData(prev => ({ ...prev, interestPayment: e.target.value }))}
-            className="w-32 text-right"
+            className="w-full text-right"
           />
         </TableCell>
-        <TableCell>
+        <TableCell className="text-right w-32">
           <Input
             type="number"
             step="0.01"
             value={editData.totalPayment}
             onChange={(e) => setEditData(prev => ({ ...prev, totalPayment: e.target.value }))}
-            className="w-32 text-right"
+            className="w-full text-right"
           />
         </TableCell>
-        <TableCell>
+        <TableCell className="text-right w-32">
           <Input
             type="number"
             step="0.01"
             value={editData.remainingBalance}
             onChange={(e) => setEditData(prev => ({ ...prev, remainingBalance: e.target.value }))}
-            className="w-32 text-right"
+            className="w-full text-right"
           />
         </TableCell>
-        <TableCell>
+        <TableCell className="w-24">
           <Badge variant={isFullyPaid ? "default" : "secondary"}>
             {isFullyPaid ? 'Paid' : 'Pending'}
           </Badge>
         </TableCell>
-        <TableCell>
+        <TableCell className="w-24">
           <div className="flex items-center space-x-2">
             <Button
               size="sm"
