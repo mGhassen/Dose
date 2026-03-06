@@ -107,14 +107,15 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
       sub += lineTotalNet;
       tax += taxAmount;
     }
-    tax = Math.round(tax * 10) / 10;
+    sub = to2Decimals(sub);
+    tax = to2Decimals(tax);
     let disc = 0;
     if (formData.discountValue) {
       const v = parseFloat(formData.discountValue) || 0;
-      if (formData.discountType === "percent") disc = Math.round(sub * (v / 100) * 100) / 100;
-      else disc = Math.round(v * 100) / 100;
+      if (formData.discountType === "percent") disc = to2Decimals(sub * (v / 100));
+      else disc = to2Decimals(v);
     }
-    const tot = Math.round((sub + tax - disc) * 100) / 100;
+    const tot = to2Decimals(sub + tax - disc);
     return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
   }, [lineItems, defaultTaxRate, formData.type, formData.discountType, formData.discountValue]);
 

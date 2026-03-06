@@ -37,8 +37,7 @@ export function lineTaxAmount(
 ): { lineTotalNet: number; taxAmount: number } {
   const gross = to2Decimals(quantity * unitPrice);
   if (taxInclusive && taxRatePercent > 0) {
-    const factor = 1 + taxRatePercent / 100;
-    const lineTotalNet = to2Decimals(gross / factor);
+    const lineTotalNet = Math.floor(((gross * 100) / (100 + taxRatePercent)) * 100) / 100;
     const taxAmount = to2Decimals(gross - lineTotalNet);
     return { lineTotalNet, taxAmount };
   }
@@ -47,9 +46,9 @@ export function lineTaxAmount(
   return { lineTotalNet, taxAmount };
 }
 
-/** Price excl. tax = Price incl. tax / (1 + tax). E.g. 10% → divisor 1.10. */
+/** Price excl. tax = Price incl. tax / (1 + tax). Floor to 2 decimals so total never exceeds what user entered (e.g. 5 incl → 4.54, not 4.55). */
 export function netUnitPriceFromInclusive(grossUnitPrice: number, taxRatePercent: number): number {
   if (taxRatePercent <= 0) return grossUnitPrice;
-  const factor = 1 + taxRatePercent / 100;
-  return to2Decimals(grossUnitPrice / factor);
+  const net = (grossUnitPrice * 100) / (100 + taxRatePercent);
+  return Math.floor(net * 100) / 100;
 }
