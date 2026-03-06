@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import Link from "next/link";
 import { Button } from "@kit/ui/button";
 import {
   DropdownMenu,
@@ -33,6 +34,8 @@ import {
   Receipt,
   X,
   Plus,
+  ArrowDownCircle,
+  CircleArrowOutUpRight,
 } from "lucide-react";
 import { useSaleById, useUpdateSale, useDeleteSale, useItems, useUnits, useMetadataEnum } from "@kit/hooks";
 import { useRouter } from "next/navigation";
@@ -120,6 +123,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
     unitCost: string;
     taxRatePercent: string;
     taxInclusive: boolean;
+    priceInputInclusive?: boolean;
     taxVariableName?: string;
     taxConditionType?: string;
     taxConditionValue?: string;
@@ -173,7 +177,8 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, line.taxInclusive ?? false);
+      const netUnit = line.priceInputInclusive ? netUnitPriceFromInclusive(p, lineRate) : p;
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, netUnit, lineRate, false);
       sub += lineTotalNet;
       tax += taxAmount;
     }
@@ -199,7 +204,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
   }, [sale]);
 
   const addLine = () => {
-    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
+    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false, priceInputInclusive: false }]);
   };
   const salesTypeLabelMap = useMemo(
     () => Object.fromEntries(salesTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])),
@@ -228,6 +233,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
         line.unitPrice = "";
         line.taxRatePercent = "";
         line.taxInclusive = false;
+        line.priceInputInclusive = false;
         line.taxVariableName = undefined;
         line.taxConditionType = undefined;
         line.taxConditionValue = undefined;
@@ -291,13 +297,14 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
               unitCost: l.unitCost != null ? String(l.unitCost) : "",
               taxRatePercent: l.taxRatePercent != null ? String(l.taxRatePercent) : "",
               taxInclusive: (l as { taxInclusive?: boolean }).taxInclusive ?? false,
+              priceInputInclusive: false,
             };
           })
         );
       } else {
         const fallbackPrice = sale.unitPrice ?? sale.amount;
         const unitPriceStr = fallbackPrice != null && Number.isFinite(fallbackPrice) ? String(fallbackPrice) : "";
-        setLineItems([{ itemId: sale.itemId?.toString() ?? "", quantity: String(sale.quantity ?? 1), unitId: sale.unitId ?? null, unitPrice: unitPriceStr, unitCost: sale.unitCost != null ? String(sale.unitCost) : "", taxRatePercent: "", taxInclusive: false }]);
+        setLineItems([{ itemId: sale.itemId?.toString() ?? "", quantity: String(sale.quantity ?? 1), unitId: sale.unitId ?? null, unitPrice: unitPriceStr, unitCost: sale.unitCost != null ? String(sale.unitCost) : "", taxRatePercent: "", taxInclusive: false, priceInputInclusive: false }]);
       }
     }
   }, [sale]);
@@ -309,7 +316,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
       const payloadLines = lineItems.map((line) => {
         const price = parseFloat(line.unitPrice) || 0;
         const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
-        const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, lineRate) : price;
+        const unitPriceNet = line.priceInputInclusive ? netUnitPriceFromInclusive(price, lineRate) : price;
         return {
           itemId: line.itemId ? parseInt(line.itemId) : undefined,
           quantity: parseFloat(line.quantity) || 0,
@@ -459,7 +466,17 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
               <div className="space-y-3 border rounded-md p-3 bg-muted/30">
                 {lineItems.map((line, index) => (
                   <div key={index} className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-3">
+                    <div className="col-span-3 flex flex-col gap-1.5">
+                      {line.itemId && (
+                        <Link
+                          href={`/items/${line.itemId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-muted-foreground hover:underline hover:text-foreground"
+                        >
+                          View
+                        </Link>
+                      )}
                       <UnifiedSelector
                         type="item"
                         items={items}
@@ -497,22 +514,45 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                             }
                           />
                         </div>
-                        <div className="col-span-4 space-y-1">
-                          <Label className="text-xs text-muted-foreground">{line.taxInclusive ? "Price (incl. tax)" : "Price (excl. tax)"}</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            className="text-sm tabular-nums"
-                            value={line.unitPrice}
-                            onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                        <div className="col-span-4">
+                          <InputGroupAttached
+                            addonStyle="default"
+                            label="Price"
+                            input={
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="text-sm tabular-nums border-0"
+                                value={line.unitPrice}
+                                onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                              />
+                            }
+                            addon={
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const rate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
+                                  const p = parseFloat(line.unitPrice) || 0;
+                                  const toIncl = !(line.priceInputInclusive ?? false);
+                                  const newVal = toIncl ? Math.round(p * (1 + rate / 100) * 100) / 100 : netUnitPriceFromInclusive(p, rate);
+                                  setLineItems((prev) => {
+                                    const next = [...prev];
+                                    next[index] = { ...next[index], unitPrice: String(newVal), priceInputInclusive: toIncl };
+                                    return next;
+                                  });
+                                }}
+                                className="p-1 rounded hover:bg-muted/50 text-violet-500 hover:text-violet-600 transition-colors"
+                                aria-label={line.priceInputInclusive ? "Price includes tax (click for excl.)" : "Price excludes tax (click for incl.)"}
+                              >
+                                {line.priceInputInclusive ?? false ? (
+                                  <ArrowDownCircle className="h-5 w-5" />
+                                ) : (
+                                  <CircleArrowOutUpRight className="h-5 w-5" />
+                                )}
+                              </button>
+                            }
                           />
-                          {line.unitPrice && (() => {
-                            const p = parseFloat(line.unitPrice) || 0;
-                            const rate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
-                            const incl = line.taxInclusive ? p : Math.round(p * (1 + rate / 100) * 100) / 100;
-                            return <p className="text-xs text-muted-foreground tabular-nums">Incl. tax: {formatCurrency(incl)}</p>;
-                          })()}
                         </div>
                         <div className="col-span-1 flex h-10 items-center">
                           <Button type="button" variant="ghost" size="icon" onClick={() => removeLine(index)} disabled={lineItems.length <= 1}>
@@ -523,14 +563,44 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                     ) : (
                       <>
                         <div className="col-span-4">
-                          <Label className="text-xs">Amount</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={line.unitPrice}
-                            onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
-                            placeholder="0"
+                          <InputGroupAttached
+                            addonStyle="default"
+                            label="Amount"
+                            input={
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="border-0"
+                                value={line.unitPrice}
+                                onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                                placeholder="0"
+                              />
+                            }
+                            addon={
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const rate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
+                                  const p = parseFloat(line.unitPrice) || 0;
+                                  const toIncl = !(line.priceInputInclusive ?? false);
+                                  const newVal = toIncl ? Math.round(p * (1 + rate / 100) * 100) / 100 : netUnitPriceFromInclusive(p, rate);
+                                  setLineItems((prev) => {
+                                    const next = [...prev];
+                                    next[index] = { ...next[index], unitPrice: String(newVal), priceInputInclusive: toIncl };
+                                    return next;
+                                  });
+                                }}
+                                className="p-1 rounded hover:bg-muted/50 text-violet-500 hover:text-violet-600 transition-colors"
+                                aria-label={line.priceInputInclusive ? "Amount includes tax (click for excl.)" : "Amount excludes tax (click for incl.)"}
+                              >
+                                {line.priceInputInclusive ?? false ? (
+                                  <ArrowDownCircle className="h-5 w-5" />
+                                ) : (
+                                  <CircleArrowOutUpRight className="h-5 w-5" />
+                                )}
+                              </button>
+                            }
                           />
                         </div>
                         <div className="col-span-4 flex h-10 items-center">

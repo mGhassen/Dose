@@ -38,7 +38,7 @@ import {
   Area,
 } from 'recharts';
 import AppLayout from "@/components/app-layout";
-import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum, useVariablesByType } from "@kit/hooks";
+import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
@@ -481,26 +481,14 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     category: "",
     sku: "",
     unitId: null as number | null,
-    unitCost: "",
-    defaultTaxRatePercent: "",
     vendorId: "",
     notes: "",
     isActive: true,
   });
   const { data: unitsData } = useUnits();
   const { data: categoryValues = [] } = useMetadataEnum("ItemCategory");
-  const { data: taxVariables = [] } = useVariablesByType("transaction_tax");
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
-  const defaultTaxItems = [
-    { id: 0, name: "None" },
-    ...taxVariables.map((v) => ({ id: v.id, name: `${v.name} (${v.value}%)`, value: v.value })),
-    { id: -1, name: "Custom" },
-  ];
-  const defaultTaxSelectedId =
-    formData.defaultTaxRatePercent === ""
-      ? 0
-      : taxVariables.find((v) => Math.abs(v.value - parseFloat(formData.defaultTaxRatePercent || "0")) < 0.01)?.id ?? -1;
 
   const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null } | null>(null);
   const [sellHistory, setSellHistory] = useState<{ id: number; effectiveDate: string; value: number | null }[]>([]);
@@ -552,8 +540,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         category: item.category || "",
         sku: item.sku || "",
         unitId: item.unitId ?? null,
-        unitCost: item.unitCost?.toString() || "",
-        defaultTaxRatePercent: item.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : "",
         vendorId: item.vendorId?.toString() || "",
         notes: item.notes || "",
         isActive: item.isActive,
@@ -581,8 +567,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           sku: formData.sku || undefined,
           unitId: formData.unitId ?? undefined,
           unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
-          unitCost: formData.unitCost ? parseFloat(formData.unitCost) : undefined,
-          defaultTaxRatePercent: formData.defaultTaxRatePercent ? parseFloat(formData.defaultTaxRatePercent) : undefined,
           vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
           notes: formData.notes || undefined,
           isActive: formData.isActive,
@@ -745,51 +729,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       placeholder="Select unit"
                       manageLink={{ href: '/variables', text: 'Variables' }}
                     />
-                  </div>
-
-                  {/* Unit cost (buying) */}
-                  <div className="space-y-2">
-                    <Label htmlFor="unitCost">Unit cost (buying)</Label>
-                    <Input
-                      id="unitCost"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.unitCost}
-                      onChange={(e) => handleInputChange('unitCost', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <UnifiedSelector
-                      label="Default tax"
-                      type="tax"
-                      items={defaultTaxItems}
-                      selectedId={defaultTaxSelectedId}
-                      onSelect={(item) => {
-                        if (item.id === 0) handleInputChange("defaultTaxRatePercent", "");
-                        else if (typeof item.id === "number" && item.id > 0 && "value" in item && typeof item.value === "number")
-                          handleInputChange("defaultTaxRatePercent", String(item.value));
-                      }}
-                      placeholder="Select tax variable"
-                      manageLink={{ href: "/variables", text: "Variables" }}
-                    />
-                    {defaultTaxSelectedId === -1 && (
-                      <>
-                        <Label htmlFor="defaultTaxRatePercent">Custom rate %</Label>
-                        <Input
-                          id="defaultTaxRatePercent"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max="100"
-                          value={formData.defaultTaxRatePercent}
-                          onChange={(e) => handleInputChange("defaultTaxRatePercent", e.target.value)}
-                          placeholder="e.g. 10"
-                        />
-                      </>
-                    )}
-                    <p className="text-xs text-muted-foreground">Pre-fills when item is added to a sale or expense line</p>
                   </div>
 
                   {/* Vendor */}
