@@ -1,6 +1,6 @@
 import type { Variable } from '@kit/types';
 
-/** First 2 decimals; 3rd digit >= 5 → up, < 5 → down. */
+/** First 2 decimals; 3rd digit > 5 → up, <= 5 → down. */
 function to2Decimals(x: number): number {
   const scaled = x * 100;
   const frac = scaled % 1;
