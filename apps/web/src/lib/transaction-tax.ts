@@ -1,7 +1,7 @@
 import type { Variable } from '@kit/types';
 
 /** First 2 decimals; 3rd digit > 5 → up, <= 5 → down. */
-function to2Decimals(x: number): number {
+export function to2Decimals(x: number): number {
   const scaled = x * 100;
   const frac = scaled % 1;
   const up = scaled >= 0 ? (frac > 0.5 ? 1 : 0) : (frac <= -0.5 ? -1 : 0);

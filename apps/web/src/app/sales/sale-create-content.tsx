@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
@@ -25,7 +25,7 @@ export interface SaleCreateContentProps {
   onCreated?: (saleId: number) => void;
 }
 
-import { lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
+import { lineTaxAmount, netUnitPriceFromInclusive, to2Decimals } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
 import { createSaleTransactionSchema } from "@/shared/zod-schemas";
 
@@ -67,6 +67,8 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     taxRatePercent: string;
     taxInclusive: boolean;
     priceInputInclusive?: boolean;
+    /** Other side of incl/excl so toggle doesn't overwrite user input */
+    cachedPriceOther?: number;
     taxVariableName?: string;
     taxConditionType?: string;
     taxConditionValue?: string;
@@ -76,6 +78,21 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
   ]);
   const lineItemsRef = useRef(lineItems);
   lineItemsRef.current = lineItems;
+
+  const updateLinePrice = useCallback(
+    (index: number, value: string) => {
+      setLineItems((prev) => {
+        const next = [...prev];
+        const line = next[index];
+        const p = parseFloat(value) || 0;
+        const rate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
+        const other = line.priceInputInclusive ? netUnitPriceFromInclusive(p, rate) : to2Decimals(p * (1 + rate / 100));
+        next[index] = { ...line, unitPrice: value, cachedPriceOther: Number.isFinite(p) && p >= 0 ? other : undefined };
+        return next;
+      });
+    },
+    [formData.type, defaultTaxRate]
+  );
 
   const hasAnyItem = lineItems.some((l) => l.itemId !== "");
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
@@ -378,7 +395,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                               min="0"
                               className="text-sm tabular-nums border-0"
                               value={line.unitPrice}
-                              onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                              onChange={(e) => updateLinePrice(index, e.target.value)}
                             />
                           }
                           addon={
@@ -388,10 +405,10 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                                 const rate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
                                 const p = parseFloat(line.unitPrice) || 0;
                                 const toIncl = !(line.priceInputInclusive ?? false);
-                                const newVal = toIncl ? Math.round(p * (1 + rate / 100) * 100) / 100 : netUnitPriceFromInclusive(p, rate);
+                                const otherVal = line.cachedPriceOther ?? (toIncl ? to2Decimals(p * (1 + rate / 100)) : netUnitPriceFromInclusive(p, rate));
                                 setLineItems((prev) => {
                                   const next = [...prev];
-                                  next[index] = { ...next[index], unitPrice: String(newVal), priceInputInclusive: toIncl };
+                                  next[index] = { ...next[index], unitPrice: String(otherVal), priceInputInclusive: toIncl, cachedPriceOther: Number.isFinite(p) ? p : undefined };
                                   return next;
                                 });
                               }}
@@ -426,7 +443,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                               min="0"
                               className="border-0"
                               value={line.unitPrice}
-                              onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                              onChange={(e) => updateLinePrice(index, e.target.value)}
                               placeholder="0"
                             />
                           }
@@ -437,10 +454,10 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                                 const rate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
                                 const p = parseFloat(line.unitPrice) || 0;
                                 const toIncl = !(line.priceInputInclusive ?? false);
-                                const newVal = toIncl ? Math.round(p * (1 + rate / 100) * 100) / 100 : netUnitPriceFromInclusive(p, rate);
+                                const otherVal = line.cachedPriceOther ?? (toIncl ? to2Decimals(p * (1 + rate / 100)) : netUnitPriceFromInclusive(p, rate));
                                 setLineItems((prev) => {
                                   const next = [...prev];
-                                  next[index] = { ...next[index], unitPrice: String(newVal), priceInputInclusive: toIncl };
+                                  next[index] = { ...next[index], unitPrice: String(otherVal), priceInputInclusive: toIncl, cachedPriceOther: Number.isFinite(p) ? p : undefined };
                                   return next;
                                 });
                               }}
@@ -529,7 +546,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                         min="0"
                         className="h-10 w-24 text-right tabular-nums border-0"
                         value={lineItems[0]?.unitPrice ?? ""}
-                        onChange={(e) => updateLine(0, "unitPrice", e.target.value)}
+                        onChange={(e) => updateLinePrice(0, e.target.value)}
                         placeholder="0"
                       />
                     }
@@ -541,10 +558,10 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                           const rate = line?.taxRatePercent !== "" ? parseFloat(line?.taxRatePercent ?? "0") : (formData.type ? defaultTaxRate : 0);
                           const p = parseFloat(line?.unitPrice ?? "") || 0;
                           const toIncl = !(line?.priceInputInclusive ?? false);
-                          const newVal = toIncl ? Math.round(p * (1 + rate / 100) * 100) / 100 : netUnitPriceFromInclusive(p, rate);
+                          const otherVal = line?.cachedPriceOther ?? (toIncl ? to2Decimals(p * (1 + rate / 100)) : netUnitPriceFromInclusive(p, rate));
                           setLineItems((prev) => {
                             const next = [...prev];
-                            next[0] = { ...next[0], unitPrice: String(newVal), priceInputInclusive: toIncl };
+                            next[0] = { ...next[0], unitPrice: String(otherVal), priceInputInclusive: toIncl, cachedPriceOther: Number.isFinite(p) ? p : undefined };
                             return next;
                           });
                         }}

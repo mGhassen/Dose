@@ -42,6 +42,7 @@ import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useSt
 import { toast } from "sonner";
 import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
+import { to2Decimals, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
 import { formatDate } from "@kit/lib/date-format";
 import { DatePicker } from "@kit/ui/date-picker";
 import { InputGroupAttached } from "@/components/input-group";
@@ -104,7 +105,7 @@ function PriceCostHistorySection({
     if (!addDate || addValue === '' || Number.isNaN(parseFloat(addValue))) return;
     const raw = parseFloat(addValue);
     const taxPct = type === 'sell' ? saleTaxPercent : expenseTaxPercent;
-    const value = addPriceInclusive && taxPct > 0 ? Math.round((raw / (1 + taxPct / 100)) * 100) / 100 : raw;
+    const value = addPriceInclusive && taxPct > 0 ? netUnitPriceFromInclusive(raw, taxPct) : raw;
     try {
       const res = await fetch(`/api/items/${itemId}/price-history`, {
         method: 'POST',
@@ -1200,7 +1201,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     {(() => {
                       const excl = (resolvedPrice?.unitPrice ?? item.unitPrice) != null ? (resolvedPrice?.unitPrice ?? item.unitPrice)! : null;
                       const rate = resolvedTax?.sale ?? 0;
-                      const incl = excl != null && rate > 0 ? Math.round(excl * (1 + rate / 100) * 100) / 100 : excl;
+                      const incl = excl != null && rate > 0 ? to2Decimals(excl * (1 + rate / 100)) : excl;
                       return excl != null ? (
                         <>
                           <p className="text-xl font-semibold tabular-nums">{formatCurrency(excl)} <span className="text-xs font-normal text-muted-foreground">(excl. tax)</span></p>
@@ -1222,7 +1223,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     {(() => {
                       const excl = (resolvedPrice?.unitCost ?? item.unitCost) != null ? (resolvedPrice?.unitCost ?? item.unitCost)! : null;
                       const rate = resolvedTax?.expense ?? 0;
-                      const incl = excl != null && rate > 0 ? Math.round(excl * (1 + rate / 100) * 100) / 100 : excl;
+                      const incl = excl != null && rate > 0 ? to2Decimals(excl * (1 + rate / 100)) : excl;
                       return excl != null ? (
                         <>
                           <p className="text-xl font-semibold tabular-nums">{formatCurrency(excl)} <span className="text-xs font-normal text-muted-foreground">(excl. tax)</span></p>
