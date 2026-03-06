@@ -1,5 +1,13 @@
 import type { Variable } from '@kit/types';
 
+/** First 2 decimals; 3rd digit >= 5 → up, < 5 → down. */
+function to2Decimals(x: number): number {
+  const scaled = x * 100;
+  const frac = scaled % 1;
+  const up = scaled >= 0 ? (frac >= 0.5 ? 1 : 0) : (frac <= -0.5 ? -1 : 0);
+  return (Math.trunc(scaled) + up) / 100;
+}
+
 export function getEffectiveTransactionTaxRate(
   variables: Variable[] | undefined,
   code: string,
@@ -27,18 +35,21 @@ export function lineTaxAmount(
   taxRatePercent: number,
   taxInclusive: boolean
 ): { lineTotalNet: number; taxAmount: number } {
-  const gross = Math.round(quantity * unitPrice * 100) / 100;
+  const gross = to2Decimals(quantity * unitPrice);
   if (taxInclusive && taxRatePercent > 0) {
-    const lineTotalNet = Math.round((gross / (1 + taxRatePercent / 100)) * 100) / 100;
-    const taxAmount = Math.round((gross - lineTotalNet) * 100) / 100;
+    const factor = 1 + taxRatePercent / 100;
+    const lineTotalNet = to2Decimals(gross / factor);
+    const taxAmount = to2Decimals(gross - lineTotalNet);
     return { lineTotalNet, taxAmount };
   }
   const lineTotalNet = gross;
-  const taxAmount = Math.round(lineTotalNet * (taxRatePercent / 100) * 100) / 100;
+  const taxAmount = to2Decimals(lineTotalNet * (taxRatePercent / 100));
   return { lineTotalNet, taxAmount };
 }
 
+/** Price excl. tax = Price incl. tax / (1 + tax). E.g. 10% → divisor 1.10. */
 export function netUnitPriceFromInclusive(grossUnitPrice: number, taxRatePercent: number): number {
   if (taxRatePercent <= 0) return grossUnitPrice;
-  return Math.round((grossUnitPrice / (1 + taxRatePercent / 100)) * 100) / 100;
+  const factor = 1 + taxRatePercent / 100;
+  return to2Decimals(grossUnitPrice / factor);
 }
