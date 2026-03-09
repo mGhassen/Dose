@@ -84,7 +84,9 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, false);
+      const inclusive = line.taxInclusive && lineRate > 0;
+      const priceForCalc = inclusive ? to2Decimals(p * (1 + lineRate / 100)) : p;
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, priceForCalc, lineRate, inclusive);
       sub += lineTotalNet;
       tax += taxAmount;
     }
@@ -311,9 +313,6 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                 onSelect={(item) => setFormData((p) => ({ ...p, type: (item.id === 0 ? "" : String(item.id)) as SalesType }))}
                 placeholder="Select type"
               />
-              {formData.type && (
-                <p className="text-xs text-muted-foreground pl-3">Tax: {defaultTaxRate.toFixed(1)}% (from tax rules when item has no override).</p>
-              )}
             </div>
           </div>
 
@@ -380,18 +379,43 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                       <div className="col-span-4">
                         <InputGroupAttached
                           addonStyle="default"
-                          label="Price (excl. tax)"
+                          label={(() => {
+                            const rate = parseFloat(line.taxRatePercent) || 0;
+                            const isIncl = line.taxInclusive && rate > 0;
+                            return isIncl ? "Price (incl. tax)" : "Price (excl. tax)";
+                          })()}
                           input={
                             <Input
                               type="number"
                               step="0.01"
                               min="0"
                               className="text-sm tabular-nums border-0"
-                              value={line.unitPrice}
-                              onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                              value={(() => {
+                                const rate = parseFloat(line.taxRatePercent) || 0;
+                                const isIncl = line.taxInclusive && rate > 0;
+                                if (line.unitPrice === "") return "";
+                                const p = parseFloat(line.unitPrice) || 0;
+                                return isIncl ? to2Decimals(p * (1 + rate / 100)) : line.unitPrice;
+                              })()}
+                              onChange={(e) => {
+                                const rate = parseFloat(line.taxRatePercent) || 0;
+                                const isIncl = line.taxInclusive && rate > 0;
+                                const raw = e.target.value;
+                                if (raw === "") {
+                                  updateLine(index, "unitPrice", "");
+                                  return;
+                                }
+                                const num = parseFloat(raw);
+                                if (Number.isNaN(num)) return;
+                                updateLine(index, "unitPrice", isIncl ? String(to2Decimals(num / (1 + rate / 100))) : raw);
+                              }}
                             />
                           }
-                          addon={<span className="text-muted-foreground text-xs">excl.</span>}
+                          addon={
+                            <span className="text-muted-foreground text-xs">
+                              {line.taxInclusive && (parseFloat(line.taxRatePercent) || 0) > 0 ? "incl." : "excl."}
+                            </span>
+                          }
                         />
                       </div>
                       <div className="col-span-1 flex h-10 items-center">
@@ -405,19 +429,40 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                       <div className="col-span-4">
                         <InputGroupAttached
                           addonStyle="default"
-                          label="Amount (excl. tax)"
+                          label={line.taxInclusive && (parseFloat(line.taxRatePercent) || 0) > 0 ? "Amount (incl. tax)" : "Amount (excl. tax)"}
                           input={
                             <Input
                               type="number"
                               step="0.01"
                               min="0"
                               className="border-0"
-                              value={line.unitPrice}
-                              onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
+                              value={(() => {
+                                const rate = parseFloat(line.taxRatePercent) || 0;
+                                const isIncl = line.taxInclusive && rate > 0;
+                                if (line.unitPrice === "") return "";
+                                const p = parseFloat(line.unitPrice) || 0;
+                                return isIncl ? to2Decimals(p * (1 + rate / 100)) : line.unitPrice;
+                              })()}
+                              onChange={(e) => {
+                                const rate = parseFloat(line.taxRatePercent) || 0;
+                                const isIncl = line.taxInclusive && rate > 0;
+                                const raw = e.target.value;
+                                if (raw === "") {
+                                  updateLine(index, "unitPrice", "");
+                                  return;
+                                }
+                                const num = parseFloat(raw);
+                                if (Number.isNaN(num)) return;
+                                updateLine(index, "unitPrice", isIncl ? String(to2Decimals(num / (1 + rate / 100))) : raw);
+                              }}
                               placeholder="0"
                             />
                           }
-                          addon={<span className="text-muted-foreground text-xs">excl.</span>}
+                          addon={
+                            <span className="text-muted-foreground text-xs">
+                              {line.taxInclusive && (parseFloat(line.taxRatePercent) || 0) > 0 ? "incl." : "excl."}
+                            </span>
+                          }
                         />
                       </div>
                         <div className="col-span-4 flex h-10 items-center">
@@ -489,9 +534,29 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                     step="0.01"
                     min="0"
                     className="h-10 w-24 text-right tabular-nums"
-                    value={lineItems[0]?.unitPrice ?? ""}
-                    onChange={(e) => updateLine(0, "unitPrice", e.target.value)}
-                    placeholder="0 (excl. tax)"
+                    value={(() => {
+                      const line = lineItems[0];
+                      if (!line?.unitPrice) return "";
+                      const rate = parseFloat(line.taxRatePercent) || 0;
+                      const isIncl = line.taxInclusive && rate > 0;
+                      const p = parseFloat(line.unitPrice) || 0;
+                      return isIncl ? to2Decimals(p * (1 + rate / 100)) : line.unitPrice;
+                    })()}
+                    onChange={(e) => {
+                      const line = lineItems[0];
+                      if (!line) return;
+                      const rate = parseFloat(line.taxRatePercent) || 0;
+                      const isIncl = line.taxInclusive && rate > 0;
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        updateLine(0, "unitPrice", "");
+                        return;
+                      }
+                      const num = parseFloat(raw);
+                      if (Number.isNaN(num)) return;
+                      updateLine(0, "unitPrice", isIncl ? String(to2Decimals(num / (1 + rate / 100))) : raw);
+                    }}
+                    placeholder="0"
                   />
                 </div>
               </div>
