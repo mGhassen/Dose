@@ -9,14 +9,14 @@ export async function upsertSellingPrice(
   supabase: SupabaseClient,
   itemId: number,
   effectiveDate: string,
-  unitPrice: number
+  unitPrice: number,
+  taxIncluded?: boolean
 ): Promise<void> {
+  const payload: Record<string, unknown> = { item_id: itemId, effective_date: effectiveDate, unit_price: unitPrice };
+  if (taxIncluded !== undefined) payload.tax_included = taxIncluded;
   const { error } = await supabase
     .from('item_selling_price_history')
-    .upsert(
-      { item_id: itemId, effective_date: effectiveDate, unit_price: unitPrice },
-      { onConflict: 'item_id,effective_date' }
-    );
+    .upsert(payload, { onConflict: 'item_id,effective_date' });
   if (error) throw error;
 }
 

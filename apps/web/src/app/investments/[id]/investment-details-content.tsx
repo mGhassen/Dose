@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import type { InvestmentType, DepreciationMethod } from "@kit/types";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface InvestmentDetailsContentProps {
   investmentId: string;
@@ -33,6 +34,7 @@ interface InvestmentDetailsContentProps {
 export default function InvestmentDetailsContent({ investmentId }: InvestmentDetailsContentProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: investment, isLoading } = useInvestmentById(investmentId);
   const { data: depreciation } = useDepreciationSchedule(investmentId);
   const updateInvestment = useUpdateInvestment();
@@ -105,13 +107,10 @@ export default function InvestmentDetailsContent({ investmentId }: InvestmentDet
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this investment? This action cannot be undone.")) {
-      return;
-    }
-
     try {
       await deleteMutation.mutateAsync(String(investmentId));
       toast.success("Investment deleted successfully");
+      setIsDeleteDialogOpen(false);
       router.push('/investments');
     } catch (error) {
       toast.error("Failed to delete investment");
@@ -182,7 +181,7 @@ export default function InvestmentDetailsContent({ investmentId }: InvestmentDet
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={handleDelete}
+                  onClick={() => setIsDeleteDialogOpen(true)}
                   disabled={deleteMutation.isPending}
                   className="text-destructive"
                 >
@@ -404,6 +403,17 @@ export default function InvestmentDetailsContent({ investmentId }: InvestmentDet
             )}
           </CardContent>
         </Card>
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleDelete}
+          title="Delete investment"
+          description="Are you sure you want to delete this investment? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteMutation.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );

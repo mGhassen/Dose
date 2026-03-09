@@ -21,16 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@kit/ui/alert-dialog";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface StockLevelDetailPageProps {
   params: Promise<{ id: string }>;
@@ -393,6 +384,17 @@ export default function StockLevelDetailPage({ params }: StockLevelDetailPagePro
           </Card>
         )}
       </div>
+      <ConfirmationDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        onConfirm={handleDelete}
+        title="Delete stock level"
+        description="Are you sure you want to delete this stock level? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        isPending={deleteMutation.isPending}
+        variant="destructive"
+      />
     </AppLayout>
   );
 }

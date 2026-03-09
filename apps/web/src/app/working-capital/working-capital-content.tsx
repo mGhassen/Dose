@@ -122,8 +122,6 @@ export default function WorkingCapitalContent() {
   ], []);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this working capital entry?")) return;
-    
     try {
       await deleteMutation.mutateAsync(String(id));
       toast.success("Working capital entry deleted successfully");
@@ -134,8 +132,6 @@ export default function WorkingCapitalContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} working capital entry(ies)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} working capital entry(ies) deleted successfully`);

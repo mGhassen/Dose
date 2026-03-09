@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Badge } from "@kit/ui/badge";
@@ -29,6 +30,7 @@ import { useUser, useDeleteUser } from "@kit/hooks";
 import { useDateFormat } from '@kit/hooks/use-date-format';
 import { useEnumValues } from '@kit/hooks';
 import RelatedDataLink from "@/components/related-data-link";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface UserDetailsContentProps {
   userId: number;
@@ -40,15 +42,15 @@ export default function UserDetailsContent({ userId }: UserDetailsContentProps) 
   const { data: user, isLoading } = useUser(userId);
   const deleteUser = useDeleteUser();
   const roleValues = useEnumValues('Role');
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const handleDelete = async () => {
-    if (confirm("Are you sure you want to delete this user?")) {
-      try {
-        await deleteUser.mutateAsync(userId);
-        router.push('/users');
-      } catch (error) {
-        console.error("Failed to delete user:", error);
-      }
+    try {
+      await deleteUser.mutateAsync(userId);
+      setIsDeleteDialogOpen(false);
+      router.push('/users');
+    } catch (error) {
+      console.error("Failed to delete user:", error);
     }
   };
 
@@ -111,7 +113,7 @@ export default function UserDetailsContent({ userId }: UserDetailsContentProps) 
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={handleDelete}
+                onClick={() => setIsDeleteDialogOpen(true)}
                 className="text-destructive"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -260,6 +262,17 @@ export default function UserDetailsContent({ userId }: UserDetailsContentProps) 
             </CardContent>
           </Card>
         </div>
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleDelete}
+          title="Delete user"
+          description="Are you sure you want to delete this user? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteUser.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );

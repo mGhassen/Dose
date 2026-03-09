@@ -43,6 +43,7 @@ import {
   TableRow,
 } from "@kit/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface LeasingDetailPageProps {
   params: Promise<{ id: string }>;
@@ -53,6 +54,7 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
   const queryClient = useQueryClient();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: leasing, isLoading } = useLeasingById(resolvedParams?.id || "");
   const { data: supplier } = useInventorySupplierById(leasing?.supplierId?.toString() || "");
   const updateLeasing = useUpdateLeasing();
@@ -389,14 +391,10 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
 
   const handleDelete = async () => {
     if (!resolvedParams?.id) return;
-    
-    if (!confirm("Are you sure you want to delete this leasing payment? This action cannot be undone.")) {
-      return;
-    }
-
     try {
       await deleteMutation.mutateAsync(String(resolvedParams.id));
       toast.success("Leasing payment deleted successfully");
+      setIsDeleteDialogOpen(false);
       router.push('/leasing');
     } catch (error) {
       toast.error("Failed to delete leasing payment");
@@ -499,7 +497,7 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={handleDelete}
+                  onClick={() => setIsDeleteDialogOpen(true)}
                   disabled={deleteMutation.isPending}
                   className="text-destructive"
                 >
@@ -1050,6 +1048,17 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
         )}
           </TabsContent>
         </Tabs>
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleDelete}
+          title="Delete leasing payment"
+          description="Are you sure you want to delete this leasing payment? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteMutation.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );

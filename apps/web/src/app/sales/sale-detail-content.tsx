@@ -41,8 +41,9 @@ import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatDateTime } from "@kit/lib/date-format";
 import type { SalesType } from "@kit/types";
-import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
+import { lineTaxAmount, to2Decimals, netUnitPriceFromInclusive, unitPriceExclToIncl } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface SaleDetailContentProps {
   saleId: string;
@@ -78,6 +79,7 @@ function DetailRow({
 export function SaleDetailContent({ saleId, initialEditMode = false, onClose, onDeleted }: SaleDetailContentProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(initialEditMode);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: sale, isLoading } = useSaleById(saleId);
 
   useEffect(() => {
@@ -135,22 +137,32 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
     const indicesWithItems = current.map((l, i) => (l.itemId ? i : -1)).filter((i) => i >= 0);
     if (indicesWithItems.length === 0) return;
     Promise.all(
-      indicesWithItems.map((index) =>
-        taxRulesApi
-          .resolve({
-            context: 'sale',
-            salesType: formData.type!,
-            itemId: parseInt(current[index].itemId!, 10),
-            date: formData.date!,
-          })
-          .then((r) => ({ index, r }))
-      )
+      indicesWithItems.map((index) => {
+        const itemId = current[index].itemId!;
+        return Promise.all([
+          fetch(`/api/items/${itemId}/resolved-price?date=${formData.date!}`).then((r) => r.json()) as Promise<{ unitPrice?: number | null; taxIncluded?: boolean }>,
+          taxRulesApi.resolve({ context: 'sale', salesType: formData.type!, itemId: parseInt(itemId, 10), date: formData.date! }),
+        ]).then(([data, r]) => ({ index, data, r }));
+      })
     )
       .then((results) => {
         setLineItems((prev) => {
           const next = [...prev];
-          for (const { index, r } of results) {
-            if (next[index]?.itemId) {
+          for (const { index, data, r } of results) {
+            if (next[index]?.itemId && data?.unitPrice != null) {
+              const rate = r.rate;
+              const apiIncl = data.taxIncluded ?? false;
+              const excl = apiIncl && rate > 0 ? netUnitPriceFromInclusive(data.unitPrice, rate) : data.unitPrice;
+              next[index] = {
+                ...next[index],
+                unitPrice: String(to2Decimals(excl)),
+                taxRatePercent: r.rate.toString(),
+                taxVariableName: r.variableName,
+                taxConditionType: r.conditionType ?? undefined,
+                taxConditionValue: r.conditionValue ?? undefined,
+                taxInclusive: r.taxInclusive ?? false,
+              };
+            } else if (next[index]?.itemId) {
               next[index] = {
                 ...next[index],
                 taxRatePercent: r.rate.toString(),
@@ -175,8 +187,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
       const p = parseFloat(line.unitPrice) || 0;
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
       const inclusive = line.taxInclusive && lineRate > 0;
-      const priceForCalc = inclusive ? to2Decimals(p * (1 + lineRate / 100)) : p;
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, priceForCalc, lineRate, inclusive);
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, inclusive);
       sub += lineTotalNet;
       tax += taxAmount;
     }
@@ -194,13 +205,34 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
 
   const detailTotals = useMemo(() => {
     if (!sale) return { subtotal: 0, total: 0 };
-    const lines = sale.lineItems?.length ? sale.lineItems : [{ quantity: sale.quantity ?? 1, unitPrice: sale.unitPrice ?? sale.amount }];
-    const sub = to2Decimals(lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0));
+    const sub = sale.subtotal ?? 0;
     const tax = sale.totalTax ?? 0;
     const disc = sale.totalDiscount ?? 0;
-    const tot = to2Decimals(sub + tax - disc);
+    const tot = sale.amount ?? 0;
     return { subtotal: sub, total: tot };
   }, [sale]);
+
+  const [resolvedLineTax, setResolvedLineTax] = useState<Record<number, { rate: number; taxInclusive: boolean }>>({});
+  useEffect(() => {
+    if (!sale?.lineItems?.length || !sale.type || !sale.date) {
+      setResolvedLineTax({});
+      return;
+    }
+    const dateStr = sale.date.split("T")[0];
+    Promise.all(
+      sale.lineItems.map((line: { id: number; itemId?: number }) =>
+        taxRulesApi
+          .resolve({ context: "sale", salesType: sale.type, itemId: line.itemId ?? undefined, date: dateStr })
+          .then((r) => ({ lineId: line.id, rate: r.rate, taxInclusive: r.taxInclusive ?? false }))
+      )
+    )
+      .then((results) => {
+        setResolvedLineTax(
+          Object.fromEntries(results.map((r) => [r.lineId, { rate: r.rate, taxInclusive: r.taxInclusive }]))
+        );
+      })
+      .catch(() => {});
+  }, [sale?.id, sale?.type, sale?.date, sale?.lineItems?.length]);
 
   const addLine = () => {
     setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
@@ -247,37 +279,49 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
     });
     if (!itemId) return;
     const dateStr = formData.date || new Date().toISOString().slice(0, 10);
-    fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`)
-      .then((r) => r.json())
-      .then((data: { unitPrice?: number | null }) => {
-        if (data?.unitPrice != null) {
+    const applyPriceAndRule = (data: { unitPrice?: number | null; taxIncluded?: boolean }, r: { rate: number; taxInclusive?: boolean; variableName?: string; conditionType?: string | null; conditionValue?: string | null }) => {
+      if (data?.unitPrice == null) return;
+      setLineItems((prev) => {
+        const next = [...prev];
+        if (next[index]?.itemId !== itemId) return next;
+        const line = next[index];
+        const rate = r.rate;
+        const apiIncl = data.taxIncluded ?? false;
+        const excl = apiIncl && rate > 0 ? netUnitPriceFromInclusive(data.unitPrice!, rate) : data.unitPrice!;
+        next[index] = {
+          ...line,
+          unitPrice: String(to2Decimals(excl)),
+          taxRatePercent: r.rate.toString(),
+          taxVariableName: r.variableName,
+          taxConditionType: r.conditionType ?? undefined,
+          taxConditionValue: r.conditionValue ?? undefined,
+          taxInclusive: r.taxInclusive ?? false,
+        };
+        return next;
+      });
+    };
+    if (formData.type && formData.date) {
+      Promise.all([
+        fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`).then((r) => r.json()) as Promise<{ unitPrice?: number | null; taxIncluded?: boolean }>,
+        taxRulesApi.resolve({ context: 'sale', salesType: formData.type, itemId: parseInt(itemId, 10), date: formData.date }),
+      ])
+        .then(([data, r]) => applyPriceAndRule(data, r))
+        .catch(() => {});
+    } else {
+      fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`)
+        .then((r) => r.json())
+        .then((data: { unitPrice?: number | null; taxIncluded?: boolean }) => {
+          if (data?.unitPrice == null) return;
+          const rate = defaultTaxRate;
+          const apiIncl = data.taxIncluded ?? false;
+          const excl = apiIncl && rate > 0 ? netUnitPriceFromInclusive(data.unitPrice, rate) : data.unitPrice;
           setLineItems((prev) => {
             const next = [...prev];
-            if (next[index]?.itemId === itemId) next[index] = { ...next[index], unitPrice: String(data.unitPrice) };
+            if (next[index]?.itemId !== itemId) return next;
+            next[index] = { ...next[index], unitPrice: String(to2Decimals(excl)) };
             return next;
           });
-        }
-      })
-      .catch(() => {});
-    if (formData.type && formData.date) {
-      taxRulesApi
-        .resolve({ context: 'sale', salesType: formData.type, itemId: parseInt(itemId, 10), date: formData.date })
-        .then((r) =>
-          setLineItems((prev) => {
-            const next = [...prev];
-            if (next[index]?.itemId === itemId) {
-              next[index] = {
-                ...next[index],
-                taxRatePercent: r.rate.toString(),
-                taxVariableName: r.variableName,
-                taxConditionType: r.conditionType ?? undefined,
-                taxConditionValue: r.conditionValue ?? undefined,
-                taxInclusive: r.taxInclusive ?? false,
-              };
-            }
-            return next;
-          })
-        )
+        })
         .catch(() => {});
     }
   };
@@ -361,14 +405,10 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
   };
 
   const handleDelete = async () => {
-    if (
-      !confirm("Are you sure you want to delete this sale? This action cannot be undone.")
-    ) {
-      return;
-    }
     try {
       await deleteMutation.mutateAsync(String(saleId));
       toast.success("Sale deleted successfully");
+      setIsDeleteDialogOpen(false);
       onDeleted();
     } catch (error) {
       toast.error("Failed to delete sale");
@@ -541,7 +581,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                                   const isIncl = line.taxInclusive && rate > 0;
                                   if (line.unitPrice === "") return "";
                                   const p = parseFloat(line.unitPrice) || 0;
-                                  return isIncl ? to2Decimals(p * (1 + rate / 100)) : line.unitPrice;
+                                  return isIncl ? unitPriceExclToIncl(p, rate) : line.unitPrice;
                                 })()}
                                 onChange={(e) => {
                                   const rate = parseFloat(line.taxRatePercent) || 0;
@@ -553,7 +593,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                                   }
                                   const num = parseFloat(raw);
                                   if (Number.isNaN(num)) return;
-                                  updateLine(index, "unitPrice", isIncl ? String(to2Decimals(num / (1 + rate / 100))) : raw);
+                                  updateLine(index, "unitPrice", isIncl ? String(netUnitPriceFromInclusive(num, rate)) : raw);
                                 }}
                               />
                             }
@@ -587,7 +627,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                                   const isIncl = line.taxInclusive && rate > 0;
                                   if (line.unitPrice === "") return "";
                                   const p = parseFloat(line.unitPrice) || 0;
-                                  return isIncl ? to2Decimals(p * (1 + rate / 100)) : line.unitPrice;
+                                  return isIncl ? unitPriceExclToIncl(p, rate) : line.unitPrice;
                                 })()}
                                 onChange={(e) => {
                                   const rate = parseFloat(line.taxRatePercent) || 0;
@@ -599,7 +639,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                                   }
                                   const num = parseFloat(raw);
                                   if (Number.isNaN(num)) return;
-                                  updateLine(index, "unitPrice", isIncl ? String(to2Decimals(num / (1 + rate / 100))) : raw);
+                                  updateLine(index, "unitPrice", isIncl ? String(netUnitPriceFromInclusive(num, rate)) : raw);
                                 }}
                                 placeholder="0"
                               />
@@ -658,7 +698,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                       const rate = parseFloat(line.taxRatePercent) || 0;
                       const isIncl = line.taxInclusive && rate > 0;
                       const p = parseFloat(line.unitPrice) || 0;
-                      return isIncl ? to2Decimals(p * (1 + rate / 100)) : line.unitPrice;
+                      return isIncl ? unitPriceExclToIncl(p, rate) : line.unitPrice;
                     })()}
                     onChange={(e) => {
                       const line = lineItems[0];
@@ -672,7 +712,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                       }
                       const num = parseFloat(raw);
                       if (Number.isNaN(num)) return;
-                      updateLine(0, "unitPrice", isIncl ? String(to2Decimals(num / (1 + rate / 100))) : raw);
+                      updateLine(0, "unitPrice", isIncl ? String(netUnitPriceFromInclusive(num, rate)) : raw);
                     }}
                     placeholder="0"
                   />
@@ -724,7 +764,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={handleDelete}
+                  onClick={() => setIsDeleteDialogOpen(true)}
                   disabled={deleteMutation.isPending}
                   className="text-destructive focus:text-destructive"
                 >
@@ -792,17 +832,37 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                     {(sale.lineItems && sale.lineItems.length > 0
                       ? sale.lineItems
                       : [{ id: 0, item: sale.item, quantity: sale.quantity ?? 1, unitPrice: sale.unitPrice ?? sale.amount, lineTotal: sale.amount }]
-                    ).map((line: { id: number; item?: { name?: string }; quantity: number; unitPrice: number; lineTotal: number }) => {
-                      const lineTotalDisplay = Math.round(line.quantity * line.unitPrice * 100) / 100;
-                      return (
-                        <tr key={line.id} className="border-b last:border-0">
-                          <td className="p-2">{line.item?.name ?? "—"}</td>
-                          <td className="p-2 text-right tabular-nums">{line.quantity}</td>
-                          <td className="p-2 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
-                          <td className="p-2 text-right tabular-nums">{formatCurrency(lineTotalDisplay)}</td>
-                        </tr>
-                      );
-                    })}
+                    ).map(
+                      (
+                        line: {
+                          id: number;
+                          item?: { name?: string };
+                          quantity: number;
+                          unitPrice: number;
+                          lineTotal: number;
+                          taxRatePercent?: number;
+                          taxAmount?: number;
+                        }
+                      ) => {
+                        const resolved = resolvedLineTax[line.id];
+                        const rate = resolved?.rate ?? line.taxRatePercent ?? 0;
+                        const inclusive = (resolved?.taxInclusive ?? false) && rate > 0;
+                        const displayUnitPrice =
+                          inclusive ? unitPriceExclToIncl(line.unitPrice, rate) : line.unitPrice;
+                        const displayLineTotal =
+                          inclusive
+                            ? to2Decimals(line.quantity * displayUnitPrice)
+                            : Math.round(line.quantity * line.unitPrice * 100) / 100;
+                        return (
+                          <tr key={line.id} className="border-b last:border-0">
+                            <td className="p-2">{line.item?.name ?? "—"}</td>
+                            <td className="p-2 text-right tabular-nums">{line.quantity}</td>
+                            <td className="p-2 text-right tabular-nums">{formatCurrency(displayUnitPrice)}</td>
+                            <td className="p-2 text-right tabular-nums">{formatCurrency(displayLineTotal)}</td>
+                          </tr>
+                        );
+                      }
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -862,6 +922,17 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
           </div>
         </div>
       </ScrollArea>
+      <ConfirmationDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        onConfirm={handleDelete}
+        title="Delete sale"
+        description="Are you sure you want to delete this sale? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        isPending={deleteMutation.isPending}
+        variant="destructive"
+      />
     </div>
   );
 }

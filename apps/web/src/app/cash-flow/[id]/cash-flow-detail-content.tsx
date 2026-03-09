@@ -13,6 +13,7 @@ import { useCashFlowById, useUpdateCashFlow, useDeleteCashFlow } from "@kit/hook
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface CashFlowDetailPageProps {
   params: Promise<{ id: string }>;
@@ -22,6 +23,7 @@ export default function CashFlowDetailContent({ params }: CashFlowDetailPageProp
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: cashFlow, isLoading } = useCashFlowById(resolvedParams?.id || "");
   const updateCashFlow = useUpdateCashFlow();
   const deleteMutation = useDeleteCashFlow();
@@ -81,14 +83,10 @@ export default function CashFlowDetailContent({ params }: CashFlowDetailPageProp
 
   const handleDelete = async () => {
     if (!resolvedParams?.id) return;
-    
-    if (!confirm("Are you sure you want to delete this cash flow entry? This action cannot be undone.")) {
-      return;
-    }
-
     try {
       await deleteMutation.mutateAsync(resolvedParams.id);
       toast.success("Cash flow entry deleted successfully");
+      setIsDeleteDialogOpen(false);
       router.push('/cash-flow');
     } catch (error) {
       toast.error("Failed to delete cash flow entry");
@@ -160,7 +158,7 @@ export default function CashFlowDetailContent({ params }: CashFlowDetailPageProp
               </Button>
               <Button
                 variant="destructive"
-                onClick={handleDelete}
+                onClick={() => setIsDeleteDialogOpen(true)}
                 disabled={deleteMutation.isPending}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -351,6 +349,17 @@ export default function CashFlowDetailContent({ params }: CashFlowDetailPageProp
             )}
           </CardContent>
         </Card>
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleDelete}
+          title="Delete cash flow entry"
+          description="Are you sure you want to delete this cash flow entry? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteMutation.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );

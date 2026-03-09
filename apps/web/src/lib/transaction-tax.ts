@@ -29,27 +29,33 @@ export function getEffectiveTransactionTaxRate(
   return valid[0]?.value ?? 0;
 }
 
-/** Single rounding per line: unitPrice is always excl. tax. */
+/** unitPrice is always excl. tax. Returns lineTotalNet (excl.) and taxAmount. */
 export function lineTaxAmount(
   quantity: number,
   unitPrice: number,
   taxRatePercent: number,
   taxInclusive: boolean
 ): { lineTotalNet: number; taxAmount: number } {
-  const gross = to2Decimals(quantity * unitPrice);
   if (taxInclusive && taxRatePercent > 0) {
-    const lineTotalNet = Math.floor(((gross * 100) / (100 + taxRatePercent)) * 100) / 100;
-    const taxAmount = to2Decimals(gross - lineTotalNet);
+    const lineTotalIncl = to2Decimals(quantity * unitPrice * (1 + taxRatePercent / 100));
+    const lineTotalNet = to2Decimals(lineTotalIncl / (1 + taxRatePercent / 100));
+    const taxAmount = to2Decimals(lineTotalIncl - lineTotalNet);
     return { lineTotalNet, taxAmount };
   }
-  const lineTotalNet = gross;
+  const lineTotalNet = to2Decimals(quantity * unitPrice);
   const taxAmount = to2Decimals(lineTotalNet * (taxRatePercent / 100));
   return { lineTotalNet, taxAmount };
 }
 
-/** Price excl. tax = Price incl. tax / (1 + tax). Used only at item price save; sales/expenses always use excl. */
+/** Price excl. tax from price incl. tax. */
 export function netUnitPriceFromInclusive(grossUnitPrice: number, taxRatePercent: number): number {
   if (taxRatePercent <= 0) return grossUnitPrice;
   const net = (grossUnitPrice * 100) / (100 + taxRatePercent);
   return to2Decimals(net);
+}
+
+/** Price incl. tax from price excl. tax (for display). */
+export function unitPriceExclToIncl(unitPriceExcl: number, taxRatePercent: number): number {
+  if (taxRatePercent <= 0) return unitPriceExcl;
+  return to2Decimals(unitPriceExcl * (1 + taxRatePercent / 100));
 }

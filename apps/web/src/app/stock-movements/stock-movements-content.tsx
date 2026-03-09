@@ -251,8 +251,6 @@ export default function StockMovementsContent() {
   ], [itemMap, movementTypeLabels]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this stock movement?")) return;
-    
     try {
       await deleteMutation.mutateAsync(id.toString());
       toast.success("Stock movement deleted successfully");
@@ -263,8 +261,6 @@ export default function StockMovementsContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} stock movement(s)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(id.toString())));
       toast.success(`${ids.length} stock movement(s) deleted successfully`);

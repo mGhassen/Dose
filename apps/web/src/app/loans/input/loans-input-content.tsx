@@ -20,16 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@kit/ui/alert-dialog";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { formatCurrency } from "@kit/lib/config";
 import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate } from "@kit/lib/date-format";
@@ -47,7 +38,6 @@ export default function LoansInputContent() {
   const [newPaymentDate, setNewPaymentDate] = useState<Date>(() => new Date());
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   const [isDeletePaymentDialogOpen, setIsDeletePaymentDialogOpen] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   
   const { data: entriesData, isLoading } = useEntries({ 
     direction: 'input', 
@@ -227,24 +217,17 @@ export default function LoansInputContent() {
 
   const handleDeletePaymentClick = (paymentId: number) => {
     setPaymentToDelete(paymentId);
-    setDeleteConfirmText("");
     setIsDeletePaymentDialogOpen(true);
   };
 
   const handleDeletePayment = async () => {
     if (!paymentToDelete) return;
 
-    if (deleteConfirmText !== "DELETE") {
-      toast.error("Please type DELETE to confirm");
-      return;
-    }
-
     try {
       await deletePayment.mutateAsync(paymentToDelete.toString());
       
       setIsDeletePaymentDialogOpen(false);
       setPaymentToDelete(null);
-      setDeleteConfirmText("");
       refetchPayments();
       queryClient.invalidateQueries({ queryKey: ['entries'] });
       toast.success("Payment deleted successfully");
@@ -454,43 +437,20 @@ export default function LoansInputContent() {
         </DialogContent>
       </Dialog>
       
-      {/* Delete Payment Confirmation Dialog */}
-      <AlertDialog open={isDeletePaymentDialogOpen} onOpenChange={setIsDeletePaymentDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Payment</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this payment? This action cannot be undone.
-              <br />
-              <br />
-              Type <strong>DELETE</strong> to confirm:
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="py-4">
-            <Input
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder="Type DELETE to confirm"
-            />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setIsDeletePaymentDialogOpen(false);
-              setPaymentToDelete(null);
-              setDeleteConfirmText("");
-            }}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeletePayment}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deleteConfirmText !== "DELETE"}
-            >
-              Delete Payment
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmationDialog
+        open={isDeletePaymentDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) setPaymentToDelete(null);
+          setIsDeletePaymentDialogOpen(open);
+        }}
+        onConfirm={handleDeletePayment}
+        title="Delete payment"
+        description="Are you sure you want to delete this payment? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        isPending={deletePayment.isPending}
+        variant="destructive"
+      />
     </div>
   );
 }

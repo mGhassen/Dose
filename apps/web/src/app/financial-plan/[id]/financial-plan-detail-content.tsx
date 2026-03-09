@@ -12,6 +12,7 @@ import { useFinancialPlanById, useUpdateFinancialPlan, useDeleteFinancialPlan, u
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface FinancialPlanDetailPageProps {
   params: Promise<{ id: string }>;
@@ -21,6 +22,7 @@ export default function FinancialPlanDetailContent({ params }: FinancialPlanDeta
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: financialPlan, isLoading, refetch } = useFinancialPlanById(resolvedParams?.id || "");
   const updateFinancialPlan = useUpdateFinancialPlan();
   const deleteMutation = useDeleteFinancialPlan();
@@ -89,14 +91,10 @@ export default function FinancialPlanDetailContent({ params }: FinancialPlanDeta
 
   const handleDelete = async () => {
     if (!resolvedParams?.id) return;
-    
-    if (!confirm("Are you sure you want to delete this financial plan? This action cannot be undone.")) {
-      return;
-    }
-
     try {
       await deleteMutation.mutateAsync(String(resolvedParams.id));
       toast.success("Financial plan deleted successfully");
+      setIsDeleteDialogOpen(false);
       router.push('/financial-plan');
     } catch (error) {
       toast.error("Failed to delete financial plan");
@@ -205,7 +203,7 @@ export default function FinancialPlanDetailContent({ params }: FinancialPlanDeta
               </Button>
               <Button
                 variant="destructive"
-                onClick={handleDelete}
+                onClick={() => setIsDeleteDialogOpen(true)}
                 disabled={deleteMutation.isPending}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -445,6 +443,17 @@ export default function FinancialPlanDetailContent({ params }: FinancialPlanDeta
             )}
           </CardContent>
         </Card>
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleDelete}
+          title="Delete financial plan"
+          description="Are you sure you want to delete this financial plan? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteMutation.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );

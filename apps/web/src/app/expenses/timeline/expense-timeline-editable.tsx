@@ -22,6 +22,7 @@ import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 import { DatePicker } from "@kit/ui/date-picker";
 import type { ExpenseProjection } from "@kit/types";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface EditableExpenseTimelineRowProps {
   projection: ExpenseProjection & { expense: any };
@@ -32,6 +33,7 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
   const [dialogPaymentDate, setDialogPaymentDate] = useState<Date>(() => new Date());
+  const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   
   const { data: actualPayments } = useActualPayments({
     paymentType: 'expense',
@@ -71,6 +73,7 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
   const handleDeletePayment = async (paymentId: number) => {
     try {
       await deletePayment.mutateAsync(String(paymentId));
+      setPaymentToDelete(null);
       onUpdate();
       toast.success("Payment deleted");
     } catch (error: any) {
@@ -156,7 +159,7 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => handleDeletePayment(payment.id)}
+                    onClick={() => setPaymentToDelete(payment.id)}
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -234,6 +237,17 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmationDialog
+        open={paymentToDelete != null}
+        onOpenChange={(open) => !open && setPaymentToDelete(null)}
+        onConfirm={() => paymentToDelete != null && handleDeletePayment(paymentToDelete)}
+        title="Delete payment"
+        description="Are you sure you want to delete this payment?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        isPending={deletePayment.isPending}
+        variant="destructive"
+      />
     </>
   );
 }

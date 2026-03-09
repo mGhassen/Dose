@@ -83,7 +83,6 @@ export default function TaxRulesContent({ selectedRuleId }: TaxRulesContentProps
   );
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this tax rule?")) return;
     try {
       await deleteMutation.mutateAsync(String(id));
       toast.success("Tax rule deleted");
@@ -94,7 +93,6 @@ export default function TaxRulesContent({ selectedRuleId }: TaxRulesContentProps
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Delete ${ids.length} tax rule(s)?`)) return;
     try {
       await Promise.all(ids.map((id) => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} tax rule(s) deleted`);

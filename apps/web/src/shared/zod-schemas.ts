@@ -381,6 +381,7 @@ export const createItemPriceHistorySchema = z.object({
   type: z.enum(["sell", "cost"]),
   effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "effectiveDate must be YYYY-MM-DD"),
   value: z.number().min(0, "value must be non-negative"),
+  taxIncluded: z.boolean().optional(),
 });
 export type CreateItemPriceHistoryInput = z.infer<typeof createItemPriceHistorySchema>;
 
@@ -388,8 +389,9 @@ export const updateItemPriceHistorySchema = z
   .object({
     effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     value: z.number().min(0).optional(),
+    taxIncluded: z.boolean().optional(),
   })
-  .refine((d) => d.effectiveDate !== undefined || d.value !== undefined, {
+  .refine((d) => d.effectiveDate !== undefined || d.value !== undefined || d.taxIncluded !== undefined, {
     message: "No updates provided",
   });
 export type UpdateItemPriceHistoryInput = z.infer<typeof updateItemPriceHistorySchema>;

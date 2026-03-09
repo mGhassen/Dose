@@ -157,7 +157,7 @@ export async function GET(
       const resolvedPrice = await getItemSellingPriceAsOf(supabase, producedItemData.id, todayStr);
       (recipe as any).producedItem = {
         ...transformItem(producedItemData),
-        unitPrice: resolvedPrice ?? undefined,
+        unitPrice: resolvedPrice.unitPrice ?? undefined,
       };
     }
 

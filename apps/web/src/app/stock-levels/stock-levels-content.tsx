@@ -127,8 +127,6 @@ export default function StockLevelsContent() {
   ], [itemMap]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this stock level?")) return;
-    
     try {
       await deleteMutation.mutateAsync(id.toString());
       toast.success("Stock level deleted successfully");
@@ -139,8 +137,6 @@ export default function StockLevelsContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} stock level(s)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(id.toString())));
       toast.success(`${ids.length} stock level(s) deleted successfully`);

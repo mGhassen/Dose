@@ -38,6 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@kit/ui/table";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface SubscriptionDetailsContentProps {
   subscriptionId: string;
@@ -46,6 +47,7 @@ interface SubscriptionDetailsContentProps {
 export default function SubscriptionDetailsContent({ subscriptionId }: SubscriptionDetailsContentProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: subscription, isLoading } = useSubscriptionById(subscriptionId);
   const { data: supplier } = useInventorySupplierById(subscription?.supplierId?.toString() || "");
   const updateSubscription = useUpdateSubscription();
@@ -157,13 +159,10 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this subscription? This action cannot be undone.")) {
-      return;
-    }
-
     try {
       await deleteMutation.mutateAsync(subscriptionId);
       toast.success("Subscription deleted successfully");
+      setIsDeleteDialogOpen(false);
       router.push('/subscriptions');
     } catch (error) {
       toast.error("Failed to delete subscription");
@@ -229,7 +228,7 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={handleDelete}
+                  onClick={() => setIsDeleteDialogOpen(true)}
                   disabled={deleteMutation.isPending}
                   className="text-destructive"
                 >
@@ -543,6 +542,17 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
         ))}
         </>
         )}
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleDelete}
+          title="Delete subscription"
+          description="Are you sure you want to delete this subscription? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteMutation.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );

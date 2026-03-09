@@ -24,6 +24,7 @@ import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate } from "@kit/lib/date-format";
 import { DatePicker } from "@kit/ui/date-picker";
 import type { LoanScheduleEntry } from "@kit/types";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface EditableScheduleRowProps {
   entry: LoanScheduleEntry;
@@ -42,6 +43,7 @@ export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], 
   const [showPayments, setShowPayments] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
   const [dialogPaymentDate, setDialogPaymentDate] = useState<Date>(() => new Date());
+  const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   const { data: paymentMethodValues = [] } = useMetadataEnum("PaymentMethod");
   const paymentMethodItems = paymentMethodValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [editData, setEditData] = useState({
@@ -174,9 +176,8 @@ export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], 
 
   const handleDeletePayment = async (paymentId: number) => {
     try {
-      // Delete payment (hooks handle invalidation automatically)
       await deletePayment.mutateAsync(paymentId.toString());
-      
+      setPaymentToDelete(null);
       onUpdate();
       toast.success("Payment deleted");
     } catch (error: any) {
@@ -373,7 +374,7 @@ export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], 
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => handleDeletePayment(payment.id)}
+                    onClick={() => setPaymentToDelete(payment.id)}
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -461,6 +462,17 @@ export function EditableScheduleRow({ entry, loanId, onUpdate, allEntries = [], 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmationDialog
+        open={paymentToDelete != null}
+        onOpenChange={(open) => !open && setPaymentToDelete(null)}
+        onConfirm={() => paymentToDelete != null && handleDeletePayment(paymentToDelete)}
+        title="Delete payment"
+        description="Are you sure you want to delete this payment?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        isPending={deletePayment.isPending}
+        variant="destructive"
+      />
     </>
   );
 }

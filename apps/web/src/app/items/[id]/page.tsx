@@ -38,14 +38,16 @@ import {
   Area,
 } from 'recharts';
 import AppLayout from "@/components/app-layout";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum } from "@kit/hooks";
 import type { ItemType } from "@kit/types";
 import { toast } from "sonner";
 import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
-import { to2Decimals, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
+import { to2Decimals, netUnitPriceFromInclusive, unitPriceExclToIncl } from "@/lib/transaction-tax";
 import { formatDate } from "@kit/lib/date-format";
 import { DatePicker } from "@kit/ui/date-picker";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 import { InputGroupAttached } from "@/components/input-group";
 
 interface ItemDetailPageProps {
@@ -56,6 +58,7 @@ interface PriceHistoryEntry {
   id: number;
   effectiveDate: string;
   value: number | null;
+  taxIncluded?: boolean;
   resolvedTax?: Record<string, { rate: number; taxInclusive: boolean }>;
 }
 
@@ -98,33 +101,30 @@ function HistoryEntryTable({
   emptyMessage: string;
 }) {
   const [adding, setAdding] = useState(false);
+  const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
   const [addDate, setAddDate] = useState('');
   const [addValue, setAddValue] = useState('');
   const [addInclusive, setAddInclusive] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDate, setEditDate] = useState('');
   const [editValue, setEditValue] = useState('');
+  const [editInclusive, setEditInclusive] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
 
   const handleAdd = async () => {
     if (!addDate || addValue === '' || Number.isNaN(parseFloat(addValue))) return;
-    const raw = parseFloat(addValue);
-    let rate = taxPercent;
-    if (addInclusive && (resolveTaxRateForDate || rate > 0)) {
-      if (resolveTaxRateForDate) {
-        try {
-          rate = await resolveTaxRateForDate(addDate);
-        } catch {
-          rate = taxPercent;
-        }
-      }
-    }
-    const value = addInclusive && rate > 0 ? netUnitPriceFromInclusive(raw, rate) : raw;
+    const value = parseFloat(addValue);
+    const body: { type: 'sell' | 'cost'; effectiveDate: string; value: number; taxIncluded?: boolean } = {
+      type,
+      effectiveDate: addDate,
+      value,
+    };
+    body.taxIncluded = addInclusive;
     try {
       const res = await fetch(`/api/items/${itemId}/price-history`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, effectiveDate: addDate, value }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         setAdding(false);
@@ -146,26 +146,31 @@ function HistoryEntryTable({
     setEditingId(e.id);
     setEditDate(e.effectiveDate);
     setEditValue(e.value != null ? String(e.value) : '');
+    setEditInclusive(e.taxIncluded ?? false);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditDate('');
     setEditValue('');
+    setEditInclusive(false);
   };
 
   const handleUpdate = async () => {
     if (editingId == null || !editDate || editValue === '' || Number.isNaN(parseFloat(editValue))) return;
+    const payload: { effectiveDate: string; value: number; taxIncluded?: boolean } = {
+      effectiveDate: editDate,
+      value: parseFloat(editValue),
+    };
+    payload.taxIncluded = editInclusive;
     try {
       const res = await fetch(`/api/items/${itemId}/price-history/${editingId}?type=${type}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ effectiveDate: editDate, value: parseFloat(editValue) }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
-        setEditingId(null);
-        setEditDate('');
-        setEditValue('');
+        cancelEdit();
         onRefetch();
         toast.success('Updated');
       } else {
@@ -181,13 +186,19 @@ function HistoryEntryTable({
     setDeleting(entryId);
     try {
       const res = await fetch(`/api/items/${itemId}/price-history/${entryId}?type=${type}`, { method: 'DELETE' });
-      if (res.ok) onRefetch();
-      else toast.error('Failed to delete');
+      if (res.ok) {
+        setEntryToDelete(null);
+        onRefetch();
+      } else toast.error('Failed to delete');
     } catch {
       toast.error('Failed to delete');
     } finally {
       setDeleting(null);
     }
+  };
+
+  const handleDeleteConfirm = () => {
+    if (entryToDelete != null) handleDelete(entryToDelete);
   };
 
   if (loading) {
@@ -198,7 +209,7 @@ function HistoryEntryTable({
     );
   }
 
-  const useTaxRuleColumns = type === 'sell' && (salesTypes?.length ?? 0) > 0 && entries.length > 0 && !!entries[0].resolvedTax;
+  const useTaxRuleColumns = false;
   const inclLabel = !useTaxRuleColumns && taxPercent > 0 ? `Incl. tax (${taxPercent}%)` : null;
   const todayStr = new Date().toISOString().slice(0, 10);
   const activeId = entries.find((e) => e.effectiveDate <= todayStr)?.id ?? null;
@@ -207,45 +218,12 @@ function HistoryEntryTable({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">{emptyMessage}</span>
-        {!adding && (
-          <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+        <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
             <Plus className="h-4 w-4 mr-1.5" />
             {addLabel}
           </Button>
-        )}
       </div>
-      {adding && (
-        <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label className="text-muted-foreground font-normal">Effective date</Label>
-              <DatePicker value={addDate ? new Date(addDate) : undefined} onChange={(d) => setAddDate(d ? dateToYYYYMMDD(d) : "")} placeholder="Pick a date" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-muted-foreground font-normal">{valueLabel}</Label>
-              <InputGroupAttached
-                addonStyle="default"
-                input={
-                  <Input type="number" step="0.01" min="0" placeholder="0.00" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="border-0" />
-                }
-                addon={
-                  taxPercent > 0 ? (
-                    <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap text-xs text-muted-foreground">
-                      <Checkbox checked={addInclusive} onCheckedChange={(c) => setAddInclusive(c === true)} aria-label="Includes tax" />
-                      <span>Incl. tax</span>
-                    </label>
-                  ) : null
-                }
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setAddDate(''); setAddValue(''); setAddInclusive(false); }}>Cancel</Button>
-            <Button size="sm" onClick={handleAdd}>Save</Button>
-          </div>
-        </div>
-      )}
-      {entries.length === 0 && !adding ? (
+      {entries.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-10 px-4 text-center">
           <DollarSign className="h-10 w-10 text-muted-foreground/60 mb-3" />
           <p className="text-sm font-medium text-muted-foreground">No entries yet</p>
@@ -260,10 +238,10 @@ function HistoryEntryTable({
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-left font-medium p-3">Effective date</th>
-                <th className="text-right font-medium p-3">Value (excl. tax)</th>
+                <th className="text-right font-medium p-3">{type === 'sell' ? 'Price' : 'Value (excl. tax)'}</th>
                 {useTaxRuleColumns && salesTypes?.map((s) => {
                   const r = entries[0]?.resolvedTax?.[s.conditionValue];
-                  const header = r ? (r.rate > 0 ? `${s.label} (${r.rate}% incl.)` : `${s.label} (Exempt)`) : s.label;
+                  const header = r ? (r.rate > 0 ? `${s.label} (${r.rate}% — tax)` : `${s.label} (Exempt)`) : s.label;
                   return <th key={s.conditionValue} className="text-right font-medium p-3">{header}</th>;
                 })}
                 {inclLabel && <th className="text-right font-medium p-3">{inclLabel}</th>}
@@ -276,65 +254,183 @@ function HistoryEntryTable({
                   key={e.id}
                   className={`border-b last:border-0 hover:bg-muted/30 ${e.id === activeId ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
                 >
-                  {editingId === e.id ? (
-                    <>
-                      <td className="p-3">
-                        <DatePicker value={editDate ? new Date(editDate) : undefined} onChange={(d) => setEditDate(d ? dateToYYYYMMDD(d) : "")} placeholder="Date" />
-                      </td>
-                      <td className="p-3">
-                        <Input type="number" step="0.01" min="0" className="h-8 w-full max-w-[120px]" value={editValue} onChange={(ev) => setEditValue(ev.target.value)} />
-                      </td>
-                      {useTaxRuleColumns && salesTypes?.map((s) => <td key={s.conditionValue} className="p-3 text-muted-foreground">—</td>)}
-                      {inclLabel && <td className="p-3 text-muted-foreground">—</td>}
-                      <td className="p-3 text-right">
-                        <Button variant="ghost" size="sm" className="h-8 mr-1" onClick={cancelEdit}>Cancel</Button>
-                        <Button size="sm" className="h-8" onClick={handleUpdate}>Save</Button>
-                      </td>
-                    </>
-                  ) : (
-                    <>
+                  <>
                       <td className="p-3 font-medium">{formatDate(e.effectiveDate)}</td>
-                      <td className="p-3 text-right tabular-nums font-medium">{e.value != null ? formatCurrency(e.value) : '—'}</td>
+                      <td className="p-3 text-right tabular-nums font-medium">
+                        {e.value != null ? formatCurrency(e.value) : '—'}
+                      </td>
                       {useTaxRuleColumns && salesTypes?.map((s) => {
                         const r = e.resolvedTax?.[s.conditionValue];
                         const rate = r?.rate ?? 0;
-                        const isInclusive = r?.taxInclusive ?? false;
-                        let display = '—';
+                        let taxAmount: number | null = null;
                         if (e.value != null && rate > 0) {
-                          if (isInclusive) {
-                            const refIncl = (() => {
-                              const firstInclusive = salesTypes?.find((st) => (e.resolvedTax?.[st.conditionValue]?.taxInclusive && (e.resolvedTax?.[st.conditionValue]?.rate ?? 0) > 0));
-                              const firstRate = firstInclusive ? (e.resolvedTax?.[firstInclusive.conditionValue]?.rate ?? 0) : 0;
-                              return firstRate > 0 ? to2Decimals(e.value * (1 + firstRate / 100)) : null;
-                            })();
-                            display = refIncl != null ? formatCurrency(refIncl) : formatCurrency(to2Decimals(e.value * (1 + rate / 100)));
+                          if (e.taxIncluded) {
+                            const anyWithRate = salesTypes?.find((st) => (e.resolvedTax?.[st.conditionValue]?.rate ?? 0) > 0);
+                            const refRate = anyWithRate ? (e.resolvedTax?.[anyWithRate.conditionValue]?.rate ?? 0) : 0;
+                            const excl = refRate > 0 ? netUnitPriceFromInclusive(e.value, refRate) : e.value;
+                            taxAmount = to2Decimals(excl * (rate / 100));
                           } else {
-                            display = formatCurrency(to2Decimals(e.value * (1 + rate / 100)));
+                            taxAmount = to2Decimals(e.value * (rate / 100));
                           }
                         }
-                        return <td key={s.conditionValue} className="p-3 text-right tabular-nums text-muted-foreground">{display}</td>;
+                        return (
+                          <td key={s.conditionValue} className="p-3 text-right tabular-nums text-muted-foreground">
+                            {taxAmount != null ? (
+                              <span title="Tax">{formatCurrency(taxAmount)}</span>
+                            ) : '—'}
+                          </td>
+                        );
                       })}
                       {inclLabel && (
                         <td className="p-3 text-right tabular-nums text-muted-foreground">
-                          {e.value != null && taxPercent > 0 ? formatCurrency(to2Decimals(e.value * (1 + taxPercent / 100))) : '—'}
+                          {e.value != null && taxPercent > 0
+                            ? formatCurrency(e.taxIncluded ? e.value : unitPriceExclToIncl(e.value, taxPercent))
+                            : '—'}
                         </td>
                       )}
                       <td className="p-3 text-right">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => startEdit(e)}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" disabled={deleting === e.id} onClick={() => handleDelete(e.id)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" disabled={deleting === e.id} onClick={() => setEntryToDelete(e.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </td>
-                    </>
-                  )}
+                  </>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      <Dialog open={adding || editingId != null} onOpenChange={(open) => {
+          if (!open) {
+            setAdding(false);
+            cancelEdit();
+            setAddDate('');
+            setAddValue('');
+            setAddInclusive(false);
+          }
+        }}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{editingId != null ? 'Edit' : 'Add'} {type === 'sell' ? 'price' : 'cost'} entry</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-4 sm:grid-cols-2 items-end">
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs text-muted-foreground">Effective date</Label>
+                  <div className="h-10 flex items-center rounded-md border border-input overflow-hidden bg-background px-3">
+                    <DatePicker
+                      value={(editingId != null ? editDate : addDate) ? new Date(editingId != null ? editDate : addDate) : undefined}
+                      onChange={(d) => {
+                        const v = d ? dateToYYYYMMDD(d) : "";
+                        if (editingId != null) setEditDate(v);
+                        else setAddDate(v);
+                      }}
+                      placeholder="Pick a date"
+                      className="border-0 p-0 h-auto [&_button]:h-full"
+                    />
+                  </div>
+                </div>
+                {type === 'sell' ? (
+                  <InputGroupAttached
+                    label={valueLabel}
+                    labelClassName="text-muted-foreground font-normal"
+                    addonStyle="default"
+                    input={
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        className="border-0 rounded-none h-full"
+                        value={editingId != null ? editValue : addValue}
+                        onChange={(ev) => {
+                          if (editingId != null) setEditValue(ev.target.value);
+                          else setAddValue(ev.target.value);
+                        }}
+                      />
+                    }
+                    addon={
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="entry-incl-tax-dialog"
+                          checked={editingId != null ? editInclusive : addInclusive}
+                          onCheckedChange={(c) => {
+                            if (editingId != null) setEditInclusive(c === true);
+                            else setAddInclusive(c === true);
+                          }}
+                          aria-label={type === 'sell' ? 'Price includes tax' : 'Cost includes tax'}
+                        />
+                        <Label htmlFor="entry-incl-tax-dialog" className="text-xs font-normal cursor-pointer whitespace-nowrap">{type === 'sell' ? 'Price includes tax' : 'Cost includes tax'}</Label>
+                      </div>
+                    }
+                  />
+                ) : (
+                  <InputGroupAttached
+                    label={valueLabel}
+                    labelClassName="text-muted-foreground font-normal"
+                    addonStyle="default"
+                    input={
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        className="border-0 rounded-none h-full"
+                        value={editingId != null ? editValue : addValue}
+                        onChange={(ev) => {
+                          if (editingId != null) setEditValue(ev.target.value);
+                          else setAddValue(ev.target.value);
+                        }}
+                      />
+                    }
+                    addon={
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="entry-incl-tax-dialog-cost"
+                          checked={editingId != null ? editInclusive : addInclusive}
+                          onCheckedChange={(c) => {
+                            if (editingId != null) setEditInclusive(c === true);
+                            else setAddInclusive(c === true);
+                          }}
+                          aria-label="Cost includes tax"
+                        />
+                        <Label htmlFor="entry-incl-tax-dialog-cost" className="text-xs font-normal cursor-pointer whitespace-nowrap">Cost includes tax</Label>
+                      </div>
+                    }
+                  />
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setAdding(false);
+                cancelEdit();
+                setAddDate('');
+                setAddValue('');
+                setAddInclusive(false);
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={editingId != null ? handleUpdate : handleAdd}>
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      <ConfirmationDialog
+        open={entryToDelete != null}
+        onOpenChange={(open) => !open && setEntryToDelete(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete price entry"
+        description="Are you sure you want to delete this price entry?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        isPending={deleting !== null}
+        variant="destructive"
+      />
     </div>
   );
 }
@@ -343,6 +439,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: item, isLoading } = useItemById(resolvedParams?.id || "");
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const { data: stockMovementsResponse } = useStockMovements({ itemId: resolvedParams?.id || "", limit: 1000 });
@@ -486,7 +583,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   ];
   const typeItems = (variableTypeValues || []).map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
-  const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null } | null>(null);
+  const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null; taxIncluded?: boolean } | null>(null);
   const [sellHistory, setSellHistory] = useState<PriceHistoryEntry[]>([]);
   const [costHistory, setCostHistory] = useState<PriceHistoryEntry[]>([]);
   const [supplierOrderPrices, setSupplierOrderPrices] = useState<{ id: number; unitPrice: number | null; quantity: number | null; unit: string; orderDate: string | null; orderNumber: string | null }[]>([]);
@@ -502,7 +599,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       ]);
       if (res.ok) {
         const d = await res.json();
-        setResolvedPrice({ unitPrice: d.unitPrice ?? null, unitCost: d.unitCost ?? null });
+        setResolvedPrice({ unitPrice: d.unitPrice ?? null, unitCost: d.unitCost ?? null, taxIncluded: d.taxIncluded });
       } else setResolvedPrice(null);
       if (sell.ok) setSellHistory(await sell.json());
       else setSellHistory([]);
@@ -581,14 +678,10 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
   const handleDelete = async () => {
     if (!resolvedParams?.id) return;
-    
-    if (!confirm("Are you sure you want to delete this item? This action cannot be undone.")) {
-      return;
-    }
-
     try {
       await deleteMutation.mutateAsync(resolvedParams.id);
       toast.success("Item deleted successfully");
+      setIsDeleteDialogOpen(false);
       router.push('/items');
     } catch (error) {
       toast.error("Failed to delete item");
@@ -665,7 +758,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={handleDelete}
+                  onClick={() => setIsDeleteDialogOpen(true)}
                   disabled={deleteMutation.isPending}
                   className="text-destructive"
                 >
@@ -1277,14 +1370,22 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   </CardHeader>
                   <CardContent className="space-y-1">
                     {(() => {
-                      const excl = (resolvedPrice?.unitPrice ?? item.unitPrice) != null ? (resolvedPrice?.unitPrice ?? item.unitPrice)! : null;
+                      const raw = (resolvedPrice?.unitPrice ?? item.unitPrice) ?? null;
                       const rate = applicableTaxes?.sales?.find((s) => s.conditionValue === "on_site")?.rate ?? 0;
-                      const incl = excl != null && rate > 0 ? to2Decimals(excl * (1 + rate / 100)) : excl;
-                      const displayPrice = (rate > 0 ? incl : excl) ?? null;
-                      return displayPrice != null ? (
-                        <p className="text-xl font-semibold tabular-nums">{formatCurrency(displayPrice)} <span className="text-xs font-normal text-muted-foreground">{rate > 0 ? "(incl. tax)" : ""}</span></p>
-                      ) : (
-                        <p className="text-2xl font-semibold tabular-nums">—</p>
+                      const isIncl = resolvedPrice?.taxIncluded === true;
+                      const inclPrice = isIncl ? raw : (raw != null && rate > 0 ? unitPriceExclToIncl(raw, rate) : raw);
+                      const exclPrice = isIncl && raw != null && rate > 0 ? netUnitPriceFromInclusive(raw, rate) : raw;
+                      if (inclPrice == null) return <p className="text-2xl font-semibold tabular-nums">—</p>;
+                      return (
+                        <>
+                          <p className="text-xl font-semibold tabular-nums">{formatCurrency(inclPrice)} <span className="text-xs font-normal text-muted-foreground">(incl. tax)</span></p>
+                          {exclPrice != null && rate > 0 && (
+                            <div className="text-sm text-muted-foreground tabular-nums space-y-0.5">
+                              <p>{formatCurrency(exclPrice)} excl. tax</p>
+                              <p>{formatCurrency(to2Decimals(inclPrice - (exclPrice ?? 0)))} tax</p>
+                            </div>
+                          )}
+                        </>
                       );
                     })()}
                   </CardContent>
@@ -1297,14 +1398,22 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   </CardHeader>
                   <CardContent className="space-y-1">
                     {(() => {
-                      const excl = (resolvedPrice?.unitCost ?? item.unitCost) != null ? (resolvedPrice?.unitCost ?? item.unitCost)! : null;
+                      const raw = (resolvedPrice?.unitCost ?? item.unitCost) ?? null;
                       const rate = applicableTaxes?.expense?.rate ?? 0;
-                      const incl = excl != null && rate > 0 ? to2Decimals(excl * (1 + rate / 100)) : excl;
-                      const displayPrice = (rate > 0 ? incl : excl) ?? null;
-                      return displayPrice != null ? (
-                        <p className="text-xl font-semibold tabular-nums">{formatCurrency(displayPrice)} <span className="text-xs font-normal text-muted-foreground">{rate > 0 ? "(incl. tax)" : ""}</span></p>
-                      ) : (
-                        <p className="text-2xl font-semibold tabular-nums">—</p>
+                      const exclPrice = raw;
+                      const inclPrice = raw != null && rate > 0 ? unitPriceExclToIncl(raw, rate) : raw;
+                      const displayPrice = (rate > 0 ? inclPrice : exclPrice) ?? null;
+                      if (displayPrice == null) return <p className="text-2xl font-semibold tabular-nums">—</p>;
+                      return (
+                        <>
+                          <p className="text-xl font-semibold tabular-nums">{formatCurrency(displayPrice)} <span className="text-xs font-normal text-muted-foreground">(incl. tax)</span></p>
+                          {exclPrice != null && rate > 0 && (
+                            <div className="text-sm text-muted-foreground tabular-nums space-y-0.5">
+                              <p>{formatCurrency(exclPrice)} excl. tax</p>
+                              <p>{formatCurrency(to2Decimals(displayPrice - exclPrice))} tax</p>
+                            </div>
+                          )}
+                        </>
                       );
                     })()}
                   </CardContent>
@@ -1376,6 +1485,17 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
             </div>
           </div>
         )}
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleDelete}
+          title="Delete item"
+          description="Are you sure you want to delete this item? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteMutation.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );

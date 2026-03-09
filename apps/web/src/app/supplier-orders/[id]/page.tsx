@@ -26,6 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@kit/ui/dialog";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface SupplierOrderDetailPageProps {
   params: Promise<{ id: string }>;
@@ -35,6 +36,7 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: order, isLoading } = useSupplierOrderById(resolvedParams?.id || "");
   const updateOrder = useUpdateSupplierOrder();
   const deleteMutation = useDeleteSupplierOrder();
@@ -59,11 +61,10 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
 
   const handleDelete = async () => {
     if (!resolvedParams?.id) return;
-    if (!confirm("Are you sure you want to delete this supplier order?")) return;
-    
     try {
       await deleteMutation.mutateAsync(resolvedParams.id);
       toast.success("Supplier order deleted successfully");
+      setIsDeleteDialogOpen(false);
       router.push('/supplier-orders');
     } catch (error: any) {
       toast.error(error?.message || "Failed to delete supplier order");
@@ -159,7 +160,7 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
             )}
             <Button
               variant="destructive"
-              onClick={handleDelete}
+              onClick={() => setIsDeleteDialogOpen(true)}
               disabled={deleteMutation.isPending}
             >
               <Trash2 className="mr-2 h-4 w-4" />
@@ -376,6 +377,17 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleDelete}
+          title="Delete supplier order"
+          description="Are you sure you want to delete this supplier order? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteMutation.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );

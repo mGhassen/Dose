@@ -18,11 +18,16 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid item id' }, { status: 400 });
     }
     const supabase = supabaseServer();
-    const [unitPrice, unitCost] = await Promise.all([
+    const [selling, unitCost] = await Promise.all([
       getItemSellingPriceAsOf(supabase, itemId, dateStr),
       getItemCostAsOf(supabase, itemId, dateStr),
     ]);
-    return NextResponse.json({ unitPrice, unitCost, date: dateStr });
+    return NextResponse.json({
+      unitPrice: selling.unitPrice,
+      unitCost,
+      taxIncluded: selling.taxIncluded,
+      date: dateStr,
+    });
   } catch (error: any) {
     console.error('Error resolving price:', error);
     return NextResponse.json(

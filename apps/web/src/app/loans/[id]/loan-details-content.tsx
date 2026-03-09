@@ -25,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@kit/ui/alert-dialog";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { Badge } from "@kit/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 import { Checkbox } from "@kit/ui/checkbox";
@@ -63,6 +64,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   const [isDeletePaymentDialogOpen, setIsDeletePaymentDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   const { data: loan, isLoading } = useLoanById(loanId);
   const { data: supplier } = useInventorySupplierById(loan?.supplierId?.toString() || "");
@@ -218,13 +220,10 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this loan? This action cannot be undone.")) {
-      return;
-    }
-
     try {
       await deleteMutation.mutateAsync(String(loanId));
       toast.success("Loan deleted successfully");
+      setIsDeleteDialogOpen(false);
       router.push('/loans');
     } catch (error) {
       toast.error("Failed to delete loan");
@@ -303,7 +302,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={handleDelete}
+                  onClick={() => setIsDeleteDialogOpen(true)}
                   disabled={deleteMutation.isPending}
                   className="text-destructive"
                 >
@@ -1032,6 +1031,17 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleDelete}
+          title="Delete loan"
+          description="Are you sure you want to delete this loan? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteMutation.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );

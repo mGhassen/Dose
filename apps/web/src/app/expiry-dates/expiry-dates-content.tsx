@@ -89,8 +89,6 @@ export default function ExpiryDatesContent() {
   ], [itemMap]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this expiry date record?")) return;
-    
     try {
       await deleteMutation.mutateAsync(id.toString());
       toast.success("Expiry date record deleted successfully");
@@ -101,8 +99,6 @@ export default function ExpiryDatesContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} expiry date record(s)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(id.toString())));
       toast.success(`${ids.length} expiry date record(s) deleted successfully`);

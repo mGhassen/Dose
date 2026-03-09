@@ -108,8 +108,6 @@ export default function SupplierOrdersContent() {
   ], [supplierMap]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this supplier order?")) return;
-    
     try {
       await deleteMutation.mutateAsync(id.toString());
       toast.success("Supplier order deleted successfully");
@@ -120,8 +118,6 @@ export default function SupplierOrdersContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} supplier order(s)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(id.toString())));
       toast.success(`${ids.length} supplier order(s) deleted successfully`);

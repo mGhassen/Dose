@@ -32,6 +32,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@kit/ui/dialog";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface MetadataEnumDetailContentProps {
   enumId: number;
@@ -44,6 +45,8 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
     value: MetadataEnumValue | null;
   } | null>(null);
   const [creatingValue, setCreatingValue] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [valueToDelete, setValueToDelete] = useState<number | null>(null);
 
   const { data: enumItem, isLoading } = useMetadataEnumById(enumId);
   const { data: enumValues } = useEnumValuesByEnumId(enumId);
@@ -95,11 +98,10 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
 
   const handleDelete = async () => {
     if (!enumId) return;
-    if (!confirm("Are you sure you want to delete this enum? This will also delete all its values.")) return;
-
     try {
       await deleteMutation.mutateAsync(enumId);
       toast.success("Enum deleted successfully");
+      setIsDeleteDialogOpen(false);
       router.push('/metadata-enums');
     } catch (error: any) {
       toast.error(error?.message || "Failed to delete enum");
@@ -140,13 +142,16 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
     }
   };
 
-  const handleDeleteValue = async (valueId: number) => {
-    if (!enumId) return;
-    if (!confirm("Are you sure you want to delete this enum value?")) return;
+  const handleDeleteValueClick = (valueId: number) => {
+    setValueToDelete(valueId);
+  };
 
+  const handleDeleteValueConfirm = async () => {
+    if (!enumId || valueToDelete == null) return;
     try {
-      await deleteValueMutation.mutateAsync({ enumId, valueId });
+      await deleteValueMutation.mutateAsync({ enumId, valueId: valueToDelete });
       toast.success("Enum value deleted successfully");
+      setValueToDelete(null);
     } catch (error) {
       toast.error("Failed to delete enum value");
       console.error(error);
@@ -196,7 +201,7 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={handleDelete}
+                  onClick={() => setIsDeleteDialogOpen(true)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
@@ -379,7 +384,7 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteValue(value.id)}
+                        onClick={() => handleDeleteValueClick(value.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -414,6 +419,28 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
             </DialogContent>
           </Dialog>
         )}
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleDelete}
+          title="Delete enum"
+          description="Are you sure you want to delete this enum? This will also delete all its values."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteMutation.isPending}
+          variant="destructive"
+        />
+        <ConfirmationDialog
+          open={valueToDelete != null}
+          onOpenChange={(open) => !open && setValueToDelete(null)}
+          onConfirm={handleDeleteValueConfirm}
+          title="Delete enum value"
+          description="Are you sure you want to delete this enum value?"
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteValueMutation.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );

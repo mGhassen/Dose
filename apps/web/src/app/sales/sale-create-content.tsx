@@ -25,7 +25,7 @@ export interface SaleCreateContentProps {
   onCreated?: (saleId: number) => void;
 }
 
-import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
+import { lineTaxAmount, to2Decimals, netUnitPriceFromInclusive, unitPriceExclToIncl } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
 import { createSaleTransactionSchema } from "@/shared/zod-schemas";
 
@@ -85,8 +85,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
       const p = parseFloat(line.unitPrice) || 0;
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
       const inclusive = line.taxInclusive && lineRate > 0;
-      const priceForCalc = inclusive ? to2Decimals(p * (1 + lineRate / 100)) : p;
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, priceForCalc, lineRate, inclusive);
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, inclusive);
       sub += lineTotalNet;
       tax += taxAmount;
     }
@@ -117,22 +116,32 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     const indicesWithItems = current.map((l, i) => (l.itemId ? i : -1)).filter((i) => i >= 0);
     if (indicesWithItems.length === 0) return;
     Promise.all(
-      indicesWithItems.map((index) =>
-        taxRulesApi
-          .resolve({
-            context: 'sale',
-            salesType: formData.type!,
-            itemId: parseInt(current[index].itemId!, 10),
-            date: formData.date!,
-          })
-          .then((r) => ({ index, r }))
-      )
+      indicesWithItems.map((index) => {
+        const itemId = current[index].itemId!;
+        return Promise.all([
+          fetch(`/api/items/${itemId}/resolved-price?date=${formData.date!}`).then((r) => r.json()) as Promise<{ unitPrice?: number | null; taxIncluded?: boolean }>,
+          taxRulesApi.resolve({ context: 'sale', salesType: formData.type!, itemId: parseInt(itemId, 10), date: formData.date! }),
+        ]).then(([data, r]) => ({ index, data, r }));
+      })
     )
       .then((results) => {
         setLineItems((prev) => {
           const next = [...prev];
-          for (const { index, r } of results) {
-            if (next[index]?.itemId) {
+          for (const { index, data, r } of results) {
+            if (next[index]?.itemId && data?.unitPrice != null) {
+              const rate = r.rate;
+              const apiIncl = data.taxIncluded ?? false;
+              const excl = apiIncl && rate > 0 ? netUnitPriceFromInclusive(data.unitPrice, rate) : data.unitPrice;
+              next[index] = {
+                ...next[index],
+                unitPrice: String(to2Decimals(excl)),
+                taxRatePercent: r.rate.toString(),
+                taxVariableName: r.variableName,
+                taxConditionType: r.conditionType ?? undefined,
+                taxConditionValue: r.conditionValue ?? undefined,
+                taxInclusive: r.taxInclusive ?? false,
+              };
+            } else if (next[index]?.itemId) {
               next[index] = {
                 ...next[index],
                 taxRatePercent: r.rate.toString(),
@@ -189,37 +198,49 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     });
     if (!itemId) return;
     const dateStr = formData.date || new Date().toISOString().slice(0, 10);
-    fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`)
-      .then((r) => r.json())
-      .then((data: { unitPrice?: number | null }) => {
-        if (data?.unitPrice != null) {
+    const applyPriceAndRule = (data: { unitPrice?: number | null; taxIncluded?: boolean }, r: { rate: number; taxInclusive?: boolean; variableName?: string; conditionType?: string | null; conditionValue?: string | null }) => {
+      if (data?.unitPrice == null) return;
+      setLineItems((prev) => {
+        const next = [...prev];
+        if (next[index]?.itemId !== itemId) return next;
+        const line = next[index];
+        const rate = r.rate;
+        const apiIncl = data.taxIncluded ?? false;
+        const excl = apiIncl && rate > 0 ? netUnitPriceFromInclusive(data.unitPrice!, rate) : data.unitPrice!;
+        next[index] = {
+          ...line,
+          unitPrice: String(to2Decimals(excl)),
+          taxRatePercent: r.rate.toString(),
+          taxVariableName: r.variableName,
+          taxConditionType: r.conditionType ?? undefined,
+          taxConditionValue: r.conditionValue ?? undefined,
+          taxInclusive: r.taxInclusive ?? false,
+        };
+        return next;
+      });
+    };
+    if (formData.type && formData.date) {
+      Promise.all([
+        fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`).then((r) => r.json()) as Promise<{ unitPrice?: number | null; taxIncluded?: boolean }>,
+        taxRulesApi.resolve({ context: 'sale', salesType: formData.type, itemId: parseInt(itemId, 10), date: formData.date }),
+      ])
+        .then(([data, r]) => applyPriceAndRule(data, r))
+        .catch(() => {});
+    } else {
+      fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`)
+        .then((r) => r.json())
+        .then((data: { unitPrice?: number | null; taxIncluded?: boolean }) => {
+          if (data?.unitPrice == null) return;
+          const rate = defaultTaxRate;
+          const apiIncl = data.taxIncluded ?? false;
+          const excl = apiIncl && rate > 0 ? netUnitPriceFromInclusive(data.unitPrice, rate) : data.unitPrice;
           setLineItems((prev) => {
             const next = [...prev];
-            if (next[index]?.itemId === itemId) next[index] = { ...next[index], unitPrice: String(data.unitPrice) };
+            if (next[index]?.itemId !== itemId) return next;
+            next[index] = { ...next[index], unitPrice: String(excl) };
             return next;
           });
-        }
-      })
-      .catch(() => {});
-    if (formData.type && formData.date) {
-      taxRulesApi
-        .resolve({ context: 'sale', salesType: formData.type, itemId: parseInt(itemId, 10), date: formData.date })
-        .then((r) =>
-          setLineItems((prev) => {
-            const next = [...prev];
-            if (next[index]?.itemId === itemId) {
-              next[index] = {
-                ...next[index],
-                taxRatePercent: r.rate.toString(),
-                taxVariableName: r.variableName,
-                taxConditionType: r.conditionType ?? undefined,
-                taxConditionValue: r.conditionValue ?? undefined,
-                taxInclusive: r.taxInclusive ?? false,
-              };
-            }
-            return next;
-          })
-        )
+        })
         .catch(() => {});
     }
   };
@@ -395,7 +416,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                                 const isIncl = line.taxInclusive && rate > 0;
                                 if (line.unitPrice === "") return "";
                                 const p = parseFloat(line.unitPrice) || 0;
-                                return isIncl ? to2Decimals(p * (1 + rate / 100)) : line.unitPrice;
+                                return isIncl ? unitPriceExclToIncl(p, rate) : line.unitPrice;
                               })()}
                               onChange={(e) => {
                                 const rate = parseFloat(line.taxRatePercent) || 0;
@@ -407,7 +428,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                                 }
                                 const num = parseFloat(raw);
                                 if (Number.isNaN(num)) return;
-                                updateLine(index, "unitPrice", isIncl ? String(to2Decimals(num / (1 + rate / 100))) : raw);
+                                updateLine(index, "unitPrice", isIncl ? String(netUnitPriceFromInclusive(num, rate)) : raw);
                               }}
                             />
                           }
@@ -441,7 +462,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                                 const isIncl = line.taxInclusive && rate > 0;
                                 if (line.unitPrice === "") return "";
                                 const p = parseFloat(line.unitPrice) || 0;
-                                return isIncl ? to2Decimals(p * (1 + rate / 100)) : line.unitPrice;
+                                return isIncl ? unitPriceExclToIncl(p, rate) : line.unitPrice;
                               })()}
                               onChange={(e) => {
                                 const rate = parseFloat(line.taxRatePercent) || 0;
@@ -453,7 +474,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                                 }
                                 const num = parseFloat(raw);
                                 if (Number.isNaN(num)) return;
-                                updateLine(index, "unitPrice", isIncl ? String(to2Decimals(num / (1 + rate / 100))) : raw);
+                                updateLine(index, "unitPrice", isIncl ? String(netUnitPriceFromInclusive(num, rate)) : raw);
                               }}
                               placeholder="0"
                             />
@@ -540,7 +561,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                       const rate = parseFloat(line.taxRatePercent) || 0;
                       const isIncl = line.taxInclusive && rate > 0;
                       const p = parseFloat(line.unitPrice) || 0;
-                      return isIncl ? to2Decimals(p * (1 + rate / 100)) : line.unitPrice;
+                      return isIncl ? unitPriceExclToIncl(p, rate) : line.unitPrice;
                     })()}
                     onChange={(e) => {
                       const line = lineItems[0];
@@ -554,7 +575,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                       }
                       const num = parseFloat(raw);
                       if (Number.isNaN(num)) return;
-                      updateLine(0, "unitPrice", isIncl ? String(to2Decimals(num / (1 + rate / 100))) : raw);
+                      updateLine(0, "unitPrice", isIncl ? String(netUnitPriceFromInclusive(num, rate)) : raw);
                     }}
                     placeholder="0"
                   />

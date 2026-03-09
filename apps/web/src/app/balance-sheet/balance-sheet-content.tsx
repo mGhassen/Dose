@@ -123,8 +123,6 @@ export default function BalanceSheetContent() {
   ], []);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this balance sheet?")) return;
-    
     try {
       await deleteMutation.mutateAsync(id.toString());
       toast.success("Balance sheet deleted successfully");
@@ -135,8 +133,6 @@ export default function BalanceSheetContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} balance sheet(s)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(id.toString())));
       toast.success(`${ids.length} balance sheet(s) deleted successfully`);

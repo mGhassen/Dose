@@ -12,6 +12,7 @@ import { useWorkingCapitalById, useUpdateWorkingCapital, useDeleteWorkingCapital
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface WorkingCapitalDetailPageProps {
   params: Promise<{ id: string }>;
@@ -21,6 +22,7 @@ export default function WorkingCapitalDetailContent({ params }: WorkingCapitalDe
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: workingCapital, isLoading, refetch } = useWorkingCapitalById(resolvedParams?.id || "");
   const updateWorkingCapital = useUpdateWorkingCapital();
   const deleteMutation = useDeleteWorkingCapital();
@@ -84,14 +86,10 @@ export default function WorkingCapitalDetailContent({ params }: WorkingCapitalDe
 
   const handleDelete = async () => {
     if (!resolvedParams?.id) return;
-    
-    if (!confirm("Are you sure you want to delete this working capital entry? This action cannot be undone.")) {
-      return;
-    }
-
     try {
       await deleteMutation.mutateAsync(String(resolvedParams.id));
       toast.success("Working capital entry deleted successfully");
+      setIsDeleteDialogOpen(false);
       router.push('/working-capital');
     } catch (error) {
       toast.error("Failed to delete working capital entry");
@@ -196,7 +194,7 @@ export default function WorkingCapitalDetailContent({ params }: WorkingCapitalDe
               </Button>
               <Button
                 variant="destructive"
-                onClick={handleDelete}
+                onClick={() => setIsDeleteDialogOpen(true)}
                 disabled={deleteMutation.isPending}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -424,6 +422,17 @@ export default function WorkingCapitalDetailContent({ params }: WorkingCapitalDe
             )}
           </CardContent>
         </Card>
+        <ConfirmationDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          onConfirm={handleDelete}
+          title="Delete working capital entry"
+          description="Are you sure you want to delete this working capital entry? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isPending={deleteMutation.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );

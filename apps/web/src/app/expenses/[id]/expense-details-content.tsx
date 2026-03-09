@@ -53,6 +53,7 @@ import type { ExpenseCategory } from "@kit/types";
 
 import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 function DetailRow({
   icon: Icon,
@@ -93,6 +94,7 @@ export function ExpenseDetailContent({
 }: ExpenseDetailContentProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(initialEditMode);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: expense, isLoading } = useExpenseById(expenseId);
   const { data: subscriptionsResponse } = useSubscriptions();
   const subscriptions = subscriptionsResponse?.data || [];
@@ -299,16 +301,10 @@ export function ExpenseDetailContent({
   };
 
   const handleDelete = async () => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this expense? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
     try {
       await deleteMutation.mutateAsync(String(expenseId));
       toast.success("Expense deleted successfully");
+      setIsDeleteDialogOpen(false);
       onDeleted();
     } catch (error) {
       toast.error("Failed to delete expense");
@@ -627,7 +623,7 @@ export function ExpenseDetailContent({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={handleDelete}
+                  onClick={() => setIsDeleteDialogOpen(true)}
                   disabled={deleteMutation.isPending}
                   className="text-destructive focus:text-destructive"
                 >
@@ -798,6 +794,17 @@ export function ExpenseDetailContent({
           </div>
         </div>
       </ScrollArea>
+      <ConfirmationDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        onConfirm={handleDelete}
+        title="Delete expense"
+        description="Are you sure you want to delete this expense? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        isPending={deleteMutation.isPending}
+        variant="destructive"
+      />
     </div>
   );
 }

@@ -30,6 +30,7 @@ import { formatDateTime } from '@kit/lib/date-format';
 import SquareDataView from './square-data-view';
 import { Alert, AlertDescription } from '@kit/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@kit/ui/dialog';
+import { ConfirmationDialog } from '@/components/confirmation-dialog';
 import { Input } from '@kit/ui/input';
 import { Label } from '@kit/ui/label';
 import { Textarea } from '@kit/ui/textarea';
@@ -49,6 +50,7 @@ export default function IntegrationsContent() {
   const [manualToken, setManualToken] = useState('');
   const [manualMerchantId, setManualMerchantId] = useState('');
   const [manualLocationId, setManualLocationId] = useState('');
+  const [integrationToDisconnect, setIntegrationToDisconnect] = useState<number | null>(null);
 
   // Check if we're returning from OAuth
   useEffect(() => {
@@ -148,22 +150,25 @@ export default function IntegrationsContent() {
   };
 
   const handleDisconnect = async (integrationId: number) => {
-    if (!confirm('Are you sure you want to disconnect this integration? This will remove all connection data.')) {
-      return;
-    }
-
     try {
       await disconnectIntegration.mutateAsync(integrationId.toString());
       toast({
         title: 'Disconnected',
         description: 'Integration has been disconnected successfully.',
       });
+      setIntegrationToDisconnect(null);
     } catch (error: any) {
       toast({
         title: 'Disconnect Failed',
         description: error.message || 'Failed to disconnect integration',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleDisconnectConfirm = async () => {
+    if (integrationToDisconnect != null) {
+      await handleDisconnect(integrationToDisconnect);
     }
   };
 
@@ -232,7 +237,7 @@ export default function IntegrationsContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDisconnect(squareIntegration.id)}
+                      onClick={() => setIntegrationToDisconnect(squareIntegration.id)}
                       disabled={disconnectIntegration.isPending}
                     >
                       {disconnectIntegration.isPending ? (
@@ -586,7 +591,7 @@ export default function IntegrationsContent() {
                   <div className="pt-4 border-t">
                     <Button
                       variant="destructive"
-                      onClick={() => handleDisconnect(squareIntegration.id)}
+                      onClick={() => setIntegrationToDisconnect(squareIntegration.id)}
                       disabled={disconnectIntegration.isPending}
                     >
                       {disconnectIntegration.isPending ? (
@@ -612,6 +617,17 @@ export default function IntegrationsContent() {
           </>
         )}
       </Tabs>
+      <ConfirmationDialog
+        open={integrationToDisconnect != null}
+        onOpenChange={(open) => !open && setIntegrationToDisconnect(null)}
+        onConfirm={handleDisconnectConfirm}
+        title="Disconnect integration"
+        description="Are you sure you want to disconnect this integration? This will remove all connection data."
+        confirmText="Disconnect"
+        cancelText="Cancel"
+        isPending={disconnectIntegration.isPending}
+        variant="destructive"
+      />
     </div>
   );
 }

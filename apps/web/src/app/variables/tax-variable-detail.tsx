@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { ScrollArea } from "@kit/ui/scroll-area";
@@ -16,6 +16,7 @@ import { useTaxRules, useDeleteVariable } from "@kit/hooks";
 import type { Variable } from "@kit/types";
 import type { VariablePayloadTax } from "@kit/types";
 import { toast } from "sonner";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -35,6 +36,7 @@ export interface TaxVariableDetailProps {
 
 export function TaxVariableDetail({ variableId, variable, onClose, onDeleted }: TaxVariableDetailProps) {
   const router = useRouter();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const deleteMutation = useDeleteVariable();
   const { data: rules = [] } = useTaxRules({ variableId: variable.id });
 
@@ -54,10 +56,10 @@ export function TaxVariableDetail({ variableId, variable, onClose, onDeleted }: 
     payload.calculationType === "inclusive" ? "Inclusive tax" : "Additive tax";
 
   const handleDelete = async () => {
-    if (!confirm("Delete this tax? This cannot be undone.")) return;
     try {
       await deleteMutation.mutateAsync(variableId);
       toast.success("Tax deleted");
+      setIsDeleteDialogOpen(false);
       onDeleted();
     } catch (e: unknown) {
       toast.error((e as Error)?.message || "Failed to delete");
@@ -85,7 +87,7 @@ export function TaxVariableDetail({ variableId, variable, onClose, onDeleted }: 
                 Edit variable
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={handleDelete}
+                onClick={() => setIsDeleteDialogOpen(true)}
                 disabled={deleteMutation.isPending}
                 className="text-destructive focus:text-destructive"
               >
@@ -142,6 +144,17 @@ export function TaxVariableDetail({ variableId, variable, onClose, onDeleted }: 
           </Section>
         </div>
       </ScrollArea>
+      <ConfirmationDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        onConfirm={handleDelete}
+        title="Delete tax"
+        description="Delete this tax? This cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        isPending={deleteMutation.isPending}
+        variant="destructive"
+      />
     </div>
   );
 }

@@ -29,6 +29,7 @@ import type { VariableType } from "@kit/types";
 import { DatePicker } from "@kit/ui/date-picker";
 import { isConvertibleDimension } from "@/lib/units/dimensions";
 import Link from "next/link";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 function KeyValue({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -63,6 +64,7 @@ export function VariableDetailContent({
 }: VariableDetailContentProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(initialEditMode);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: variable, isLoading } = useVariableById(variableId);
   const updateVariable = useUpdateVariable();
   const deleteMutation = useDeleteVariable();
@@ -190,10 +192,10 @@ export function VariableDetailContent({
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this variable? This action cannot be undone.")) return;
     try {
       await deleteMutation.mutateAsync(variableId);
       toast.success("Variable deleted successfully");
+      setIsDeleteDialogOpen(false);
       onDeleted();
     } catch (error) {
       toast.error("Failed to delete variable");
@@ -483,7 +485,7 @@ export function VariableDetailContent({
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={handleDelete}
+                onClick={() => setIsDeleteDialogOpen(true)}
                 disabled={deleteMutation.isPending}
                 className="text-destructive focus:text-destructive"
               >
@@ -560,6 +562,17 @@ export function VariableDetailContent({
           </div>
         </div>
       </ScrollArea>
+      <ConfirmationDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        onConfirm={handleDelete}
+        title="Delete variable"
+        description="Are you sure you want to delete this variable? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        isPending={deleteMutation.isPending}
+        variant="destructive"
+      />
     </div>
   );
 }

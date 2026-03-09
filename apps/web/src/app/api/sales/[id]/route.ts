@@ -5,7 +5,8 @@ import { supabaseServer } from '@kit/lib/supabase';
 import type { Sale, UpdateSaleData, SaleLineItem } from '@kit/types';
 import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
 import { upsertSellingPrice, upsertCost } from '@/lib/items/price-history-upsert';
-import { getTaxRateForSaleLine } from '@/lib/tax-rules-resolve';
+import { getTaxRateAndRuleForSaleLine } from '@/lib/tax-rules-resolve';
+import { lineTaxAmount, netUnitPriceFromInclusive, unitPriceExclToIncl } from '@/lib/transaction-tax';
 import { parseRequestBody, updateSaleTransactionSchema } from '@/shared/zod-schemas';
 
 function transformSale(row: any): Sale {
@@ -130,7 +131,8 @@ export async function GET(
       
       if (itemData) {
         const dateStr = sale.date ? sale.date.split('T')[0] : undefined;
-        const sellPrice = sale.unitPrice != null ? sale.unitPrice : (dateStr ? await getItemSellingPriceAsOf(supabase, itemData.id, dateStr) : undefined);
+        const resolvedSell = dateStr ? await getItemSellingPriceAsOf(supabase, itemData.id, dateStr) : null;
+        const sellPrice = sale.unitPrice != null ? sale.unitPrice : (resolvedSell?.unitPrice ?? undefined);
         const costPrice = sale.unitCost ?? undefined;
         sale.item = {
           id: itemData.id,
@@ -215,6 +217,8 @@ export async function PUT(
         let priceLookupItemId: number | null = null;
         let itemCategory: string | null = null;
         let itemCreatedAt: string | null = null;
+        let resolvedPriceFromHistory: number | null = null;
+        let resolvedTaxIncludedFromHistory: boolean | null = null;
         if (line.itemId && dateStr) {
           const { data: itemRow } = await supabase.from('items').select('id, category, created_at').eq('id', line.itemId).single();
           if (itemRow) {
@@ -232,26 +236,40 @@ export async function PUT(
           if (priceLookupItemId) {
             if (unitPrice == null) {
               const resolved = await getItemSellingPriceAsOf(supabase, priceLookupItemId, dateStr);
-              if (resolved != null) unitPrice = resolved;
+              if (resolved.unitPrice != null) {
+                unitPrice = resolved.unitPrice;
+                resolvedPriceFromHistory = resolved.unitPrice;
+                resolvedTaxIncludedFromHistory = resolved.taxIncluded;
+              }
             }
             if (unitCost == null) {
               const resolved = await getItemCostAsOf(supabase, priceLookupItemId, dateStr);
               if (resolved != null) unitCost = resolved;
             }
-            if (unitPrice != null) await upsertSellingPrice(supabase, priceLookupItemId, dateStr, unitPrice);
             if (unitCost != null) await upsertCost(supabase, priceLookupItemId, dateStr, unitCost);
           }
         }
-        let lineTaxRate = await getTaxRateForSaleLine(supabase, priceLookupItemId ?? line.itemId ?? null, itemCategory, body.type, dateStr, itemCreatedAt);
-        if (line.taxRatePercent != null) lineTaxRate = line.taxRatePercent;
+        const taxRule = await getTaxRateAndRuleForSaleLine(supabase, priceLookupItemId ?? line.itemId ?? null, itemCategory, body.type, dateStr, itemCreatedAt);
+        let lineTaxRate = line.taxRatePercent != null ? line.taxRatePercent : taxRule.rate;
+        const taxInclusive = taxRule.taxInclusive ?? false;
+        let netUnit = unitPrice ?? 0;
+        if (resolvedPriceFromHistory != null && resolvedTaxIncludedFromHistory === true && lineTaxRate > 0) {
+          netUnit = netUnitPriceFromInclusive(resolvedPriceFromHistory, lineTaxRate);
+        }
         const qty = typeof line.quantity === 'number' ? line.quantity : parseFloat(String(line.quantity));
-        const lineTotal = Math.round(qty * (unitPrice ?? 0) * 100) / 100;
-        const taxAmount = Math.round(lineTotal * (lineTaxRate / 100) * 100) / 100;
+        const { lineTotalNet, taxAmount } = lineTaxAmount(qty, netUnit, lineTaxRate, taxInclusive);
+        const lineTotal = lineTotalNet;
+        const priceToSave = priceLookupItemId != null && netUnit > 0
+          ? (taxInclusive && lineTaxRate > 0 ? unitPriceExclToIncl(netUnit, lineTaxRate) : netUnit)
+          : null;
+        if (priceLookupItemId != null && priceToSave != null) {
+          await upsertSellingPrice(supabase, priceLookupItemId, dateStr, priceToSave, taxInclusive);
+        }
         lines.push({
           itemId: line.itemId,
           quantity: qty,
           unitId: line.unitId,
-          unitPrice: unitPrice ?? 0,
+          unitPrice: netUnit,
           unitCost,
           lineTotal,
           taxRatePercent: lineTaxRate,

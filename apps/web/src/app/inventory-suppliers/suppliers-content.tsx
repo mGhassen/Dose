@@ -76,8 +76,6 @@ export default function SuppliersContent() {
   ], []);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this supplier?")) return;
-    
     try {
       await deleteMutation.mutateAsync(id.toString());
       toast.success("Supplier deleted successfully");
@@ -88,8 +86,6 @@ export default function SuppliersContent() {
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} supplier(s)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(id.toString())));
       toast.success(`${ids.length} supplier(s) deleted successfully`);

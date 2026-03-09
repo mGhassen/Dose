@@ -36,6 +36,7 @@ import { useToast } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
 import SquareDataView from '../square-data-view';
 import { Alert, AlertDescription } from '@kit/ui/alert';
+import { ConfirmationDialog } from '@/components/confirmation-dialog';
 
 function getStatusBadge(status: string) {
   switch (status) {
@@ -85,6 +86,7 @@ export default function IntegrationDetailPage({ params }: { params: Promise<{ id
 
 function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string; activeTab: string; setActiveTab: (tab: string) => void }) {
   const router = useRouter();
+  const [isDisconnectDialogOpen, setIsDisconnectDialogOpen] = useState(false);
   const { data: integration, isLoading } = useIntegrationById(id);
   const syncIntegration = useSyncIntegration();
   const disconnectIntegration = useDisconnectIntegration();
@@ -110,16 +112,13 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
   };
 
   const handleDisconnect = async () => {
-    if (!confirm('Are you sure you want to disconnect this integration? This will remove all connection data.')) {
-      return;
-    }
-
     try {
       await disconnectIntegration.mutateAsync(id);
       toast({
         title: 'Disconnected',
         description: 'Integration has been disconnected successfully.',
       });
+      setIsDisconnectDialogOpen(false);
       router.push('/settings/integrations');
     } catch (error: any) {
       toast({
@@ -234,7 +233,7 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={handleDisconnect}
+                      onClick={() => setIsDisconnectDialogOpen(true)}
                       disabled={disconnectIntegration.isPending}
                       className="text-destructive focus:text-destructive"
                     >
@@ -372,6 +371,17 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
             </TabsContent>
           )}
         </Tabs>
+        <ConfirmationDialog
+          open={isDisconnectDialogOpen}
+          onOpenChange={setIsDisconnectDialogOpen}
+          onConfirm={handleDisconnect}
+          title="Disconnect integration"
+          description="Are you sure you want to disconnect this integration? This will remove all connection data."
+          confirmText="Disconnect"
+          cancelText="Cancel"
+          isPending={disconnectIntegration.isPending}
+          variant="destructive"
+        />
       </div>
     </AppLayout>
   );
