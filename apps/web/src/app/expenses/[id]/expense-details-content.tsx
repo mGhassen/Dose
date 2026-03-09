@@ -34,7 +34,6 @@ import {
 import { DatePicker } from "@kit/ui/date-picker";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
-import { Checkbox } from "@kit/ui/checkbox";
 import {
   useExpenseById,
   useUpdateExpense,
@@ -52,7 +51,7 @@ import { formatDate } from "@kit/lib/date-format";
 import { dateToYYYYMMDD } from "@kit/lib";
 import type { ExpenseCategory } from "@kit/types";
 
-import { lineTaxAmount, netUnitPriceFromInclusive } from "@/lib/transaction-tax";
+import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
 
 function DetailRow({
@@ -148,17 +147,19 @@ export function ExpenseDetailContent({
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : defaultTaxRate;
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, line.taxInclusive);
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, false);
       sub += lineTotalNet;
       tax += taxAmount;
     }
+    sub = to2Decimals(sub);
+    tax = to2Decimals(tax);
     let disc = 0;
     if (formData.discountValue) {
       const v = parseFloat(formData.discountValue) || 0;
-      if (formData.discountType === "percent") disc = Math.round(sub * (v / 100) * 100) / 100;
-      else disc = Math.round(v * 100) / 100;
+      if (formData.discountType === "percent") disc = to2Decimals(sub * (v / 100));
+      else disc = to2Decimals(v);
     }
-    const tot = Math.round((sub + tax - disc) * 100) / 100;
+    const tot = to2Decimals(sub + tax - disc);
     return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
   }, [lineItems, defaultTaxRate, formData.discountType, formData.discountValue]);
 
@@ -213,17 +214,41 @@ export function ExpenseDetailContent({
         line.unitPrice = "";
         line.taxRatePercent = "";
       } else {
-        const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; unit_cost?: number; unitCost?: number; unit_price?: number; unitPrice?: number; defaultTaxRatePercent?: number } | undefined;
+        const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; category?: string; defaultTaxRatePercent?: number } | undefined;
         line.quantity = "1";
         line.unitId = item?.unitId ?? null;
-        const price = item?.unit_cost ?? item?.unitCost ?? item?.unit_price ?? item?.unitPrice;
-        line.unitPrice = price != null ? String(price) : "";
-        line.unitCost = item?.unitCost != null ? String(item.unitCost) : (item?.unit_cost != null ? String(item.unit_cost) : "");
-        line.taxRatePercent = item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : String(defaultTaxRate);
+        line.unitPrice = "";
+        line.unitCost = "";
+        line.taxRatePercent = String(defaultTaxRate);
       }
       next[index] = line;
       return next;
     });
+    if (!itemId) return;
+    const dateStr = formData.expenseDate || new Date().toISOString().slice(0, 10);
+    const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { category?: string } | undefined;
+    fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`)
+      .then((r) => r.json())
+      .then((data: { unitCost?: number | null }) => {
+        if (data?.unitCost != null) {
+          setLineItems((prev) => {
+            const next = [...prev];
+            if (next[index]?.itemId === itemId) next[index] = { ...next[index], unitPrice: String(data.unitCost), unitCost: String(data.unitCost) };
+            return next;
+          });
+        }
+      })
+      .catch(() => {});
+    taxRulesApi
+      .resolve({ context: 'expense', itemId: parseInt(itemId, 10), date: dateStr, itemCategory: item?.category })
+      .then((r) =>
+        setLineItems((prev) => {
+          const next = [...prev];
+          if (next[index]?.itemId === itemId) next[index] = { ...next[index], taxRatePercent: r.rate.toString() };
+          return next;
+        })
+      )
+      .catch(() => {});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -242,12 +267,11 @@ export function ExpenseDetailContent({
         return;
       }
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : defaultTaxRate;
-      const unitPriceNet = line.taxInclusive ? netUnitPriceFromInclusive(price, lineRate) : price;
       payloadLines.push({
         itemId: line.itemId ? parseInt(line.itemId, 10) : undefined,
         quantity: qty,
         unitId: line.unitId ?? undefined,
-        unitPrice: unitPriceNet,
+        unitPrice: price,
         unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
         taxRatePercent: line.taxRatePercent !== "" ? lineRate : undefined,
       });
@@ -425,7 +449,7 @@ export function ExpenseDetailContent({
                           />
                         </div>
                         <div className="col-span-2">
-                          <Label className="text-xs text-muted-foreground">{line.taxInclusive ? "Price (incl. tax)" : "Price (excl. tax)"}</Label>
+                          <Label className="text-xs text-muted-foreground">Price (excl. tax)</Label>
                           <Input
                             type="number"
                             step="0.01"
@@ -437,7 +461,7 @@ export function ExpenseDetailContent({
                         </div>
                         <div className="col-span-2">
                           <InputGroupAttached
-                            label="Tax % / Incl. tax"
+                            label="Tax %"
                             addonStyle="default"
                             input={
                               <Input
@@ -450,16 +474,7 @@ export function ExpenseDetailContent({
                                 placeholder={String(defaultTaxRate)}
                               />
                             }
-                            addon={
-                              <div className="flex h-full min-h-10 items-center justify-center leading-none" title="Price includes tax">
-                                <Checkbox
-                                  id={`exp-edit-tax-incl-${index}`}
-                                  checked={line.taxInclusive}
-                                  onCheckedChange={(checked) => updateLine(index, "taxInclusive", checked === true)}
-                                  aria-label="Price includes tax"
-                                />
-                              </div>
-                            }
+                            addon={<span className="text-muted-foreground text-xs">%</span>}
                           />
                         </div>
                         <div className="col-span-1 flex h-10 items-center">

@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
       if (sale.itemId && itemsMap.has(sale.itemId)) {
         const itemData = itemsMap.get(sale.itemId);
         const sellPrice = sale.unitPrice ?? undefined;
-        const costPrice = sale.unitCost != null ? sale.unitCost : (itemData.unit_cost != null ? parseFloat(itemData.unit_cost) : undefined);
+        const costPrice = sale.unitCost ?? undefined;
         if (itemData.item_type === 'recipe') {
           sale.item = {
             id: itemData.id,
@@ -245,13 +245,13 @@ export async function POST(request: NextRequest) {
         let itemCategory: string | null = null;
         let itemCreatedAt: string | null = null;
         if (line.itemId && dateStr) {
-          const { data: itemRow } = await supabase.from('items').select('id, default_tax_rate_percent, category, created_at').eq('id', line.itemId).single();
+          const { data: itemRow } = await supabase.from('items').select('id, category, created_at').eq('id', line.itemId).single();
           if (itemRow) {
             priceLookupItemId = itemRow.id;
             itemCategory = itemRow.category ?? null;
             itemCreatedAt = itemRow.created_at ?? null;
           } else {
-            const { data: produced } = await supabase.from('items').select('id, default_tax_rate_percent, category, created_at').eq('produced_from_recipe_id', line.itemId).single();
+            const { data: produced } = await supabase.from('items').select('id, category, created_at').eq('produced_from_recipe_id', line.itemId).single();
             if (produced) {
               priceLookupItemId = produced.id;
               itemCategory = produced.category ?? null;

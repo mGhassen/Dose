@@ -417,7 +417,9 @@ export interface UpdateVariableData extends Partial<CreateVariableData> {}
 
 export type TaxRuleConditionType = 'sales_type' | 'expense' | null;
 export type TaxRuleScopeType = 'all' | 'items' | 'categories';
-export type TaxRuleRuleType = 'exemption' | 'reduction';
+export type TaxRuleRuleType = 'taxable' | 'exemption';
+
+export type TaxRuleCalculationType = 'additive' | 'inclusive';
 
 export interface TaxRule {
   id: number;
@@ -436,6 +438,7 @@ export interface TaxRule {
   applyToCustomAmounts: boolean;
   applyToFutureItems: boolean;
   ruleType: TaxRuleRuleType;
+  calculationType?: TaxRuleCalculationType | null;
   createdAt: string;
   updatedAt: string;
   variable?: Variable;
@@ -457,6 +460,7 @@ export interface CreateTaxRuleData {
   applyToCustomAmounts?: boolean;
   applyToFutureItems?: boolean;
   ruleType?: TaxRuleRuleType;
+  calculationType?: TaxRuleCalculationType | null;
 }
 
 export interface UpdateTaxRuleData extends Partial<CreateTaxRuleData> {}
@@ -996,7 +1000,7 @@ export interface FinancialKPIs {
 // ITEMS (replaces ingredients - can be regular items or recipes)
 // ============================================================================
 
-export type ItemType = 'item' | 'recipe';
+export type ItemType = 'item' | 'product' | 'recipe';
 
 export interface Item {
   id: number;
@@ -1011,12 +1015,13 @@ export interface Item {
   updatedAt: string;
   // Item-specific fields (only when itemType === 'item')
   sku?: string;
-  unitPrice?: number;   // Selling price
-  unitCost?: number;    // Buying/cost price (for recipe cost, etc.)
+  unitPrice?: number;
+  unitCost?: number;
   vendorId?: number;
   notes?: string;
-  producedFromRecipeId?: number; // ID of recipe that produced this item
-  defaultTaxRatePercent?: number; // Default tax % when item is added to sale/expense line (user can override)
+  producedFromRecipeId?: number;
+  defaultTaxRatePercent?: number;
+  type?: string; // Variable type (same as in variables), e.g. unit, other
   // Recipe-specific fields (only when itemType === 'recipe')
   servingSize?: number;
   preparationTime?: number;
@@ -1037,8 +1042,8 @@ export interface CreateItemData {
   notes?: string;
   defaultTaxRatePercent?: number;
   isActive?: boolean;
-  // Note: Recipes are created via CreateRecipeData, not CreateItemData
-  // Items table only stores regular inventory items
+  itemType?: 'item' | 'product';
+  type?: string;
 }
 
 export interface UpdateItemData extends Partial<CreateItemData> {

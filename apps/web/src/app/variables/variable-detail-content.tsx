@@ -28,8 +28,7 @@ import { dateToYYYYMMDD } from "@kit/lib";
 import type { VariableType } from "@kit/types";
 import { DatePicker } from "@kit/ui/date-picker";
 import { isConvertibleDimension } from "@/lib/units/dimensions";
-import { TaxVariableDetail } from "./tax-variable-detail";
-import { TaxVariableEditSection } from "./tax-variable-edit-section";
+import Link from "next/link";
 
 function KeyValue({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -144,9 +143,9 @@ export function VariableDetailContent({
       return;
     }
 
-    const wasTax = variable?.type === "tax" || variable?.type === "transaction_tax";
-    const isNowTax = formData.type === "tax" || formData.type === "transaction_tax";
-    if (wasTax && !isNowTax && taxRules.length > 0) {
+    const wasTransactionTax = variable?.type === "transaction_tax";
+    const isNowTransactionTax = formData.type === "transaction_tax";
+    if (wasTransactionTax && !isNowTransactionTax && taxRules.length > 0) {
       const ok = window.confirm(
         "This variable has tax rule(s). Changing type will make them inactive. Do you want to delete them?"
       );
@@ -162,7 +161,7 @@ export function VariableDetailContent({
           dimension: formData.payloadDimension || "other",
           base_unit_id: formData.payloadBaseUnitId ?? null,
         }
-      : !isNowTax
+      : !isTaxOrTransactionTax
         ? null
         : undefined;
     const numValue = isUnitType && !unitRequiresFactor ? 1 : parseFloat(formData.value);
@@ -243,17 +242,6 @@ export function VariableDetailContent({
           Back to variables
         </Button>
       </div>
-    );
-  }
-
-  if ((variable.type === "tax" || variable.type === "transaction_tax") && !isEditing) {
-    return (
-      <TaxVariableDetail
-        variableId={variableId}
-        variable={variable}
-        onClose={onClose}
-        onDeleted={onDeleted}
-      />
     );
   }
 
@@ -427,9 +415,9 @@ export function VariableDetailContent({
                 </div>
               </div>
 
-              {isTaxOrTransactionTax && (
-                <div className="pt-2">
-                  <TaxVariableEditSection variableId={variableId} variable={variable} />
+              {formData.type === "transaction_tax" && (
+                <div className="pt-2 text-sm text-muted-foreground">
+                  <Link href="/tax-rules" className="text-primary hover:underline">Tax rules apply this variable to items — Manage tax rules</Link>
                 </div>
               )}
             </div>

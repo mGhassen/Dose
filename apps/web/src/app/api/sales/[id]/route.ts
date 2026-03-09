@@ -131,7 +131,7 @@ export async function GET(
       if (itemData) {
         const dateStr = sale.date ? sale.date.split('T')[0] : undefined;
         const sellPrice = sale.unitPrice != null ? sale.unitPrice : (dateStr ? await getItemSellingPriceAsOf(supabase, itemData.id, dateStr) : undefined);
-        const costPrice = sale.unitCost != null ? sale.unitCost : (itemData.unit_cost != null ? parseFloat(itemData.unit_cost) : undefined);
+        const costPrice = sale.unitCost ?? undefined;
         sale.item = {
           id: itemData.id,
           name: itemData.name,

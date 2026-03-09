@@ -5842,33 +5842,13 @@ INSERT INTO financial_plan (month, equity, loans, other_sources, total_sources, 
 -- VARIABLES
 -- ============================================================================
 INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active) VALUES
-('VAT Rate', 'tax', 19.0, 'percentage', '2024-01-01', NULL, 'Value Added Tax rate', true),
+('VAT Rate', 'tax', 20.0, 'percentage', '2024-01-01', NULL, 'Value Added Tax rate', true),
 ('Corporate Tax Rate', 'tax', 25.0, 'percentage', '2024-01-01', NULL, 'Corporate income tax rate', true),
 ('Inflation Rate', 'inflation', 8.5, 'percentage', '2024-01-01', NULL, 'Annual inflation rate', true),
 ('EUR to TND Exchange Rate', 'exchange_rate', 3.25, 'rate', '2024-01-01', NULL, 'Euro to Tunisian Dinar exchange rate', true),
 ('Minimum Wage', 'cost', 450.0, 'TND', '2024-01-01', NULL, 'Minimum monthly wage', true),
 ('Social Security Rate', 'tax', 18.75, 'percentage', '2024-01-01', NULL, 'Employer social security contribution rate', true),
 ('Employee Social Tax Rate', 'tax', 20.0, 'percentage', '2024-01-01', NULL, 'Employee social tax deduction rate (applied to brute salary to calculate net)', true);
-
--- Transaction tax variables (skip if already seeded by migration 20260304192821)
-INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active)
-SELECT v.name, v.type, v.value, v.unit, v.effective_date, v.end_date, v.description, v.is_active
-FROM (VALUES
-  ('on_site', 'transaction_tax', 10.0, 'percentage', '2024-01-01'::date, NULL::date, 'Sales: On site', true),
-  ('delivery', 'transaction_tax', 10.0, 'percentage', '2024-01-01'::date, NULL::date, 'Sales: Delivery', true),
-  ('takeaway', 'transaction_tax', 5.5, 'percentage', '2024-01-01'::date, NULL::date, 'Sales: Takeaway', true),
-  ('catering', 'transaction_tax', 10.0, 'percentage', '2024-01-01'::date, NULL::date, 'Sales: Catering', true),
-  ('other', 'transaction_tax', 0.0, 'percentage', '2024-01-01'::date, NULL::date, 'Sales: Other', true),
-  ('rent', 'transaction_tax', 0.0, 'percentage', '2024-01-01'::date, NULL::date, 'Expense: Rent', true),
-  ('utilities', 'transaction_tax', 10.0, 'percentage', '2024-01-01'::date, NULL::date, 'Expense: Utilities', true),
-  ('supplies', 'transaction_tax', 10.0, 'percentage', '2024-01-01'::date, NULL::date, 'Expense: Supplies', true),
-  ('marketing', 'transaction_tax', 10.0, 'percentage', '2024-01-01'::date, NULL::date, 'Expense: Marketing', true),
-  ('insurance', 'transaction_tax', 0.0, 'percentage', '2024-01-01'::date, NULL::date, 'Expense: Insurance', true),
-  ('maintenance', 'transaction_tax', 10.0, 'percentage', '2024-01-01'::date, NULL::date, 'Expense: Maintenance', true),
-  ('professional_services', 'transaction_tax', 10.0, 'percentage', '2024-01-01'::date, NULL::date, 'Expense: Professional services', true),
-  ('other', 'transaction_tax', 0.0, 'percentage', '2024-01-01'::date, NULL::date, 'Expense: Other', true)
-) AS v(name, type, value, unit, effective_date, end_date, description, is_active)
-WHERE NOT EXISTS (SELECT 1 FROM variables WHERE type = 'transaction_tax' LIMIT 1);
 
 -- ENTRIES (Created from existing data)
 -- ============================================================================

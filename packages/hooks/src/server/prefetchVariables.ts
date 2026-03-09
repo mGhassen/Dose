@@ -8,7 +8,7 @@ export async function prefetchVariables(queryClient?: QueryClient) {
     await qc.prefetchQuery({
       queryKey: ['variables'],
       queryFn: async () => {
-        const result = await variablesApi.getAll();
+        const result = await variablesApi.getAll({ limit: 1000 });
         return result?.data ?? [];
       },
     });

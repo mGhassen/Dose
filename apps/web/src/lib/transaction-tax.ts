@@ -29,6 +29,7 @@ export function getEffectiveTransactionTaxRate(
   return valid[0]?.value ?? 0;
 }
 
+/** Single rounding per line: unitPrice is always excl. tax. */
 export function lineTaxAmount(
   quantity: number,
   unitPrice: number,
@@ -46,9 +47,9 @@ export function lineTaxAmount(
   return { lineTotalNet, taxAmount };
 }
 
-/** Price excl. tax = Price incl. tax / (1 + tax). Floor to 2 decimals so total never exceeds what user entered (e.g. 5 incl → 4.54, not 4.55). */
+/** Price excl. tax = Price incl. tax / (1 + tax). Used only at item price save; sales/expenses always use excl. */
 export function netUnitPriceFromInclusive(grossUnitPrice: number, taxRatePercent: number): number {
   if (taxRatePercent <= 0) return grossUnitPrice;
   const net = (grossUnitPrice * 100) / (100 + taxRatePercent);
-  return Math.floor(net * 100) / 100;
+  return to2Decimals(net);
 }

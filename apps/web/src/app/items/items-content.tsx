@@ -35,25 +35,23 @@ export default function ItemsContent() {
     {
       accessorKey: "name",
       header: "Name",
-      cell: ({ row }) => {
-        const isProduced = row.original.itemType === 'item' && row.original.producedFromRecipeId;
-        return (
-          <div className="flex items-center gap-2">
-            <StatusPin active={row.original.isActive} size="sm" />
-            <div className="font-medium">
-              {row.original.name}
-            </div>
-            {row.original.itemType === 'recipe' && (
-              <Badge variant="secondary" className="text-xs">Recipe</Badge>
-            )}
-            {row.original.itemType === 'item' && (
-              <Badge variant="secondary" className="text-xs">
-                {isProduced ? 'Product' : 'Item'}
-              </Badge>
-            )}
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <StatusPin active={row.original.isActive} size="sm" />
+          <div className="font-medium">
+            {row.original.name}
           </div>
-        );
-      },
+          {row.original.itemType === 'recipe' && (
+            <Badge variant="secondary" className="text-xs">Recipe</Badge>
+          )}
+          {row.original.itemType === 'product' && (
+            <Badge variant="secondary" className="text-xs">Product</Badge>
+          )}
+          {row.original.itemType === 'item' && (
+            <Badge variant="secondary" className="text-xs">Item</Badge>
+          )}
+        </div>
+      ),
     },
     {
       accessorKey: "sku",
@@ -195,6 +193,7 @@ export default function ItemsContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
+            { value: "itemType", label: "Type" },
             { value: "category", label: "Category" },
             { value: "isActive", label: "Status" },
           ]}

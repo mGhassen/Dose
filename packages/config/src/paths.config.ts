@@ -243,6 +243,11 @@ export const pathsConfig: NavigationConfig = {
           translationKey: "variables"
         },
         {
+          title: "tax-rules",
+          url: "/tax-rules",
+          translationKey: "taxRules"
+        },
+        {
           title: "metadata-enums",
           url: "/metadata-enums",
           translationKey: "metadataEnums"

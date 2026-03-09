@@ -16,17 +16,16 @@ function transformItem(row: any): Item {
     unit: row.unit || '',
     unitId: row.unit_id,
     category: row.category,
-    itemType: 'item' as const,
+    itemType: (row.item_type === 'product' || row.item_type === 'item') ? row.item_type : 'item',
     isActive: row.is_active ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     sku: row.sku,
     unitPrice: undefined,
-    unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
     vendorId: row.vendor_id,
     notes: row.notes,
     producedFromRecipeId: row.produced_from_recipe_id,
-    defaultTaxRatePercent: row.default_tax_rate_percent != null ? parseFloat(row.default_tax_rate_percent) : undefined,
+    type: row.type ?? undefined,
   };
 }
 
@@ -35,23 +34,22 @@ function transformToSnakeCase(data: CreateItemData): any {
     name: data.name,
     description: data.description,
     category: data.category,
-    item_type: 'item',
+    item_type: data.itemType ?? 'item',
     sku: data.sku,
-    unit_cost: data.unitCost,
     vendor_id: data.vendorId,
     notes: data.notes,
     is_active: data.isActive ?? true,
   };
   if (data.unitId != null) result.unit_id = data.unitId;
   if (data.unit != null) result.unit = data.unit;
-  if (data.defaultTaxRatePercent !== undefined) result.default_tax_rate_percent = data.defaultTaxRatePercent;
+  if (data.type != null && data.type !== '') result.type = data.type;
   return result;
 }
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const { page, limit, offset } = getPaginationParams(searchParams);
+    const { page, limit, offset } = getPaginationParams(searchParams, { maxLimit: 2000 });
     const itemType = searchParams.get('itemType');
     const includeRecipes = searchParams.get('includeRecipes') === 'true';
     const producedOnly = searchParams.get('producedOnly') === 'true';
@@ -64,8 +62,6 @@ export async function GET(request: NextRequest) {
 
     if (itemType) {
       itemsQuery = itemsQuery.eq('item_type', itemType);
-    } else {
-      itemsQuery = itemsQuery.eq('item_type', 'item');
     }
 
     if (producedOnly) {

@@ -291,6 +291,8 @@ export const createItemSchema = z
     notes: z.string().optional(),
     defaultTaxRatePercent: z.number().optional(),
     isActive: z.boolean().optional(),
+    itemType: z.enum(["item", "product"]).optional(),
+    type: z.string().optional(),
   })
   .refine((d) => (typeof d.unit === "string" && d.unit.trim() !== "") || d.unitId != null, {
     message: "Provide either unit or unitId",
@@ -450,7 +452,8 @@ export const createTaxRuleSchema = z.object({
   description: z.string().nullable().optional(),
   applyToCustomAmounts: z.boolean().optional(),
   applyToFutureItems: z.boolean().optional(),
-  ruleType: z.enum(["exemption", "reduction"]).optional(),
+  ruleType: z.enum(["taxable", "exemption"]).optional(),
+  calculationType: z.enum(["additive", "inclusive"]).nullable().optional(),
 });
 export type CreateTaxRuleInput = z.infer<typeof createTaxRuleSchema>;
 

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import { SupplierOrderStatus, StockMovementType, StockMovementReferenceType } from '@kit/types';
 import { getItemTotalStock } from '@/lib/stock/get-item-stock';
+import { getItemCostAsOf } from '@/lib/items/price-resolve';
 
 interface ReceiveOrderData {
   actualDeliveryDate?: string;
@@ -73,12 +74,8 @@ export async function POST(
       const unitPrice = parseFloat(String(orderItem.unit_price)) || 0;
 
       const currentStock = await getItemTotalStock(supabase, itemId);
-      const { data: itemRow } = await supabase
-        .from('items')
-        .select('unit_cost')
-        .eq('id', itemId)
-        .single();
-      const currentCost = itemRow?.unit_cost != null ? parseFloat(String(itemRow.unit_cost)) : 0;
+      const currentCost =
+        (await getItemCostAsOf(supabase, itemId, effectiveDate)) ?? 0;
 
       const { error: itemUpdateError } = await supabase
         .from('supplier_order_items')
@@ -109,8 +106,6 @@ export async function POST(
           totalQty > 0
             ? (currentStock * currentCost + receivedQty * unitPrice) / totalQty
             : unitPrice;
-
-        await supabase.from('items').update({ unit_cost: newAvg }).eq('id', itemId);
 
         await supabase.from('item_cost_history').upsert(
           {

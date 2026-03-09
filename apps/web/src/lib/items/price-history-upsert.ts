@@ -33,5 +33,4 @@ export async function upsertCost(
       { onConflict: 'item_id,effective_date' }
     );
   if (error) throw error;
-  await supabase.from('items').update({ unit_cost: null }).eq('id', itemId);
 }

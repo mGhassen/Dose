@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
@@ -12,7 +12,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
 import { ScrollArea } from "@kit/ui/scroll-area";
-import { Save, X, Plus, Trash2, ArrowDownCircle, CircleArrowOutUpRight } from "lucide-react";
+import { Save, X, Plus, Trash2 } from "lucide-react";
 import { useCreateSale, useItems, useUnits, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import type { SalesType } from "@kit/types";
@@ -25,7 +25,7 @@ export interface SaleCreateContentProps {
   onCreated?: (saleId: number) => void;
 }
 
-import { lineTaxAmount, netUnitPriceFromInclusive, to2Decimals } from "@/lib/transaction-tax";
+import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
 import { createSaleTransactionSchema } from "@/shared/zod-schemas";
 
@@ -66,33 +66,15 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     unitCost: string;
     taxRatePercent: string;
     taxInclusive: boolean;
-    priceInputInclusive?: boolean;
-    /** Other side of incl/excl so toggle doesn't overwrite user input */
-    cachedPriceOther?: number;
     taxVariableName?: string;
     taxConditionType?: string;
     taxConditionValue?: string;
   };
   const [lineItems, setLineItems] = useState<LineItem[]>([
-    { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false, priceInputInclusive: false },
+    { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false },
   ]);
   const lineItemsRef = useRef(lineItems);
   lineItemsRef.current = lineItems;
-
-  const updateLinePrice = useCallback(
-    (index: number, value: string) => {
-      setLineItems((prev) => {
-        const next = [...prev];
-        const line = next[index];
-        const p = parseFloat(value) || 0;
-        const rate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
-        const other = line.priceInputInclusive ? netUnitPriceFromInclusive(p, rate) : to2Decimals(p * (1 + rate / 100));
-        next[index] = { ...line, unitPrice: value, cachedPriceOther: Number.isFinite(p) && p >= 0 ? other : undefined };
-        return next;
-      });
-    },
-    [formData.type, defaultTaxRate]
-  );
 
   const hasAnyItem = lineItems.some((l) => l.itemId !== "");
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
@@ -102,8 +84,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
-      const netUnit = line.priceInputInclusive ? netUnitPriceFromInclusive(p, lineRate) : p;
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, netUnit, lineRate, false);
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, false);
       sub += lineTotalNet;
       tax += taxAmount;
     }
@@ -120,7 +101,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
   }, [lineItems, defaultTaxRate, formData.type, formData.discountType, formData.discountValue]);
 
   const addLine = () => {
-    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false, priceInputInclusive: false }]);
+    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
   };
 
   const salesTypeLabelMap = useMemo(
@@ -191,7 +172,6 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
         line.unitPrice = "";
         line.taxRatePercent = "";
         line.taxInclusive = false;
-        line.priceInputInclusive = false;
         line.taxVariableName = undefined;
         line.taxConditionType = undefined;
         line.taxConditionValue = undefined;
@@ -199,14 +179,27 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
         const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; unit_price?: number; unitPrice?: number; defaultTaxRatePercent?: number } | undefined;
         line.quantity = "1";
         line.unitId = item?.unitId ?? null;
-        const price = item?.unit_price ?? item?.unitPrice;
-        line.unitPrice = price != null ? String(price) : "";
+        line.unitPrice = "";
         line.taxRatePercent = formData.type ? String(defaultTaxRate) : (item?.defaultTaxRatePercent != null ? String(item.defaultTaxRatePercent) : "");
       }
       next[index] = line;
       return next;
     });
-    if (itemId && formData.type && formData.date) {
+    if (!itemId) return;
+    const dateStr = formData.date || new Date().toISOString().slice(0, 10);
+    fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`)
+      .then((r) => r.json())
+      .then((data: { unitPrice?: number | null }) => {
+        if (data?.unitPrice != null) {
+          setLineItems((prev) => {
+            const next = [...prev];
+            if (next[index]?.itemId === itemId) next[index] = { ...next[index], unitPrice: String(data.unitPrice) };
+            return next;
+          });
+        }
+      })
+      .catch(() => {});
+    if (formData.type && formData.date) {
       taxRulesApi
         .resolve({ context: 'sale', salesType: formData.type, itemId: parseInt(itemId, 10), date: formData.date })
         .then((r) =>
@@ -245,12 +238,11 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
         return;
       }
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : defaultTaxRate;
-      const unitPriceNet = line.priceInputInclusive ? netUnitPriceFromInclusive(price, lineRate) : price;
       payloadLines.push({
         itemId: line.itemId ? parseInt(line.itemId) : undefined,
         quantity: qty,
         unitId: line.unitId ?? undefined,
-        unitPrice: unitPriceNet,
+        unitPrice: price,
         unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
         taxRatePercent: line.taxRatePercent !== "" ? lineRate : undefined,
       });
@@ -388,7 +380,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                       <div className="col-span-4">
                         <InputGroupAttached
                           addonStyle="default"
-                          label="Price"
+                          label="Price (excl. tax)"
                           input={
                             <Input
                               type="number"
@@ -396,33 +388,10 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                               min="0"
                               className="text-sm tabular-nums border-0"
                               value={line.unitPrice}
-                              onChange={(e) => updateLinePrice(index, e.target.value)}
+                              onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
                             />
                           }
-                          addon={
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const rate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
-                                const p = parseFloat(line.unitPrice) || 0;
-                                const toIncl = !(line.priceInputInclusive ?? false);
-                                const otherVal = line.cachedPriceOther ?? (toIncl ? to2Decimals(p * (1 + rate / 100)) : netUnitPriceFromInclusive(p, rate));
-                                setLineItems((prev) => {
-                                  const next = [...prev];
-                                  next[index] = { ...next[index], unitPrice: String(otherVal), priceInputInclusive: toIncl, cachedPriceOther: Number.isFinite(p) ? p : undefined };
-                                  return next;
-                                });
-                              }}
-                              className="p-1 rounded hover:bg-muted/50 text-violet-500 hover:text-violet-600 transition-colors"
-                              aria-label={line.priceInputInclusive ? "Price includes tax (click for excl.)" : "Price excludes tax (click for incl.)"}
-                            >
-                              {line.priceInputInclusive ?? false ? (
-                                <ArrowDownCircle className="h-5 w-5" />
-                              ) : (
-                                <CircleArrowOutUpRight className="h-5 w-5" />
-                              )}
-                            </button>
-                          }
+                          addon={<span className="text-muted-foreground text-xs">excl.</span>}
                         />
                       </div>
                       <div className="col-span-1 flex h-10 items-center">
@@ -436,7 +405,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                       <div className="col-span-4">
                         <InputGroupAttached
                           addonStyle="default"
-                          label="Amount"
+                          label="Amount (excl. tax)"
                           input={
                             <Input
                               type="number"
@@ -444,34 +413,11 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                               min="0"
                               className="border-0"
                               value={line.unitPrice}
-                              onChange={(e) => updateLinePrice(index, e.target.value)}
+                              onChange={(e) => updateLine(index, "unitPrice", e.target.value)}
                               placeholder="0"
                             />
                           }
-                          addon={
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const rate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
-                                const p = parseFloat(line.unitPrice) || 0;
-                                const toIncl = !(line.priceInputInclusive ?? false);
-                                const otherVal = line.cachedPriceOther ?? (toIncl ? to2Decimals(p * (1 + rate / 100)) : netUnitPriceFromInclusive(p, rate));
-                                setLineItems((prev) => {
-                                  const next = [...prev];
-                                  next[index] = { ...next[index], unitPrice: String(otherVal), priceInputInclusive: toIncl, cachedPriceOther: Number.isFinite(p) ? p : undefined };
-                                  return next;
-                                });
-                              }}
-                              className="p-1 rounded hover:bg-muted/50 text-violet-500 hover:text-violet-600 transition-colors"
-                              aria-label={line.priceInputInclusive ? "Amount includes tax (click for excl.)" : "Amount excludes tax (click for incl.)"}
-                            >
-                              {line.priceInputInclusive ?? false ? (
-                                <ArrowDownCircle className="h-5 w-5" />
-                              ) : (
-                                <CircleArrowOutUpRight className="h-5 w-5" />
-                              )}
-                            </button>
-                          }
+                          addon={<span className="text-muted-foreground text-xs">excl.</span>}
                         />
                       </div>
                         <div className="col-span-4 flex h-10 items-center">
@@ -538,44 +484,14 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
               <div className="flex flex-col gap-1.5">
                 <div className="flex justify-between font-semibold items-center gap-2">
                   <span>Total</span>
-                  <InputGroupAttached
-                    addonStyle="default"
-                    input={
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="h-10 w-24 text-right tabular-nums border-0"
-                        value={lineItems[0]?.unitPrice ?? ""}
-                        onChange={(e) => updateLinePrice(0, e.target.value)}
-                        placeholder="0"
-                      />
-                    }
-                    addon={
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const line = lineItems[0];
-                          const rate = line?.taxRatePercent !== "" ? parseFloat(line?.taxRatePercent ?? "0") : (formData.type ? defaultTaxRate : 0);
-                          const p = parseFloat(line?.unitPrice ?? "") || 0;
-                          const toIncl = !(line?.priceInputInclusive ?? false);
-                          const otherVal = line?.cachedPriceOther ?? (toIncl ? to2Decimals(p * (1 + rate / 100)) : netUnitPriceFromInclusive(p, rate));
-                          setLineItems((prev) => {
-                            const next = [...prev];
-                            next[0] = { ...next[0], unitPrice: String(otherVal), priceInputInclusive: toIncl, cachedPriceOther: Number.isFinite(p) ? p : undefined };
-                            return next;
-                          });
-                        }}
-                        className="p-1 rounded hover:bg-muted/50 text-violet-500 hover:text-violet-600 transition-colors"
-                        aria-label={lineItems[0]?.priceInputInclusive ? "Amount includes tax (click for excl.)" : "Amount excludes tax (click for incl.)"}
-                      >
-                        {lineItems[0]?.priceInputInclusive ?? false ? (
-                          <ArrowDownCircle className="h-5 w-5" />
-                        ) : (
-                          <CircleArrowOutUpRight className="h-5 w-5" />
-                        )}
-                      </button>
-                    }
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="h-10 w-24 text-right tabular-nums"
+                    value={lineItems[0]?.unitPrice ?? ""}
+                    onChange={(e) => updateLine(0, "unitPrice", e.target.value)}
+                    placeholder="0 (excl. tax)"
                   />
                 </div>
               </div>

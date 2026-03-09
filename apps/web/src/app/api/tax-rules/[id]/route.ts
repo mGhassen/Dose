@@ -20,7 +20,8 @@ function transformRule(row: any, variable?: any): TaxRule {
     description: row.description ?? null,
     applyToCustomAmounts: row.apply_to_custom_amounts ?? true,
     applyToFutureItems: row.apply_to_future_items ?? true,
-    ruleType: row.rule_type || 'exemption',
+    ruleType: (row.rule_type === 'reduction' ? 'taxable' : row.rule_type) || 'taxable',
+    calculationType: row.calculation_type ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     variable,
@@ -44,6 +45,7 @@ function toSnakeCase(data: UpdateTaxRuleData): any {
   if (data.applyToCustomAmounts !== undefined) result.apply_to_custom_amounts = data.applyToCustomAmounts;
   if (data.applyToFutureItems !== undefined) result.apply_to_future_items = data.applyToFutureItems;
   if (data.ruleType !== undefined) result.rule_type = data.ruleType;
+  if (data.calculationType !== undefined) result.calculation_type = data.calculationType;
   return result;
 }
 

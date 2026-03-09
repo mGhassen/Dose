@@ -13,17 +13,16 @@ function transformItem(row: any): Item {
     unit: row.unit || '',
     unitId: row.unit_id,
     category: row.category,
-    itemType: 'item' as const,
+    itemType: (row.item_type === 'product' || row.item_type === 'item') ? row.item_type : 'item',
     isActive: row.is_active ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     sku: row.sku,
     unitPrice: undefined,
-    unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
     vendorId: row.vendor_id,
     notes: row.notes,
     producedFromRecipeId: row.produced_from_recipe_id,
-    defaultTaxRatePercent: row.default_tax_rate_percent != null ? parseFloat(row.default_tax_rate_percent) : undefined,
+    type: row.type ?? undefined,
   };
 }
 
@@ -37,12 +36,12 @@ function transformToSnakeCase(data: UpdateItemData): any {
   if (data.unitId !== undefined) result.unit_id = data.unitId;
   if (data.category !== undefined) result.category = data.category;
   if (data.sku !== undefined) result.sku = data.sku;
-  if (data.unitCost !== undefined) result.unit_cost = data.unitCost;
   if (data.vendorId !== undefined) result.vendor_id = data.vendorId;
   if (data.notes !== undefined) result.notes = data.notes;
   if (data.isActive !== undefined) result.is_active = data.isActive;
   if (data.producedFromRecipeId !== undefined) result.produced_from_recipe_id = data.producedFromRecipeId;
-  if (data.defaultTaxRatePercent !== undefined) result.default_tax_rate_percent = data.defaultTaxRatePercent;
+  if (data.itemType !== undefined) result.item_type = data.itemType;
+  if (data.type !== undefined) result.type = data.type === '' ? null : data.type;
   return result;
 }
 

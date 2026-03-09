@@ -18,13 +18,18 @@ export interface PaginatedResponse<T> {
 }
 
 // Helper to calculate pagination
-export function getPaginationParams(searchParams: URLSearchParams): {
+export function getPaginationParams(
+  searchParams: URLSearchParams,
+  options?: { maxLimit?: number }
+): {
   limit: number;
   offset: number;
   page: number;
 } {
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
+  const defaultMax = 100;
+  const maxLimit = options?.maxLimit ?? defaultMax;
+  const limit = Math.min(maxLimit, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
   const offset = (page - 1) * limit;
 
   return { page, limit, offset };

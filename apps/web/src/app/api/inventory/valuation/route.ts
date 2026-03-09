@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       .from('stock_levels')
       .select(`
         *,
-        item:items(id, name, unit, unit_cost)
+        item:items(id, name, unit)
       `)
       .gt('quantity', 0);
 
@@ -25,10 +25,8 @@ export async function GET(request: NextRequest) {
     const valuations = await Promise.all(
       (stockLevels || []).map(async (sl) => {
         const itemId = sl.item_id;
-        const storedCost = sl.item?.unit_cost != null ? parseFloat(String(sl.item.unit_cost)) : 0;
-
-        let avgUnitPrice = storedCost;
-        if (avgUnitPrice === 0) {
+        let avgUnitPrice = 0;
+        {
           const { data: orderItems } = await supabase
             .from('supplier_order_items')
             .select('unit_price, quantity')
@@ -51,7 +49,7 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        const quantity = parseFloat(sl.quantity);
+        const quantity = parseFloat(String(sl.quantity));
         const totalValue = quantity * avgUnitPrice;
 
         return {

@@ -20,7 +20,7 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { StockMovementType } from "@kit/types";
-import { Save, X, Trash2, MoreVertical, Edit2, Package, TrendingUp, TrendingDown, Plus, DollarSign, History } from "lucide-react";
+import { Save, X, Trash2, MoreVertical, Edit2, Package, TrendingUp, TrendingDown, Plus, DollarSign } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import { Separator } from "@kit/ui/separator";
 import {
@@ -39,6 +39,7 @@ import {
 } from 'recharts';
 import AppLayout from "@/components/app-layout";
 import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum } from "@kit/hooks";
+import type { ItemType } from "@kit/types";
 import { toast } from "sonner";
 import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
@@ -55,6 +56,7 @@ interface PriceHistoryEntry {
   id: number;
   effectiveDate: string;
   value: number | null;
+  resolvedTax?: Record<string, { rate: number; taxInclusive: boolean }>;
 }
 
 interface SupplierOrderPriceRow {
@@ -66,46 +68,58 @@ interface SupplierOrderPriceRow {
   orderNumber: string | null;
 }
 
-function PriceCostHistorySection({
+function HistoryEntryTable({
   itemId,
-  sellHistory,
-  costHistory,
-  supplierOrderPrices = [],
-  resolvedPrice,
-  itemUnitPrice,
-  itemUnitCost,
+  type,
+  entries,
   loading,
   onRefetch,
   formatCurrency,
   formatDate,
-  saleTaxPercent = 0,
-  expenseTaxPercent = 0,
+  taxPercent,
+  resolveTaxRateForDate,
+  salesTypes,
+  addLabel,
+  valueLabel,
+  emptyMessage,
 }: {
   itemId: string;
-  sellHistory: PriceHistoryEntry[];
-  costHistory: PriceHistoryEntry[];
-  supplierOrderPrices?: SupplierOrderPriceRow[];
-  resolvedPrice: { unitPrice: number | null; unitCost: number | null } | null;
-  itemUnitPrice?: number;
-  itemUnitCost?: number;
+  type: 'sell' | 'cost';
+  entries: PriceHistoryEntry[];
   loading: boolean;
   onRefetch: () => void;
   formatCurrency: (n: number) => string;
   formatDate: (d: string) => string;
-  saleTaxPercent?: number;
-  expenseTaxPercent?: number;
+  taxPercent: number;
+  resolveTaxRateForDate?: (date: string) => Promise<number>;
+  salesTypes?: { conditionValue: string; label: string }[];
+  addLabel: string;
+  valueLabel: string;
+  emptyMessage: string;
 }) {
-  const [adding, setAdding] = useState<'sell' | 'cost' | null>(null);
+  const [adding, setAdding] = useState(false);
   const [addDate, setAddDate] = useState('');
   const [addValue, setAddValue] = useState('');
-  const [addPriceInclusive, setAddPriceInclusive] = useState(false);
+  const [addInclusive, setAddInclusive] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDate, setEditDate] = useState('');
+  const [editValue, setEditValue] = useState('');
   const [deleting, setDeleting] = useState<number | null>(null);
 
-  const handleAdd = async (type: 'sell' | 'cost') => {
+  const handleAdd = async () => {
     if (!addDate || addValue === '' || Number.isNaN(parseFloat(addValue))) return;
     const raw = parseFloat(addValue);
-    const taxPct = type === 'sell' ? saleTaxPercent : expenseTaxPercent;
-    const value = addPriceInclusive && taxPct > 0 ? netUnitPriceFromInclusive(raw, taxPct) : raw;
+    let rate = taxPercent;
+    if (addInclusive && (resolveTaxRateForDate || rate > 0)) {
+      if (resolveTaxRateForDate) {
+        try {
+          rate = await resolveTaxRateForDate(addDate);
+        } catch {
+          rate = taxPercent;
+        }
+      }
+    }
+    const value = addInclusive && rate > 0 ? netUnitPriceFromInclusive(raw, rate) : raw;
     try {
       const res = await fetch(`/api/items/${itemId}/price-history`, {
         method: 'POST',
@@ -113,10 +127,10 @@ function PriceCostHistorySection({
         body: JSON.stringify({ type, effectiveDate: addDate, value }),
       });
       if (res.ok) {
-        setAdding(null);
+        setAdding(false);
         setAddDate('');
         setAddValue('');
-        setAddPriceInclusive(false);
+        setAddInclusive(false);
         onRefetch();
         toast.success('Added');
       } else {
@@ -128,7 +142,42 @@ function PriceCostHistorySection({
     }
   };
 
-  const handleDelete = async (type: 'sell' | 'cost', entryId: number) => {
+  const startEdit = (e: PriceHistoryEntry) => {
+    setEditingId(e.id);
+    setEditDate(e.effectiveDate);
+    setEditValue(e.value != null ? String(e.value) : '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDate('');
+    setEditValue('');
+  };
+
+  const handleUpdate = async () => {
+    if (editingId == null || !editDate || editValue === '' || Number.isNaN(parseFloat(editValue))) return;
+    try {
+      const res = await fetch(`/api/items/${itemId}/price-history/${editingId}?type=${type}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ effectiveDate: editDate, value: parseFloat(editValue) }),
+      });
+      if (res.ok) {
+        setEditingId(null);
+        setEditDate('');
+        setEditValue('');
+        onRefetch();
+        toast.success('Updated');
+      } else {
+        const err = await res.json();
+        toast.error(err?.error || 'Failed to update');
+      }
+    } catch {
+      toast.error('Failed to update');
+    }
+  };
+
+  const handleDelete = async (entryId: number) => {
     setDeleting(entryId);
     try {
       const res = await fetch(`/api/items/${itemId}/price-history/${entryId}?type=${type}`, { method: 'DELETE' });
@@ -141,9 +190,6 @@ function PriceCostHistorySection({
     }
   };
 
-  const currentSell = resolvedPrice?.unitPrice ?? itemUnitPrice;
-  const currentCost = resolvedPrice?.unitCost ?? itemUnitCost;
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -152,221 +198,144 @@ function PriceCostHistorySection({
     );
   }
 
+  const useTaxRuleColumns = type === 'sell' && (salesTypes?.length ?? 0) > 0 && entries.length > 0 && !!entries[0].resolvedTax;
+  const inclLabel = !useTaxRuleColumns && taxPercent > 0 ? `Incl. tax (${taxPercent}%)` : null;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const activeId = entries.find((e) => e.effectiveDate <= todayStr)?.id ?? null;
+
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <h4 className="text-sm font-semibold">Cost from supplier orders</h4>
-        <p className="text-xs text-muted-foreground">
-          Cost above is the weighted average of current stock and is updated when orders are received. Recipe cost and valuation use it first; otherwise cost history or item default.
-        </p>
-        <div className="rounded-md border">
-          {supplierOrderPrices.length === 0 ? (
-            <div className="py-6 text-center text-sm text-muted-foreground">No supplier order lines for this item yet</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-left font-medium p-3">Order date</th>
-                  <th className="text-right font-medium p-3">Unit price</th>
-                  <th className="text-right font-medium p-3">Quantity</th>
-                  <th className="text-left font-medium p-3">Order #</th>
-                </tr>
-              </thead>
-              <tbody>
-                {supplierOrderPrices.map((r) => (
-                  <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
-                    <td className="p-3">{r.orderDate ? formatDate(r.orderDate) : '—'}</td>
-                    <td className="p-3 text-right font-medium tabular-nums">{r.unitPrice != null ? formatCurrency(r.unitPrice) : '—'}</td>
-                    <td className="p-3 text-right tabular-nums">{r.quantity != null ? `${r.quantity} ${r.unit}` : '—'}</td>
-                    <td className="p-3 text-muted-foreground">{r.orderNumber ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-muted-foreground">{emptyMessage}</span>
+        {!adding && (
+          <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            {addLabel}
+          </Button>
+        )}
+      </div>
+      {adding && (
+        <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-muted-foreground font-normal">Effective date</Label>
+              <DatePicker value={addDate ? new Date(addDate) : undefined} onChange={(d) => setAddDate(d ? dateToYYYYMMDD(d) : "")} placeholder="Pick a date" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-muted-foreground font-normal">{valueLabel}</Label>
+              <InputGroupAttached
+                addonStyle="default"
+                input={
+                  <Input type="number" step="0.01" min="0" placeholder="0.00" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="border-0" />
+                }
+                addon={
+                  taxPercent > 0 ? (
+                    <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap text-xs text-muted-foreground">
+                      <Checkbox checked={addInclusive} onCheckedChange={(c) => setAddInclusive(c === true)} aria-label="Includes tax" />
+                      <span>Incl. tax</span>
+                    </label>
+                  ) : null
+                }
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setAddDate(''); setAddValue(''); setAddInclusive(false); }}>Cancel</Button>
+            <Button size="sm" onClick={handleAdd}>Save</Button>
+          </div>
         </div>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                <CardTitle className="text-base">Selling price history</CardTitle>
-              </div>
-              {adding !== 'sell' && (
-                <Button variant="outline" size="sm" onClick={() => setAdding('sell')}>
-                  <Plus className="h-4 w-4 mr-1.5" />
-                  Add
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {adding === 'sell' && (
-              <div className="rounded-lg border bg-muted/30 p-4 space-y-6">
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="sell-date" className="text-muted-foreground font-normal">Effective date</Label>
-                    <DatePicker value={addDate ? new Date(addDate) : undefined} onChange={(d) => setAddDate(d ? dateToYYYYMMDD(d) : "")} placeholder="Pick a date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground font-normal">Price</Label>
-                    <InputGroupAttached
-                      addonStyle="default"
-                      input={
-                        <Input id="sell-price" type="number" step="0.01" min="0" placeholder="0.00" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="border-0" />
-                      }
-                      addon={
-                        <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap text-xs text-muted-foreground">
-                          <Checkbox checked={addPriceInclusive} onCheckedChange={(c) => setAddPriceInclusive(c === true)} aria-label="Price includes tax" />
-                          <span>Incl. tax</span>
-                        </label>
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3 pt-1">
-                  <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); setAddPriceInclusive(false); }}>Cancel</button>
-                  <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => handleAdd('sell')}>Save</Button>
-                </div>
-              </div>
-            )}
-            {sellHistory.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-10 px-4 text-center">
-                <DollarSign className="h-10 w-10 text-muted-foreground/60 mb-3" />
-                <p className="text-sm font-medium text-muted-foreground">No selling price history</p>
-                <p className="text-xs text-muted-foreground mt-1">Add dates and prices to track changes over time.</p>
-                {adding !== 'sell' && (
-                  <Button variant="outline" size="sm" className="mt-4" onClick={() => setAdding('sell')}>
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    Add first entry
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="rounded-lg border divide-y">
-                {sellHistory.map((e) => (
-                  <div key={e.id} className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <History className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium tabular-nums">{e.value != null ? formatCurrency(e.value) : '—'}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(e.effectiveDate)}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" disabled={deleting === e.id} onClick={() => handleDelete('sell', e.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-muted-foreground" />
-                <CardTitle className="text-base">Cost history</CardTitle>
-              </div>
-              {adding !== 'cost' && (
-                <Button variant="outline" size="sm" onClick={() => setAdding('cost')}>
-                  <Plus className="h-4 w-4 mr-1.5" />
-                  Add
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {adding === 'cost' && (
-              <div className="rounded-lg border bg-muted/30 p-4 space-y-6">
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="cost-date" className="text-muted-foreground font-normal">Effective date</Label>
-                    <DatePicker value={addDate ? new Date(addDate) : undefined} onChange={(d) => setAddDate(d ? dateToYYYYMMDD(d) : "")} placeholder="Pick a date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground font-normal">Cost</Label>
-                    <InputGroupAttached
-                      addonStyle="default"
-                      input={
-                        <Input id="cost-value" type="number" step="0.01" min="0" placeholder="0.00" value={addValue} onChange={(e) => setAddValue(e.target.value)} className="border-0" />
-                      }
-                      addon={
-                        <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap text-xs text-muted-foreground">
-                          <Checkbox checked={addPriceInclusive} onCheckedChange={(c) => setAddPriceInclusive(c === true)} aria-label="Cost includes tax" />
-                          <span>Incl. tax</span>
-                        </label>
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3 pt-1">
-                  <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => { setAdding(null); setAddDate(''); setAddValue(''); setAddPriceInclusive(false); }}>Cancel</button>
-                  <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => handleAdd('cost')}>Save</Button>
-                </div>
-              </div>
-            )}
-            {costHistory.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-10 px-4 text-center">
-                <DollarSign className="h-10 w-10 text-muted-foreground/60 mb-3" />
-                <p className="text-sm font-medium text-muted-foreground">No cost history</p>
-                <p className="text-xs text-muted-foreground mt-1">Add dates and costs for valuation and recipes.</p>
-                {adding !== 'cost' && (
-                  <Button variant="outline" size="sm" className="mt-4" onClick={() => setAdding('cost')}>
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    Add first entry
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="rounded-lg border divide-y">
-                {costHistory.map((e) => (
-                  <div key={e.id} className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <History className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium tabular-nums">{e.value != null ? formatCurrency(e.value) : '—'}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(e.effectiveDate)}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" disabled={deleting === e.id} onClick={() => handleDelete('cost', e.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      )}
+      {entries.length === 0 && !adding ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-10 px-4 text-center">
+          <DollarSign className="h-10 w-10 text-muted-foreground/60 mb-3" />
+          <p className="text-sm font-medium text-muted-foreground">No entries yet</p>
+          <Button variant="outline" size="sm" className="mt-4" onClick={() => setAdding(true)}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            Add first entry
+          </Button>
+        </div>
+      ) : (
+        <div className="rounded-md border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="text-left font-medium p-3">Effective date</th>
+                <th className="text-right font-medium p-3">Value (excl. tax)</th>
+                {useTaxRuleColumns && salesTypes?.map((s) => {
+                  const r = entries[0]?.resolvedTax?.[s.conditionValue];
+                  const header = r ? (r.rate > 0 ? `${s.label} (${r.rate}% incl.)` : `${s.label} (Exempt)`) : s.label;
+                  return <th key={s.conditionValue} className="text-right font-medium p-3">{header}</th>;
+                })}
+                {inclLabel && <th className="text-right font-medium p-3">{inclLabel}</th>}
+                <th className="w-[100px] text-right font-medium p-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((e) => (
+                <tr
+                  key={e.id}
+                  className={`border-b last:border-0 hover:bg-muted/30 ${e.id === activeId ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
+                >
+                  {editingId === e.id ? (
+                    <>
+                      <td className="p-3">
+                        <DatePicker value={editDate ? new Date(editDate) : undefined} onChange={(d) => setEditDate(d ? dateToYYYYMMDD(d) : "")} placeholder="Date" />
+                      </td>
+                      <td className="p-3">
+                        <Input type="number" step="0.01" min="0" className="h-8 w-full max-w-[120px]" value={editValue} onChange={(ev) => setEditValue(ev.target.value)} />
+                      </td>
+                      {useTaxRuleColumns && salesTypes?.map((s) => <td key={s.conditionValue} className="p-3 text-muted-foreground">—</td>)}
+                      {inclLabel && <td className="p-3 text-muted-foreground">—</td>}
+                      <td className="p-3 text-right">
+                        <Button variant="ghost" size="sm" className="h-8 mr-1" onClick={cancelEdit}>Cancel</Button>
+                        <Button size="sm" className="h-8" onClick={handleUpdate}>Save</Button>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="p-3 font-medium">{formatDate(e.effectiveDate)}</td>
+                      <td className="p-3 text-right tabular-nums font-medium">{e.value != null ? formatCurrency(e.value) : '—'}</td>
+                      {useTaxRuleColumns && salesTypes?.map((s) => {
+                        const r = e.resolvedTax?.[s.conditionValue];
+                        const rate = r?.rate ?? 0;
+                        const isInclusive = r?.taxInclusive ?? false;
+                        let display = '—';
+                        if (e.value != null && rate > 0) {
+                          if (isInclusive) {
+                            const refIncl = (() => {
+                              const firstInclusive = salesTypes?.find((st) => (e.resolvedTax?.[st.conditionValue]?.taxInclusive && (e.resolvedTax?.[st.conditionValue]?.rate ?? 0) > 0));
+                              const firstRate = firstInclusive ? (e.resolvedTax?.[firstInclusive.conditionValue]?.rate ?? 0) : 0;
+                              return firstRate > 0 ? to2Decimals(e.value * (1 + firstRate / 100)) : null;
+                            })();
+                            display = refIncl != null ? formatCurrency(refIncl) : formatCurrency(to2Decimals(e.value * (1 + rate / 100)));
+                          } else {
+                            display = formatCurrency(to2Decimals(e.value * (1 + rate / 100)));
+                          }
+                        }
+                        return <td key={s.conditionValue} className="p-3 text-right tabular-nums text-muted-foreground">{display}</td>;
+                      })}
+                      {inclLabel && (
+                        <td className="p-3 text-right tabular-nums text-muted-foreground">
+                          {e.value != null && taxPercent > 0 ? formatCurrency(to2Decimals(e.value * (1 + taxPercent / 100))) : '—'}
+                        </td>
+                      )}
+                      <td className="p-3 text-right">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => startEdit(e)}>
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" disabled={deleting === e.id} onClick={() => handleDelete(e.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
-  );
-}
-
-function PriceCostHistoryCard(
-  props: {
-    itemId: string;
-    sellHistory: PriceHistoryEntry[];
-    costHistory: PriceHistoryEntry[];
-    loading: boolean;
-    onRefetch: () => void;
-    formatCurrency: (n: number) => string;
-    formatDate: (d: string) => string;
-  }
-) {
-  return (
-    <PriceCostHistorySection
-      {...props}
-      supplierOrderPrices={[]}
-      resolvedPrice={null}
-      itemUnitPrice={undefined}
-      itemUnitCost={undefined}
-    />
   );
 }
 
@@ -379,18 +348,36 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const { data: stockMovementsResponse } = useStockMovements({ itemId: resolvedParams?.id || "", limit: 1000 });
   const updateItem = useUpdateItem();
   const deleteMutation = useDeleteItem();
-  const [resolvedTax, setResolvedTax] = useState<{ sale: number; expense: number } | null>(null);
+  const salesTypeValues = ['on_site', 'delivery', 'takeaway', 'catering', 'other'] as const;
+  const [applicableTaxes, setApplicableTaxes] = useState<{
+    sales: { conditionValue: string; label: string; rate: number; variableName?: string; taxInclusive?: boolean }[];
+    expense: { rate: number; variableName?: string; taxInclusive?: boolean } | null;
+  } | null>(null);
+  const { data: salesTypeMeta = [] } = useMetadataEnum("SalesType");
+  const salesTypeLabels: Record<string, string> = useMemo(
+    () => Object.fromEntries(salesTypeMeta.map((ev) => [ev.name, ev.label ?? ev.name])),
+    [salesTypeMeta]
+  );
 
   useEffect(() => {
     if (!resolvedParams?.id || !item?.id) return;
     const dateStr = new Date().toISOString().slice(0, 10);
-    Promise.all([
-      taxRulesApi.resolve({ context: 'sale', salesType: 'on_site', itemId: item.id, date: dateStr }),
-      taxRulesApi.resolve({ context: 'expense', itemId: item.id, date: dateStr }),
-    ])
-      .then(([saleRes, expenseRes]) => setResolvedTax({ sale: saleRes.rate, expense: expenseRes.rate }))
-      .catch(() => setResolvedTax(null));
-  }, [resolvedParams?.id, item?.id]);
+    const salesPromises = salesTypeValues.map((st) =>
+      taxRulesApi
+        .resolve({ context: 'sale', salesType: st, itemId: item.id, date: dateStr })
+        .then((r) => ({ conditionValue: st, label: salesTypeLabels[st] ?? st, rate: r.rate, variableName: r.variableName, taxInclusive: r.taxInclusive }))
+    );
+    const expensePromise = taxRulesApi
+      .resolve({ context: 'expense', itemId: item.id, date: dateStr })
+      .then((r) => ({ rate: r.rate, variableName: r.variableName, taxInclusive: r.taxInclusive }));
+    Promise.all([...salesPromises, expensePromise])
+      .then((results) => {
+        const sales = results.slice(0, salesTypeValues.length) as { conditionValue: string; label: string; rate: number; variableName?: string; taxInclusive?: boolean }[];
+        const expense = results[results.length - 1] as { rate: number; variableName?: string; taxInclusive?: boolean };
+        setApplicableTaxes({ sales, expense });
+      })
+      .catch(() => setApplicableTaxes(null));
+  }, [resolvedParams?.id, item?.id, salesTypeLabels]);
 
   // Calculate stock level from movements (running balance)
   const calculatedStock = useMemo(() => {
@@ -485,15 +472,23 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     vendorId: "",
     notes: "",
     isActive: true,
+    itemType: "item" as ItemType,
+    type: "",
   });
   const { data: unitsData } = useUnits();
   const { data: categoryValues = [] } = useMetadataEnum("ItemCategory");
+  const { data: variableTypeValues = [], isLoading: variableTypeLoading } = useMetadataEnum("VariableType");
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const itemTypeItems: { id: ItemType; name: string }[] = [
+    { id: "item", name: "Item" },
+    { id: "product", name: "Product" },
+  ];
+  const typeItems = (variableTypeValues || []).map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
   const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null } | null>(null);
-  const [sellHistory, setSellHistory] = useState<{ id: number; effectiveDate: string; value: number | null }[]>([]);
-  const [costHistory, setCostHistory] = useState<{ id: number; effectiveDate: string; value: number | null }[]>([]);
+  const [sellHistory, setSellHistory] = useState<PriceHistoryEntry[]>([]);
+  const [costHistory, setCostHistory] = useState<PriceHistoryEntry[]>([]);
   const [supplierOrderPrices, setSupplierOrderPrices] = useState<{ id: number; unitPrice: number | null; quantity: number | null; unit: string; orderDate: string | null; orderNumber: string | null }[]>([]);
   const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
   const fetchPriceHistory = useCallback(async (itemId: string) => {
@@ -544,6 +539,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         vendorId: item.vendorId?.toString() || "",
         notes: item.notes || "",
         isActive: item.isActive,
+        itemType: (item.itemType === "product" ? "product" : "item") as ItemType,
+        type: item.type || "",
       });
     }
   }, [item]);
@@ -571,6 +568,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
           notes: formData.notes || undefined,
           isActive: formData.isActive,
+          itemType: formData.itemType,
+          type: formData.type || undefined,
         },
       });
       toast.success("Item updated successfully");
@@ -641,10 +640,11 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               {item.itemType === "recipe" && (
                 <Badge variant="secondary" className="text-xs">Recipe</Badge>
               )}
+              {item.itemType === "product" && (
+                <Badge variant="secondary" className="text-xs">Product</Badge>
+              )}
               {item.itemType === "item" && (
-                <Badge variant="secondary" className="text-xs">
-                  {item.producedFromRecipeId ? "Product" : "Item"}
-                </Badge>
+                <Badge variant="secondary" className="text-xs">Item</Badge>
               )}
             </div>
             <p className="text-muted-foreground">
@@ -716,6 +716,31 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       selectedId={formData.category || undefined}
                       onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
                       placeholder="Select category"
+                    />
+                  </div>
+
+                  {/* Item type */}
+                  <div className="space-y-2">
+                    <UnifiedSelector
+                      label="Item type"
+                      type="type"
+                      items={itemTypeItems}
+                      selectedId={formData.itemType}
+                      onSelect={(item) => handleInputChange('itemType', item.id as ItemType)}
+                      placeholder="Select type"
+                    />
+                  </div>
+
+                  {/* Type (variable type) */}
+                  <div className="space-y-2">
+                    <UnifiedSelector
+                      label="Type"
+                      type="type"
+                      items={typeItems}
+                      selectedId={formData.type || undefined}
+                      onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))}
+                      placeholder={variableTypeLoading ? "Loading…" : "Select type"}
+                      manageLink={{ href: '/variables', text: 'Variables' }}
                     />
                   </div>
 
@@ -892,9 +917,10 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </div>
 
               <Tabs defaultValue="movements" className="w-full">
-                <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsList className="grid w-full max-w-lg grid-cols-3">
                   <TabsTrigger value="movements">Movements</TabsTrigger>
-                  <TabsTrigger value="price-cost">Price & cost</TabsTrigger>
+                  <TabsTrigger value="price">Price</TabsTrigger>
+                  <TabsTrigger value="cost">Cost</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="movements" className="mt-4 space-y-4">
@@ -1056,28 +1082,91 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               )}
                 </TabsContent>
 
-                <TabsContent value="price-cost" className="mt-4">
+                <TabsContent value="price" className="mt-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Price & cost history</CardTitle>
-                      <CardDescription>Cost is the weighted average of current stock (updated when supplier orders are received). Selling price uses price history or item default.</CardDescription>
+                      <CardTitle>Selling price history</CardTitle>
+                      <CardDescription>Selling price uses price history by effective date, or the item default. Add or edit entries below.</CardDescription>
                     </CardHeader>
                     <CardContent>
                       {resolvedParams?.id && (
-                        <PriceCostHistorySection
+                        <HistoryEntryTable
                           itemId={resolvedParams.id}
-                          sellHistory={sellHistory}
-                          costHistory={costHistory}
-                          supplierOrderPrices={supplierOrderPrices}
-                          resolvedPrice={resolvedPrice}
-                          itemUnitPrice={item.unitPrice}
-                          itemUnitCost={item.unitCost}
+                          type="sell"
+                          entries={sellHistory}
                           loading={priceHistoryLoading}
                           onRefetch={() => fetchPriceHistory(resolvedParams.id)}
                           formatCurrency={formatCurrency}
                           formatDate={formatDate}
-                          saleTaxPercent={resolvedTax?.sale ?? 0}
-                          expenseTaxPercent={resolvedTax?.expense ?? 0}
+                          taxPercent={applicableTaxes?.sales?.find((s) => s.conditionValue === "on_site")?.rate ?? 0}
+                          resolveTaxRateForDate={async (date) => {
+                            const r = await taxRulesApi.resolve({ context: 'sale', salesType: 'on_site', itemId: item.id, date });
+                            return r.rate;
+                          }}
+                          salesTypes={salesTypeValues.map((st) => ({ conditionValue: st, label: salesTypeLabels[st] ?? st }))}
+                          addLabel="Add"
+                          valueLabel="Price"
+                          emptyMessage="Track selling prices by effective date."
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="cost" className="mt-4 space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Cost from supplier orders</CardTitle>
+                      <CardDescription>Weighted average of current stock; updated when orders are received. Recipe cost and valuation use it first; otherwise cost history or item default.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-md border">
+                        {supplierOrderPrices.length === 0 ? (
+                          <div className="py-6 text-center text-sm text-muted-foreground">No supplier order lines for this item yet</div>
+                        ) : (
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th className="text-left font-medium p-3">Order date</th>
+                                <th className="text-right font-medium p-3">Unit price</th>
+                                <th className="text-right font-medium p-3">Quantity</th>
+                                <th className="text-left font-medium p-3">Order #</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {supplierOrderPrices.map((r) => (
+                                <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
+                                  <td className="p-3">{r.orderDate ? formatDate(r.orderDate) : '—'}</td>
+                                  <td className="p-3 text-right font-medium tabular-nums">{r.unitPrice != null ? formatCurrency(r.unitPrice) : '—'}</td>
+                                  <td className="p-3 text-right tabular-nums">{r.quantity != null ? `${r.quantity} ${r.unit}` : '—'}</td>
+                                  <td className="p-3 text-muted-foreground">{r.orderNumber ?? '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Cost history</CardTitle>
+                      <CardDescription>Manual cost entries by effective date for valuation and recipes when no supplier order data exists.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {resolvedParams?.id && (
+                        <HistoryEntryTable
+                          itemId={resolvedParams.id}
+                          type="cost"
+                          entries={costHistory}
+                          loading={priceHistoryLoading}
+                          onRefetch={() => fetchPriceHistory(resolvedParams.id)}
+                          formatCurrency={formatCurrency}
+                          formatDate={formatDate}
+                          taxPercent={applicableTaxes?.expense?.rate ?? 0}
+                          addLabel="Add"
+                          valueLabel="Cost"
+                          emptyMessage="Add dates and costs for valuation and recipes."
                         />
                       )}
                     </CardContent>
@@ -1137,17 +1226,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     </>
                   )}
 
-                  {/* Default tax rate */}
-                  <>
-                    <Separator />
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Default tax rate</label>
-                      <p className="text-sm mt-1">
-                        {item.defaultTaxRatePercent != null ? `${item.defaultTaxRatePercent}%` : '—'}
-                      </p>
-                    </div>
-                  </>
-
                   {/* Vendor */}
                   {supplierName && (
                     <>
@@ -1200,13 +1278,11 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   <CardContent className="space-y-1">
                     {(() => {
                       const excl = (resolvedPrice?.unitPrice ?? item.unitPrice) != null ? (resolvedPrice?.unitPrice ?? item.unitPrice)! : null;
-                      const rate = resolvedTax?.sale ?? 0;
+                      const rate = applicableTaxes?.sales?.find((s) => s.conditionValue === "on_site")?.rate ?? 0;
                       const incl = excl != null && rate > 0 ? to2Decimals(excl * (1 + rate / 100)) : excl;
-                      return excl != null ? (
-                        <>
-                          <p className="text-xl font-semibold tabular-nums">{formatCurrency(excl)} <span className="text-xs font-normal text-muted-foreground">(excl. tax)</span></p>
-                          {rate > 0 && incl != null && <p className="text-sm tabular-nums text-muted-foreground">{formatCurrency(incl)} (incl. {rate}% tax)</p>}
-                        </>
+                      const displayPrice = (rate > 0 ? incl : excl) ?? null;
+                      return displayPrice != null ? (
+                        <p className="text-xl font-semibold tabular-nums">{formatCurrency(displayPrice)} <span className="text-xs font-normal text-muted-foreground">{rate > 0 ? "(incl. tax)" : ""}</span></p>
                       ) : (
                         <p className="text-2xl font-semibold tabular-nums">—</p>
                       );
@@ -1222,13 +1298,11 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   <CardContent className="space-y-1">
                     {(() => {
                       const excl = (resolvedPrice?.unitCost ?? item.unitCost) != null ? (resolvedPrice?.unitCost ?? item.unitCost)! : null;
-                      const rate = resolvedTax?.expense ?? 0;
+                      const rate = applicableTaxes?.expense?.rate ?? 0;
                       const incl = excl != null && rate > 0 ? to2Decimals(excl * (1 + rate / 100)) : excl;
-                      return excl != null ? (
-                        <>
-                          <p className="text-xl font-semibold tabular-nums">{formatCurrency(excl)} <span className="text-xs font-normal text-muted-foreground">(excl. tax)</span></p>
-                          {rate > 0 && incl != null && <p className="text-sm tabular-nums text-muted-foreground">{formatCurrency(incl)} (incl. {rate}% tax)</p>}
-                        </>
+                      const displayPrice = (rate > 0 ? incl : excl) ?? null;
+                      return displayPrice != null ? (
+                        <p className="text-xl font-semibold tabular-nums">{formatCurrency(displayPrice)} <span className="text-xs font-normal text-muted-foreground">{rate > 0 ? "(incl. tax)" : ""}</span></p>
                       ) : (
                         <p className="text-2xl font-semibold tabular-nums">—</p>
                       );
@@ -1237,20 +1311,39 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 </Card>
               </div>
 
-              {resolvedTax && (
+              {applicableTaxes && (
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Applicable tax (from rules)</CardTitle>
+                    <CardDescription className="text-xs">Selling = price incl. tax. Cost = price incl. tax (when rule applies).</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Sales (on-site)</span>
-                      <span className="tabular-nums font-medium">{resolvedTax.sale}%</span>
+                  <CardContent className="space-y-3 text-sm">
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1.5">Selling</p>
+                      <div className="space-y-1">
+                        {applicableTaxes.sales.map((s) => (
+                          <div key={s.conditionValue} className="flex justify-between">
+                            <span className="text-muted-foreground">{s.label}</span>
+                            <span className="tabular-nums font-medium">
+                              {s.rate === 0 ? "0% (Exempt)" : `${s.rate}%${s.variableName ? ` (${s.variableName})` : ""}`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Expense</span>
-                      <span className="tabular-nums font-medium">{resolvedTax.expense}%</span>
-                    </div>
+                    {applicableTaxes.expense != null && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1.5">Cost</p>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Expense</span>
+                          <span className="tabular-nums font-medium">
+                            {applicableTaxes.expense.rate === 0
+                              ? "0% (Exempt)"
+                              : `${applicableTaxes.expense.rate}%${applicableTaxes.expense.variableName ? ` (${applicableTaxes.expense.variableName})` : ""}`}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}

@@ -12,6 +12,7 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateItem, useInventorySuppliers, useUnits, useMetadataEnum } from "@kit/hooks";
+import type { ItemType } from "@kit/types";
 import { toast } from "sonner";
 
 export default function CreateItemPage() {
@@ -20,8 +21,14 @@ export default function CreateItemPage() {
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const { data: unitsData } = useUnits();
   const { data: categoryValues = [] } = useMetadataEnum("ItemCategory");
+  const { data: variableTypeValues = [], isLoading: variableTypeLoading } = useMetadataEnum("VariableType");
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const itemTypeItems: { id: ItemType; name: string }[] = [
+    { id: "item", name: "Item" },
+    { id: "product", name: "Product" },
+  ];
+  const typeItems = (variableTypeValues || []).map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -31,6 +38,8 @@ export default function CreateItemPage() {
     vendorId: "",
     notes: "",
     isActive: true,
+    itemType: "item" as ItemType,
+    type: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,6 +61,8 @@ export default function CreateItemPage() {
         vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
         notes: formData.notes || undefined,
         isActive: formData.isActive,
+        itemType: formData.itemType,
+        type: formData.type || undefined,
       });
       toast.success("Item created successfully");
       router.push('/items');
@@ -112,6 +123,31 @@ export default function CreateItemPage() {
                     selectedId={formData.category || undefined}
                     onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
                     placeholder="Select category"
+                  />
+                </div>
+
+                {/* Item type */}
+                <div className="space-y-2">
+                  <UnifiedSelector
+                    label="Item type"
+                    type="type"
+                    items={itemTypeItems}
+                    selectedId={formData.itemType}
+                    onSelect={(item) => handleInputChange('itemType', item.id as ItemType)}
+                    placeholder="Select type"
+                  />
+                </div>
+
+                {/* Type (variable type) */}
+                <div className="space-y-2">
+                  <UnifiedSelector
+                    label="Type"
+                    type="type"
+                    items={typeItems}
+                    selectedId={formData.type || undefined}
+                    onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))}
+                    placeholder={variableTypeLoading ? "Loading…" : "Select type"}
+                    manageLink={{ href: '/variables', text: 'Variables' }}
                   />
                 </div>
 

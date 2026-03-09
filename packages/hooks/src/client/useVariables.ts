@@ -8,7 +8,7 @@ export function useVariables() {
   return useQuery({
     queryKey: ['variables'],
     queryFn: async () => {
-      const result = await variablesApi.getAll();
+      const result = await variablesApi.getAll({ limit: 1000 });
       return Array.isArray(result?.data) ? result.data : [];
     },
   });

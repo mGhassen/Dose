@@ -14,6 +14,7 @@ export function useTaxRuleById(id: string) {
     queryKey: ['tax-rules', id],
     queryFn: () => taxRulesApi.getById(id),
     enabled: !!id,
+    retry: (_, error: unknown) => (error as { status?: number })?.status !== 404,
   });
 }
 

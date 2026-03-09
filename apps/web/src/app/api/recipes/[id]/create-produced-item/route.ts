@@ -41,7 +41,7 @@ export async function POST(
         unit: recipeData.unit || 'serving',
         unit_id: recipeData.unit_id,
         produced_from_recipe_id: Number(recipeId),
-        item_type: 'item',
+        item_type: 'product',
         is_active: true,
       })
       .select()
@@ -59,7 +59,7 @@ export async function POST(
       unit: newItem.unit,
       unitId: newItem.unit_id,
       category: newItem.category,
-      itemType: 'item',
+      itemType: 'product',
       isActive: newItem.is_active,
       createdAt: newItem.created_at,
       updatedAt: newItem.updated_at,

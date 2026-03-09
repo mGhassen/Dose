@@ -17,7 +17,8 @@ export default function AdminLayout({
   const isSplitView =
     pathname === "/sales" || pathname === "/sales/create" || /^\/sales\/\d+(\/edit)?$/.test(pathname) ||
     pathname === "/expenses" || pathname === "/expenses/create" || /^\/expenses\/\d+(\/edit)?$/.test(pathname) ||
-    pathname === "/variables" || pathname === "/variables/create" || /^\/variables\/\d+(\/edit)?$/.test(pathname);
+    pathname === "/variables" || pathname === "/variables/create" || /^\/variables\/\d+(\/edit)?$/.test(pathname) ||
+    pathname === "/tax-rules" || pathname === "/tax-rules/create" || /^\/tax-rules\/\d+(\/edit)?$/.test(pathname);
 
   return (
     <SidebarProvider>

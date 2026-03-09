@@ -50,27 +50,8 @@ export async function GET(
         const itemId = ri.item_id;
         const recipeQty = parseFloat(ri.quantity);
         const recipeUnitId = ri.unit_id;
-        const itemUnitCost =
-          ri.item?.unit_cost != null ? parseFloat(String(ri.item.unit_cost)) : 0;
-
         let avgPricePerRecipeUnit = 0;
-        let priceSource: 'order' | 'item' = 'order';
-
-        if (itemUnitCost > 0 && ri.item) {
-          const itemUnitId = ri.item.unit_id;
-          if (
-            recipeUnitId != null &&
-            itemUnitId != null &&
-            getFactor(recipeUnitId) != null &&
-            getFactor(itemUnitId) != null
-          ) {
-            avgPricePerRecipeUnit =
-              itemUnitCost * (getFactor(itemUnitId)! / getFactor(recipeUnitId)!);
-          } else {
-            avgPricePerRecipeUnit = itemUnitCost;
-          }
-          priceSource = 'item';
-        }
+        let priceSource: 'order' | 'history' = 'order';
 
         if (avgPricePerRecipeUnit === 0) {
           const threeMonthsAgo = new Date();
@@ -115,8 +96,7 @@ export async function GET(
         if (avgPricePerRecipeUnit === 0 && ri.item) {
           const todayStr = new Date().toISOString().split('T')[0];
           const resolved = await getItemCostAsOf(supabase, itemId, todayStr);
-          const fallbackCost = resolved ?? (ri.item.unit_cost != null ? parseFloat(ri.item.unit_cost) : 0);
-          if (fallbackCost > 0) {
+          if (resolved != null && resolved > 0) {
             const itemUnitId = ri.item.unit_id;
             if (
               recipeUnitId != null &&
@@ -124,11 +104,11 @@ export async function GET(
               getFactor(recipeUnitId) != null &&
               getFactor(itemUnitId) != null
             ) {
-              avgPricePerRecipeUnit = fallbackCost * (getFactor(itemUnitId)! / getFactor(recipeUnitId)!);
+              avgPricePerRecipeUnit = resolved * (getFactor(itemUnitId)! / getFactor(recipeUnitId)!);
             } else {
-              avgPricePerRecipeUnit = fallbackCost;
+              avgPricePerRecipeUnit = resolved;
             }
-            priceSource = 'item';
+            priceSource = 'history';
           }
         }
 
