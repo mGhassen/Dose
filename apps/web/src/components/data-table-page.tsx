@@ -257,9 +257,9 @@ export default function DataTablePage<T>({
       const hasFilters = searchTerm || Object.keys(unifiedFilters).length > 0 || appliedFilters.length > 0;
       
       if (hasFilters) {
-        // Apply unified filters (skip "all" = show all for that key)
+        // Apply unified filters
         Object.entries(unifiedFilters).forEach(([key, value]) => {
-          if (value !== undefined && value !== "" && value !== null && value !== "all") {
+          if (value !== undefined && value !== "" && value !== null) {
             filtered = filtered.filter((item: any) => {
               const itemValue = item[key];
               
@@ -269,7 +269,6 @@ export default function DataTablePage<T>({
                 const itemDate = new Date(itemValue);
                 return itemDate.toDateString() === value.toDateString();
               } else {
-                if (key === "itemType") return String(itemValue) === String(value);
                 return String(itemValue).toLowerCase().includes(String(value).toLowerCase());
               }
             });
@@ -340,9 +339,9 @@ export default function DataTablePage<T>({
     // Client-side pagination: apply filters and search
     let filtered: T[] = Array.isArray(data) ? data : [];
 
-    // Apply unified filters first (skip "all" = show all for that key)
+    // Apply unified filters first
     Object.entries(unifiedFilters).forEach(([key, value]) => {
-      if (value !== undefined && value !== "" && value !== null && value !== "all") {
+      if (value !== undefined && value !== "" && value !== null) {
         filtered = filtered.filter((item: any) => {
           // Handle nested field access (e.g., 'event.id', 'assetModel.id')
           let itemValue: any;
@@ -359,7 +358,8 @@ export default function DataTablePage<T>({
             const itemDate = new Date(itemValue);
             return itemDate.toDateString() === value.toDateString();
           } else {
-            if (key.includes('Id') || key.includes('_id') || key === "itemType") {
+            // For ID fields, do exact match
+            if (key.includes('Id') || key.includes('_id')) {
               return String(itemValue) === String(value);
             }
             return String(itemValue).toLowerCase().includes(String(value).toLowerCase());
