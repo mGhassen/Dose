@@ -160,13 +160,19 @@ export default function VariablesContent({ selectedVariableId }: VariablesConten
       onBulkCopy={handleBulkCopy}
       onBulkExport={handleBulkExport}
       filterColumns={[
-        { value: "type", label: "Type" },
-        { value: "isActive", label: "Status" },
+        { value: "name", label: "Name" },
+        { value: "type", label: "Type", type: "select", options: variableTypeValues.map((ev) => ({ value: ev.name, label: ev.label ?? ev.name })) },
+        { value: "value", label: "Value" },
+        { value: "effectiveDate", label: "Effective Date" },
+        { value: "endDate", label: "End Date" },
+        { value: "isActive", label: "Status", type: "select", options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] },
       ]}
       sortColumns={[
         { value: "name", label: "Name", type: "character varying" },
+        { value: "type", label: "Type", type: "character varying" },
         { value: "value", label: "Value", type: "numeric" },
         { value: "effectiveDate", label: "Effective Date", type: "date" },
+        { value: "endDate", label: "End Date", type: "date" },
       ]}
       localStoragePrefix="variables"
       searchFields={["name", "description"]}

@@ -290,11 +290,18 @@ export default function LoansInputContent() {
           onBulkDelete={handleBulkDelete}
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
-          filterColumns={[]}
+          filterColumns={[
+            { value: "name", label: "Loan Name" },
+            { value: "amount", label: "Principal Amount" },
+            { value: "entryDate", label: "Received Date" },
+            { value: "payments", label: "Payments", type: "select" },
+            { value: "description", label: "Description" },
+          ]}
           sortColumns={[
             { value: "name", label: "Loan Name", type: "character varying" },
             { value: "amount", label: "Principal Amount", type: "numeric" },
             { value: "entryDate", label: "Received Date", type: "date" },
+            { value: "description", label: "Description", type: "character varying" },
           ]}
           localStoragePrefix="loans-input"
           searchFields={["name", "description"]}

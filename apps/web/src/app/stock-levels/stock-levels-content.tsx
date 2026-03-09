@@ -306,10 +306,19 @@ export default function StockLevelsContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "location", label: "Location" },
+            { value: "itemId", label: "Item", type: "select" },
+            { value: "quantity", label: "Quantity" },
+            { value: "location", label: "Location", type: "select" },
+            { value: "minimumStockLevel", label: "Minimum" },
+            { value: "maximumStockLevel", label: "Maximum" },
+            { value: "lastUpdated", label: "Last Updated" },
           ]}
           sortColumns={[
+            { value: "itemId", label: "Item", type: "numeric" },
             { value: "quantity", label: "Quantity", type: "numeric" },
+            { value: "location", label: "Location", type: "character varying" },
+            { value: "minimumStockLevel", label: "Minimum", type: "numeric" },
+            { value: "maximumStockLevel", label: "Maximum", type: "numeric" },
             { value: "lastUpdated", label: "Last Updated", type: "timestamp" },
             { value: "createdAt", label: "Created", type: "timestamp" },
           ]}

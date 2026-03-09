@@ -5,6 +5,7 @@ import { supabaseServer } from '@kit/lib/supabase';
 import { dateToYYYYMMDD } from '@kit/lib';
 import type { SupplierOrder, CreateSupplierOrderData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
+import { lineTaxAmount } from '@/lib/transaction-tax';
 
 function transformSupplierOrder(row: any): SupplierOrder {
   return {
@@ -93,9 +94,11 @@ export async function POST(request: NextRequest) {
 
     const supabase = supabaseServer();
     
-    // Calculate total amount
     const totalAmount = body.items.reduce((sum, item) => {
-      return sum + (item.quantity * item.unitPrice);
+      const rate = item.taxRatePercent ?? 0;
+      const inclusive = item.taxInclusive ?? false;
+      const { lineTotalNet, taxAmount } = lineTaxAmount(item.quantity, item.unitPrice, rate, inclusive);
+      return sum + lineTotalNet + taxAmount;
     }, 0);
 
     // Insert order
@@ -110,17 +113,23 @@ export async function POST(request: NextRequest) {
 
     if (orderError) throw orderError;
 
-    // Insert order items
-    const orderItems = body.items.map(item => ({
-      order_id: orderData.id,
-      item_id: item.itemId,
-      quantity: item.quantity,
-      unit: item.unit,
-      unit_id: item.unitId,
-      unit_price: item.unitPrice,
-      total_price: item.quantity * item.unitPrice,
-      notes: item.notes,
-    }));
+    const orderItems = body.items.map(item => {
+      const rate = item.taxRatePercent ?? 0;
+      const inclusive = item.taxInclusive ?? false;
+      const { lineTotalNet, taxAmount } = lineTaxAmount(item.quantity, item.unitPrice, rate, inclusive);
+      return {
+        order_id: orderData.id,
+        item_id: item.itemId,
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_id: item.unitId,
+        unit_price: item.unitPrice,
+        total_price: lineTotalNet,
+        tax_rate_percent: rate || null,
+        tax_amount: taxAmount || null,
+        notes: item.notes,
+      };
+    });
 
     const { error: itemsError } = await supabase
       .from('supplier_order_items')

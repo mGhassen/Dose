@@ -143,11 +143,17 @@ export default function MetadataEnumsContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "isActive", label: "Status" },
+            { value: "name", label: "Name" },
+            { value: "label", label: "Label" },
+            { value: "valueCount", label: "Value Count" },
+            { value: "updatedAt", label: "Updated" },
+            { value: "isActive", label: "Status", type: "select", options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] },
           ]}
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
             { value: "label", label: "Label", type: "character varying" },
+            { value: "valueCount", label: "Value Count", type: "numeric" },
+            { value: "updatedAt", label: "Updated", type: "timestamp" },
           ]}
           localStoragePrefix="metadataEnums"
           searchFields={["name", "label", "description"]}

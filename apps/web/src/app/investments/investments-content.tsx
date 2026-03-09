@@ -167,13 +167,22 @@ export default function InvestmentsContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "type", label: "Type" },
-            { value: "depreciationMethod", label: "Depreciation Method" },
+            { value: "name", label: "Name" },
+            { value: "type", label: "Type", type: "select" },
+            { value: "amount", label: "Amount" },
+            { value: "purchaseDate", label: "Purchase Date" },
+            { value: "usefulLifeMonths", label: "Useful Life" },
+            { value: "depreciationMethod", label: "Depreciation Method", type: "select" },
+            { value: "residualValue", label: "Residual Value" },
           ]}
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
+            { value: "type", label: "Type", type: "character varying" },
             { value: "amount", label: "Amount", type: "numeric" },
             { value: "purchaseDate", label: "Purchase Date", type: "date" },
+            { value: "usefulLifeMonths", label: "Useful Life", type: "numeric" },
+            { value: "depreciationMethod", label: "Depreciation Method", type: "character varying" },
+            { value: "residualValue", label: "Residual Value", type: "numeric" },
           ]}
           localStoragePrefix="investments"
           searchFields={["name", "description"]}

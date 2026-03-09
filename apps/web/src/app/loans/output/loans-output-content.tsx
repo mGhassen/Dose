@@ -228,11 +228,15 @@ export default function LoansOutputContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "payments", label: "Payment Status" },
+            { value: "name", label: "Payment Description" },
+            { value: "amount", label: "Payment Amount" },
+            { value: "payments", label: "Payment Status", type: "select" },
+            { value: "dueDate", label: "Due Date" },
           ]}
           sortColumns={[
             { value: "name", label: "Payment Description", type: "character varying" },
             { value: "amount", label: "Payment Amount", type: "numeric" },
+            { value: "payments", label: "Payment Status", type: "character varying" },
             { value: "dueDate", label: "Due Date", type: "date" },
           ]}
           localStoragePrefix="loans-output"

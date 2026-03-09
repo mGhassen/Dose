@@ -232,14 +232,23 @@ export default function SubscriptionsContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "category", label: "Category" },
-            { value: "recurrence", label: "Recurrence" },
-            { value: "isActive", label: "Status" },
+            { value: "name", label: "Name" },
+            { value: "category", label: "Category", type: "select" },
+            { value: "amount", label: "Amount" },
+            { value: "recurrence", label: "Recurrence", type: "select" },
+            { value: "startDate", label: "Start Date" },
+            { value: "endDate", label: "End Date" },
+            { value: "vendor", label: "Vendor" },
+            { value: "isActive", label: "Status", type: "select", options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] },
           ]}
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
+            { value: "category", label: "Category", type: "character varying" },
             { value: "amount", label: "Amount", type: "numeric" },
+            { value: "recurrence", label: "Recurrence", type: "character varying" },
             { value: "startDate", label: "Start Date", type: "date" },
+            { value: "endDate", label: "End Date", type: "date" },
+            { value: "vendor", label: "Vendor", type: "character varying" },
           ]}
           localStoragePrefix="subscriptions"
           searchFields={["name", "description", "vendor"]}

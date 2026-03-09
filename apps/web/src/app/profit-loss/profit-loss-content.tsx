@@ -578,8 +578,22 @@ export default function ProfitLossContent() {
             onBulkDelete={handleBulkDelete}
             onBulkCopy={handleBulkCopy}
             onBulkExport={handleBulkExport}
+            filterColumns={[
+              { value: "month", label: "Month" },
+              { value: "totalRevenue", label: "Total Revenue" },
+              { value: "costOfGoodsSold", label: "Cost of Goods Sold" },
+              { value: "grossProfit", label: "Gross Profit" },
+              { value: "operatingExpenses", label: "Operating Expenses" },
+              { value: "personnelCosts", label: "Personnel Costs" },
+              { value: "netProfit", label: "Net Profit" },
+            ]}
             sortColumns={[
               { value: "month", label: "Month", type: "character varying" },
+              { value: "totalRevenue", label: "Total Revenue", type: "numeric" },
+              { value: "costOfGoodsSold", label: "Cost of Goods Sold", type: "numeric" },
+              { value: "grossProfit", label: "Gross Profit", type: "numeric" },
+              { value: "operatingExpenses", label: "Operating Expenses", type: "numeric" },
+              { value: "personnelCosts", label: "Personnel Costs", type: "numeric" },
               { value: "netProfit", label: "Net Profit", type: "numeric" },
             ]}
             localStoragePrefix="profit-loss"

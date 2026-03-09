@@ -193,12 +193,22 @@ export default function PersonnelContent() {
             onBulkCopy={handleBulkCopy}
             onBulkExport={handleBulkExport}
             filterColumns={[
-              { value: "type", label: "Type" },
-              { value: "isActive", label: "Status" },
+              { value: "firstName", label: "First Name" },
+              { value: "email", label: "Email" },
+              { value: "position", label: "Position" },
+              { value: "type", label: "Type", type: "select" },
+              { value: "baseSalary", label: "Base Salary" },
+              { value: "employerCharges", label: "Employer Charges" },
+              { value: "startDate", label: "Start Date" },
+              { value: "isActive", label: "Status", type: "select", options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] },
             ]}
             sortColumns={[
-              { value: "firstName", label: "Name", type: "character varying" },
+              { value: "firstName", label: "First Name", type: "character varying" },
+              { value: "email", label: "Email", type: "character varying" },
+              { value: "position", label: "Position", type: "character varying" },
+              { value: "type", label: "Type", type: "character varying" },
               { value: "baseSalary", label: "Base Salary", type: "numeric" },
+              { value: "employerCharges", label: "Employer Charges", type: "numeric" },
               { value: "startDate", label: "Start Date", type: "date" },
             ]}
             localStoragePrefix="personnel"

@@ -169,8 +169,24 @@ export default function FinancialPlanContent() {
         onBulkDelete={handleBulkDelete}
         onBulkCopy={handleBulkCopy}
         onBulkExport={handleBulkExport}
+        filterColumns={[
+          { value: "month", label: "Month" },
+          { value: "totalSources", label: "Total Sources" },
+          { value: "equity", label: "Equity" },
+          { value: "loans", label: "Loans" },
+          { value: "totalUses", label: "Total Uses" },
+          { value: "investments", label: "Investments" },
+          { value: "workingCapital", label: "Working Capital" },
+          { value: "netFinancing", label: "Net Financing" },
+        ]}
         sortColumns={[
           { value: "month", label: "Month", type: "character varying" },
+          { value: "totalSources", label: "Total Sources", type: "numeric" },
+          { value: "equity", label: "Equity", type: "numeric" },
+          { value: "loans", label: "Loans", type: "numeric" },
+          { value: "totalUses", label: "Total Uses", type: "numeric" },
+          { value: "investments", label: "Investments", type: "numeric" },
+          { value: "workingCapital", label: "Working Capital", type: "numeric" },
           { value: "netFinancing", label: "Net Financing", type: "numeric" },
         ]}
         localStoragePrefix="financial-plan"

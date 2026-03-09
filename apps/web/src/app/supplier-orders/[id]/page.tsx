@@ -256,7 +256,12 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
                               </div>
                             )}
                             <div className="text-sm text-muted-foreground mt-1">
-                              Unit Price: {formatCurrency(item.unitPrice)} • Total: {formatCurrency(item.totalPrice)}
+                              Unit price: {formatCurrency(item.unitPrice)}
+                              {item.taxRatePercent != null && item.taxRatePercent > 0 && (
+                                <> • Tax {item.taxRatePercent}%: {formatCurrency(item.taxAmount ?? 0)}</>
+                              )}
+                              {" • "}
+                              Total: {formatCurrency(item.totalPrice + (item.taxAmount ?? 0))}
                             </div>
                           </div>
                           {isFullyReceived && (

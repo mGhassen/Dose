@@ -792,10 +792,14 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
               handleExportLocations();
             }}
             filterColumns={[
-              { value: 'status', label: 'Status' },
+              { value: 'name', label: 'Name' },
+              { value: 'address', label: 'Address' },
+              { value: 'status', label: 'Status', type: 'select' },
             ]}
             sortColumns={[
               { value: 'name', label: 'Name', type: 'character varying' },
+              { value: 'address', label: 'Address', type: 'character varying' },
+              { value: 'status', label: 'Status', type: 'character varying' },
             ]}
             localStoragePrefix="square-locations"
             searchFields={['name', 'address']}
@@ -826,12 +830,18 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
                 handleExportOrders();
               }}
               filterColumns={[
-                { value: 'state', label: 'State' },
+                { value: 'id', label: 'ID' },
+                { value: 'reference_id', label: 'Reference ID' },
+                { value: 'location_id', label: 'Location ID' },
+                { value: 'state', label: 'State', type: 'select' },
                 { value: 'created_at', label: 'Created At' },
               ]}
               sortColumns={[
-                { value: 'created_at', label: 'Created At', type: 'timestamp' },
+                { value: 'id', label: 'ID', type: 'character varying' },
                 { value: 'reference_id', label: 'Reference ID', type: 'character varying' },
+                { value: 'location_id', label: 'Location ID', type: 'character varying' },
+                { value: 'state', label: 'State', type: 'character varying' },
+                { value: 'created_at', label: 'Created At', type: 'timestamp' },
               ]}
               localStoragePrefix="square-orders"
               searchFields={['reference_id', 'id', 'location_id']}
@@ -860,11 +870,19 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
               handleExportPayments();
             }}
             filterColumns={[
-              { value: 'status', label: 'Status' },
-              { value: 'source_type', label: 'Payment Method' },
+              { value: 'id', label: 'ID' },
+              { value: 'order_id', label: 'Order ID' },
+              { value: 'location_id', label: 'Location ID' },
+              { value: 'status', label: 'Status', type: 'select' },
+              { value: 'source_type', label: 'Payment Method', type: 'select' },
               { value: 'created_at', label: 'Created At' },
             ]}
             sortColumns={[
+              { value: 'id', label: 'ID', type: 'character varying' },
+              { value: 'order_id', label: 'Order ID', type: 'character varying' },
+              { value: 'location_id', label: 'Location ID', type: 'character varying' },
+              { value: 'status', label: 'Status', type: 'character varying' },
+              { value: 'source_type', label: 'Payment Method', type: 'character varying' },
               { value: 'created_at', label: 'Created At', type: 'timestamp' },
               { value: 'amount_money.amount', label: 'Amount', type: 'numeric' },
             ]}
@@ -894,12 +912,16 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
               handleExportCatalog();
             }}
             filterColumns={[
-              { value: 'categoryName', label: 'Category' },
-              { value: 'is_deleted', label: 'Status' },
+              { value: 'name', label: 'Name' },
+              { value: 'description', label: 'Description' },
+              { value: 'categoryName', label: 'Category', type: 'select' },
+              { value: 'is_deleted', label: 'Status', type: 'select', options: [{ value: 'true', label: 'Deleted' }, { value: 'false', label: 'Active' }] },
             ]}
             sortColumns={[
               { value: 'name', label: 'Name', type: 'character varying' },
+              { value: 'description', label: 'Description', type: 'character varying' },
               { value: 'categoryName', label: 'Category', type: 'character varying' },
+              { value: 'is_deleted', label: 'Status', type: 'character varying' },
             ]}
             localStoragePrefix="square-catalog"
             searchFields={['name', 'description', 'categoryName']}

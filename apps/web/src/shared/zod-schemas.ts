@@ -781,6 +781,8 @@ const supplierOrderItemSchema = z.object({
   unit: z.string(),
   unitId: z.number().optional(),
   unitPrice: z.number(),
+  taxRatePercent: z.number().optional(),
+  taxInclusive: z.boolean().optional(),
   notes: z.string().optional(),
 });
 export const createSupplierOrderSchema = z.object({

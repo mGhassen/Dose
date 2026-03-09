@@ -208,14 +208,23 @@ export default function LeasingContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "type", label: "Type" },
-            { value: "frequency", label: "Frequency" },
-            { value: "isActive", label: "Status" },
+            { value: "name", label: "Name" },
+            { value: "type", label: "Type", type: "select" },
+            { value: "amount", label: "Amount" },
+            { value: "frequency", label: "Frequency", type: "select" },
+            { value: "startDate", label: "Start Date" },
+            { value: "endDate", label: "End Date" },
+            { value: "lessor", label: "Lessor" },
+            { value: "isActive", label: "Status", type: "select", options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] },
           ]}
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
+            { value: "type", label: "Type", type: "character varying" },
             { value: "amount", label: "Amount", type: "numeric" },
+            { value: "frequency", label: "Frequency", type: "character varying" },
             { value: "startDate", label: "Start Date", type: "date" },
+            { value: "endDate", label: "End Date", type: "date" },
+            { value: "lessor", label: "Lessor", type: "character varying" },
           ]}
           localStoragePrefix="leasing"
           searchFields={["name", "description", "lessor"]}

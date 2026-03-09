@@ -193,13 +193,24 @@ export default function ItemsContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "itemType", label: "Type" },
-            { value: "category", label: "Category" },
-            { value: "isActive", label: "Status" },
+            { value: "name", label: "Name" },
+            { value: "sku", label: "SKU" },
+            { value: "itemType", label: "Type", type: "select", options: [{ value: "item", label: "Item" }, { value: "product", label: "Product" }, { value: "recipe", label: "Recipe" }] },
+            { value: "category", label: "Category", type: "select" },
+            { value: "unit", label: "Unit", type: "select" },
+            { value: "unitPrice", label: "Selling price" },
+            { value: "vendorId", label: "Vendor", type: "select" },
+            { value: "isActive", label: "Status", type: "select", options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] },
+            { value: "createdAt", label: "Created" },
           ]}
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
+            { value: "sku", label: "SKU", type: "character varying" },
+            { value: "itemType", label: "Type", type: "character varying" },
+            { value: "category", label: "Category", type: "character varying" },
+            { value: "unit", label: "Unit", type: "character varying" },
             { value: "unitPrice", label: "Selling price", type: "numeric" },
+            { value: "vendorId", label: "Vendor", type: "numeric" },
             { value: "createdAt", label: "Created", type: "timestamp" },
           ]}
           localStoragePrefix="items"

@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { SupplierOrder, SupplierOrderItem, UpdateSupplierOrderData } from '@kit/types';
+import { lineTaxAmount } from '@/lib/transaction-tax';
 
 function transformSupplierOrder(row: any): SupplierOrder {
   return {
@@ -30,6 +31,8 @@ function transformSupplierOrderItem(row: any): SupplierOrderItem {
     unitId: row.unit_id,
     unitPrice: parseFloat(row.unit_price),
     totalPrice: parseFloat(row.total_price),
+    taxRatePercent: row.tax_rate_percent != null ? parseFloat(row.tax_rate_percent) : undefined,
+    taxAmount: row.tax_amount != null ? parseFloat(row.tax_amount) : undefined,
     receivedQuantity: row.received_quantity ? parseFloat(row.received_quantity) : undefined,
     notes: row.notes,
     createdAt: row.created_at,
@@ -129,10 +132,12 @@ export async function PUT(
     // Update order
     const updateData = transformToSnakeCase(body);
     
-    // Calculate total if items are being updated
     if (body.items) {
       const totalAmount = body.items.reduce((sum, item) => {
-        return sum + (item.quantity * item.unitPrice);
+        const rate = item.taxRatePercent ?? 0;
+        const inclusive = item.taxInclusive ?? false;
+        const { lineTotalNet, taxAmount } = lineTaxAmount(item.quantity, item.unitPrice, rate, inclusive);
+        return sum + lineTotalNet + taxAmount;
       }, 0);
       updateData.total_amount = totalAmount;
     }
@@ -162,16 +167,23 @@ export async function PUT(
 
       // Insert new items
       if (body.items.length > 0) {
-        const orderItems = body.items.map(item => ({
-          order_id: Number(id),
-          item_id: item.itemId,
-          quantity: item.quantity,
-          unit: item.unit,
-          unit_id: item.unitId,
-          unit_price: item.unitPrice,
-          total_price: item.quantity * item.unitPrice,
-          notes: item.notes,
-        }));
+        const orderItems = body.items.map(item => {
+          const rate = item.taxRatePercent ?? 0;
+          const inclusive = item.taxInclusive ?? false;
+          const { lineTotalNet, taxAmount } = lineTaxAmount(item.quantity, item.unitPrice, rate, inclusive);
+          return {
+            order_id: Number(id),
+            item_id: item.itemId,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_id: item.unitId,
+            unit_price: item.unitPrice,
+            total_price: lineTotalNet,
+            tax_rate_percent: rate || null,
+            tax_amount: taxAmount || null,
+            notes: item.notes,
+          };
+        });
 
         const { error: itemsError } = await supabase
           .from('supplier_order_items')

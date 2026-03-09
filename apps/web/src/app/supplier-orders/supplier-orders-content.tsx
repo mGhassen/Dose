@@ -252,10 +252,19 @@ export default function SupplierOrdersContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "status", label: "Status" },
+            { value: "orderNumber", label: "Order Number" },
+            { value: "supplierId", label: "Supplier", type: "select" },
+            { value: "orderDate", label: "Order Date" },
+            { value: "expectedDeliveryDate", label: "Expected Delivery" },
+            { value: "status", label: "Status", type: "select" },
+            { value: "totalAmount", label: "Total Amount" },
           ]}
           sortColumns={[
+            { value: "orderNumber", label: "Order Number", type: "character varying" },
+            { value: "supplierId", label: "Supplier", type: "numeric" },
             { value: "orderDate", label: "Order Date", type: "date" },
+            { value: "expectedDeliveryDate", label: "Expected Delivery", type: "date" },
+            { value: "status", label: "Status", type: "character varying" },
             { value: "totalAmount", label: "Total Amount", type: "numeric" },
             { value: "createdAt", label: "Created", type: "timestamp" },
           ]}

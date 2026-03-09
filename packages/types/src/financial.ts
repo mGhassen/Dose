@@ -1197,6 +1197,8 @@ export interface SupplierOrderItem {
   unitId?: number;
   unitPrice: number;
   totalPrice: number;
+  taxRatePercent?: number;
+  taxAmount?: number;
   receivedQuantity?: number;
   notes?: string;
   createdAt: string;
@@ -1235,6 +1237,8 @@ export interface CreateSupplierOrderData {
     unit: string;
     unitId?: number;
     unitPrice: number;
+    taxRatePercent?: number;
+    taxInclusive?: boolean;
     notes?: string;
   }>;
 }
@@ -1247,6 +1251,8 @@ export interface UpdateSupplierOrderData extends Partial<Omit<CreateSupplierOrde
     unit: string;
     unitId?: number;
     unitPrice: number;
+    taxRatePercent?: number;
+    taxInclusive?: boolean;
     notes?: string;
   }>;
 }
@@ -1258,6 +1264,8 @@ export interface CreateSupplierOrderItemData {
   unit: string;
   unitId?: number;
   unitPrice: number;
+  taxRatePercent?: number;
+  taxAmount?: number;
   notes?: string;
 }
 

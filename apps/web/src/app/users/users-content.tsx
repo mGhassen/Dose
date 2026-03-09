@@ -330,8 +330,9 @@ export default function UsersContent() {
           { value: "email", label: tCommon('email') },
           { value: "firstName", label: tCommon('firstName') },
           { value: "lastName", label: tCommon('lastName') },
-          { value: "role", label: tCommon('role') },
-          { value: "status", label: tCommon('status') }
+          { value: "role", label: tCommon('role'), type: "select" },
+          { value: "status", label: tCommon('status'), type: "select" },
+          { value: "createdAt", label: tCommon('createdAt') },
         ]}
         sortColumns={[
           { value: "email", label: tCommon('email'), type: "character varying" },
@@ -339,7 +340,7 @@ export default function UsersContent() {
           { value: "lastName", label: tCommon('lastName'), type: "character varying" },
           { value: "role", label: tCommon('role'), type: "character varying" },
           { value: "status", label: tCommon('status'), type: "character varying" },
-          { value: "createdAt", label: tCommon('createdAt'), type: "timestamp" }
+          { value: "createdAt", label: tCommon('createdAt'), type: "timestamp" },
         ]}
         localStoragePrefix="users"
         searchFields={["email", "firstName", "lastName"]}

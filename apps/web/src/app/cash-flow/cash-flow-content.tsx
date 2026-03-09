@@ -528,8 +528,20 @@ export default function CashFlowContent() {
             onBulkDelete={handleBulkDelete}
             onBulkCopy={handleBulkCopy}
             onBulkExport={handleBulkExport}
+            filterColumns={[
+              { value: "month", label: "Month" },
+              { value: "openingBalance", label: "Opening Balance" },
+              { value: "cashInflows", label: "Cash Inflows" },
+              { value: "cashOutflows", label: "Cash Outflows" },
+              { value: "netCashFlow", label: "Net Cash Flow" },
+              { value: "closingBalance", label: "Closing Balance" },
+            ]}
             sortColumns={[
               { value: "month", label: "Month", type: "character varying" },
+              { value: "openingBalance", label: "Opening Balance", type: "numeric" },
+              { value: "cashInflows", label: "Cash Inflows", type: "numeric" },
+              { value: "cashOutflows", label: "Cash Outflows", type: "numeric" },
+              { value: "netCashFlow", label: "Net Cash Flow", type: "numeric" },
               { value: "closingBalance", label: "Closing Balance", type: "numeric" },
             ]}
             localStoragePrefix="cash-flow"

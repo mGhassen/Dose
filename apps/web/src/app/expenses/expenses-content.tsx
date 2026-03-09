@@ -227,13 +227,19 @@ export default function ExpensesContent({ selectedExpenseId }: ExpensesContentPr
               onBulkCopy={handleBulkCopy}
               onBulkExport={handleBulkExport}
               filterColumns={[
-                { value: "category", label: "Category" },
-                { value: "subscriptionId", label: "Subscription" },
+                { value: "name", label: "Name" },
+                { value: "category", label: "Category", type: "select", options: categoryValues.map((ev) => ({ value: ev.name, label: ev.label ?? ev.name })) },
+                { value: "amount", label: "Amount" },
+                { value: "subscriptionId", label: "Subscription", type: "select", options: subscriptions.map((sub) => ({ value: String(sub.id), label: sub.name })) },
+                { value: "expenseDate", label: "Expense Date" },
+                { value: "vendor", label: "Vendor" },
               ]}
               sortColumns={[
                 { value: "name", label: "Name", type: "character varying" },
+                { value: "category", label: "Category", type: "character varying" },
                 { value: "amount", label: "Amount", type: "numeric" },
                 { value: "expenseDate", label: "Expense Date", type: "date" },
+                { value: "vendor", label: "Vendor", type: "character varying" },
               ]}
               localStoragePrefix="expenses"
               searchFields={["name", "description", "vendor"]}

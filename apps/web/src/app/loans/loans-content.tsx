@@ -248,12 +248,24 @@ export default function LoansContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "status", label: "Status" },
+            { value: "name", label: "Name" },
+            { value: "loanNumber", label: "Loan Number" },
+            { value: "principalAmount", label: "Principal" },
+            { value: "interestRate", label: "Interest Rate" },
+            { value: "durationMonths", label: "Duration (months)" },
+            { value: "startDate", label: "Start Date" },
+            { value: "status", label: "Status", type: "select" },
+            { value: "lender", label: "Lender" },
           ]}
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
+            { value: "loanNumber", label: "Loan Number", type: "character varying" },
             { value: "principalAmount", label: "Principal", type: "numeric" },
+            { value: "interestRate", label: "Interest Rate", type: "numeric" },
+            { value: "durationMonths", label: "Duration", type: "numeric" },
             { value: "startDate", label: "Start Date", type: "date" },
+            { value: "status", label: "Status", type: "character varying" },
+            { value: "lender", label: "Lender", type: "character varying" },
           ]}
           localStoragePrefix="loans"
           searchFields={["name", "loanNumber", "lender", "description"]}

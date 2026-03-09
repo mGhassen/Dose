@@ -69,10 +69,19 @@ export default function UnitsSettingsContent() {
           onRowClick={(u) => router.push(`/settings/units/${u.id}`)}
           onDelete={handleDelete}
           onBulkDelete={handleBulkDelete}
-          filterColumns={[{ value: "dimension", label: "Dimension" }]}
+          filterColumns={[
+            { value: "symbol", label: "Symbol" },
+            { value: "name", label: "Name" },
+            { value: "dimension", label: "Dimension", type: "select" },
+            { value: "baseUnitId", label: "Base Unit", type: "select" },
+            { value: "factorToBase", label: "Factor" },
+          ]}
           sortColumns={[
             { value: "symbol", label: "Symbol", type: "character varying" },
             { value: "name", label: "Name", type: "character varying" },
+            { value: "dimension", label: "Dimension", type: "character varying" },
+            { value: "baseUnitId", label: "Base Unit", type: "numeric" },
+            { value: "factorToBase", label: "Factor", type: "numeric" },
           ]}
           localStoragePrefix="settingsUnits"
           searchFields={["symbol", "name", "dimension"]}

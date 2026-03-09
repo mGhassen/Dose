@@ -217,12 +217,18 @@ export default function InputsContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "entryType", label: "Type" },
+            { value: "name", label: "Name" },
+            { value: "entryType", label: "Type", type: "select" },
+            { value: "amount", label: "Amount" },
+            { value: "entryDate", label: "Date" },
+            { value: "description", label: "Description" },
           ]}
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
+            { value: "entryType", label: "Type", type: "character varying" },
             { value: "amount", label: "Amount", type: "numeric" },
             { value: "entryDate", label: "Date", type: "date" },
+            { value: "description", label: "Description", type: "character varying" },
           ]}
           localStoragePrefix="inputs"
           searchFields={["name", "description"]}

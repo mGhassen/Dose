@@ -116,6 +116,20 @@ export default function TaxRulesContent({ selectedRuleId }: TaxRulesContentProps
       }}
       onDelete={handleDelete}
       onBulkDelete={handleBulkDelete}
+      filterColumns={[
+        { value: "variable", label: "Variable" },
+        { value: "condition", label: "Condition", type: "select" },
+        { value: "scopeType", label: "Scope Type", type: "select" },
+        { value: "ruleType", label: "Rule Type", type: "select" },
+        { value: "priority", label: "Priority" },
+      ]}
+      sortColumns={[
+        { value: "variable", label: "Variable", type: "character varying" },
+        { value: "condition", label: "Condition", type: "character varying" },
+        { value: "scopeType", label: "Scope Type", type: "character varying" },
+        { value: "ruleType", label: "Rule Type", type: "character varying" },
+        { value: "priority", label: "Priority", type: "numeric" },
+      ]}
       localStoragePrefix="tax-rules"
       searchFields={[]}
     />

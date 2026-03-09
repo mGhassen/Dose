@@ -164,10 +164,20 @@ export default function VendorsContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "isActive", label: "Status" },
+            { value: "name", label: "Name" },
+            { value: "email", label: "Email" },
+            { value: "phone", label: "Phone" },
+            { value: "contactPerson", label: "Contact Person" },
+            { value: "address", label: "Address" },
+            { value: "createdAt", label: "Created" },
+            { value: "isActive", label: "Status", type: "select", options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] },
           ]}
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
+            { value: "email", label: "Email", type: "character varying" },
+            { value: "phone", label: "Phone", type: "character varying" },
+            { value: "contactPerson", label: "Contact Person", type: "character varying" },
+            { value: "address", label: "Address", type: "character varying" },
             { value: "createdAt", label: "Created", type: "timestamp" },
           ]}
           localStoragePrefix="vendors"

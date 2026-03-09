@@ -210,11 +210,22 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
           onBulkExport={handleBulkExport}
           activeRowId={selectedSaleId}
           filterColumns={[
-            { value: "type", label: "Type" },
+            { value: "date", label: "Date" },
+            { value: "type", label: "Type", type: "select" },
+            { value: "amount", label: "Amount" },
+            { value: "quantity", label: "Quantity" },
+            { value: "unitPrice", label: "Sell price" },
+            { value: "unitCost", label: "Cost price" },
+            { value: "description", label: "Description" },
           ]}
           sortColumns={[
             { value: "date", label: "Date", type: "date" },
+            { value: "type", label: "Type", type: "character varying" },
             { value: "amount", label: "Amount", type: "numeric" },
+            { value: "quantity", label: "Quantity", type: "numeric" },
+            { value: "unitPrice", label: "Sell price", type: "numeric" },
+            { value: "unitCost", label: "Cost price", type: "numeric" },
+            { value: "description", label: "Description", type: "character varying" },
           ]}
           localStoragePrefix="sales"
           searchFields={["description"]}

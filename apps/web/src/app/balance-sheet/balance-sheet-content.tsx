@@ -568,9 +568,25 @@ export default function BalanceSheetContent() {
             onBulkDelete={handleBulkDelete}
             onBulkCopy={handleBulkCopy}
             onBulkExport={handleBulkExport}
+            filterColumns={[
+              { value: "month", label: "Month" },
+              { value: "totalAssets", label: "Total Assets" },
+              { value: "currentAssets", label: "Current Assets" },
+              { value: "fixedAssets", label: "Fixed Assets" },
+              { value: "totalLiabilities", label: "Total Liabilities" },
+              { value: "currentLiabilities", label: "Current Liabilities" },
+              { value: "longTermDebt", label: "Long Term Debt" },
+              { value: "totalEquity", label: "Total Equity" },
+            ]}
             sortColumns={[
               { value: "month", label: "Month", type: "character varying" },
               { value: "totalAssets", label: "Total Assets", type: "numeric" },
+              { value: "currentAssets", label: "Current Assets", type: "numeric" },
+              { value: "fixedAssets", label: "Fixed Assets", type: "numeric" },
+              { value: "totalLiabilities", label: "Total Liabilities", type: "numeric" },
+              { value: "currentLiabilities", label: "Current Liabilities", type: "numeric" },
+              { value: "longTermDebt", label: "Long Term Debt", type: "numeric" },
+              { value: "totalEquity", label: "Total Equity", type: "numeric" },
             ]}
             localStoragePrefix="balance-sheet"
             searchFields={[]}

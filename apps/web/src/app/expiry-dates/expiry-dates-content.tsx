@@ -179,10 +179,20 @@ export default function ExpiryDatesContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "isExpired", label: "Status" },
+            { value: "itemId", label: "Item", type: "select" },
+            { value: "quantity", label: "Quantity" },
+            { value: "expiryDate", label: "Expiry Date" },
+            { value: "location", label: "Location", type: "select" },
+            { value: "isExpired", label: "Status", type: "select", options: [{ value: "true", label: "Expired" }, { value: "false", label: "Active" }] },
+            { value: "disposedDate", label: "Disposed Date" },
           ]}
           sortColumns={[
+            { value: "itemId", label: "Item", type: "numeric" },
+            { value: "quantity", label: "Quantity", type: "numeric" },
             { value: "expiryDate", label: "Expiry Date", type: "date" },
+            { value: "location", label: "Location", type: "character varying" },
+            { value: "isExpired", label: "Status", type: "character varying" },
+            { value: "disposedDate", label: "Disposed Date", type: "date" },
             { value: "createdAt", label: "Created", type: "timestamp" },
           ]}
           localStoragePrefix="expiry-dates"

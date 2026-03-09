@@ -574,11 +574,20 @@ export default function StockMovementsContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "movementType", label: "Movement Type" },
+            { value: "itemId", label: "Item", type: "select" },
+            { value: "movementType", label: "Movement Type", type: "select" },
+            { value: "quantity", label: "Quantity" },
+            { value: "location", label: "Location", type: "select" },
+            { value: "movementDate", label: "Date" },
+            { value: "referenceType", label: "Reference Type", type: "select" },
           ]}
           sortColumns={[
-            { value: "movementDate", label: "Date", type: "timestamp" },
+            { value: "itemId", label: "Item", type: "numeric" },
+            { value: "movementType", label: "Movement Type", type: "character varying" },
             { value: "quantity", label: "Quantity", type: "numeric" },
+            { value: "location", label: "Location", type: "character varying" },
+            { value: "movementDate", label: "Date", type: "timestamp" },
+            { value: "referenceType", label: "Reference Type", type: "character varying" },
             { value: "createdAt", label: "Created", type: "timestamp" },
           ]}
           localStoragePrefix="stock-movements"

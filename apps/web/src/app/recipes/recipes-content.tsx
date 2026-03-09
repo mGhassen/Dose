@@ -222,11 +222,18 @@ export default function RecipesContent() {
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
           filterColumns={[
-            { value: "isActive", label: "Status" },
+            { value: "name", label: "Name" },
+            { value: "servingSize", label: "Serving Size" },
+            { value: "preparationTime", label: "Preparation Time" },
+            { value: "cookingTime", label: "Cooking Time" },
+            { value: "createdAt", label: "Created" },
+            { value: "isActive", label: "Status", type: "select", options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }] },
           ]}
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
             { value: "servingSize", label: "Serving Size", type: "integer" },
+            { value: "preparationTime", label: "Preparation Time", type: "numeric" },
+            { value: "cookingTime", label: "Cooking Time", type: "numeric" },
             { value: "createdAt", label: "Created", type: "timestamp" },
           ]}
           localStoragePrefix="recipes"

@@ -41,6 +41,124 @@ import ViewToggle from "@/components/view-toggle";
 import { formatMonthYear } from "@kit/lib/date-format";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
+const FILTER_PREFIX = "f_";
+
+export type FilterColumnType = "text" | "number" | "date" | "select" | "multiselect";
+
+export interface FilterColumnConfig {
+  value: string;
+  label: string;
+  type?: FilterColumnType;
+  options?: Array<{ value: string; label: string }>;
+}
+
+interface AppliedFilter {
+  column: string;
+  operator: string;
+  value: string | string[];
+}
+
+function parseSortParam(sortStr: string | null): Array<{ id: string; column: string; direction: "asc" | "desc" }> {
+  if (!sortStr || typeof sortStr !== "string") return [];
+  return sortStr.split(",").reduce<Array<{ id: string; column: string; direction: "asc" | "desc" }>>((acc, part) => {
+    const [column, dir] = part.trim().split(":");
+    if (column && (dir === "asc" || dir === "desc")) {
+      acc.push({ id: `${column}-${dir}`, column, direction: dir });
+    }
+    return acc;
+  }, []);
+}
+
+function serializeSortRules(
+  rules: Array<{ column: string; direction: "asc" | "desc" }>
+): string {
+  return rules.map((r) => `${r.column}:${r.direction}`).join(",");
+}
+
+function parseFiltersFromParams(
+  searchParams: URLSearchParams,
+  filterColumns: FilterColumnConfig[]
+): AppliedFilter[] {
+  const colMap = new Map(filterColumns.map((c) => [c.value, c]));
+  const filters: AppliedFilter[] = [];
+  searchParams.forEach((value, key) => {
+    if (!key.startsWith(FILTER_PREFIX)) return;
+    const column = key.slice(FILTER_PREFIX.length);
+    if (!column) return;
+    const config = colMap.get(column);
+    const isMulti = config?.type === "multiselect";
+    const filterValue = isMulti && value ? value.split(",").filter(Boolean) : value;
+    if (value !== "" && (isMulti ? (filterValue as string[]).length > 0 : true)) {
+      filters.push({ column, operator: "equals", value: filterValue });
+    }
+  });
+  return filters;
+}
+
+function serializeFiltersToParams(filters: AppliedFilter[]): Record<string, string> {
+  const params: Record<string, string> = {};
+  filters.forEach((f) => {
+    if (!f.column || f.value === undefined) return;
+    const v = f.value;
+    const str = Array.isArray(v) ? v.filter(Boolean).join(",") : String(v).trim();
+    if (str) params[`${FILTER_PREFIX}${f.column}`] = str;
+  });
+  return params;
+}
+
+function getCellValue(item: any, column: string): any {
+  if (column.includes(".")) {
+    return column.split(".").reduce((obj: any, k) => obj?.[k], item);
+  }
+  return item[column];
+}
+
+function normalizeCellValue(value: any): string[] {
+  if (value == null) return [];
+  return Array.isArray(value) ? value.map((v) => String(v)) : [String(value)];
+}
+
+function applySingleFilter(item: any, filter: AppliedFilter): boolean {
+  const raw = getCellValue(item, filter.column);
+  const cellArr = normalizeCellValue(raw);
+  const filterValue = filter.value;
+  if (filterValue === undefined || filterValue === null) return true;
+  if (Array.isArray(filterValue)) {
+    if (filterValue.length === 0) return true;
+    const cellSet = new Set(cellArr);
+    const hasIntersection = filterValue.some((v) => cellSet.has(String(v)));
+    return filter.operator === "not_equals" ? !hasIntersection : hasIntersection;
+  }
+  const filterStr = String(filterValue).trim();
+  if (filterStr === "") return true;
+  const match = (s: string) => cellArr.some((c) => c === s || c.toLowerCase() === filterStr.toLowerCase());
+  const matchContains = (s: string) => cellArr.some((c) => c.toLowerCase().includes(filterStr.toLowerCase()));
+  const matchStarts = (s: string) => cellArr.some((c) => c.toLowerCase().startsWith(filterStr.toLowerCase()));
+  const matchEnds = (s: string) => cellArr.some((c) => c.toLowerCase().endsWith(filterStr.toLowerCase()));
+  switch (filter.operator) {
+    case "equals":
+      if (typeof raw === "number" && !isNaN(Number(filterStr))) return cellArr.some((c) => Number(c) === Number(filterStr));
+      return match(filterStr);
+    case "not_equals":
+      if (typeof raw === "number" && !isNaN(Number(filterStr))) return !cellArr.some((c) => Number(c) === Number(filterStr));
+      return !match(filterStr);
+    case "contains":
+      return raw != null && matchContains(filterStr);
+    case "starts_with":
+      return raw != null && matchStarts(filterStr);
+    case "ends_with":
+      return raw != null && matchEnds(filterStr);
+    case "greater_than":
+      if (typeof raw === "number" && !isNaN(Number(filterStr))) return raw > Number(filterStr);
+      return cellArr.some((c) => String(c) > filterStr);
+    case "less_than":
+      if (typeof raw === "number" && !isNaN(Number(filterStr))) return raw < Number(filterStr);
+      return cellArr.some((c) => String(c) < filterStr);
+    default:
+      return true;
+  }
+}
+
 interface DataTablePageProps<T> {
   title: string;
   description: string;
@@ -53,7 +171,7 @@ interface DataTablePageProps<T> {
   onBulkDelete?: (ids: number[]) => Promise<void>;
   onBulkCopy?: (data: T[], type: 'selected' | 'all') => void;
   onBulkExport?: (data: T[], type: 'selected' | 'all') => void;
-  filterColumns?: Array<{ value: string; label: string }>;
+  filterColumns?: FilterColumnConfig[];
   sortColumns?: Array<{ value: string; label: string; type: string }>;
   localStoragePrefix: string;
   searchFields?: string[];
@@ -153,12 +271,12 @@ export default function DataTablePage<T>({
     }
     return [];
   });
-  const [appliedFilters, setAppliedFilters] = useState<any[]>(() => {
+  const [appliedFilters, setAppliedFilters] = useState<AppliedFilter[]>(() => {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem(`${localStoragePrefix}-applied-filters`);
         const parsed = saved ? JSON.parse(saved) : [];
-        return Array.isArray(parsed) ? parsed.filter(filter => filter && filter.column && filter.operator) : [];
+        return Array.isArray(parsed) ? parsed.filter((f: any) => f && f.column && f.operator) : [];
       } catch (error) {
         console.error('Error parsing applied filters from localStorage:', error);
         localStorage.removeItem(`${localStoragePrefix}-applied-filters`);
@@ -167,7 +285,7 @@ export default function DataTablePage<T>({
     }
     return [];
   });
-  const [pendingFilters, setPendingFilters] = useState<any[]>([]);
+  const [pendingFilters, setPendingFilters] = useState<AppliedFilter[]>([]);
   const [unifiedFilters, setUnifiedFilters] = useState<FilterState>({});
   
   // Confirmation dialog state
@@ -178,6 +296,38 @@ export default function DataTablePage<T>({
   useEffect(() => {
     setPendingFilters([...appliedFilters]);
   }, []);
+
+  useEffect(() => {
+    const search = searchParams.get("search");
+    const sort = searchParams.get("sort");
+    const hasFilterParams = Array.from(searchParams.keys()).some((k) => k.startsWith(FILTER_PREFIX));
+    if (search !== null) setSearchTerm(search);
+    if (sort !== null) {
+      const rules = parseSortParam(sort);
+      if (rules.length > 0) setSortRules(rules);
+    }
+    if (hasFilterParams) {
+      const fromUrl = parseFiltersFromParams(searchParams, filterColumns);
+      if (fromUrl.length > 0) setAppliedFilters(fromUrl);
+    }
+  }, [searchParams, filterColumns]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (searchTerm) params.set("search", searchTerm);
+    else params.delete("search");
+    if (sortRules.length > 0) params.set("sort", serializeSortRules(sortRules));
+    else params.delete("sort");
+    Array.from(params.keys()).forEach((k) => {
+      if (k.startsWith(FILTER_PREFIX)) params.delete(k);
+    });
+    const filterParams = serializeFiltersToParams(appliedFilters);
+    Object.entries(filterParams).forEach(([k, v]) => params.set(k, v));
+    const newUrl = `${typeof window !== "undefined" ? window.location.pathname : ""}${params.toString() ? `?${params.toString()}` : ""}`;
+    if (typeof window !== "undefined" && window.location.pathname + (window.location.search || "") !== newUrl) {
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, [searchTerm, sortRules, appliedFilters, searchParams]);
 
   // Handle unified filter changes
   const handleUnifiedFilterChange = (filters: FilterState, search: string) => {
@@ -286,49 +436,9 @@ export default function DataTablePage<T>({
           );
         }
 
-        // Apply applied filters
-        appliedFilters.forEach(filter => {
+        appliedFilters.forEach((filter) => {
           if (!filter.column) return;
-          
-          filtered = filtered.filter((item: any) => {
-            const value = item[filter.column];
-            const filterValue = filter.value;
-            
-            if (!filterValue || (typeof filterValue === 'string' && filterValue.trim() === '')) {
-              return true;
-            }
-            
-            switch (filter.operator) {
-              case 'equals':
-                if (typeof value === 'number' && !isNaN(Number(filterValue))) {
-                  return value === Number(filterValue);
-                }
-                return String(value) === String(filterValue);
-              case 'not_equals':
-                if (typeof value === 'number' && !isNaN(Number(filterValue))) {
-                  return value !== Number(filterValue);
-                }
-                return String(value) !== String(filterValue);
-              case 'contains':
-                return value != null && String(value).toLowerCase().includes(String(filterValue).toLowerCase());
-              case 'starts_with':
-                return value != null && String(value).toLowerCase().startsWith(String(filterValue).toLowerCase());
-              case 'ends_with':
-                return value != null && String(value).toLowerCase().endsWith(String(filterValue).toLowerCase());
-              case 'greater_than':
-                if (typeof value === 'number' && !isNaN(Number(filterValue))) {
-                  return value > Number(filterValue);
-                }
-                return String(value) > String(filterValue);
-              case 'less_than':
-                if (typeof value === 'number' && !isNaN(Number(filterValue))) {
-                  return value < Number(filterValue);
-                }
-                return String(value) < String(filterValue);
-              default:
-                return true;
-            }
-          });
+          filtered = filtered.filter((item: any) => applySingleFilter(item, filter));
         });
       }
       
@@ -379,48 +489,9 @@ export default function DataTablePage<T>({
       );
     }
 
-    appliedFilters.forEach(filter => {
+    appliedFilters.forEach((filter) => {
       if (!filter.column) return;
-      
-      filtered = filtered.filter((item: any) => {
-        const value = item[filter.column];
-        const filterValue = filter.value;
-        
-        if (!filterValue || (typeof filterValue === 'string' && filterValue.trim() === '')) {
-          return true;
-        }
-        
-        switch (filter.operator) {
-          case 'equals':
-            if (typeof value === 'number' && !isNaN(Number(filterValue))) {
-              return value === Number(filterValue);
-            }
-            return String(value) === String(filterValue);
-          case 'not_equals':
-            if (typeof value === 'number' && !isNaN(Number(filterValue))) {
-              return value !== Number(filterValue);
-            }
-            return String(value) !== String(filterValue);
-          case 'contains':
-            return value != null && String(value).toLowerCase().includes(String(filterValue).toLowerCase());
-          case 'starts_with':
-            return value != null && String(value).toLowerCase().startsWith(String(filterValue).toLowerCase());
-          case 'ends_with':
-            return value != null && String(value).toLowerCase().endsWith(String(filterValue).toLowerCase());
-          case 'greater_than':
-            if (typeof value === 'number' && !isNaN(Number(filterValue))) {
-              return value > Number(filterValue);
-            }
-            return String(value) > String(filterValue);
-          case 'less_than':
-            if (typeof value === 'number' && !isNaN(Number(filterValue))) {
-              return value < Number(filterValue);
-            }
-            return String(value) < String(filterValue);
-          default:
-            return true;
-        }
-      });
+      filtered = filtered.filter((item: any) => applySingleFilter(item, filter));
     });
 
     if (sortRules.length > 0) {
@@ -480,6 +551,27 @@ export default function DataTablePage<T>({
       }
     }
   }, [appliedFilters, localStoragePrefix]);
+
+  const derivedFilterOptions = useMemo(() => {
+    const map = new Map<string, Array<{ value: string; label: string }>>();
+    filterColumns.forEach((col) => {
+      if ((col.type === "select" || col.type === "multiselect") && !col.options?.length) {
+        const raw = (data as any[]).flatMap((row) => {
+          const v = col.value.includes(".") ? col.value.split(".").reduce((o: any, k) => o?.[k], row) : row[col.value];
+          return Array.isArray(v) ? v : v != null && v !== "" ? [v] : [];
+        });
+        const distinct = [...new Set(raw.map((x) => String(x)))].sort().filter(Boolean);
+        map.set(col.value, distinct.map((value) => ({ value, label: value })));
+      }
+    });
+    return map;
+  }, [data, filterColumns]);
+
+  const getFilterOptionsForColumn = (columnValue: string): Array<{ id: string; name: string }> => {
+    const config = filterColumns.find((c) => c.value === columnValue);
+    const options = config?.options ?? derivedFilterOptions.get(columnValue) ?? [];
+    return options.map((o) => ({ id: o.value, name: o.label }));
+  };
 
   // Get all column keys
   const getAllColumnKeys = () => columns.map((col, index) => col.id || (col as any).accessorKey || `col-${index}`);
@@ -771,23 +863,68 @@ export default function DataTablePage<T>({
                                 <option value="less_than">{tDataTable('filtering.operators.lessThan')}</option>
                               </select>
                               
-                              <input 
-                                type="text"
-                                placeholder={tForms('placeholders.enterValue')}
-                                value={filter.value}
-                                onChange={(e) => {
-                                  const newFilters = [...pendingFilters];
-                                  newFilters[index].value = e.target.value;
-                                  setPendingFilters(newFilters);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    setAppliedFilters([...pendingFilters]);
-                                  }
-                                }}
-                                 className="flex-1 p-2 border border-border rounded-md bg-card text-foreground text-sm"
-                              />
+                              {(() => {
+                                const colConfig = filterColumns.find((c) => c.value === filter.column);
+                                const colLabel = colConfig?.label ?? filter.column;
+                                if (colConfig?.type === "select") {
+                                  const options = [{ id: "", name: `All ${colLabel}` }, ...getFilterOptionsForColumn(filter.column)];
+                                  return (
+                                    <div className="flex-1 min-w-0">
+                                      <UnifiedSelector
+                                        label=""
+                                        type={`filter-${filter.column}`}
+                                        items={options}
+                                        selectedId={(typeof filter.value === "string" ? filter.value : "") || undefined}
+                                        onSelect={(item) => {
+                                          const newFilters = [...pendingFilters];
+                                          newFilters[index].value = item.id === "" ? "" : String(item.id);
+                                          setPendingFilters(newFilters);
+                                        }}
+                                        placeholder={tForms('placeholders.selectColumn')}
+                                      />
+                                    </div>
+                                  );
+                                }
+                                if (colConfig?.type === "multiselect") {
+                                  const selectedIds = Array.isArray(filter.value) ? filter.value : filter.value ? [filter.value] : [];
+                                  return (
+                                    <div className="flex-1 min-w-0">
+                                      <UnifiedSelector
+                                        label=""
+                                        mode="multi"
+                                        type={`filter-${filter.column}`}
+                                        items={getFilterOptionsForColumn(filter.column)}
+                                        selectedIds={selectedIds}
+                                        onSelectionChange={(ids) => {
+                                          const newFilters = [...pendingFilters];
+                                          newFilters[index].value = ids.map(String);
+                                          setPendingFilters(newFilters);
+                                        }}
+                                        placeholder={tForms('placeholders.selectColumn')}
+                                      />
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <input 
+                                    type="text"
+                                    placeholder={tForms('placeholders.enterValue')}
+                                    value={typeof filter.value === "string" ? filter.value : Array.isArray(filter.value) ? filter.value.join(", ") : ""}
+                                    onChange={(e) => {
+                                      const newFilters = [...pendingFilters];
+                                      newFilters[index].value = e.target.value;
+                                      setPendingFilters(newFilters);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        setAppliedFilters([...pendingFilters]);
+                                      }
+                                    }}
+                                    className="flex-1 p-2 border border-border rounded-md bg-card text-foreground text-sm min-w-0"
+                                  />
+                                );
+                              })()}
                               
                               <Button
                                 variant="ghost"
@@ -875,7 +1012,7 @@ export default function DataTablePage<T>({
                                   {index === 0 ? tDataTable('sorting.sortBy') : tDataTable('sorting.thenBy')}
                                 </span>
                                 <span className="font-semibold text-sm text-foreground">
-                                  {rule.column}
+                                  {sortColumns.find((c) => c.value === rule.column)?.label ?? rule.column}
                                 </span>
                               </div>
                               

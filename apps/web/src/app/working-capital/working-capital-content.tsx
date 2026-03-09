@@ -487,8 +487,22 @@ export default function WorkingCapitalContent() {
             onBulkDelete={handleBulkDelete}
             onBulkCopy={handleBulkCopy}
             onBulkExport={handleBulkExport}
+            filterColumns={[
+              { value: "month", label: "Month" },
+              { value: "accountsReceivable", label: "Accounts Receivable" },
+              { value: "inventory", label: "Inventory" },
+              { value: "accountsPayable", label: "Accounts Payable" },
+              { value: "otherCurrentAssets", label: "Other Current Assets" },
+              { value: "otherCurrentLiabilities", label: "Other Current Liabilities" },
+              { value: "workingCapitalNeed", label: "Working Capital Need" },
+            ]}
             sortColumns={[
               { value: "month", label: "Month", type: "character varying" },
+              { value: "accountsReceivable", label: "Accounts Receivable", type: "numeric" },
+              { value: "inventory", label: "Inventory", type: "numeric" },
+              { value: "accountsPayable", label: "Accounts Payable", type: "numeric" },
+              { value: "otherCurrentAssets", label: "Other Current Assets", type: "numeric" },
+              { value: "otherCurrentLiabilities", label: "Other Current Liabilities", type: "numeric" },
               { value: "workingCapitalNeed", label: "Working Capital Need", type: "numeric" },
             ]}
             localStoragePrefix="working-capital"

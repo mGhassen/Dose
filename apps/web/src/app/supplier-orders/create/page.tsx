@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
@@ -9,19 +9,23 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
-import { Save, X, Plus, Trash2, Calculator } from "lucide-react";
+import { InputGroupAttached } from "@/components/input-group";
+import { Save, X, Plus, Trash2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateSupplierOrder, useInventorySuppliers, useItems } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
-import { dateToYYYYMMDD } from "@kit/lib";
+import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
 import { SupplierOrderStatus } from "@kit/types";
+import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
 
 interface OrderItem {
   itemId: number;
   quantity: number;
   unit: string;
   unitPrice: number;
+  taxRatePercent?: number;
+  taxInclusive?: boolean;
   notes?: string;
 }
 
@@ -43,10 +47,28 @@ export default function CreateSupplierOrderPage() {
   });
   
   const [items, setItems] = useState<OrderItem[]>([]);
+  const [defaultTaxRate, setDefaultTaxRate] = useState(0);
 
-  const totalAmount = useMemo(() => {
-    return items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-  }, [items]);
+  useEffect(() => {
+    if (!formData.orderDate) {
+      setDefaultTaxRate(0);
+      return;
+    }
+    taxRulesApi.resolve({ context: "expense", date: formData.orderDate }).then((r) => setDefaultTaxRate(r.rate)).catch(() => setDefaultTaxRate(0));
+  }, [formData.orderDate]);
+
+  const { subtotal, totalTax, totalAmount } = useMemo(() => {
+    let sub = 0;
+    let tax = 0;
+    for (const item of items) {
+      const rate = item.taxRatePercent ?? defaultTaxRate;
+      const inclusive = item.taxInclusive ?? false;
+      const { lineTotalNet, taxAmount } = lineTaxAmount(item.quantity, item.unitPrice, rate, inclusive);
+      sub += lineTotalNet;
+      tax += taxAmount;
+    }
+    return { subtotal: to2Decimals(sub), totalTax: to2Decimals(tax), totalAmount: to2Decimals(sub + tax) };
+  }, [items, defaultTaxRate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,11 +99,13 @@ export default function CreateSupplierOrderPage() {
         expectedDeliveryDate: formData.expectedDeliveryDate || undefined,
         status: SupplierOrderStatus.PENDING,
         notes: formData.notes || undefined,
-        items: items.map(item => ({
+        items: items.map((item) => ({
           itemId: item.itemId,
           quantity: item.quantity,
           unit: item.unit,
           unitPrice: item.unitPrice,
+          taxRatePercent: item.taxRatePercent ?? defaultTaxRate,
+          taxInclusive: item.taxInclusive,
           notes: item.notes,
         })),
       });
@@ -97,7 +121,7 @@ export default function CreateSupplierOrderPage() {
   };
 
   const addItem = () => {
-    setItems([...items, { itemId: 0, quantity: 0, unit: "", unitPrice: 0 }]);
+    setItems([...items, { itemId: 0, quantity: 0, unit: "", unitPrice: 0, taxInclusive: false }]);
   };
 
   const removeItem = (index: number) => {
@@ -200,86 +224,100 @@ export default function CreateSupplierOrderPage() {
                   </Button>
                 </div>
 
+                <div className="border rounded-lg px-4">
                 {items.map((item, index) => {
-                  const selectedItem = allItems.find(i => i.id === item.itemId);
-                  const itemTotal = item.quantity * item.unitPrice;
-                  
+                  const rate = item.taxRatePercent ?? defaultTaxRate;
+                  const inclusive = item.taxInclusive ?? false;
+                  const { lineTotalNet, taxAmount } = lineTaxAmount(item.quantity, item.unitPrice, rate, inclusive);
+                  const lineTotal = lineTotalNet + taxAmount;
                   return (
-                    <div key={index} className="grid grid-cols-12 gap-4 items-end p-4 border rounded-lg">
-                      <div className="col-span-12 md:col-span-4">
+                    <div key={index} className="grid grid-cols-12 gap-4 items-end py-3 border-b last:border-b-0">
+                      <div className="col-span-12 md:col-span-3">
                         <UnifiedSelector
                           label="Item"
                           required
                           type="item"
-                          items={allItems.filter(i => i.isActive && i.itemType === 'item').map((it) => ({
-                            ...it,
-                            id: it.id,
-                            name: `${it.name} (${it.unit})`,
-                          }))}
+                          items={allItems.filter((i) => i.isActive && i.itemType === "item").map((it) => ({ ...it, id: it.id, name: `${it.name} (${it.unit})` }))}
                           selectedId={item.itemId || undefined}
-                          onSelect={(sel) => updateItem(index, 'itemId', sel.id === 0 ? 0 : Number(sel.id))}
+                          onSelect={(sel) => updateItem(index, "itemId", sel.id === 0 ? 0 : Number(sel.id))}
                           placeholder="Select item"
                         />
                       </div>
-                      <div className="col-span-6 md:col-span-2">
-                        <Label>Quantity *</Label>
+                      <div className="col-span-6 md:col-span-1">
+                        <Label>Qty *</Label>
                         <Input
                           type="number"
                           step="0.01"
                           min="0"
                           value={item.quantity || ""}
-                          onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => updateItem(index, "quantity", parseFloat(e.target.value) || 0)}
                           placeholder="0"
                           required
                         />
                       </div>
-                      <div className="col-span-6 md:col-span-2">
+                      <div className="col-span-6 md:col-span-1">
                         <Label>Unit *</Label>
-                        <Input
-                          value={item.unit}
-                          onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                          placeholder="kg, L, etc."
-                          required
-                        />
+                        <Input value={item.unit} onChange={(e) => updateItem(index, "unit", e.target.value)} placeholder="kg, L" required />
                       </div>
-                      <div className="col-span-6 md:col-span-2">
-                        <Label>Unit Price *</Label>
+                      <div className="col-span-6 md:col-span-1">
+                        <Label className="text-xs text-muted-foreground">Unit price (excl.)</Label>
                         <Input
                           type="number"
                           step="0.01"
                           min="0"
                           value={item.unitPrice || ""}
-                          onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
+                          onChange={(e) => updateItem(index, "unitPrice", parseFloat(e.target.value) || 0)}
+                          placeholder="0"
                           required
+                        />
+                      </div>
+                      <div className="col-span-4 md:col-span-1">
+                        <InputGroupAttached
+                          label="Tax %"
+                          addonStyle="default"
+                          input={
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="text-sm tabular-nums"
+                              value={item.taxRatePercent ?? ""}
+                              onChange={(e) => updateItem(index, "taxRatePercent", e.target.value === "" ? undefined : parseFloat(e.target.value) || 0)}
+                              placeholder={String(defaultTaxRate)}
+                            />
+                          }
+                          addon={<span className="text-muted-foreground text-xs">%</span>}
                         />
                       </div>
                       <div className="col-span-6 md:col-span-1">
                         <Label>Total</Label>
-                        <div className="h-10 flex items-center px-3 border rounded-md bg-muted">
-                          {formatCurrency(itemTotal)}
+                        <div className="h-10 flex items-center px-3 border rounded-md bg-muted text-sm tabular-nums">
+                          {formatCurrency(lineTotal)}
                         </div>
                       </div>
-                      <div className="col-span-12 md:col-span-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeItem(index)}
-                          className="w-full"
-                        >
+                      <div className="col-span-6 md:col-span-1">
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)} className="w-full">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
                   );
                 })}
+                </div>
 
                 {items.length > 0 && (
-                  <div className="flex justify-end p-4 border rounded-lg bg-muted">
-                    <div className="flex items-center gap-4">
-                      <div className="text-sm text-muted-foreground">Total Amount:</div>
-                      <div className="text-2xl font-bold">{formatCurrency(totalAmount)}</div>
+                  <div className="flex flex-col items-end gap-1 p-4 border rounded-lg bg-muted">
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-muted-foreground">Subtotal (excl. tax):</span>
+                      <span className="tabular-nums">{formatCurrency(subtotal)}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-muted-foreground">Tax:</span>
+                      <span className="tabular-nums">{formatCurrency(totalTax)}</span>
+                    </div>
+                    <div className="flex items-center gap-4 pt-1 border-t mt-1">
+                      <span className="text-muted-foreground">Total:</span>
+                      <span className="text-xl font-bold tabular-nums">{formatCurrency(totalAmount)}</span>
                     </div>
                   </div>
                 )}
