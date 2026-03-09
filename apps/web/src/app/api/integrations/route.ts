@@ -38,15 +38,13 @@ function transformToSnakeCase(data: CreateIntegrationData): any {
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
-    
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
+    const token = authHeader.replace(/^Bearer\s+/i, '');
 
     const supabase = supabaseServer();
-    
-    // Get current user's account
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser(token);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -96,15 +94,13 @@ export async function POST(request: NextRequest) {
     const body = parsed.data as CreateIntegrationData;
 
     const authHeader = request.headers.get('authorization');
-    
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
+    const token = authHeader.replace(/^Bearer\s+/i, '');
 
     const supabase = supabaseServer();
-    
-    // Get current user's account
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser(token);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -44,8 +44,10 @@ export async function apiRequest<T>(
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   endpoint: string,
   data?: any,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  requestOptions?: { timeout?: number }
 ): Promise<T> {
+  const timeoutMs = requestOptions?.timeout ?? 4000;
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   let url = `${API_BASE_URL}${normalizedEndpoint}`;
   
@@ -92,9 +94,8 @@ export async function apiRequest<T>(
         throw abortError;
       }
       
-      // Create a controller for timeout
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000);
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
       
       // If external signal is provided, abort our controller when it aborts
       if (signal) {

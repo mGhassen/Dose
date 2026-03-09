@@ -108,7 +108,10 @@ export const integrationsApi = {
       const query = searchParams.toString();
       return apiRequest<SquareListOrdersResponse>(
         'GET',
-        `/api/integrations/${integrationId}/square/orders${query ? `?${query}` : ''}`
+        `/api/integrations/${integrationId}/square/orders${query ? `?${query}` : ''}`,
+        undefined,
+        undefined,
+        { timeout: 60000 }
       );
     },
     getPayments: (
@@ -138,7 +141,10 @@ export const integrationsApi = {
       const query = searchParams.toString();
       return apiRequest<SquareListPaymentsResponse>(
         'GET',
-        `/api/integrations/${integrationId}/square/payments${query ? `?${query}` : ''}`
+        `/api/integrations/${integrationId}/square/payments${query ? `?${query}` : ''}`,
+        undefined,
+        undefined,
+        { timeout: 60000 }
       );
     },
     getCatalog: (

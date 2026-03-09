@@ -85,15 +85,13 @@ export async function POST(
     }
 
     const authHeader = request.headers.get('authorization');
-    
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
+    const token = authHeader.replace(/^Bearer\s+/i, '');
 
     const supabase = supabaseServer();
-    
-    // Get current user's account
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser(token);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -108,28 +106,24 @@ export async function POST(
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Generate state token for CSRF protection
     const state = crypto.randomBytes(32).toString('hex');
-    
-    // Build Square OAuth URL (use sandbox if enabled or detected)
-    // Note: Square requires 'connect.' subdomain for OAuth
+    const redirectUri = `${request.nextUrl.origin}/api/integrations/oauth/square/callback`;
+
     const oauthBaseUrl = isSandbox
       ? 'https://connect.squareupsandbox.com/oauth2/authorize'
       : 'https://connect.squareup.com/oauth2/authorize';
-    
+
     const authUrl = new URL(oauthBaseUrl);
     authUrl.searchParams.append('client_id', SQUARE_APP_ID);
     authUrl.searchParams.append('scope', 'MERCHANT_PROFILE_READ PAYMENTS_READ ORDERS_READ ITEMS_READ');
     authUrl.searchParams.append('session', 'false');
     authUrl.searchParams.append('state', state);
-    authUrl.searchParams.append('redirect_uri', SQUARE_REDIRECT_URI);
+    authUrl.searchParams.append('redirect_uri', redirectUri);
 
     console.log('[OAuth Initiate]', {
       integrationType,
       sandbox: isSandbox,
-      sandboxAutoDetected: !SQUARE_USE_SANDBOX && SQUARE_APP_ID?.startsWith('sandbox-'),
-      oauthUrl: authUrl.toString(),
-      redirectUri: SQUARE_REDIRECT_URI,
+      redirectUri,
       clientId: SQUARE_APP_ID?.substring(0, 20) + '...',
     });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   useSquareLocations,
   useSquareOrders,
@@ -23,6 +24,7 @@ import {
 import { formatDateTime } from '@kit/lib/date-format';
 import DataTablePage from '@/components/data-table-page';
 import { ColumnDef } from '@tanstack/react-table';
+import { processCatalogData } from './process-catalog';
 
 interface SquareDataViewProps {
   integrationId: string;
@@ -31,6 +33,7 @@ interface SquareDataViewProps {
 }
 
 export default function SquareDataView({ integrationId, onSync, isSyncing }: SquareDataViewProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('locations');
 
   // Fetch data automatically when tab is active
@@ -39,24 +42,31 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
     enabled: activeTab === 'locations' || activeTab === 'orders', // Also fetch when orders tab is active
   });
   
-  // Get location IDs from locations data or use empty array
-  const locationIds = locations && locations.length > 0 ? locations.map((loc: any) => loc.id) : [];
-  
+  const locationIds = useMemo(
+    () => (locations && locations.length > 0 ? locations.map((loc: any) => loc.id) : []),
+    [locations]
+  );
+
+  const ordersParams = useMemo(
+    () =>
+      locationIds.length > 0
+        ? { location_ids: locationIds }
+        : undefined,
+    [locationIds]
+  );
+
   const { data: orders, isLoading: ordersLoading, refetch: refetchOrders, error: ordersError } = useSquareOrders(
     integrationId,
+    ordersParams,
     {
-      location_ids: locationIds.length > 0 ? locationIds : undefined,
-      // No date filter - fetch all data, filtering will be done in the DataTable
-    },
-    {
-      enabled: activeTab === 'orders' && locationIds.length > 0, // Only fetch orders if we have location IDs
+      enabled: activeTab === 'orders' && locationIds.length > 0,
     }
   );
+  const paymentsParams = useMemo(() => ({}), []);
+
   const { data: payments, isLoading: paymentsLoading, refetch: refetchPayments, error: paymentsError } = useSquarePayments(
     integrationId,
-    {
-      // No date filter - fetch all data, filtering will be done in the DataTable
-    },
+    paymentsParams,
     {
       enabled: activeTab === 'payments',
     }
@@ -71,109 +81,10 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
     }
   );
 
-  // Process catalog data to merge items with their variations, categories, modifiers, etc.
-  const processedCatalogData = useMemo(() => {
-    if (!catalog?.objects || catalog.objects.length === 0) return [];
-
-    const objects = catalog.objects;
-    
-    // Create lookup maps
-    const itemsMap = new Map<string, any>();
-    const variationsMap = new Map<string, any[]>();
-    const categoriesMap = new Map<string, any>();
-    const modifierListsMap = new Map<string, any>();
-    const modifiersMap = new Map<string, any[]>();
-    const taxesMap = new Map<string, any>();
-
-    // First pass: categorize all objects
-    objects.forEach((obj: any) => {
-      switch (obj.type) {
-        case 'ITEM':
-          itemsMap.set(obj.id, obj);
-          // Initialize variations array
-          variationsMap.set(obj.id, []);
-          break;
-        case 'ITEM_VARIATION':
-          const itemId = obj.item_variation_data?.item_id;
-          if (itemId) {
-            if (!variationsMap.has(itemId)) {
-              variationsMap.set(itemId, []);
-            }
-            variationsMap.get(itemId)!.push(obj);
-          }
-          break;
-        case 'CATEGORY':
-          categoriesMap.set(obj.id, obj);
-          break;
-        case 'MODIFIER_LIST':
-          modifierListsMap.set(obj.id, obj);
-          // Initialize modifiers array
-          modifiersMap.set(obj.id, []);
-          break;
-        case 'MODIFIER':
-          const modifierListId = obj.modifier_data?.modifier_list_id;
-          if (modifierListId) {
-            if (!modifiersMap.has(modifierListId)) {
-              modifiersMap.set(modifierListId, []);
-            }
-            modifiersMap.get(modifierListId)!.push(obj);
-          }
-          break;
-        case 'TAX':
-          taxesMap.set(obj.id, obj);
-          break;
-      }
-    });
-
-    // Second pass: build merged items with all related data
-    const mergedItems: any[] = [];
-    
-    itemsMap.forEach((item, itemId) => {
-      // Get category
-      const categoryId = item.item_data?.category_id;
-      const category = categoryId ? categoriesMap.get(categoryId) : null;
-
-      // Get variations
-      const variations = variationsMap.get(itemId) || [];
-
-      // Get modifier lists and their modifiers
-      const modifierListInfos = item.item_data?.modifier_list_info || [];
-      const modifierListsWithModifiers = modifierListInfos.map((modListInfo: any) => {
-        const modListId = modListInfo.modifier_list_id;
-        const modList = modifierListsMap.get(modListId);
-        const modifiers = modifiersMap.get(modListId) || [];
-        return {
-          ...modListInfo,
-          modifierList: modList,
-          modifiers: modifiers,
-        };
-      });
-
-      // Get taxes
-      const taxIds = item.item_data?.tax_ids || [];
-      const taxes = taxIds.map((taxId: string) => taxesMap.get(taxId)).filter(Boolean);
-
-      // Create merged item
-      mergedItems.push({
-        id: itemId,
-        type: 'ITEM',
-        name: item.item_data?.name || 'Unknown',
-        description: item.item_data?.description || '',
-        category: category,
-        categoryName: category?.category_data?.name || '',
-        variations: variations,
-        modifierLists: modifierListsWithModifiers,
-        taxes: taxes,
-        taxIds: taxIds,
-        is_deleted: item.is_deleted || false,
-        updated_at: item.updated_at,
-        // Original item data for reference
-        _original: item,
-      });
-    });
-
-    return mergedItems;
-  }, [catalog]);
+  const processedCatalogData = useMemo(
+    () => processCatalogData(catalog),
+    [catalog]
+  );
 
   const formatMoney = (amount: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('en-US', {
@@ -825,6 +736,11 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
               data={orders?.orders || []}
               columns={ordersColumns}
               loading={ordersLoading || (activeTab === 'orders' && locationsLoading)}
+              onRowClick={(row) => {
+                if (row?.id) {
+                  router.push(`/settings/integrations/${integrationId}/orders/${row.id}`);
+                }
+              }}
               onBulkExport={(data, type) => {
                 const itemsToExport = type === 'selected' ? data : (orders?.orders || []);
                 handleExportOrders();
@@ -843,7 +759,7 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
                 { value: 'state', label: 'State', type: 'character varying' },
                 { value: 'created_at', label: 'Created At', type: 'timestamp' },
               ]}
-              localStoragePrefix="square-orders"
+              localStoragePrefix={`square-orders-${integrationId}`}
               searchFields={['reference_id', 'id', 'location_id']}
               selectable={false}
               headerActions={
@@ -865,6 +781,11 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
             data={payments?.payments || []}
             columns={paymentsColumns}
             loading={paymentsLoading}
+            onRowClick={(row) => {
+              if (row?.id) {
+                router.push(`/settings/integrations/${integrationId}/payments/${row.id}`);
+              }
+            }}
             onBulkExport={(data, type) => {
               const itemsToExport = type === 'selected' ? data : (payments?.payments || []);
               handleExportPayments();
@@ -886,7 +807,7 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
               { value: 'created_at', label: 'Created At', type: 'timestamp' },
               { value: 'amount_money.amount', label: 'Amount', type: 'numeric' },
             ]}
-            localStoragePrefix="square-payments"
+            localStoragePrefix={`square-payments-${integrationId}`}
             searchFields={['id', 'order_id', 'location_id']}
             selectable={false}
             headerActions={
@@ -907,6 +828,11 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
             data={processedCatalogData}
             columns={catalogColumns}
             loading={catalogLoading}
+            onRowClick={(row) => {
+              if (row?.id) {
+                router.push(`/settings/integrations/${integrationId}/catalog/${row.id}`);
+              }
+            }}
             onBulkExport={(data, type) => {
               const itemsToExport = type === 'selected' ? data : processedCatalogData;
               handleExportCatalog();
@@ -923,7 +849,7 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
               { value: 'categoryName', label: 'Category', type: 'character varying' },
               { value: 'is_deleted', label: 'Status', type: 'character varying' },
             ]}
-            localStoragePrefix="square-catalog"
+            localStoragePrefix={`square-catalog-${integrationId}`}
             searchFields={['name', 'description', 'categoryName']}
             defaultHiddenColumns={[]}
             selectable={false}

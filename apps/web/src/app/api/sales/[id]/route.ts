@@ -350,7 +350,15 @@ export async function DELETE(
   try {
     const { id } = await params;
     const supabase = supabaseServer();
-    
+
+    const { error: movementError } = await supabase
+      .from('stock_movements')
+      .delete()
+      .eq('reference_type', 'sale')
+      .eq('reference_id', Number(id));
+
+    if (movementError) throw movementError;
+
     const { error } = await supabase
       .from('sales')
       .delete()

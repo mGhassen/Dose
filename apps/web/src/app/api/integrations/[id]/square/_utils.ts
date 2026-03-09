@@ -28,8 +28,11 @@ export async function getIntegrationWithValidToken(
   integrationId: string,
   authHeader: string | null
 ): Promise<IntegrationResult> {
-  // First, get the integration
-  const { data: { user } } = await supabase.auth.getUser();
+  const token = authHeader?.replace(/^Bearer\s+/i, '') ?? null;
+  if (!token) {
+    return { integration: null, accessToken: null, error: { status: 401, message: 'Unauthorized' } };
+  }
+  const { data: { user } } = await supabase.auth.getUser(token);
   if (!user) {
     return { integration: null, accessToken: null, error: { status: 401, message: 'Unauthorized' } };
   }

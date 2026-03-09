@@ -1322,7 +1322,8 @@ export enum StockMovementReferenceType {
   MANUAL = 'manual',
   WASTE = 'waste',
   EXPIRY = 'expiry',
-  SALE = 'sale'
+  SALE = 'sale',
+  EXPENSE = 'expense'
 }
 
 export interface StockMovement {

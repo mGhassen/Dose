@@ -30,20 +30,21 @@ function transformIntegration(row: any): Integration {
   };
 }
 
-async function exchangeCodeForToken(code: string): Promise<{
+async function exchangeCodeForToken(
+  code: string,
+  redirectUri: string
+): Promise<{
   access_token: string;
   refresh_token?: string;
   expires_at?: string;
   merchant_id?: string;
   location_id?: string;
-}> {
-  // Auto-detect sandbox mode from client_id if not explicitly set
+} | null> {
   const isSandbox = SQUARE_USE_SANDBOX || (SQUARE_APP_ID?.startsWith('sandbox-') ?? false);
-  
   const tokenUrl = isSandbox
     ? 'https://connect.squareupsandbox.com/oauth2/token'
     : 'https://connect.squareup.com/oauth2/token';
-  
+
   const response = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
@@ -55,13 +56,19 @@ async function exchangeCodeForToken(code: string): Promise<{
       client_secret: SQUARE_APP_SECRET,
       code,
       grant_type: 'authorization_code',
-      redirect_uri: SQUARE_REDIRECT_URI,
+      redirect_uri: redirectUri,
     }),
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Square token exchange failed: ${error}`);
+    const errorText = await response.text();
+    const isAlreadyClaimed =
+      response.status === 401 &&
+      (errorText.includes('already claimed') || errorText.includes('Authorization code is already claimed'));
+    if (isAlreadyClaimed) {
+      return null;
+    }
+    throw new Error(`Square token exchange failed: ${errorText}`);
   }
 
   const data = await response.json();
@@ -188,15 +195,13 @@ export async function POST(
     const { code, state } = parsed.data;
 
     const authHeader = request.headers.get('authorization');
-    
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
+    const token = authHeader.replace(/^Bearer\s+/i, '');
 
     const supabase = supabaseServer();
-    
-    // Get current user's account
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser(token);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -211,16 +216,28 @@ export async function POST(
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Exchange code for access token
-    const tokenData = await exchangeCodeForToken(code);
+    const callbackUrl = new URL(request.url);
+    callbackUrl.search = '';
+    const redirectUri = callbackUrl.toString();
 
-    // Check if Square integration already exists
+    const tokenData = await exchangeCodeForToken(code, redirectUri);
+
     const { data: existing } = await supabase
       .from('integrations')
       .select('*')
       .eq('account_id', account.id)
       .eq('integration_type', 'square')
       .single();
+
+    if (tokenData === null) {
+      if (existing) {
+        return NextResponse.json(transformIntegration(existing));
+      }
+      return NextResponse.json(
+        { error: 'Authorization code was already used. Please try connecting again.' },
+        { status: 400 }
+      );
+    }
 
     let integration;
     if (existing) {

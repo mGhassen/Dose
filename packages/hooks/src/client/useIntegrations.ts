@@ -203,8 +203,16 @@ export function useSquareOrders(
   },
   options?: { enabled?: boolean }
 ) {
+  const stableKey = params
+    ? [
+        params.location_ids?.slice().sort().join(',') ?? '',
+        params.limit,
+        params.cursor,
+        params.query ? JSON.stringify(params.query) : '',
+      ]
+    : '';
   return useQuery({
-    queryKey: ['integrations', integrationId, 'square', 'orders', params],
+    queryKey: ['integrations', integrationId, 'square', 'orders', stableKey],
     queryFn: () => integrationsApi.square.getOrders(integrationId, params),
     enabled: options?.enabled !== undefined ? options.enabled : !!integrationId,
     retry: false, // Don't retry on auth errors
@@ -234,8 +242,18 @@ export function useSquarePayments(
   },
   options?: { enabled?: boolean }
 ) {
+  const stableKey = params
+    ? [
+        params.begin_time,
+        params.end_time,
+        params.sort_order,
+        params.cursor,
+        params.location_id,
+        params.limit,
+      ]
+    : '';
   return useQuery({
-    queryKey: ['integrations', integrationId, 'square', 'payments', params],
+    queryKey: ['integrations', integrationId, 'square', 'payments', stableKey],
     queryFn: () => integrationsApi.square.getPayments(integrationId, params),
     enabled: options?.enabled !== undefined ? options.enabled : !!integrationId,
     retry: false, // Don't retry on auth errors

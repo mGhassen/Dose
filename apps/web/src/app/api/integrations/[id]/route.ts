@@ -28,9 +28,13 @@ function transformIntegration(row: any): Integration {
 
 async function getIntegrationAndVerifyAccess(
   supabase: any,
-  integrationId: string
+  integrationId: string,
+  accessToken: string | null
 ): Promise<{ integration: any; error: any }> {
-  const { data: { user } } = await supabase.auth.getUser();
+  if (!accessToken) {
+    return { integration: null, error: { status: 401, message: 'Unauthorized' } };
+  }
+  const { data: { user } } = await supabase.auth.getUser(accessToken);
   if (!user) {
     return { integration: null, error: { status: 401, message: 'Unauthorized' } };
   }
@@ -66,15 +70,14 @@ export async function GET(
   try {
     const { id } = await params;
     const authHeader = request.headers.get('authorization');
-    
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
+    const token = authHeader.replace(/^Bearer\s+/i, '');
 
     const supabase = supabaseServer();
-    
-    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
-    
+    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id, token);
+
     if (accessError) {
       return NextResponse.json(
         { error: accessError.message },
@@ -103,15 +106,14 @@ export async function PUT(
     const body: UpdateIntegrationData = parsed.data as UpdateIntegrationData;
 
     const authHeader = request.headers.get('authorization');
-    
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
+    const token = authHeader.replace(/^Bearer\s+/i, '');
 
     const supabase = supabaseServer();
-    
-    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
-    
+    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id, token);
+
     if (accessError) {
       return NextResponse.json(
         { error: accessError.message },
@@ -152,15 +154,14 @@ export async function DELETE(
   try {
     const { id } = await params;
     const authHeader = request.headers.get('authorization');
-    
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
+    const token = authHeader.replace(/^Bearer\s+/i, '');
 
     const supabase = supabaseServer();
-    
-    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
-    
+    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id, token);
+
     if (accessError) {
       return NextResponse.json(
         { error: accessError.message },

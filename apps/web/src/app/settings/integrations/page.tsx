@@ -114,6 +114,7 @@ export default function IntegrationsPage() {
     }
   }, [completeOAuth, toast, router, queryClient]);
 
+  const oauthCompletedRef = React.useRef(false);
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
@@ -131,7 +132,8 @@ export default function IntegrationsPage() {
       return;
     }
 
-    if (code && state) {
+    if (code && state && !oauthCompletedRef.current) {
+      oauthCompletedRef.current = true;
       handleOAuthCallback(code, state, integrationType);
     }
   }, [handleOAuthCallback, toast]);

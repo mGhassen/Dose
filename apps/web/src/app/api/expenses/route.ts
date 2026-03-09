@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Expense, CreateExpenseData, PaginatedResponse, ExpenseLineItem } from '@kit/types';
+import { StockMovementType, StockMovementReferenceType } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { z } from "zod";
 import { parseBody, createExpenseTransactionSchema, createExpenseSchema, type CreateExpenseTransactionInput, type CreateExpenseInput } from '@/shared/zod-schemas';
@@ -264,6 +265,27 @@ export async function POST(request: NextRequest) {
         is_active: true,
       });
       if (entryError) console.error('Error creating entry for expense:', entryError);
+
+      const itemIds = [...new Set(lines.filter((l) => l.itemId != null && l.quantity > 0).map((l) => l.itemId!))];
+      if (itemIds.length > 0) {
+        const { data: items } = await supabase.from('items').select('id, unit').in('id', itemIds);
+        const unitByItemId = new Map((items || []).map((i) => [i.id, i.unit || 'unit']));
+        for (const l of lines) {
+          if (!l.itemId || l.quantity <= 0) continue;
+          const unit = unitByItemId.get(l.itemId) ?? 'unit';
+          const { error: outError } = await supabase.from('stock_movements').insert({
+            item_id: l.itemId,
+            movement_type: StockMovementType.OUT,
+            quantity: l.quantity,
+            unit,
+            reference_type: StockMovementReferenceType.EXPENSE,
+            reference_id: expenseRow.id,
+            movement_date: txBody.expenseDate,
+            notes: `Expense #${expenseRow.id}`,
+          });
+          if (outError) console.error('Stock movement error:', outError);
+        }
+      }
 
       const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_type), subscription:subscriptions(id, name)').eq('expense_id', expenseRow.id).order('sort_order', { ascending: true });
       const lineItems = (lineRows || []).map(transformLineItem);

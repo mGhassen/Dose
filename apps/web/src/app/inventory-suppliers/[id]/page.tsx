@@ -285,12 +285,13 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
     <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <StatusPin active={supplier.isActive} title={supplier.isActive ? "Active" : "Inactive"} />
-            <h1 className="text-2xl font-bold">
-              {isEditing ? "Edit Supplier" : supplier.name}
-            </h1>
-          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <StatusPin active={supplier.isActive} title={supplier.isActive ? "Active" : "Inactive"} />
+              <h1 className="text-2xl font-bold">
+                {isEditing ? "Edit Supplier" : supplier.name}
+              </h1>
+            </div>
             <p className="text-muted-foreground">
               {isEditing ? "Update supplier information" : "Supplier details and information"}
             </p>
