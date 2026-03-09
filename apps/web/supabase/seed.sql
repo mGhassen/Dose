@@ -6403,7 +6403,7 @@ SELECT
   COALESCE(r.description, '') || ' (Produced from recipe)',
   r.category,
   r.unit,
-  'item' as item_type,
+  'product' as item_type,
   r.id as produced_from_recipe_id,
   r.is_active
 FROM recipes r

@@ -117,6 +117,7 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
     try {
       await deleteMutation.mutateAsync(String(id));
       toast.success("Sale deleted successfully");
+      if (selectedSaleId === id) router.push("/sales");
     } catch (error) {
       toast.error("Failed to delete sale");
       console.error(error);
@@ -127,6 +128,7 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} sale(s) deleted successfully`);
+      if (selectedSaleId !== undefined && ids.includes(selectedSaleId)) router.push("/sales");
     } catch (error) {
       toast.error("Failed to delete sales");
       console.error(error);

@@ -76,11 +76,10 @@ export default function VariablesContent({ selectedVariableId }: VariablesConten
   ], [typeLabels]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this variable?")) return;
-    
     try {
       await deleteMutation.mutateAsync(String(id));
       toast.success("Variable deleted successfully");
+      if (selectedVariableId === id) router.push("/variables");
     } catch (error) {
       toast.error("Failed to delete variable");
       console.error(error);
@@ -88,11 +87,10 @@ export default function VariablesContent({ selectedVariableId }: VariablesConten
   };
 
   const handleBulkDelete = async (ids: number[]) => {
-    if (!confirm(`Are you sure you want to delete ${ids.length} variable(s)?`)) return;
-    
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} variable(s) deleted successfully`);
+      if (selectedVariableId !== undefined && ids.includes(selectedVariableId)) router.push("/variables");
     } catch (error) {
       toast.error("Failed to delete variables");
       console.error(error);

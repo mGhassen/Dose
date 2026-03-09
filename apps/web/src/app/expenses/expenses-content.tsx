@@ -130,6 +130,7 @@ export default function ExpensesContent({ selectedExpenseId }: ExpensesContentPr
     try {
       await deleteMutation.mutateAsync(id.toString());
       toast.success("Expense deleted successfully");
+      if (selectedExpenseId === id) router.push("/expenses");
     } catch (error) {
       toast.error("Failed to delete expense");
       console.error(error);
@@ -140,6 +141,7 @@ export default function ExpensesContent({ selectedExpenseId }: ExpensesContentPr
     try {
       await Promise.all(ids.map(id => deleteMutation.mutateAsync(id.toString())));
       toast.success(`${ids.length} expense(s) deleted successfully`);
+      if (selectedExpenseId !== undefined && ids.includes(selectedExpenseId)) router.push("/expenses");
     } catch (error) {
       toast.error("Failed to delete expenses");
       console.error(error);

@@ -87,6 +87,7 @@ export default function TaxRulesContent({ selectedRuleId }: TaxRulesContentProps
     try {
       await deleteMutation.mutateAsync(String(id));
       toast.success("Tax rule deleted");
+      if (selectedRuleId === id) router.push("/tax-rules");
     } catch (e: unknown) {
       toast.error((e as Error)?.message ?? "Failed to delete");
     }
@@ -97,6 +98,7 @@ export default function TaxRulesContent({ selectedRuleId }: TaxRulesContentProps
     try {
       await Promise.all(ids.map((id) => deleteMutation.mutateAsync(String(id))));
       toast.success(`${ids.length} tax rule(s) deleted`);
+      if (selectedRuleId !== undefined && ids.includes(selectedRuleId)) router.push("/tax-rules");
     } catch (e: unknown) {
       toast.error((e as Error)?.message ?? "Failed to delete");
     }
