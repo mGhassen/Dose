@@ -182,6 +182,10 @@ export function useSyncJob(jobId: number | null) {
     queryKey: ['sync-jobs', jobId],
     queryFn: () => integrationsApi.getSyncJob(jobId!),
     enabled: jobId != null,
+    refetchInterval: (query) => {
+      const data = query.state.data as { status?: string } | undefined;
+      return data?.status === 'pending' || data?.status === 'processing' ? 2000 : false;
+    },
   });
 }
 

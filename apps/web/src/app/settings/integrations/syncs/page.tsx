@@ -23,25 +23,16 @@ import {
   SelectValue,
 } from '@kit/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@kit/ui/dialog';
-import { Alert, AlertDescription } from '@kit/ui/alert';
-import {
   ArrowLeft,
-  RefreshCw,
   Loader2,
   CheckCircle2,
   XCircle,
   Clock,
-  AlertCircle,
   Eye,
   RotateCcw,
   Activity,
 } from 'lucide-react';
-import { useAllSyncJobs, useSyncJob, useRetrySyncJob, useIntegrations } from '@kit/hooks';
+import { useAllSyncJobs, useRetrySyncJob, useIntegrations } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
 import { useToast } from '@kit/hooks';
 
@@ -83,8 +74,6 @@ export default function SyncActivityPage() {
   const integrationIdParam = searchParams.get('integration_id');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [integrationFilter, setIntegrationFilter] = useState<string>('all');
-  const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
-
   useEffect(() => {
     if (integrationIdParam) setIntegrationFilter(integrationIdParam);
   }, [integrationIdParam]);
@@ -96,7 +85,6 @@ export default function SyncActivityPage() {
   };
   const { data: jobs = [], isLoading } = useAllSyncJobs(filters);
   const { data: integrations = [] } = useIntegrations();
-  const { data: selectedJobDetails } = useSyncJob(selectedJobId);
   const retrySyncJob = useRetrySyncJob();
   const { toast } = useToast();
 
@@ -108,7 +96,6 @@ export default function SyncActivityPage() {
     try {
       await retrySyncJob.mutateAsync(jobId);
       toast({ title: 'Retry started', description: 'Job has been queued for processing.' });
-      setSelectedJobId(null);
     } catch (e: any) {
       toast({ title: 'Retry failed', description: e?.message || 'Failed to retry', variant: 'destructive' });
     }
@@ -275,8 +262,10 @@ export default function SyncActivityPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setSelectedJobId(job.id)}>
-                            <Eye className="h-4 w-4" />
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/settings/integrations/syncs/${job.id}`}>
+                              <Eye className="h-4 w-4" />
+                            </Link>
                           </Button>
                           {(job.status === 'failed' || job.status === 'completed') && (
                             <Button
@@ -298,109 +287,6 @@ export default function SyncActivityPage() {
           </CardContent>
         </Card>
       </div>
-
-      <Dialog open={selectedJobId != null} onOpenChange={(open) => !open && setSelectedJobId(null)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Job #{selectedJobId}</DialogTitle>
-          </DialogHeader>
-          {selectedJobDetails ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div><span className="text-muted-foreground">Status</span><br /><Badge variant={selectedJobDetails.status === 'failed' ? 'destructive' : 'default'}>{selectedJobDetails.status}</Badge></div>
-                <div><span className="text-muted-foreground">Type</span><br />{selectedJobDetails.sync_type}</div>
-                <div><span className="text-muted-foreground">Created</span><br />{formatDateTime(selectedJobDetails.created_at)}</div>
-                <div><span className="text-muted-foreground">Started</span><br />{selectedJobDetails.started_at ? formatDateTime(selectedJobDetails.started_at) : '—'}</div>
-                <div><span className="text-muted-foreground">Completed</span><br />{selectedJobDetails.completed_at ? formatDateTime(selectedJobDetails.completed_at) : '—'}</div>
-                <div><span className="text-muted-foreground">Duration</span><br />{formatDuration(selectedJobDetails.started_at, selectedJobDetails.completed_at)}</div>
-              </div>
-              {selectedJobDetails.stats && Object.keys(selectedJobDetails.stats).length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Stats</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {typeof selectedJobDetails.stats.items_imported === 'number' && (
-                      <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <span className="text-sm"><strong>{selectedJobDetails.stats.items_imported}</strong> items imported</span>
-                      </div>
-                    )}
-                    {typeof selectedJobDetails.stats.items_failed === 'number' && (
-                      <div className={`flex items-center gap-2 rounded-md border px-3 py-2 ${selectedJobDetails.stats.items_failed > 0 ? 'border-destructive/50' : ''}`}>
-                        {selectedJobDetails.stats.items_failed > 0 ? <XCircle className="h-4 w-4 text-destructive" /> : <Clock className="h-4 w-4 text-muted-foreground" />}
-                        <span className="text-sm"><strong>{selectedJobDetails.stats.items_failed}</strong> items failed</span>
-                      </div>
-                    )}
-                    {typeof selectedJobDetails.stats.orders_imported === 'number' && (
-                      <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <span className="text-sm"><strong>{selectedJobDetails.stats.orders_imported}</strong> orders imported</span>
-                      </div>
-                    )}
-                    {typeof selectedJobDetails.stats.orders_failed === 'number' && (
-                      <div className={`flex items-center gap-2 rounded-md border px-3 py-2 ${selectedJobDetails.stats.orders_failed > 0 ? 'border-destructive/50' : ''}`}>
-                        {selectedJobDetails.stats.orders_failed > 0 ? <XCircle className="h-4 w-4 text-destructive" /> : <Clock className="h-4 w-4 text-muted-foreground" />}
-                        <span className="text-sm"><strong>{selectedJobDetails.stats.orders_failed}</strong> orders failed</span>
-                      </div>
-                    )}
-                    {typeof selectedJobDetails.stats.payments_imported === 'number' && (
-                      <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <span className="text-sm"><strong>{selectedJobDetails.stats.payments_imported}</strong> payments imported</span>
-                      </div>
-                    )}
-                    {typeof selectedJobDetails.stats.payments_failed === 'number' && (
-                      <div className={`flex items-center gap-2 rounded-md border px-3 py-2 ${selectedJobDetails.stats.payments_failed > 0 ? 'border-destructive/50' : ''}`}>
-                        {selectedJobDetails.stats.payments_failed > 0 ? <XCircle className="h-4 w-4 text-destructive" /> : <Clock className="h-4 w-4 text-muted-foreground" />}
-                        <span className="text-sm"><strong>{selectedJobDetails.stats.payments_failed}</strong> payments failed</span>
-                      </div>
-                    )}
-                  </div>
-                  <pre className="text-xs bg-muted p-2 rounded overflow-x-auto mt-2 text-muted-foreground">{JSON.stringify(selectedJobDetails.stats, null, 2)}</pre>
-                </div>
-              )}
-              {selectedJobDetails.error_message && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{selectedJobDetails.error_message}</AlertDescription>
-                </Alert>
-              )}
-              {selectedJobDetails.errors && selectedJobDetails.errors.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Per-entity errors</p>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Source ID</TableHead>
-                        <TableHead>Error</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedJobDetails.errors.map((err: any, idx: number) => (
-                        <TableRow key={idx}>
-                          <TableCell className="font-mono text-xs">{err.data_type}</TableCell>
-                          <TableCell className="font-mono text-xs truncate max-w-[120px]">{err.source_id}</TableCell>
-                          <TableCell className="text-destructive text-sm">{err.error_message}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-              {(selectedJobDetails.status === 'failed' || selectedJobDetails.status === 'completed') && (
-                <Button onClick={() => handleRetry(selectedJobDetails.id)} disabled={retrySyncJob.isPending}>
-                  {retrySyncJob.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCcw className="h-4 w-4 mr-2" />}
-                  Retry job
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </AppLayout>
   );
 }

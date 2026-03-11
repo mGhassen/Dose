@@ -631,8 +631,17 @@ export interface SyncJob {
   stats?: Record<string, number>;
 }
 
+export interface SyncJobStep {
+  id?: number;
+  sequence: number;
+  name: string;
+  status: 'pending' | 'running' | 'done' | 'failed';
+  details?: Record<string, number | string>;
+}
+
 export interface SyncJobWithErrors extends SyncJob {
   errors?: Array<{ data_type: string; source_id: string; error_message: string }>;
+  steps?: SyncJobStep[];
 }
 
 export type SyncStartResponse =

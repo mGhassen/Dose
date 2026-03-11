@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useIntegrations, useIntegrationByType, useInitiateOAuth, useCompleteOAuth, useSyncIntegration, useDisconnectIntegration, useManualConnectIntegration } from '@kit/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { Button } from '@kit/ui/button';
@@ -36,6 +37,7 @@ import { Label } from '@kit/ui/label';
 import { Textarea } from '@kit/ui/textarea';
 
 export default function IntegrationsContent() {
+  const router = useRouter();
   const { data: integrations, isLoading } = useIntegrations();
   const { data: squareIntegration } = useIntegrationByType('square');
   const initiateOAuth = useInitiateOAuth();
@@ -143,11 +145,13 @@ export default function IntegrationsContent() {
           variant: 'destructive',
         });
       } else {
-        const jobId = res?.job_id ?? '';
-        toast({
-          title: 'Sync Started',
-          description: jobId ? `Job #${jobId}. Processing in background.` : 'Data synchronization has been started.',
-        });
+        const jobId = res?.job_id;
+        if (jobId != null) {
+          window.location.href = `/settings/integrations/syncs/${jobId}`;
+          toast({ title: 'Redirecting to sync…', description: `Job #${jobId}` });
+          return;
+        }
+        toast({ title: 'Sync Started', description: 'Data synchronization has been started.' });
       }
     } catch (error: any) {
       toast({

@@ -53,9 +53,13 @@ export const integrationsApi = {
 
   // Sync operations (async: returns job_id, processor runs in background)
   sync: (id: string, syncType?: 'orders' | 'payments' | 'catalog' | 'locations' | 'full') =>
-    apiRequest<SyncStartResponse>('POST', `/api/integrations/${id}/sync`, {
-      sync_type: syncType || 'full',
-    }),
+    apiRequest<SyncStartResponse>(
+      'POST',
+      `/api/integrations/${id}/sync`,
+      { sync_type: syncType || 'full' },
+      undefined,
+      { timeout: 120000 }
+    ),
   getSyncJobs: (integrationId: string) =>
     apiRequest<SyncJob[]>('GET', `/api/integrations/${integrationId}/sync`),
   getSyncJob: (jobId: number) =>

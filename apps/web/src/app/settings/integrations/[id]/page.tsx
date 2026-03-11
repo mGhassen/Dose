@@ -108,11 +108,13 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
           variant: 'destructive',
         });
       } else {
-        const jobId = res?.job_id ?? '';
-        toast({
-          title: 'Sync Started',
-          description: jobId ? `Job #${jobId}. Processing in background.` : 'Data synchronization has been started.',
-        });
+        const jobId = res?.job_id;
+        if (jobId != null) {
+          window.location.href = `/settings/integrations/syncs/${jobId}`;
+          toast({ title: 'Redirecting to sync…', description: `Job #${jobId}` });
+          return;
+        }
+        toast({ title: 'Sync Started', description: 'Data synchronization has been started.' });
       }
     } catch (error: any) {
       toast({

@@ -74,6 +74,22 @@ async function fetchAndStageSquare(
     orders_fetched: 0,
     payments_fetched: 0,
   };
+  let sequence = 0;
+  const insertStep = async (
+    name: string,
+    status: 'pending' | 'running' | 'done' | 'failed',
+    details: Record<string, number> = {}
+  ) => {
+    sequence += 1;
+    const { error } = await supabase.from('sync_job_steps').insert({
+      job_id: jobId,
+      sequence,
+      name,
+      status,
+      details,
+    });
+    if (error) throw new Error(`sync_job_steps: ${error.message}`);
+  };
 
   if (syncType === 'catalog' || syncType === 'full') {
     const catalogTypes = ['ITEM', 'ITEM_VARIATION', 'CATEGORY', 'MODIFIER', 'MODIFIER_LIST', 'TAX'];
@@ -106,8 +122,10 @@ async function fetchAndStageSquare(
         });
         if (insertErr) return { error: `Failed to stage catalog: ${insertErr.message}` };
         stats.catalog_batches += 1;
+        await insertStep(`Catalog — page ${stats.catalog_batches}`, 'done', { objects: objects.length });
       }
     } while (catalogCursor);
+    if (stats.catalog_batches === 0) await insertStep('Fetch catalog', 'done', { objects: 0 });
   }
 
   let locationIds: string[] = integration.config?.location_id ? [integration.config.location_id] : [];
@@ -123,8 +141,11 @@ async function fetchAndStageSquare(
     const now = new Date();
     const startDate = new Date(now.getFullYear() - 2, 0, 1);
     const ranges = getMonthlyDateRanges(startDate, now);
+    let ordersStepAdded = false;
 
     for (const range of ranges) {
+      const monthLabel = new Date(range.startAt).toISOString().slice(0, 7);
+      let ordersPageInMonth = 0;
       let ordersCursor: string | null = null;
       do {
         const orderBody: any = {
@@ -171,12 +192,20 @@ async function fetchAndStageSquare(
           if (insertErr) return { error: `Failed to stage order: ${insertErr.message}` };
           stats.orders_fetched += 1;
         }
+        if (orders.length > 0) {
+          ordersPageInMonth += 1;
+          ordersStepAdded = true;
+          await insertStep(`Orders — ${monthLabel} — page ${ordersPageInMonth}`, 'done', { orders: orders.length });
+        }
       } while (ordersCursor);
     }
+    if (!ordersStepAdded) await insertStep('Fetch orders', 'done', { orders: 0 });
   }
 
   if (syncType === 'payments' || syncType === 'full') {
     let paymentsCursor: string | null = null;
+    let paymentsPage = 0;
+    let paymentsStepAdded = false;
     do {
       const payUrl = `${SQUARE_API_BASE}/v2/payments${paymentsCursor ? `?cursor=${paymentsCursor}` : ''}`;
       const payResponse = await fetch(payUrl, { headers });
@@ -203,7 +232,13 @@ async function fetchAndStageSquare(
         if (insertErr) return { error: `Failed to stage payment: ${insertErr.message}` };
         stats.payments_fetched += 1;
       }
+      if (payments.length > 0) {
+        paymentsPage += 1;
+        paymentsStepAdded = true;
+        await insertStep(`Payments — page ${paymentsPage}`, 'done', { payments: payments.length });
+      }
     } while (paymentsCursor);
+    if (!paymentsStepAdded) await insertStep('Fetch payments', 'done', { payments: 0 });
   }
 
   return { stats };

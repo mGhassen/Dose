@@ -64,7 +64,17 @@ export async function GET(
       .eq('job_id', jobId)
       .order('created_at', { ascending: true });
 
-    return NextResponse.json({ ...job, errors: errors || [] });
+    const { data: steps } = await supabase
+      .from('sync_job_steps')
+      .select('id, sequence, name, status, details')
+      .eq('job_id', jobId)
+      .order('sequence', { ascending: true });
+
+    return NextResponse.json({
+      ...job,
+      errors: errors || [],
+      steps: steps || [],
+    });
   } catch (error: any) {
     console.error('Error fetching sync job:', error);
     return NextResponse.json(

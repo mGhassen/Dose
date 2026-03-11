@@ -29,6 +29,47 @@ async function recordImportError(
   });
 }
 
+async function getNextStepSequence(supabase: SupabaseClient, jobId: number): Promise<number> {
+  const { data: rows } = await supabase
+    .from('sync_job_steps')
+    .select('sequence')
+    .eq('job_id', jobId)
+    .order('sequence', { ascending: false })
+    .limit(1);
+  const max = rows?.[0]?.sequence ?? 0;
+  return max + 1;
+}
+
+async function insertStep(
+  supabase: SupabaseClient,
+  jobId: number,
+  sequence: number,
+  name: string,
+  status: 'pending' | 'running' | 'done' | 'failed',
+  details: Record<string, number> = {}
+): Promise<void> {
+  await supabase.from('sync_job_steps').insert({
+    job_id: jobId,
+    sequence,
+    name,
+    status,
+    details,
+  });
+}
+
+async function completeStep(
+  supabase: SupabaseClient,
+  jobId: number,
+  sequence: number,
+  details: Record<string, number>
+): Promise<void> {
+  await supabase
+    .from('sync_job_steps')
+    .update({ status: 'done', details, updated_at: new Date().toISOString() })
+    .eq('job_id', jobId)
+    .eq('sequence', sequence);
+}
+
 export async function processSyncJob(
   supabase: SupabaseClient,
   job: { id: number; integration_id: number; sync_type: string },
@@ -55,6 +96,9 @@ export async function processSyncJob(
 
   const catalogBatches = stagingRows.filter((r) => r.data_type === 'catalog_batch');
   if (catalogBatches.length > 0 && (syncType === 'catalog' || syncType === 'full')) {
+    let stepSeq = await getNextStepSequence(supabase, jobId);
+    await insertStep(supabase, jobId, stepSeq, 'Process catalog', 'running', {});
+    const catalogStepSeq = stepSeq;
     const allCatalogObjects: any[] = [];
     for (const row of catalogBatches) {
       const arr = Array.isArray(row.payload) ? row.payload : [row.payload];
@@ -155,10 +199,17 @@ export async function processSyncJob(
         }
       }
     }
+    await completeStep(supabase, jobId, catalogStepSeq, {
+      items_imported: stats.items_imported,
+      items_failed: stats.items_failed,
+    });
   }
 
   const orderRows = stagingRows.filter((r) => r.data_type === 'order');
   if (orderRows.length > 0 && (syncType === 'orders' || syncType === 'full')) {
+    let stepSeq = await getNextStepSequence(supabase, jobId);
+    await insertStep(supabase, jobId, stepSeq, 'Process orders', 'running', {});
+    const ordersStepSeq = stepSeq;
     for (const row of orderRows) {
       const order = row.payload;
       const orderId = order?.id || row.source_id;
@@ -287,10 +338,17 @@ export async function processSyncJob(
         stats.orders_failed += 1;
       }
     }
+    await completeStep(supabase, jobId, ordersStepSeq, {
+      orders_imported: stats.orders_imported,
+      orders_failed: stats.orders_failed,
+    });
   }
 
   const paymentRows = stagingRows.filter((r) => r.data_type === 'payment');
   if (paymentRows.length > 0 && (syncType === 'payments' || syncType === 'full')) {
+    let stepSeq = await getNextStepSequence(supabase, jobId);
+    await insertStep(supabase, jobId, stepSeq, 'Process payments', 'running', {});
+    const paymentsStepSeq = stepSeq;
     for (const row of paymentRows) {
       const payment = row.payload;
       const paymentId = payment?.id || row.source_id;
@@ -341,6 +399,10 @@ export async function processSyncJob(
         stats.payments_failed += 1;
       }
     }
+    await completeStep(supabase, jobId, paymentsStepSeq, {
+      payments_imported: stats.payments_imported,
+      payments_failed: stats.payments_failed,
+    });
   }
 
   const hasFailures =
