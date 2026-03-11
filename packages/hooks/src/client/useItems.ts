@@ -48,8 +48,16 @@ export function useItems(params?: { page?: number; limit?: number; itemType?: st
 export function useItemById(id: string) {
   return useQuery({
     queryKey: ['items', id],
-    queryFn: () => itemsApi.getById(id),
+    queryFn: async () => {
+      try {
+        return await itemsApi.getById(id);
+      } catch (err: any) {
+        if (err?.status === 404) return null;
+        throw err;
+      }
+    },
     enabled: !!id,
+    retry: (failureCount, error: any) => error?.status === 404 ? false : failureCount < 3,
   });
 }
 

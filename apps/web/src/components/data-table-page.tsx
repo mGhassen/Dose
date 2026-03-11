@@ -554,9 +554,10 @@ export default function DataTablePage<T>({
 
   const derivedFilterOptions = useMemo(() => {
     const map = new Map<string, Array<{ value: string; label: string }>>();
+    const rows = Array.isArray(data) ? data : (data && typeof data === 'object' && 'data' in data && Array.isArray((data as { data: unknown[] }).data) ? (data as { data: unknown[] }).data : []);
     filterColumns.forEach((col) => {
       if ((col.type === "select" || col.type === "multiselect") && !col.options?.length) {
-        const raw = (data as any[]).flatMap((row) => {
+        const raw = rows.flatMap((row: any) => {
           const v = col.value.includes(".") ? col.value.split(".").reduce((o: any, k) => o?.[k], row) : row[col.value];
           return Array.isArray(v) ? v : v != null && v !== "" ? [v] : [];
         });

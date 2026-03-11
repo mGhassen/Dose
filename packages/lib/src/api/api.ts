@@ -134,17 +134,18 @@ export async function apiRequest<T>(
           throw error;
         }
         
-        console.error(`[API Error] ${method} ${endpoint} -> ${response.status} ${response.statusText}`);
-        console.error(`[API Error] Response Body: ${errorText.substring(0, 500)}${errorText.length > 500 ? '...' : ''}`);
-        console.error(`[API Error] Full URL: ${url}`);
-        
-        // Try to parse error details for better error messages
+        const is404 = response.status === 404;
+        if (!is404) {
+          console.error(`[API Error] ${method} ${endpoint} -> ${response.status} ${response.statusText}`);
+          console.error(`[API Error] Response Body: ${errorText.substring(0, 500)}${errorText.length > 500 ? '...' : ''}`);
+          console.error(`[API Error] Full URL: ${url}`);
+        }
+
         let errorDetails: any = {};
         let errorMessage = `API request failed: ${method} ${endpoint} -> ${response.status} ${response.statusText}`;
         try {
           const parsedError = JSON.parse(errorText);
           if (parsedError.error) {
-            // If error is a string, use it directly but include endpoint
             if (typeof parsedError.error === 'string') {
               errorMessage = `${parsedError.error} (${method} ${endpoint})`;
             } else {
@@ -156,28 +157,15 @@ export async function apiRequest<T>(
           } else {
             errorDetails = parsedError;
           }
-          
-          // Include details if available
           if (parsedError.details) {
             errorDetails = { ...errorDetails, ...parsedError.details };
           }
         } catch {
-          // If not JSON, use the raw text as error message but include endpoint
           if (errorText && errorText.length > 0) {
             const rawMessage = errorText.length > 200 ? errorText.substring(0, 200) + '...' : errorText;
             errorMessage = `${rawMessage} (${method} ${endpoint})`;
             errorDetails = { message: errorText.substring(0, 200) };
           }
-        }
-        
-        // For 404, provide more helpful context
-        if (response.status === 404) {
-          console.error(`[API] 404 Not Found for ${method} ${endpoint}`);
-          console.error(`[API] This usually means:`);
-          console.error(`  - The API route doesn't exist: ${endpoint}`);
-          console.error(`  - The route file is missing or has a typo`);
-          console.error(`  - Next.js dev server needs to be restarted`);
-          console.error(`  - Route file has syntax errors preventing it from being registered`);
         }
         
         // For 403, provide more helpful context

@@ -622,8 +622,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   }, [params]);
 
   useEffect(() => {
-    if (resolvedParams?.id && !isEditing) fetchPriceHistory(resolvedParams.id);
-  }, [resolvedParams?.id, isEditing, fetchPriceHistory]);
+    if (resolvedParams?.id && item != null && !isEditing) fetchPriceHistory(resolvedParams.id);
+  }, [resolvedParams?.id, item, isEditing, fetchPriceHistory]);
 
   useEffect(() => {
     if (item) {
