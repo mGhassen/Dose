@@ -4,6 +4,9 @@ import type {
   CreateIntegrationData,
   UpdateIntegrationData,
   IntegrationSyncData,
+  SyncJob,
+  SyncJobWithErrors,
+  SyncStartResponse,
   SquareLocation,
   SquareOrder,
   SquarePayment,
@@ -48,13 +51,29 @@ export const integrationsApi = {
   manualConnect: (data: { integration_type: string; access_token: string; merchant_id?: string; location_id?: string }) =>
     apiRequest<Integration>('POST', '/api/integrations/manual-connect', data),
 
-  // Sync operations
+  // Sync operations (async: returns job_id, processor runs in background)
   sync: (id: string, syncType?: 'orders' | 'payments' | 'catalog' | 'locations' | 'full') =>
-    apiRequest<IntegrationSyncData>('POST', `/api/integrations/${id}/sync`, {
+    apiRequest<SyncStartResponse>('POST', `/api/integrations/${id}/sync`, {
       sync_type: syncType || 'full',
     }),
-  getSyncStatus: (id: string) =>
-    apiRequest<IntegrationSyncData | null>('GET', `/api/integrations/${id}/sync`),
+  getSyncJobs: (integrationId: string) =>
+    apiRequest<SyncJob[]>('GET', `/api/integrations/${integrationId}/sync`),
+  getSyncJob: (jobId: number) =>
+    apiRequest<SyncJobWithErrors>('GET', `/api/sync-jobs/${jobId}`),
+  retrySyncJob: (jobId: number) =>
+    apiRequest<{ job_id: number; message: string }>('POST', `/api/sync-jobs/${jobId}/retry`),
+  getAllSyncJobs: (params?: { status?: string; integration_id?: string; limit?: number; offset?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.integration_id) searchParams.set('integration_id', params.integration_id);
+    if (params?.limit != null) searchParams.set('limit', String(params.limit));
+    if (params?.offset != null) searchParams.set('offset', String(params.offset));
+    const q = searchParams.toString();
+    return apiRequest<{ jobs: (SyncJob & { integration_name?: string; integration_type?: string })[] }>(
+      'GET',
+      `/api/sync-jobs${q ? `?${q}` : ''}`
+    );
+  },
 
   // Square-specific data fetching
   square: {

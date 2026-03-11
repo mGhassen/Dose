@@ -159,23 +159,55 @@ export function useSyncIntegration() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['integrations'] });
       queryClient.invalidateQueries({ queryKey: ['integrations', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['integrations', variables.id, 'sync'] });
+      queryClient.invalidateQueries({ queryKey: ['integrations', variables.id, 'sync', 'jobs'] });
     },
   });
 }
 
-export function useSyncStatus(integrationId: string) {
+export function useSyncJobs(integrationId: string) {
   return useQuery({
-    queryKey: ['integrations', integrationId, 'sync', 'status'],
-    queryFn: () => integrationsApi.getSyncStatus(integrationId),
+    queryKey: ['integrations', integrationId, 'sync', 'jobs'],
+    queryFn: () => integrationsApi.getSyncJobs(integrationId),
     enabled: !!integrationId,
     refetchInterval: (query) => {
-      // Poll every 2 seconds if sync is in progress
-      const data = query.state.data;
-      if (data?.status === 'in_progress') {
-        return 2000;
-      }
-      return false;
+      const jobs = query.state.data as { status?: string }[] | undefined;
+      const hasPending = Array.isArray(jobs) && jobs.some((j) => j.status === 'pending' || j.status === 'processing');
+      return hasPending ? 2000 : false;
+    },
+  });
+}
+
+export function useSyncJob(jobId: number | null) {
+  return useQuery({
+    queryKey: ['sync-jobs', jobId],
+    queryFn: () => integrationsApi.getSyncJob(jobId!),
+    enabled: jobId != null,
+  });
+}
+
+export function useRetrySyncJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: number) => integrationsApi.retrySyncJob(jobId),
+    onSuccess: (_, jobId) => {
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['integrations'] });
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', 'all'] });
+    },
+  });
+}
+
+export function useAllSyncJobs(filters?: { status?: string; integration_id?: string; limit?: number; offset?: number }) {
+  return useQuery({
+    queryKey: ['sync-jobs', 'all', filters],
+    queryFn: async () => {
+      const res = await integrationsApi.getAllSyncJobs(filters);
+      return res.jobs ?? [];
+    },
+    refetchInterval: (query) => {
+      const jobs = query.state.data as { status?: string }[] | undefined;
+      const hasPending = Array.isArray(jobs) && jobs.some((j) => j.status === 'pending' || j.status === 'processing');
+      return hasPending ? 2500 : false;
     },
   });
 }

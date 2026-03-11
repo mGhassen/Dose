@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useIntegrationById, useSyncIntegration, useDisconnectIntegration } from '@kit/hooks';
+import { useIntegrationById, useSyncIntegration, useSyncJobs, useRetrySyncJob, useDisconnectIntegration } from '@kit/hooks';
 import AppLayout from '@/components/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { Button } from '@kit/ui/button';
@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@kit/ui/dropdown-menu';
+import Link from 'next/link';
 import { 
   Square, 
   Settings,
@@ -31,6 +32,7 @@ import {
   AlertCircle,
   Trash2,
   MoreVertical,
+  Activity,
 } from 'lucide-react';
 import { useToast } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
@@ -89,25 +91,44 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
   const [isDisconnectDialogOpen, setIsDisconnectDialogOpen] = useState(false);
   const { data: integration, isLoading } = useIntegrationById(id);
   const syncIntegration = useSyncIntegration();
+  const { data: syncJobs = [] } = useSyncJobs(id);
+  const retrySyncJob = useRetrySyncJob();
   const disconnectIntegration = useDisconnectIntegration();
   const { toast } = useToast();
 
+  const lastJob = Array.isArray(syncJobs) ? syncJobs[0] : null;
+
   const handleSync = async (syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'full' = 'full') => {
     try {
-      await syncIntegration.mutateAsync({
-        id: id,
-        syncType,
-      });
-      toast({
-        title: 'Sync Started',
-        description: 'Data synchronization has been started.',
-      });
+      const res = await syncIntegration.mutateAsync({ id, syncType });
+      if (res && 'status' in res && res.status === 'failed') {
+        toast({
+          title: 'Sync Failed',
+          description: res.error_message || 'Fetch failed. See job for details.',
+          variant: 'destructive',
+        });
+      } else {
+        const jobId = res?.job_id ?? '';
+        toast({
+          title: 'Sync Started',
+          description: jobId ? `Job #${jobId}. Processing in background.` : 'Data synchronization has been started.',
+        });
+      }
     } catch (error: any) {
       toast({
         title: 'Sync Failed',
         description: error.message || 'Failed to sync data',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleRetryJob = async (jobId: number) => {
+    try {
+      await retrySyncJob.mutateAsync(jobId);
+      toast({ title: 'Retry Started', description: 'Job has been queued for processing.' });
+    } catch (e: any) {
+      toast({ title: 'Retry Failed', description: e?.message || 'Failed to retry', variant: 'destructive' });
     }
   };
 
@@ -296,46 +317,72 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
               </CardContent>
             </Card>
 
-            {/* Sync Status Card */}
+            {/* Sync Jobs Card */}
             <Card>
               <CardHeader>
                 <CardTitle>Sync Information</CardTitle>
-                <CardDescription>Last sync status and history</CardDescription>
+                <CardDescription>Last sync job status and history</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Last Sync</p>
-                    <p className="text-sm font-medium mt-1">
-                      {integration.last_sync_at ? formatDateTime(integration.last_sync_at) : 'Never'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Sync Status</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      {integration.last_sync_status === 'success' && (
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
-                      )}
-                      {integration.last_sync_status === 'error' && (
-                        <XCircle className="w-4 h-4 text-red-500" />
-                      )}
-                      {integration.last_sync_status === 'in_progress' && (
-                        <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                      )}
-                      <p className="text-sm font-medium capitalize">
-                        {integration.last_sync_status || 'Not synced'}
-                      </p>
+                {lastJob ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Job #{lastJob.id}</p>
+                        <p className="text-sm font-medium mt-1">{formatDateTime(lastJob.created_at)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Status</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {lastJob.status === 'completed' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                          {lastJob.status === 'failed' && <XCircle className="w-4 h-4 text-red-500" />}
+                          {(lastJob.status === 'pending' || lastJob.status === 'processing') && (
+                            <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                          )}
+                          <Badge variant={lastJob.status === 'failed' ? 'destructive' : lastJob.status === 'completed' ? 'default' : 'secondary'}>
+                            {lastJob.status}
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-
-                {integration.last_sync_error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      <p>{integration.last_sync_error}</p>
-                    </AlertDescription>
-                  </Alert>
+                    {lastJob.stats && typeof lastJob.stats === 'object' && (
+                      <p className="text-sm text-muted-foreground">
+                        Imported: {[lastJob.stats.items_imported, lastJob.stats.orders_imported, lastJob.stats.payments_imported].filter(Boolean).join(', ') || '—'}
+                        {(lastJob.stats.items_failed || lastJob.stats.orders_failed || lastJob.stats.payments_failed) ? (
+                          <span className="text-destructive ml-2">
+                            Failed: {[lastJob.stats.items_failed, lastJob.stats.orders_failed, lastJob.stats.payments_failed].filter(Boolean).join(', ')}
+                          </span>
+                        ) : null}
+                      </p>
+                    )}
+                    {lastJob.error_message && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{lastJob.error_message}</AlertDescription>
+                      </Alert>
+                    )}
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/settings/integrations/syncs?integration_id=${id}`}>
+                          <Activity className="w-4 h-4 mr-1" />
+                          View all syncs
+                        </Link>
+                      </Button>
+                      {(lastJob.status === 'failed' || lastJob.status === 'completed') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRetryJob(lastJob.id)}
+                          disabled={retrySyncJob.isPending}
+                        >
+                          {retrySyncJob.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                          Retry
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No sync jobs yet. Use Sync from the menu above.</p>
                 )}
               </CardContent>
             </Card>

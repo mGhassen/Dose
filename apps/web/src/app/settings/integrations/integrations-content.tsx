@@ -132,14 +132,23 @@ export default function IntegrationsContent() {
 
   const handleSync = async (integrationId: number, syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'full' = 'full') => {
     try {
-      await syncIntegration.mutateAsync({
+      const res = await syncIntegration.mutateAsync({
         id: integrationId.toString(),
         syncType,
       });
-      toast({
-        title: 'Sync Started',
-        description: 'Data synchronization has been started.',
-      });
+      if (res && 'status' in res && res.status === 'failed') {
+        toast({
+          title: 'Sync Failed',
+          description: res.error_message || 'Fetch failed. See job for details.',
+          variant: 'destructive',
+        });
+      } else {
+        const jobId = res?.job_id ?? '';
+        toast({
+          title: 'Sync Started',
+          description: jobId ? `Job #${jobId}. Processing in background.` : 'Data synchronization has been started.',
+        });
+      }
     } catch (error: any) {
       toast({
         title: 'Sync Failed',

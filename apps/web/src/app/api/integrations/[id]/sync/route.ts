@@ -1,176 +1,215 @@
-// Integration Sync Route
+// Integration Sync Route – Phase 1 only: fetch from Square, write to staging, create job, return 202
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
-import type { IntegrationSyncData } from '@kit/types';
 
 const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
-const SQUARE_API_BASE = SQUARE_USE_SANDBOX 
+const SQUARE_API_BASE = SQUARE_USE_SANDBOX
   ? 'https://connect.squareupsandbox.com'
   : 'https://connect.squareup.com';
 
+function getMonthlyDateRanges(start: Date, end: Date): { startAt: string; endAt: string }[] {
+  const ranges: { startAt: string; endAt: string }[] = [];
+  const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
+  while (cur <= end) {
+    const chunkEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0, 23, 59, 59, 999);
+    const rangeEnd = chunkEnd > end ? end : chunkEnd;
+    ranges.push({
+      startAt: new Date(cur).toISOString(),
+      endAt: rangeEnd.toISOString(),
+    });
+    cur.setMonth(cur.getMonth() + 1);
+    cur.setDate(1);
+  }
+  return ranges;
+}
+
 async function getIntegrationAndVerifyAccess(
   supabase: any,
-  integrationId: string
+  integrationId: string,
+  token: string
 ): Promise<{ integration: any; error: any }> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser(token);
   if (!user) {
     return { integration: null, error: { status: 401, message: 'Unauthorized' } };
   }
-
   const { data: account } = await supabase
     .from('accounts')
     .select('id')
     .eq('auth_user_id', user.id)
     .single();
-
   if (!account) {
     return { integration: null, error: { status: 404, message: 'Account not found' } };
   }
-
   const { data: integration, error } = await supabase
     .from('integrations')
     .select('*')
     .eq('id', integrationId)
     .eq('account_id', account.id)
     .single();
-
   if (error) {
     return { integration: null, error: { status: 404, message: 'Integration not found' } };
   }
-
   return { integration, error: null };
 }
 
-async function syncSquareIntegration(
+async function fetchAndStageSquare(
+  supabase: any,
   integration: any,
-  syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'full'
-): Promise<{ records_synced: number; records_failed: number; error?: string }> {
-  const accessToken = integration.access_token; // Should be decrypted in production
-  
+  jobId: number,
+  syncType: string
+): Promise<{ error?: string; stats?: Record<string, number> }> {
+  const accessToken = integration.access_token;
+  const integrationId = integration.id as number;
   if (!accessToken) {
-    console.error('[Sync] Access token not found for integration:', integration.id);
-    throw new Error('Access token not found. Please reconnect the integration.');
+    return { error: 'Access token not found. Please reconnect the integration.' };
   }
+  const headers = {
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    'Square-Version': '2024-01-18',
+  };
+  const stats: Record<string, number> = {
+    catalog_batches: 0,
+    orders_fetched: 0,
+    payments_fetched: 0,
+  };
 
-  console.log('[Sync] Starting sync for integration:', {
-    integrationId: integration.id,
-    syncType,
-    hasAccessToken: !!accessToken,
-    tokenLength: accessToken.length,
-    tokenPrefix: accessToken.substring(0, 10) + '...',
-    sandbox: SQUARE_API_BASE.includes('sandbox'),
-  });
-
-  let recordsSynced = 0;
-  let recordsFailed = 0;
-  let error: string | undefined;
-
-  try {
-    if (syncType === 'locations' || syncType === 'full') {
-      // Fetch locations
-      const locationsResponse = await fetch(`${SQUARE_API_BASE}/v2/locations`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Square-Version': '2024-01-18',
-        },
+  if (syncType === 'catalog' || syncType === 'full') {
+    const catalogTypes = ['ITEM', 'ITEM_VARIATION', 'CATEGORY', 'MODIFIER', 'MODIFIER_LIST', 'TAX'];
+    let catalogCursor: string | null = null;
+    do {
+      const catalogResponse = await fetch(`${SQUARE_API_BASE}/v2/catalog/search`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ object_types: catalogTypes, cursor: catalogCursor || undefined }),
       });
-      
-      if (locationsResponse.ok) {
-        const locationsData = await locationsResponse.json();
-        recordsSynced += locationsData.locations?.length || 0;
-        console.log('[Sync] Successfully fetched locations:', recordsSynced);
-      } else {
-        const errorText = await locationsResponse.text();
-        let errorDetails;
+      if (!catalogResponse.ok) {
+        const errorText = await catalogResponse.text();
+        let errorDetails: any;
         try {
           errorDetails = JSON.parse(errorText);
         } catch {
           errorDetails = errorText;
         }
-        recordsFailed++;
-        const errorMsg = errorDetails?.errors?.[0]?.detail || locationsResponse.statusText || 'Unknown error';
-        error = `Failed to fetch locations: ${errorMsg}`;
-        console.error('[Sync] Failed to fetch locations:', {
-          status: locationsResponse.status,
-          statusText: locationsResponse.statusText,
-          details: errorDetails,
-          apiBase: SQUARE_API_BASE,
-          errorCode: errorDetails?.errors?.[0]?.code,
-          errorCategory: errorDetails?.errors?.[0]?.category,
-          errorDetail: errorDetails?.errors?.[0]?.detail,
-          fullError: JSON.stringify(errorDetails, null, 2),
-        });
+        return { error: `Failed to fetch catalog: ${errorDetails?.errors?.[0]?.detail || catalogResponse.statusText}` };
       }
-    }
-
-    if (syncType === 'catalog' || syncType === 'full') {
-      // Fetch catalog - all types including modifiers and taxes
-      const catalogTypes = ['ITEM', 'ITEM_VARIATION', 'CATEGORY', 'MODIFIER', 'MODIFIER_LIST', 'TAX'];
-      let catalogCursor: string | null = null;
-      let totalCatalogItems = 0;
-
-      do {
-        const catalogResponse: Response = await fetch(`${SQUARE_API_BASE}/v2/catalog/search`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Square-Version': '2024-01-18',
-          },
-          body: JSON.stringify({
-            object_types: catalogTypes,
-            cursor: catalogCursor || undefined,
-          }),
+      const catalogData = await catalogResponse.json();
+      const objects = catalogData.objects || [];
+      catalogCursor = catalogData.cursor || null;
+      if (objects.length > 0) {
+        const { error: insertErr } = await supabase.from('sync_square_data').insert({
+          job_id: jobId,
+          data_type: 'catalog_batch',
+          source_id: '',
+          payload: objects,
         });
-
-        if (catalogResponse.ok) {
-          const catalogData = await catalogResponse.json();
-          const objects = catalogData.objects || [];
-          totalCatalogItems += objects.length;
-          catalogCursor = catalogData.cursor || null;
-          console.log('[Sync] Fetched catalog batch:', {
-            count: objects.length,
-            total: totalCatalogItems,
-            hasMore: !!catalogCursor,
-            types: [...new Set(objects.map((o: any) => o.type))],
-          });
-        } else {
-          const errorText = await catalogResponse.text();
-          let errorDetails;
-          try {
-            errorDetails = JSON.parse(errorText);
-          } catch {
-            errorDetails = errorText;
-          }
-          recordsFailed++;
-          const errorMsg = errorDetails?.errors?.[0]?.detail || catalogResponse.statusText || 'Unknown error';
-          error = `Failed to fetch catalog: ${errorMsg}`;
-          console.error('[Sync] Failed to fetch catalog:', {
-            status: catalogResponse.status,
-            statusText: catalogResponse.statusText,
-            details: errorDetails,
-          });
-          break;
-        }
-      } while (catalogCursor);
-
-      if (totalCatalogItems > 0) {
-        recordsSynced += totalCatalogItems;
-        console.log('[Sync] Successfully fetched catalog items:', totalCatalogItems);
+        if (insertErr) return { error: `Failed to stage catalog: ${insertErr.message}` };
+        stats.catalog_batches += 1;
       }
-    }
-
-    return { records_synced: recordsSynced, records_failed: recordsFailed, error };
-  } catch (err: any) {
-    error = err.message || 'Unknown error occurred during sync';
-    console.error('[Sync] Error during sync:', {
-      error: err.message,
-      stack: err.stack,
-      integrationId: integration.id,
-    });
-    return { records_synced: recordsSynced, records_failed: recordsFailed, error };
+    } while (catalogCursor);
   }
+
+  let locationIds: string[] = integration.config?.location_id ? [integration.config.location_id] : [];
+  if (locationIds.length === 0 && (syncType === 'orders' || syncType === 'full')) {
+    const locRes = await fetch(`${SQUARE_API_BASE}/v2/locations`, { headers });
+    if (locRes.ok) {
+      const locData = await locRes.json();
+      locationIds = (locData.locations || []).map((l: any) => l.id);
+    }
+  }
+
+  if ((syncType === 'orders' || syncType === 'full') && locationIds.length > 0) {
+    const now = new Date();
+    const createdAt = integration.created_at ? new Date(integration.created_at) : null;
+    const startDate = createdAt && createdAt.getTime() < now.getTime()
+      ? createdAt
+      : new Date(now.getFullYear() - 2, 0, 1);
+    const ranges = getMonthlyDateRanges(startDate, now);
+
+    for (const range of ranges) {
+      let ordersCursor: string | null = null;
+      do {
+        const orderBody: any = {
+          location_ids: locationIds,
+          limit: 100,
+          query: {
+            filter: {
+              date_time_filter: {
+                created_at: {
+                  start_at: range.startAt,
+                  end_at: range.endAt,
+                },
+              },
+            },
+          },
+          sort: { sort_field: 'CREATED_AT', sort_order: 'ASC' },
+        };
+        if (ordersCursor) orderBody.cursor = ordersCursor;
+        const ordersResponse = await fetch(`${SQUARE_API_BASE}/v2/orders/search`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(orderBody),
+        });
+        if (!ordersResponse.ok) {
+          const errText = await ordersResponse.text();
+          let errDetails: any;
+          try {
+            errDetails = JSON.parse(errText);
+          } catch {
+            errDetails = errText;
+          }
+          return { error: `Failed to fetch orders: ${errDetails?.errors?.[0]?.detail || ordersResponse.statusText}` };
+        }
+        const ordersData = await ordersResponse.json();
+        const orders = ordersData.orders || [];
+        ordersCursor = ordersData.cursor || null;
+        for (const order of orders) {
+          const { error: insertErr } = await supabase.from('sync_square_data').insert({
+            job_id: jobId,
+            data_type: 'order',
+            source_id: order.id || '',
+            payload: order,
+          });
+          if (insertErr) return { error: `Failed to stage order: ${insertErr.message}` };
+          stats.orders_fetched += 1;
+        }
+      } while (ordersCursor);
+    }
+  }
+
+  if (syncType === 'payments' || syncType === 'full') {
+    let paymentsCursor: string | null = null;
+    do {
+      const payUrl = `${SQUARE_API_BASE}/v2/payments${paymentsCursor ? `?cursor=${paymentsCursor}` : ''}`;
+      const payResponse = await fetch(payUrl, { headers });
+      if (!payResponse.ok) {
+        const errText = await payResponse.text();
+        let errDetails: any;
+        try {
+          errDetails = JSON.parse(errText);
+        } catch {
+          errDetails = errText;
+        }
+        return { error: `Failed to fetch payments: ${errDetails?.errors?.[0]?.detail || payResponse.statusText}` };
+      }
+      const payData = await payResponse.json();
+      const payments = payData.payments || [];
+      paymentsCursor = payData.cursor || null;
+      for (const payment of payments) {
+        const { error: insertErr } = await supabase.from('sync_square_data').insert({
+          job_id: jobId,
+          data_type: 'payment',
+          source_id: payment.id || '',
+          payload: payment,
+        });
+        if (insertErr) return { error: `Failed to stage payment: ${insertErr.message}` };
+        stats.payments_fetched += 1;
+      }
+    } while (paymentsCursor);
+  }
+
+  return { stats };
 }
 
 export async function POST(
@@ -186,87 +225,85 @@ export async function POST(
     const syncType = parsed.data.sync_type || 'full';
 
     const authHeader = request.headers.get('authorization');
-    
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
+    const token = authHeader.replace(/^Bearer\s+/i, '');
 
     const supabase = supabaseServer();
-    
-    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
-    
+    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id, token);
     if (accessError) {
       return NextResponse.json(
         { error: accessError.message },
         { status: accessError.status }
       );
     }
-
     if (integration.status !== 'connected') {
-      return NextResponse.json(
-        { error: 'Integration is not connected' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Integration is not connected' }, { status: 400 });
     }
-
-    // Verify access token exists
     if (!integration.access_token) {
-      console.error('[Sync] Integration has no access token:', {
-        integrationId: id,
-        status: integration.status,
-        is_active: integration.is_active,
-      });
       return NextResponse.json(
         { error: 'Access token not found. Please reconnect the integration.' },
         { status: 401 }
       );
     }
 
-    // Update sync status to in_progress
-    await supabase
-      .from('integrations')
-      .update({
-        last_sync_status: 'in_progress',
-        last_sync_error: null,
+    const { data: jobRow, error: jobErr } = await supabase
+      .from('sync_jobs')
+      .insert({
+        integration_id: integration.id,
+        sync_type: syncType,
+        status: 'pending',
+        stats: {},
       })
-      .eq('id', id);
-
-    const startedAt = new Date().toISOString();
-
-    // Perform sync based on integration type
-    let syncResult;
-    if (integration.integration_type === 'square') {
-      syncResult = await syncSquareIntegration(integration, syncType);
-    } else {
+      .select('id')
+      .single();
+    if (jobErr) {
+      console.error('[Sync] Failed to create sync job:', jobErr);
       return NextResponse.json(
-        { error: `Sync not implemented for integration type: ${integration.integration_type}` },
-        { status: 501 }
+        { error: 'Failed to create sync job', details: jobErr.message },
+        { status: 500 }
+      );
+    }
+    const jobId = jobRow.id;
+
+    const result = await fetchAndStageSquare(supabase, integration, jobId, syncType);
+
+    if (result.error) {
+      await supabase
+        .from('sync_jobs')
+        .update({
+          status: 'failed',
+          error_message: result.error,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', jobId);
+      return NextResponse.json(
+        { job_id: jobId, status: 'failed', error_message: result.error },
+        { status: 200 }
       );
     }
 
-    const completedAt = new Date().toISOString();
-    const syncStatus: IntegrationSyncData = {
-      integration_id: integration.id,
-      sync_type: syncType,
-      status: syncResult.error ? 'error' : 'success',
-      records_synced: syncResult.records_synced,
-      records_failed: syncResult.records_failed,
-      started_at: startedAt,
-      completed_at: completedAt,
-      error: syncResult.error,
-    };
+    await supabase
+      .from('sync_jobs')
+      .update({ stats: result.stats || {} })
+      .eq('id', jobId);
 
-    // Update integration with sync results
     await supabase
       .from('integrations')
-      .update({
-        last_sync_at: completedAt,
-        last_sync_status: syncStatus.status,
-        last_sync_error: syncResult.error || null,
-      })
+      .update({ last_sync_status: 'in_progress', last_sync_error: null })
       .eq('id', id);
 
-    return NextResponse.json(syncStatus);
+    const origin = request.nextUrl.origin;
+    const secret = process.env.CRON_SECRET;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (secret) headers['x-cron-secret'] = secret;
+    fetch(`${origin}/api/cron/process-sync-jobs?job_id=${jobId}`, { method: 'POST', headers }).catch(() => {});
+
+    return NextResponse.json(
+      { job_id: jobId, message: 'Sync started. Processing in background.' },
+      { status: 202 }
+    );
   } catch (error: any) {
     console.error('Error syncing integration:', error);
     return NextResponse.json(
@@ -283,38 +320,26 @@ export async function GET(
   try {
     const { id } = await params;
     const authHeader = request.headers.get('authorization');
-    
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
     }
+    const token = authHeader.replace(/^Bearer\s+/i, '');
 
     const supabase = supabaseServer();
-    
-    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id);
-    
+    const { integration, error: accessError } = await getIntegrationAndVerifyAccess(supabase, id, token);
     if (accessError) {
       return NextResponse.json(
         { error: accessError.message },
         { status: accessError.status }
       );
     }
-
-    if (!integration.last_sync_at) {
-      return NextResponse.json(null);
-    }
-
-    const syncStatus: IntegrationSyncData = {
-      integration_id: integration.id,
-      sync_type: 'full', // Default, could be stored separately
-      status: integration.last_sync_status || 'success',
-      records_synced: 0, // Could be stored separately
-      records_failed: 0, // Could be stored separately
-      started_at: integration.last_sync_at,
-      completed_at: integration.last_sync_at,
-      error: integration.last_sync_error || undefined,
-    };
-
-    return NextResponse.json(syncStatus);
+    const { data: jobs } = await supabase
+      .from('sync_jobs')
+      .select('*')
+      .eq('integration_id', id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    return NextResponse.json(jobs || []);
   } catch (error: any) {
     console.error('Error fetching sync status:', error);
     return NextResponse.json(
@@ -323,4 +348,3 @@ export async function GET(
     );
   }
 }
-

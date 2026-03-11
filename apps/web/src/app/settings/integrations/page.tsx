@@ -18,7 +18,9 @@ import {
   AlertCircle,
   CheckCircle2,
   ExternalLink,
+  Activity,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useToast } from '@kit/hooks';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@kit/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@kit/ui/tabs';
@@ -249,26 +251,40 @@ export default function IntegrationsPage() {
   return (
     <AppLayout>
       <div className="space-y-8">
+        <Tabs value="connectors" className="w-full">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <TabsList className="grid w-full max-w-xs grid-cols-2">
+              <TabsTrigger value="connectors">Connectors</TabsTrigger>
+              <TabsTrigger value="syncs" asChild>
+                <Link href="/settings/integrations/syncs">
+                  <Activity className="h-4 w-4 mr-2" />
+                  Sync activity
+                </Link>
+              </TabsTrigger>
+            </TabsList>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search integrations"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 w-64"
+                />
+              </div>
+              <Button variant="outline" size="default">
+                <Plus className="h-4 w-4 mr-2" />
+                Request an integration
+              </Button>
+            </div>
+          </div>
+
+          <TabsContent value="connectors" className="mt-6 space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Settings className="h-6 w-6" />
             <h1 className="text-3xl font-bold tracking-tight">Integrations</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search integrations"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-64"
-              />
-            </div>
-            <Button variant="outline" size="default">
-              <Plus className="h-4 w-4 mr-2" />
-              Request an integration
-            </Button>
           </div>
         </div>
 
@@ -568,6 +584,8 @@ export default function IntegrationsPage() {
             </Tabs>
           </DialogContent>
         </Dialog>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );

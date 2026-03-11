@@ -131,8 +131,38 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
     if (countError) throw countError;
 
-    // Fetch items in batch to avoid N+1 queries
-    const itemIds = [...new Set((data || []).map((row: any) => row.item_id).filter(Boolean))];
+    const salesRows = data || [];
+    const saleIdsWithNullItem = salesRows.filter((r: any) => r.item_id == null).map((r: any) => r.id);
+    const firstLineBySale = new Map<number, { item_id: number | null; quantity: number; unit_price: number; unit_cost: number | null }>();
+    if (saleIdsWithNullItem.length > 0) {
+      const { data: lineItemsData } = await supabase
+        .from('sale_line_items')
+        .select('sale_id, item_id, quantity, unit_price, unit_cost, sort_order')
+        .in('sale_id', saleIdsWithNullItem)
+        .order('sort_order');
+      const bySale = new Map<number, any[]>();
+      for (const line of lineItemsData || []) {
+        const sid = line.sale_id;
+        if (!bySale.has(sid)) bySale.set(sid, []);
+        bySale.get(sid)!.push(line);
+      }
+      bySale.forEach((lines, saleId) => {
+        const first = lines[0];
+        if (first) {
+          firstLineBySale.set(saleId, {
+            item_id: first.item_id,
+            quantity: parseFloat(first.quantity),
+            unit_price: parseFloat(first.unit_price),
+            unit_cost: first.unit_cost != null ? parseFloat(first.unit_cost) : null,
+          });
+        }
+      });
+    }
+
+    const itemIds = [...new Set([
+      ...salesRows.map((row: any) => row.item_id).filter(Boolean),
+      ...Array.from(firstLineBySale.values()).map((f) => f.item_id).filter(Boolean),
+    ])];
     const itemsMap = new Map<number, any>();
     
     if (itemIds.length > 0) {
@@ -167,8 +197,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform sales with items
-    const sales: Sale[] = (data || []).map((row: any) => {
-      const sale = transformSale(row);
+    const sales: Sale[] = salesRows.map((row: any) => {
+      const firstLine = row.item_id == null ? firstLineBySale.get(row.id) : null;
+      const mergedRow = firstLine
+        ? { ...row, item_id: firstLine.item_id, quantity: firstLine.quantity, unit_price: firstLine.unit_price, unit_cost: firstLine.unit_cost }
+        : row;
+      const sale = transformSale(mergedRow);
       
       if (sale.itemId && itemsMap.has(sale.itemId)) {
         const itemData = itemsMap.get(sale.itemId);

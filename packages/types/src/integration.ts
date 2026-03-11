@@ -607,7 +607,7 @@ export interface SquareListCatalogResponse {
   errors?: SquareError[];
 }
 
-// Integration sync data
+// Integration sync data (legacy / compatibility)
 export interface IntegrationSyncData {
   integration_id: number;
   sync_type: 'orders' | 'payments' | 'catalog' | 'locations' | 'full';
@@ -618,4 +618,24 @@ export interface IntegrationSyncData {
   completed_at?: string;
   error?: string;
 }
+
+export interface SyncJob {
+  id: number;
+  integration_id: number;
+  sync_type: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+  error_message?: string;
+  stats?: Record<string, number>;
+}
+
+export interface SyncJobWithErrors extends SyncJob {
+  errors?: Array<{ data_type: string; source_id: string; error_message: string }>;
+}
+
+export type SyncStartResponse =
+  | { job_id: number; message?: string }
+  | { job_id: number; status: 'failed'; error_message?: string };
 

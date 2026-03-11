@@ -1,41 +1,45 @@
-# Coffee Shop Inventory Seed Data
+# Seed Data
 
-The coffee shop seed data has been added to `seed.sql` (not as a migration).
+## Staging seed (default)
 
-## What's Included
+`seed.sql` is the **staging seed**: config only, no business data.
 
-- **40+ Ingredients**: Coffee beans, dairy, syrups, packaging, toppings, etc.
-- **6 Suppliers**: Coffee roasters, dairy suppliers, packaging companies, etc.
-- **15 Recipes**: Common coffee shop drinks (espresso, latte, cappuccino, etc.)
-- **Initial Stock Levels**: Pre-configured stock levels with min/max thresholds
+- **variables**: VAT, tax rates, TVA (20% / 5.5% / 10%), exchange rate, min wage, social security, etc.
+- **tax_rules**: TVA rules by sales type (on_site 10%, delivery/takeaway 5.5%) and expense (20%).
 
-## Usage
+Loaded automatically when you run:
 
-The seed data will be automatically loaded when you run:
 ```bash
 supabase db reset
 ```
 
-This applies all migrations first, then runs `seed.sql`.
+(Migrations run first, then `seed.sql`.)
 
-## Note on Recipe Ingredients
+## Full coffee-shop seed
 
-The recipe ingredients (linking recipes to ingredients with quantities) are not included in the seed data because they require specific ingredient IDs that may vary. You'll need to:
+`seed-full.sql` contains the full dataset (2 years of sales, suppliers, items, recipes, expenses, etc.).
 
-1. Create recipes through the UI
-2. Add ingredients to recipes through the recipe detail/edit pages
-3. Or manually insert recipe_ingredients records after ingredients are created
+To use it after a reset:
 
-## Future Migrations
+```bash
+cd apps/web
+psql "postgresql://postgres:postgres@127.0.0.1:64322/postgres" -f supabase/seed-full.sql
+```
 
-If you need to add more seed data or modify the inventory schema, create a new migration using:
+Or with Supabase CLI (if your local DB is already up):
+
+```bash
+supabase db execute -f supabase/seed-full.sql
+```
+
+(Adjust connection string if needed; default local port is 64322.)
+
+## Future migrations
+
+To add or change seed data or schema:
 
 ```bash
 supabase migration new <migration_name>
 ```
 
-Then edit the generated migration file in `apps/web/supabase/migrations/`.
-
-
-
-
+Edit the generated file in `apps/web/supabase/migrations/`.
