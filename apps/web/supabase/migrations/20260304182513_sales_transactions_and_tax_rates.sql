@@ -50,11 +50,4 @@ SET subtotal = amount,
     total_discount = COALESCE(total_discount, 0)
 WHERE subtotal IS NULL;
 
--- Default tax rates per sales type (effective from 2024-01-01)
-INSERT INTO sales_tax_rates (name, rate_percent, sales_type, effective_date)
-VALUES
-  ('On site', 10.00, 'on_site', '2024-01-01'),
-  ('Delivery', 10.00, 'delivery', '2024-01-01'),
-  ('Takeaway', 5.50, 'takeaway', '2024-01-01'),
-  ('Catering', 10.00, 'catering', '2024-01-01'),
-  ('Other', 0.00, 'other', '2024-01-01');
+-- Default tax rates per sales type: moved to seed.sql (variables + tax_rules).

@@ -121,10 +121,7 @@ async function fetchAndStageSquare(
 
   if ((syncType === 'orders' || syncType === 'full') && locationIds.length > 0) {
     const now = new Date();
-    const createdAt = integration.created_at ? new Date(integration.created_at) : null;
-    const startDate = createdAt && createdAt.getTime() < now.getTime()
-      ? createdAt
-      : new Date(now.getFullYear() - 2, 0, 1);
+    const startDate = new Date(now.getFullYear() - 2, 0, 1);
     const ranges = getMonthlyDateRanges(startDate, now);
 
     for (const range of ranges) {

@@ -82,7 +82,7 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
   );
 
   const processedCatalogData = useMemo(
-    () => processCatalogData(catalog),
+    () => processCatalogData(catalog ?? null),
     [catalog]
   );
 

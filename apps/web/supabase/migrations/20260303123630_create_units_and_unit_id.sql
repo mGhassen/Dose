@@ -14,32 +14,7 @@ CREATE INDEX idx_units_symbol ON units(symbol);
 CREATE INDEX idx_units_dimension ON units(dimension);
 CREATE INDEX idx_units_base_unit_id ON units(base_unit_id);
 
--- Seed common units (base units first: g, L, unit/serving)
-INSERT INTO units (name, symbol, dimension, base_unit_id, factor_to_base) VALUES
-  ('Gram', 'g', 'mass', NULL, 1),
-  ('Liter', 'L', 'volume', NULL, 1),
-  ('Unit', 'unit', 'count', NULL, 1),
-  ('Serving', 'serving', 'count', NULL, 1);
-
--- Derived units (reference base by symbol for id)
-INSERT INTO units (name, symbol, dimension, base_unit_id, factor_to_base)
-SELECT 'Kilogram', 'kg', 'mass', u.id, 1000 FROM units u WHERE u.symbol = 'g' LIMIT 1;
-INSERT INTO units (name, symbol, dimension, base_unit_id, factor_to_base)
-SELECT 'Milligram', 'mg', 'mass', u.id, 0.001 FROM units u WHERE u.symbol = 'g' LIMIT 1;
-INSERT INTO units (name, symbol, dimension, base_unit_id, factor_to_base)
-SELECT 'Milliliter', 'mL', 'volume', u.id, 0.001 FROM units u WHERE u.symbol = 'L' LIMIT 1;
-INSERT INTO units (name, symbol, dimension, base_unit_id, factor_to_base)
-SELECT 'Piece', 'piece', 'count', u.id, 1 FROM units u WHERE u.symbol = 'unit' LIMIT 1;
-INSERT INTO units (name, symbol, dimension, base_unit_id, factor_to_base)
-SELECT 'Box', 'box', 'count', u.id, 1 FROM units u WHERE u.symbol = 'unit' LIMIT 1;
-INSERT INTO units (name, symbol, dimension, base_unit_id, factor_to_base)
-SELECT 'Can', 'can', 'count', u.id, 1 FROM units u WHERE u.symbol = 'unit' LIMIT 1;
-INSERT INTO units (name, symbol, dimension, base_unit_id, factor_to_base)
-SELECT 'Bottle', 'bottle', 'count', u.id, 1 FROM units u WHERE u.symbol = 'unit' LIMIT 1;
-INSERT INTO units (name, symbol, dimension, base_unit_id, factor_to_base)
-SELECT 'Pack', 'pack', 'count', u.id, 1 FROM units u WHERE u.symbol = 'unit' LIMIT 1;
-INSERT INTO units (name, symbol, dimension, base_unit_id, factor_to_base)
-SELECT 'Bag', 'bag', 'count', u.id, 1 FROM units u WHERE u.symbol = 'unit' LIMIT 1;
+-- Seed common units: moved to seed.sql.
 
 -- Add unit_id to all tables that have unit
 ALTER TABLE items ADD COLUMN IF NOT EXISTS unit_id BIGINT REFERENCES units(id) ON DELETE SET NULL;

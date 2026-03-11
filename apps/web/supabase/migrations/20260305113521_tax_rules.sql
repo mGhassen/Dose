@@ -23,10 +23,7 @@ CREATE INDEX IF NOT EXISTS idx_tax_rules_priority ON tax_rules(priority);
 CREATE TRIGGER update_tax_rules_updated_at BEFORE UPDATE ON tax_rules
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Single default expense tax (no category-based lookup)
-INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active)
-SELECT 'expense', 'transaction_tax', 0, 'percentage', '2024-01-01', NULL, 'Default expense tax (not category-based)', true
-WHERE NOT EXISTS (SELECT 1 FROM variables WHERE type = 'transaction_tax' AND name = 'expense');
+-- Default expense tax variable: moved to seed.sql.
 
 -- Subscription default tax: applied when subscription generates expense lines (e.g. payment marked paid).
 ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS default_tax_rate_percent DECIMAL(5,2) NULL;

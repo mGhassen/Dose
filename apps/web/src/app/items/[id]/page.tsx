@@ -665,7 +665,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
           notes: formData.notes || undefined,
           isActive: formData.isActive,
-          itemType: formData.itemType,
+          itemType: formData.itemType === 'recipe' ? undefined : formData.itemType,
           type: formData.type || undefined,
         },
       });

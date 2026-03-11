@@ -85,7 +85,8 @@ async function runProcessor(specificJobId?: number) {
     const { data: stagingRows, error: stageErr } = await supabase
       .from('sync_square_data')
       .select('data_type, source_id, payload')
-      .eq('job_id', job.id);
+      .eq('job_id', job.id)
+      .limit(50000);
     if (stageErr) {
       await supabase
         .from('sync_jobs')
