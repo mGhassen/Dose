@@ -52,7 +52,7 @@ export const integrationsApi = {
     apiRequest<Integration>('POST', '/api/integrations/manual-connect', data),
 
   // Sync operations (async: returns job_id, processor runs in background)
-  sync: (id: string, syncType?: 'orders' | 'payments' | 'catalog' | 'locations' | 'full') =>
+  sync: (id: string, syncType?: 'orders' | 'payments' | 'catalog' | 'locations' | 'transactions' | 'full') =>
     apiRequest<SyncStartResponse>(
       'POST',
       `/api/integrations/${id}/sync`,

@@ -18,6 +18,7 @@ import {
 import Link from 'next/link';
 import { 
   Square, 
+  Wallet,
   Settings,
   RefreshCw, 
   CheckCircle2, 
@@ -59,6 +60,8 @@ function getIntegrationIcon(type: string) {
   switch (type) {
     case 'square':
       return Square;
+    case 'pennylane':
+      return Wallet;
     default:
       return Settings;
   }
@@ -98,7 +101,7 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
 
   const lastJob = Array.isArray(syncJobs) ? syncJobs[0] : null;
 
-  const handleSync = async (syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'full' = 'full') => {
+  const handleSync = async (syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'transactions' | 'full' = 'full') => {
     try {
       const res = await syncIntegration.mutateAsync({ id, syncType });
       const jobId = res?.job_id;
@@ -210,50 +213,71 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => handleSync('full')}
-                      disabled={syncIntegration.isPending}
-                    >
-                      {syncIntegration.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Syncing...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                          Sync All Data
-                        </>
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleSync('orders')}
-                      disabled={syncIntegration.isPending}
-                    >
-                      <ShoppingCart className="w-4 h-4 mr-2" />
-                      Sync Orders
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleSync('payments')}
-                      disabled={syncIntegration.isPending}
-                    >
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Sync Payments
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleSync('catalog')}
-                      disabled={syncIntegration.isPending}
-                    >
-                      <Package className="w-4 h-4 mr-2" />
-                      Sync Catalog
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleSync('locations')}
-                      disabled={syncIntegration.isPending}
-                    >
-                      <MapPin className="w-4 h-4 mr-2" />
-                      Sync Locations
-                    </DropdownMenuItem>
+                    {integration.integration_type === 'pennylane' ? (
+                      <DropdownMenuItem
+                        onClick={() => handleSync('transactions')}
+                        disabled={syncIntegration.isPending}
+                      >
+                        {syncIntegration.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Syncing...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Sync bank transactions
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    ) : (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => handleSync('full')}
+                          disabled={syncIntegration.isPending}
+                        >
+                          {syncIntegration.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Syncing...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                              Sync All Data
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleSync('orders')}
+                          disabled={syncIntegration.isPending}
+                        >
+                          <ShoppingCart className="w-4 h-4 mr-2" />
+                          Sync Orders
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleSync('payments')}
+                          disabled={syncIntegration.isPending}
+                        >
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          Sync Payments
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleSync('catalog')}
+                          disabled={syncIntegration.isPending}
+                        >
+                          <Package className="w-4 h-4 mr-2" />
+                          Sync Catalog
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleSync('locations')}
+                          disabled={syncIntegration.isPending}
+                        >
+                          <MapPin className="w-4 h-4 mr-2" />
+                          Sync Locations
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={() => setIsDisconnectDialogOpen(true)}
@@ -319,6 +343,20 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
               </CardContent>
             </Card>
 
+            {integration.integration_type === 'pennylane' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Bank transactions</CardTitle>
+                  <CardDescription>View and reconcile imported bank statement lines</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="outline" asChild>
+                    <Link href={`/bank-transactions?integration_id=${integration.id}`}>View bank transactions</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Sync Jobs Card */}
             <Card>
               <CardHeader>
@@ -349,7 +387,7 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                     </div>
                     {lastJob.stats && typeof lastJob.stats === 'object' && (
                       <p className="text-sm text-muted-foreground">
-                        Imported: {[lastJob.stats.items_imported, lastJob.stats.orders_imported, lastJob.stats.payments_imported].filter(Boolean).join(', ') || '—'}
+                        Imported: {[lastJob.stats.items_imported, lastJob.stats.orders_imported, lastJob.stats.payments_imported, lastJob.stats.transactions_imported].filter(Boolean).join(', ') || '—'}
                         {(lastJob.stats.items_failed || lastJob.stats.orders_failed || lastJob.stats.payments_failed) ? (
                           <span className="text-destructive ml-2">
                             Failed: {[lastJob.stats.items_failed, lastJob.stats.orders_failed, lastJob.stats.payments_failed].filter(Boolean).join(', ')}

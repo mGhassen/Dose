@@ -9,6 +9,7 @@ function transformSale(row: any) {
   return {
     date: row.date,
     amount: parseFloat(row.amount),
+    subtotal: row.subtotal != null ? parseFloat(row.subtotal) : null,
   };
 }
 
@@ -70,17 +71,36 @@ export async function GET(request: NextRequest) {
 
     const supabase = supabaseServer();
 
-    const [salesResult, expensesResult, personnelResult, loansResult, cashFlowResult, workingCapitalResult, profitLossResult] = await Promise.all([
-      supabase.from('sales').select('date, amount').gte('date', startDate).lte('date', endDate),
+    let allSales: any[] = [];
+    let salesPage = 0;
+    const salesPageSize = 1000;
+    let salesHasMore = true;
+    while (salesHasMore) {
+      const { data: salesPageData, error: salesErr } = await supabase
+        .from('sales')
+        .select('date, amount, subtotal')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .range(salesPage * salesPageSize, (salesPage + 1) * salesPageSize - 1);
+      if (salesErr) throw salesErr;
+      if (salesPageData?.length) {
+        allSales = allSales.concat(salesPageData);
+        salesHasMore = salesPageData.length === salesPageSize;
+        salesPage++;
+      } else {
+        salesHasMore = false;
+      }
+    }
+
+    const [expensesResult, personnelResult, loansResult, cashFlowResult, workingCapitalResult, profitLossResult] = await Promise.all([
       supabase.from('expenses').select('amount, start_date, end_date, is_active').eq('is_active', true),
       supabase.from('personnel').select('base_salary, employer_charges, employer_charges_type, start_date, end_date, is_active').eq('is_active', true),
       supabase.from('loans').select('principal_amount, status').eq('status', 'active'),
       supabase.from('cash_flow').select('month, closing_balance').eq('month', lastMonth),
       supabase.from('working_capital').select('month, working_capital_need').eq('month', lastMonth),
-      supabase.from('profit_and_loss').select('total_revenue, cost_of_goods_sold, net_profit').gte('month', firstMonth).lte('month', lastMonth),
+      supabase.from('profit_and_loss').select('total_revenue, cost_of_goods_sold, net_profit, taxes').gte('month', firstMonth).lte('month', lastMonth),
     ]);
 
-    if (salesResult.error) throw salesResult.error;
     if (expensesResult.error) throw expensesResult.error;
     if (personnelResult.error) throw personnelResult.error;
     if (loansResult.error) throw loansResult.error;
@@ -88,7 +108,7 @@ export async function GET(request: NextRequest) {
     if (workingCapitalResult.error && workingCapitalResult.error.code !== 'PGRST116') throw workingCapitalResult.error;
     if (profitLossResult.error) throw profitLossResult.error;
 
-    const sales = (salesResult.data || []).map(transformSale);
+    const sales = allSales.map(transformSale);
     const expenses = (expensesResult.data || []).map(transformExpense);
     const personnel = (personnelResult.data || []).map(transformPersonnel);
     const loans = (loansResult.data || []).map(transformLoan);
@@ -96,7 +116,7 @@ export async function GET(request: NextRequest) {
     const workingCapital = workingCapitalResult.data?.[0] ? transformWorkingCapital(workingCapitalResult.data[0]) : null;
     const profitLoss = profitLossResult.data || [];
 
-    const totalRevenue = sales.reduce((sum, sale) => sum + sale.amount, 0);
+    const totalRevenue = sales.reduce((sum, sale) => sum + (sale.subtotal != null ? sale.subtotal : sale.amount), 0);
 
     const { projectExpensesForDateRange } = await import('@/lib/calculations/expense-projections');
     const expenseProjections = projectExpensesForDateRange(expenses as any, startDate, endDate);
@@ -118,6 +138,7 @@ export async function GET(request: NextRequest) {
 
     const costOfGoodsSold = profitLoss.reduce((sum, pl) => sum + parseFloat(pl.cost_of_goods_sold || '0'), 0);
     const grossProfit = totalRevenue - costOfGoodsSold;
+    const totalTaxes = profitLoss.reduce((sum, pl) => sum + parseFloat(pl.taxes || '0'), 0);
 
     return NextResponse.json({
       totalRevenue,
@@ -128,6 +149,7 @@ export async function GET(request: NextRequest) {
       totalDebt,
       personnelCost,
       grossProfit,
+      totalTaxes,
     });
   } catch (error: any) {
     console.error('Error fetching dashboard KPIs:', error);

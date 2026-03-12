@@ -39,6 +39,7 @@ export * from './client/useUnits';
 export * from './client/useActualPayments';
 export * from './client/useEntries';
 export * from './client/usePayments';
+export * from './client/useBankTransactions';
 
 // Export inventory management hooks
 export * from './client/useIngredients';

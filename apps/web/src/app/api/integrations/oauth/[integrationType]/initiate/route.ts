@@ -15,7 +15,33 @@ export async function POST(
 ) {
   try {
     const { integrationType } = await params;
-    
+
+    if (integrationType === 'pennylane') {
+      const PENNYLANE_CLIENT_ID = process.env.PENNYLANE_CLIENT_ID;
+      const PENNYLANE_REDIRECT_URI = process.env.PENNYLANE_REDIRECT_URI || 'http://localhost:3000/api/integrations/oauth/pennylane/callback';
+      if (!PENNYLANE_CLIENT_ID) {
+        return NextResponse.json({ error: 'Pennylane credentials not configured' }, { status: 500 });
+      }
+      const authHeader = request.headers.get('authorization');
+      if (!authHeader?.startsWith('Bearer ')) {
+        return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
+      }
+      const token = authHeader.replace(/^Bearer\s+/i, '');
+      const supabase = supabaseServer();
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const { data: account } = await supabase.from('accounts').select('id').eq('auth_user_id', user.id).single();
+      if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+      const state = crypto.randomBytes(32).toString('hex');
+      const authUrl = new URL('https://app.pennylane.com/oauth/authorize');
+      authUrl.searchParams.set('client_id', PENNYLANE_CLIENT_ID);
+      authUrl.searchParams.set('redirect_uri', PENNYLANE_REDIRECT_URI);
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('scope', 'transactions:readonly');
+      authUrl.searchParams.set('state', state);
+      return NextResponse.json({ auth_url: authUrl.toString(), state });
+    }
+
     if (integrationType !== 'square') {
       return NextResponse.json(
         { error: `OAuth not implemented for integration type: ${integrationType}` },

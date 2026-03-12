@@ -15,7 +15,7 @@ import {
   Wallet,
   Users,
   CreditCard,
-  BarChart3
+  BarChart3,
 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
@@ -46,9 +46,9 @@ export default function DashboardContent() {
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
+        {/* Key metrics — main 3 */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card className="border-primary/20 bg-primary/5">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -58,33 +58,17 @@ export default function DashboardContent() {
                 {kpisLoading ? '...' : kpis ? formatCurrency(kpis.totalRevenue) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Revenue for {formatShortDate(dateRange.startDate)} – {formatShortDate(dateRange.endDate)}
+                {formatShortDate(dateRange.startDate)} – {formatShortDate(dateRange.endDate)}
               </p>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-              <TrendingDown className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.totalExpenses) : formatCurrency(0)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {kpis && kpis.totalRevenue > 0 ? `${((kpis.totalExpenses / kpis.totalRevenue) * 100).toFixed(1)}% of revenue` : 'No data'}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
+          <Card className={kpis?.netProfit != null && kpis.netProfit < 0 ? 'border-red-200 bg-red-50 dark:bg-red-950/20' : 'border-green-200 bg-green-50/50 dark:bg-green-950/20'}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${kpis?.netProfit && kpis.netProfit < 0 ? 'text-red-500' : ''}`}>
+              <div className={`text-2xl font-bold ${kpis?.netProfit != null && kpis.netProfit < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
                 {kpisLoading ? '...' : kpis ? formatCurrency(kpis.netProfit) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -92,7 +76,6 @@ export default function DashboardContent() {
               </p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Cash Balance</CardTitle>
@@ -102,69 +85,83 @@ export default function DashboardContent() {
               <div className="text-2xl font-bold">
                 {kpisLoading ? '...' : kpis ? formatCurrency(kpis.cashBalance) : formatCurrency(0)}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Current cash balance
-              </p>
+              <p className="text-xs text-muted-foreground">Current balance</p>
             </CardContent>
           </Card>
+        </div>
 
+        {/* P&L detail — one card with table */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Income & costs</CardTitle>
+            <p className="text-xs text-muted-foreground font-normal">
+              {formatShortDate(dateRange.startDate)} – {formatShortDate(dateRange.endDate)}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="flex justify-between gap-2 rounded-lg border p-3 sm:flex-col sm:justify-start">
+                <span className="text-xs text-muted-foreground">Revenue</span>
+                <span className="font-semibold tabular-nums">{kpisLoading ? '...' : kpis ? formatCurrency(kpis.totalRevenue) : formatCurrency(0)}</span>
+              </div>
+              <div className="flex justify-between gap-2 rounded-lg border p-3 sm:flex-col sm:justify-start">
+                <span className="text-xs text-muted-foreground">Expenses</span>
+                <span className="font-semibold tabular-nums">{kpisLoading ? '...' : kpis ? formatCurrency(kpis.totalExpenses) : formatCurrency(0)}</span>
+              </div>
+              <div className="flex justify-between gap-2 rounded-lg border p-3 sm:flex-col sm:justify-start">
+                <span className="text-xs text-muted-foreground">Gross profit</span>
+                <span className="font-semibold tabular-nums">{kpisLoading ? '...' : kpis ? formatCurrency(kpis.grossProfit) : formatCurrency(0)}</span>
+              </div>
+              <div className="flex justify-between gap-2 rounded-lg border p-3 sm:flex-col sm:justify-start">
+                <span className="text-xs text-muted-foreground">Taxes</span>
+                <span className="font-semibold tabular-nums">{kpisLoading ? '...' : kpis ? formatCurrency(kpis.totalTaxes) : formatCurrency(0)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Balance sheet & other KPIs — compact row */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Working Capital</CardTitle>
+              <CardTitle className="text-sm font-medium">Working capital</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.workingCapital) : formatCurrency(0)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                BFR (Working Capital Need)
-              </p>
+              <div className="text-xl font-bold">{kpisLoading ? '...' : kpis ? formatCurrency(kpis.workingCapital) : formatCurrency(0)}</div>
+              <p className="text-xs text-muted-foreground">BFR</p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Debt</CardTitle>
+              <CardTitle className="text-sm font-medium">Total debt</CardTitle>
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.totalDebt) : formatCurrency(0)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Total active debt
-              </p>
+              <div className="text-xl font-bold">{kpisLoading ? '...' : kpis ? formatCurrency(kpis.totalDebt) : formatCurrency(0)}</div>
+              <p className="text-xs text-muted-foreground">Active debt</p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Personnel Cost</CardTitle>
+              <CardTitle className="text-sm font-medium">Personnel cost</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.personnelCost) : formatCurrency(0)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Annual personnel cost
-              </p>
+              <div className="text-xl font-bold">{kpisLoading ? '...' : kpis ? formatCurrency(kpis.personnelCost) : formatCurrency(0)}</div>
+              <p className="text-xs text-muted-foreground">Period total</p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Gross Profit</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Expenses / revenue</CardTitle>
+              <TrendingDown className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {kpisLoading ? '...' : kpis ? formatCurrency(kpis.grossProfit) : formatCurrency(0)}
+              <div className="text-xl font-bold">
+                {kpis && kpis.totalRevenue > 0 ? `${((kpis.totalExpenses / kpis.totalRevenue) * 100).toFixed(1)}%` : '0%'}
               </div>
-              <p className="text-xs text-muted-foreground">
-                {kpis && kpis.totalRevenue > 0 ? `${((kpis.grossProfit / kpis.totalRevenue) * 100).toFixed(1)}% margin` : 'No data'}
-              </p>
+              <p className="text-xs text-muted-foreground">Expense ratio</p>
             </CardContent>
           </Card>
         </div>

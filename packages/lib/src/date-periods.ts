@@ -7,6 +7,9 @@ export type DatePeriodPreset =
   | 'last_month'
   | 'this_quarter'
   | 'last_quarter'
+  | 'last_3_months'
+  | 'last_6_months'
+  | 'last_12_months'
   | 'this_year'
   | 'last_year';
 
@@ -135,6 +138,30 @@ export function getDateRangeForPreset(preset: DatePeriodPreset, refDate = new Da
         label: 'Last quarter',
       };
     }
+    case 'last_3_months': {
+      const end = new Date(refDate);
+      end.setHours(23, 59, 59, 999);
+      const start = new Date(end);
+      start.setMonth(start.getMonth() - 3);
+      start.setHours(0, 0, 0, 0);
+      return { startDate: toISODate(start), endDate: toISODate(end), label: 'Last 3 months' };
+    }
+    case 'last_6_months': {
+      const end = new Date(refDate);
+      end.setHours(23, 59, 59, 999);
+      const start = new Date(end);
+      start.setMonth(start.getMonth() - 6);
+      start.setHours(0, 0, 0, 0);
+      return { startDate: toISODate(start), endDate: toISODate(end), label: 'Last 6 months' };
+    }
+    case 'last_12_months': {
+      const end = new Date(refDate);
+      end.setHours(23, 59, 59, 999);
+      const start = new Date(end);
+      start.setMonth(start.getMonth() - 12);
+      start.setHours(0, 0, 0, 0);
+      return { startDate: toISODate(start), endDate: toISODate(end), label: 'Last 12 months' };
+    }
     case 'this_year': {
       const start = new Date(today.getFullYear(), 0, 1);
       const end = new Date(today.getFullYear(), 11, 31);
@@ -160,6 +187,9 @@ export const DATE_PERIOD_PRESETS: { value: DatePeriodPreset; label: string }[] =
   { value: 'last_month', label: 'Last month' },
   { value: 'this_quarter', label: 'This quarter' },
   { value: 'last_quarter', label: 'Last quarter' },
+  { value: 'last_3_months', label: 'Last 3 months' },
+  { value: 'last_6_months', label: 'Last 6 months' },
+  { value: 'last_12_months', label: 'Last 12 months' },
   { value: 'this_year', label: 'This year' },
   { value: 'last_year', label: 'Last year' },
 ];

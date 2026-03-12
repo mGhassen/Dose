@@ -12,7 +12,20 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate') || `${year}-12-31`;
 
     const monthsInRange = getMonthsInRange(startDate, endDate);
+    const firstMonth = monthsInRange[0];
+    const lastMonth = monthsInRange[monthsInRange.length - 1];
     const supabase = supabaseServer();
+
+    const { data: plRows } = await supabase
+      .from('profit_and_loss')
+      .select('month, total_revenue')
+      .gte('month', firstMonth)
+      .lte('month', lastMonth);
+
+    const plByMonth: Record<string, number> = {};
+    (plRows || []).forEach((row: any) => {
+      plByMonth[row.month] = parseFloat(row.total_revenue || '0');
+    });
 
     let allSales: any[] = [];
     let page = 0;
@@ -22,7 +35,7 @@ export async function GET(request: NextRequest) {
     while (hasMore) {
       const { data, error } = await supabase
         .from('sales')
-        .select('date, amount')
+        .select('date, amount, subtotal')
         .gte('date', startDate)
         .lte('date', endDate)
         .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -41,12 +54,20 @@ export async function GET(request: NextRequest) {
     const monthlyData: Record<string, number> = {};
     monthsInRange.forEach(m => { monthlyData[m] = 0; });
 
-    (allSales || []).forEach((sale: any) => {
-      const month = sale.date.slice(0, 7);
-      if (monthlyData[month] !== undefined) {
-        monthlyData[month] += parseFloat(sale.amount);
-      }
-    });
+    const usePL = plRows && plRows.length > 0;
+    if (usePL) {
+      monthsInRange.forEach(m => {
+        monthlyData[m] = plByMonth[m] ?? 0;
+      });
+    } else {
+      (allSales || []).forEach((sale: any) => {
+        const month = sale.date?.slice(0, 7);
+        if (month && monthlyData[month] !== undefined) {
+          const amt = sale.subtotal != null ? parseFloat(sale.subtotal) : parseFloat(sale.amount);
+          monthlyData[month] += amt;
+        }
+      });
+    }
 
     const chartData = monthsInRange.map(month => ({
       month,

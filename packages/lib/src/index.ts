@@ -46,6 +46,7 @@ export * from './api/dashboard';
 export * from './api/actual-payments';
 export * from './api/entries';
 export * from './api/payments';
+export * from './api/bank-transactions';
 
 // Export inventory management API modules (ingredientsApi is legacy alias from items)
 export * from './api/items';

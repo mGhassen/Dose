@@ -1,5 +1,5 @@
 // Integration Types
-export type IntegrationType = 'square' | 'stripe' | 'shopify' | 'other';
+export type IntegrationType = 'square' | 'pennylane' | 'stripe' | 'shopify' | 'other';
 
 export type IntegrationStatus = 'pending' | 'connected' | 'disconnected' | 'error';
 

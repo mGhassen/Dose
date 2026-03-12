@@ -45,15 +45,56 @@ export async function POST(
       return NextResponse.json({ error: 'Integration not found' }, { status: 404 });
     }
 
+    if (integration.integration_type === 'pennylane') {
+      if (!integration.refresh_token) {
+        return NextResponse.json({ error: 'No refresh token available' }, { status: 400 });
+      }
+      const PENNYLANE_CLIENT_ID = process.env.PENNYLANE_CLIENT_ID;
+      const PENNYLANE_CLIENT_SECRET = process.env.PENNYLANE_CLIENT_SECRET;
+      if (!PENNYLANE_CLIENT_ID || !PENNYLANE_CLIENT_SECRET) {
+        return NextResponse.json({ error: 'Pennylane credentials not configured' }, { status: 500 });
+      }
+      const body = new URLSearchParams({
+        client_id: PENNYLANE_CLIENT_ID,
+        client_secret: PENNYLANE_CLIENT_SECRET,
+        refresh_token: integration.refresh_token,
+        grant_type: 'refresh_token',
+      });
+      const response = await fetch('https://app.pennylane.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        return NextResponse.json({ error: 'Failed to refresh Pennylane token', details: text }, { status: response.status });
+      }
+      const data = await response.json();
+      const expiresAt = data.expires_in ? new Date(Date.now() + data.expires_in * 1000).toISOString() : null;
+      const { data: updated, error: updateError } = await supabase
+        .from('integrations')
+        .update({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token ?? integration.refresh_token,
+          token_expires_at: expiresAt,
+          status: 'connected',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      if (updateError) throw updateError;
+      return NextResponse.json(updated);
+    }
+
     if (integration.integration_type !== 'square') {
-      return NextResponse.json({ error: 'Token refresh only implemented for Square' }, { status: 501 });
+      return NextResponse.json({ error: 'Token refresh only implemented for Square and Pennylane' }, { status: 501 });
     }
 
     if (!integration.refresh_token) {
       return NextResponse.json({ error: 'No refresh token available' }, { status: 400 });
     }
 
-    // Determine Square token endpoint based on sandbox setting
     const squareTokenEndpoint = SQUARE_USE_SANDBOX
       ? 'https://connect.squareupsandbox.com/oauth2/token'
       : 'https://connect.squareup.com/oauth2/token';

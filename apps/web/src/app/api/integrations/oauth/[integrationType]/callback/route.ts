@@ -9,6 +9,10 @@ const SQUARE_APP_SECRET = process.env.SQUARE_APPLICATION_SECRET;
 const SQUARE_REDIRECT_URI = process.env.SQUARE_REDIRECT_URI || 'http://localhost:3000/api/integrations/oauth/square/callback';
 const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
 
+const PENNYLANE_CLIENT_ID = process.env.PENNYLANE_CLIENT_ID;
+const PENNYLANE_CLIENT_SECRET = process.env.PENNYLANE_CLIENT_SECRET;
+const PENNYLANE_REDIRECT_URI = process.env.PENNYLANE_REDIRECT_URI || 'http://localhost:3000/api/integrations/oauth/pennylane/callback';
+
 function transformIntegration(row: any): Integration {
   return {
     id: row.id,
@@ -167,13 +171,102 @@ export async function GET(
   }
 }
 
+async function exchangeCodeForTokenPennylane(
+  code: string,
+  redirectUri: string
+): Promise<{ access_token: string; refresh_token?: string; expires_in?: number } | null> {
+  if (!PENNYLANE_CLIENT_ID || !PENNYLANE_CLIENT_SECRET) throw new Error('Pennylane credentials not configured');
+  const body = new URLSearchParams({
+    client_id: PENNYLANE_CLIENT_ID,
+    client_secret: PENNYLANE_CLIENT_SECRET,
+    code,
+    redirect_uri: redirectUri,
+    grant_type: 'authorization_code',
+  });
+  const response = await fetch('https://app.pennylane.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    if (response.status === 400 && text.includes('already')) return null;
+    throw new Error(`Pennylane token exchange failed: ${text}`);
+  }
+  return response.json();
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ integrationType: string }> }
 ) {
   try {
     const { integrationType } = await params;
-    
+
+    if (integrationType === 'pennylane') {
+      if (!PENNYLANE_CLIENT_ID || !PENNYLANE_CLIENT_SECRET) {
+        return NextResponse.json({ error: 'Pennylane credentials not configured' }, { status: 500 });
+      }
+      const parsed = await import('@/shared/zod-schemas').then((m) =>
+        m.parseRequestBody(request, m.oauthCallbackBodySchema)
+      );
+      if (!parsed.success) return parsed.response;
+      const { code, state } = parsed.data;
+      const authHeader = request.headers.get('authorization');
+      if (!authHeader?.startsWith('Bearer ')) {
+        return NextResponse.json({ error: 'Authorization header required' }, { status: 401 });
+      }
+      const token = authHeader.replace(/^Bearer\s+/i, '');
+      const supabase = supabaseServer();
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const { data: account } = await supabase.from('accounts').select('id').eq('auth_user_id', user.id).single();
+      if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+      const callbackUrl = new URL(request.url);
+      callbackUrl.search = '';
+      const tokenData = await exchangeCodeForTokenPennylane(code, callbackUrl.toString());
+      const { data: existing } = await supabase
+        .from('integrations')
+        .select('*')
+        .eq('account_id', account.id)
+        .eq('integration_type', 'pennylane')
+        .single();
+      if (tokenData === null) {
+        if (existing) return NextResponse.json(transformIntegration(existing));
+        return NextResponse.json({ error: 'Authorization code was already used. Please try connecting again.' }, { status: 400 });
+      }
+      const expiresAt = tokenData.expires_in
+        ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+        : null;
+      const updateData = {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token ?? null,
+        token_expires_at: expiresAt,
+        status: 'connected',
+        is_active: true,
+        config: existing?.config ?? {},
+      };
+      if (existing) {
+        const { data, error } = await supabase.from('integrations').update(updateData).eq('id', existing.id).select().single();
+        if (error) throw error;
+        return NextResponse.json(transformIntegration(data));
+      }
+      const insertData = {
+        account_id: account.id,
+        integration_type: 'pennylane',
+        name: 'Pennylane',
+        status: 'connected',
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token ?? null,
+        token_expires_at: expiresAt,
+        is_active: true,
+        config: {},
+      };
+      const { data, error } = await supabase.from('integrations').insert(insertData).select().single();
+      if (error) throw error;
+      return NextResponse.json(transformIntegration(data));
+    }
+
     if (integrationType !== 'square') {
       return NextResponse.json(
         { error: `OAuth callback not implemented for integration type: ${integrationType}` },

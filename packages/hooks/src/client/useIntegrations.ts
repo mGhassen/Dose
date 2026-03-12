@@ -154,7 +154,7 @@ export function useSyncIntegration() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ id, syncType }: { id: string; syncType?: 'orders' | 'payments' | 'catalog' | 'locations' | 'full' }) =>
+    mutationFn: ({ id, syncType }: { id: string; syncType?: 'orders' | 'payments' | 'catalog' | 'locations' | 'transactions' | 'full' }) =>
       integrationsApi.sync(id, syncType),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['integrations'] });

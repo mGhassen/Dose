@@ -9,6 +9,7 @@ export interface FinancialKPIs {
   totalDebt: number;
   personnelCost: number;
   grossProfit: number;
+  totalTaxes: number;
 }
 
 export interface DashboardDateParams {

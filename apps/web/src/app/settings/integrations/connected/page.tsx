@@ -8,6 +8,7 @@ import { Button } from '@kit/ui/button';
 import { Badge } from '@kit/ui/badge';
 import { 
   Square, 
+  Wallet,
   CheckCircle2, 
   XCircle, 
   Clock,
@@ -19,12 +20,8 @@ import {
 import { formatDateTime } from '@kit/lib/date-format';
 
 const AVAILABLE_INTEGRATIONS = [
-  {
-    type: 'square',
-    name: 'Square POS',
-    icon: Square,
-    color: 'text-blue-500',
-  },
+  { type: 'square', name: 'Square POS', icon: Square, color: 'text-blue-500' },
+  { type: 'pennylane', name: 'Pennylane', icon: Wallet, color: 'text-emerald-600' },
 ];
 
 function getStatusBadge(status: string) {

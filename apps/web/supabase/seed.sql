@@ -554,9 +554,12 @@ CROSS JOIN (VALUES
   ('last_month', 'Last month', 'Last month', 6),
   ('this_quarter', 'This Quarter', 'Current quarter', 7),
   ('last_quarter', 'Last quarter', 'Last quarter', 8),
-  ('this_year', 'This Year', 'Current year', 9),
-  ('last_year', 'Last year', 'Last year', 10),
-  ('custom', 'Custom', 'Custom date range', 11)
+  ('last_3_months', 'Last 3 months', 'Last 3 months', 9),
+  ('last_6_months', 'Last 6 months', 'Last 6 months', 10),
+  ('last_12_months', 'Last 12 months', 'Last 12 months', 11),
+  ('this_year', 'This Year', 'Current year', 12),
+  ('last_year', 'Last year', 'Last year', 13),
+  ('custom', 'Custom', 'Custom date range', 14)
 ) AS v(name, label, description, display_order)
 WHERE e.name = 'GlobalDateFilterPreset'
 ON CONFLICT (enum_id, name) DO NOTHING;

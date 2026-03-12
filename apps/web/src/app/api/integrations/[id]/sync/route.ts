@@ -284,6 +284,83 @@ async function fetchAndStageSquare(
   return { stats };
 }
 
+const PENNYLANE_API_BASE = 'https://app.pennylane.com/api/external/v2';
+
+async function fetchAndStagePennylane(
+  supabase: any,
+  integration: any,
+  jobId: number,
+  _syncType: string
+): Promise<{ error?: string; stats?: Record<string, number> }> {
+  const accessToken = integration.access_token;
+  if (!accessToken) {
+    return { error: 'Access token not found. Please reconnect the integration.' };
+  }
+  const stats: Record<string, number> = { transactions_fetched: 0 };
+  let sequence = 0;
+  const insertStep = async (
+    name: string,
+    status: 'pending' | 'running' | 'done' | 'failed',
+    details: Record<string, number> = {}
+  ) => {
+    sequence += 1;
+    const { error } = await supabase.from('sync_job_steps').insert({
+      job_id: jobId,
+      sequence,
+      name,
+      status,
+      details,
+    });
+    if (error) throw new Error(`sync_job_steps: ${error.message}`);
+  };
+
+  let page = 1;
+  const perPage = 100;
+  let hasMore = true;
+
+  while (hasMore) {
+    const url = new URL(`${PENNYLANE_API_BASE}/transactions`);
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('per_page', String(perPage));
+
+    const res = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return { error: `Pennylane transactions: ${res.status} ${text}` };
+    }
+
+    const data = await res.json();
+    const transactions = Array.isArray(data) ? data : data?.transactions ?? data?.data ?? [];
+    if (transactions.length === 0) {
+      if (page === 1) await insertStep('Fetch transactions', 'done', { transactions: 0 });
+      break;
+    }
+
+    const rows = transactions.map((tx: any) => ({
+      job_id: jobId,
+      data_type: 'transaction',
+      source_id: String(tx.id ?? tx.uuid ?? ''),
+      payload: tx,
+    }));
+    const { error: insertErr } = await supabase.from('sync_pennylane_data').insert(rows);
+    if (insertErr) return { error: `Failed to stage transactions: ${insertErr.message}` };
+
+    stats.transactions_fetched += transactions.length;
+    await insertStep(`Transactions — page ${page}`, 'done', { transactions: transactions.length });
+
+    if (transactions.length < perPage) break;
+    page += 1;
+  }
+
+  return { stats };
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -339,7 +416,18 @@ export async function POST(
     }
     const jobId = jobRow.id;
 
-    const result = await fetchAndStageSquare(supabase, integration, jobId, syncType);
+    const isPennylane = integration.integration_type === 'pennylane';
+    const effectiveSyncType = isPennylane ? (syncType === 'full' ? 'transactions' : syncType) : syncType;
+    if (isPennylane && effectiveSyncType !== 'transactions') {
+      return NextResponse.json(
+        { error: 'Pennylane sync only supports sync_type: "transactions" or "full"' },
+        { status: 400 }
+      );
+    }
+
+    const result = isPennylane
+      ? await fetchAndStagePennylane(supabase, integration, jobId, effectiveSyncType)
+      : await fetchAndStageSquare(supabase, integration, jobId, syncType);
 
     if (result.error) {
       await supabase

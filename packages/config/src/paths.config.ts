@@ -89,6 +89,12 @@ export const pathsConfig: NavigationConfig = {
         },
       ]
     },
+    {
+      title: "Bank transactions",
+      url: "/bank-transactions",
+      icon: "Wallet",
+      translationKey: "bankTransactions"
+    },
     // {
     //   title: "financial-results",
     //   url: "#",

@@ -8,6 +8,7 @@ import AppLayout from '@/components/app-layout';
 import { Button } from '@kit/ui/button';
 import {
   Square,
+  Wallet,
   Link2,
   Loader2,
   Key,
@@ -46,6 +47,15 @@ const AVAILABLE_INTEGRATIONS = [
     icon: Square,
     color: 'text-blue-500',
     bgColor: 'bg-blue-500',
+    category: 'connector',
+  },
+  {
+    type: 'pennylane',
+    name: 'Pennylane',
+    description: 'Import bank statements and reconcile with sales, expenses, and more.',
+    icon: Wallet,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-600',
     category: 'connector',
   },
 ];
