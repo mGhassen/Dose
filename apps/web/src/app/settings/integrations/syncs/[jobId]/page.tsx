@@ -7,6 +7,13 @@ import AppLayout from '@/components/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { Button } from '@kit/ui/button';
 import { Badge } from '@kit/ui/badge';
+import { Progress } from '@kit/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@kit/ui/tabs';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@kit/ui/collapsible';
 import {
   Table,
   TableBody,
@@ -25,6 +32,11 @@ import {
   AlertCircle,
   RotateCcw,
   Circle,
+  ChevronRight,
+  ListOrdered,
+  BarChart3,
+  FileWarning,
+  Info,
 } from 'lucide-react';
 import { useSyncJob, useRetrySyncJob } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
@@ -74,6 +86,12 @@ function isFetchStep(name: string): boolean {
   );
 }
 
+function stepsProgress(steps: SyncJobStep[]): number {
+  if (!steps.length) return 0;
+  const done = steps.filter((s) => s.status === 'done').length;
+  return Math.round((done / steps.length) * 100);
+}
+
 export default function SyncJobDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -81,6 +99,7 @@ export default function SyncJobDetailPage() {
   const { data: job, isLoading, error, isError } = useSyncJob(jobId);
   const retrySyncJob = useRetrySyncJob();
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     if (params?.jobId != null && isNaN(Number(params.jobId))) {
@@ -141,7 +160,7 @@ export default function SyncJobDetailPage() {
           <Card>
             <CardContent className="pt-6">
               <p className="text-center text-muted-foreground">
-                Job not found or you don’t have access to it.
+                Job not found or you don't have access to it.
               </p>
               <Button variant="link" asChild className="mt-2 w-full justify-center">
                 <Link href="/settings/integrations/syncs">View all syncs</Link>
@@ -155,202 +174,227 @@ export default function SyncJobDetailPage() {
 
   const steps: SyncJobStep[] = job.steps ?? [];
   const isRunning = job.status === 'pending' || job.status === 'processing';
+  const hasErrors = Boolean(job.error_message || (job.errors && job.errors.length > 0));
+  const stepProgress = stepsProgress(steps);
+
+  const statusBadge = () => {
+    if (job.status === 'completed') {
+      return (
+        <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600/90 text-white gap-1.5">
+          <CheckCircle2 className="h-3.5 w-3" />
+          Completed
+        </Badge>
+      );
+    }
+    if (job.status === 'failed') {
+      return (
+        <Badge variant="destructive" className="gap-1.5">
+          <XCircle className="h-3.5 w-3" />
+          Failed
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="secondary" className="gap-1.5">
+        <Loader2 className="h-3.5 w-3 animate-spin" />
+        {job.status === 'processing' ? 'Running' : 'Pending'}
+      </Badge>
+    );
+  };
 
   return (
     <AppLayout>
-      <div className="space-y-6 p-4 md:p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" asChild>
+      <div className="space-y-6 p-4 md:p-6 max-w-4xl">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" asChild>
               <Link href="/settings/integrations/syncs">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Sync activity
+                Sync activity
               </Link>
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Job #{job.id}</h1>
-              <p className="text-muted-foreground text-sm">
-                {job.sync_type} sync — {isRunning ? 'in progress' : job.status}
-              </p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-semibold tracking-tight">Job #{job.id}</h1>
+              {statusBadge()}
+              <span className="text-muted-foreground text-sm">{job.sync_type}</span>
             </div>
           </div>
           {(job.status === 'failed' || job.status === 'completed') && (
-            <Button onClick={handleRetry} disabled={retrySyncJob.isPending}>
+            <Button onClick={handleRetry} disabled={retrySyncJob.isPending} size="sm">
               {retrySyncJob.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
                 <RotateCcw className="h-4 w-4 mr-2" />
               )}
-              Retry job
+              Retry
             </Button>
           )}
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Status</CardTitle>
-            <CardDescription>Job metadata and duration</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">Status</span>
-                <div className="mt-1">
-                  {job.status === 'completed' && (
-                    <Badge variant="default" className="bg-green-600">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      completed
-                    </Badge>
-                  )}
-                  {job.status === 'failed' && (
-                    <Badge variant="destructive">
-                      <XCircle className="h-3 w-3 mr-1" />
-                      failed
-                    </Badge>
-                  )}
-                  {(job.status === 'pending' || job.status === 'processing') && (
-                    <Badge variant="secondary">
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      {job.status}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Type</span>
-                <p className="font-medium mt-1">{job.sync_type}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Created</span>
-                <p className="font-medium mt-1">{formatDateTime(job.created_at)}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Started</span>
-                <p className="font-medium mt-1">
-                  {job.started_at ? formatDateTime(job.started_at) : '—'}
-                </p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Completed</span>
-                <p className="font-medium mt-1">
-                  {job.completed_at ? formatDateTime(job.completed_at) : '—'}
-                </p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Duration</span>
-                <p className="font-medium mt-1">
-                  {formatDuration(job.started_at, job.completed_at)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {job.stats && Object.keys(job.stats).length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Stats</CardTitle>
-              <CardDescription>Imported and failed counts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {typeof job.stats.items_imported === 'number' && (
-                  <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">
-                      <strong>{job.stats.items_imported}</strong> items imported
-                    </span>
-                  </div>
-                )}
-                {typeof job.stats.items_failed === 'number' && (
-                  <div
-                    className={`flex items-center gap-2 rounded-md border px-3 py-2 ${
-                      job.stats.items_failed > 0 ? 'border-destructive/50' : ''
-                    }`}
-                  >
-                    {job.stats.items_failed > 0 ? (
-                      <XCircle className="h-4 w-4 text-destructive" />
-                    ) : (
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <span className="text-sm">
-                      <strong>{job.stats.items_failed}</strong> items failed
-                    </span>
-                  </div>
-                )}
-                {typeof job.stats.orders_imported === 'number' && (
-                  <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">
-                      <strong>{job.stats.orders_imported}</strong> orders imported
-                    </span>
-                  </div>
-                )}
-                {typeof job.stats.orders_failed === 'number' && (
-                  <div
-                    className={`flex items-center gap-2 rounded-md border px-3 py-2 ${
-                      job.stats.orders_failed > 0 ? 'border-destructive/50' : ''
-                    }`}
-                  >
-                    {job.stats.orders_failed > 0 ? (
-                      <XCircle className="h-4 w-4 text-destructive" />
-                    ) : (
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <span className="text-sm">
-                      <strong>{job.stats.orders_failed}</strong> orders failed
-                    </span>
-                  </div>
-                )}
-                {typeof job.stats.payments_imported === 'number' && (
-                  <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">
-                      <strong>{job.stats.payments_imported}</strong> payments imported
-                    </span>
-                  </div>
-                )}
-                {typeof job.stats.payments_failed === 'number' && (
-                  <div
-                    className={`flex items-center gap-2 rounded-md border px-3 py-2 ${
-                      job.stats.payments_failed > 0 ? 'border-destructive/50' : ''
-                    }`}
-                  >
-                    {job.stats.payments_failed > 0 ? (
-                      <XCircle className="h-4 w-4 text-destructive" />
-                    ) : (
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <span className="text-sm">
-                      <strong>{job.stats.payments_failed}</strong> payments failed
-                    </span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        {job.error_message && (
+          <Alert variant="destructive" className="border-destructive/50">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{job.error_message}</AlertDescription>
+          </Alert>
         )}
 
-        <Alert className="border-muted bg-muted/30">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="space-y-2 text-sm">
-            <p>
-              <strong>Phase 1 — Fetch:</strong> Data is fetched from Square (catalog, orders, payments) and stored in staging. Steps like &quot;Catalog — page 1&quot;, &quot;Orders — 2024-01 — page 1&quot; show fetch progress.
-            </p>
-            <p>
-              <strong>Phase 2 — Process:</strong> Staging data is processed in chunks and written to your app (items, sales, payments). Steps like &quot;Process catalog — chunk 1/5&quot;, &quot;Process catalog — complete&quot; show chunk progress and final totals.
-            </p>
-          </AlertDescription>
-        </Alert>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid lg:grid-cols-3">
+            <TabsTrigger value="overview" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="steps" className="gap-2">
+              <ListOrdered className="h-4 w-4" />
+              Steps
+              {steps.length > 0 && (
+                <span className="text-muted-foreground font-normal">({steps.length})</span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="errors" className="gap-2" disabled={!hasErrors}>
+              <FileWarning className="h-4 w-4" />
+              Errors
+              {job.errors?.length ? (
+                <Badge variant="destructive" className="h-5 px-1.5 text-xs">
+                  {job.errors.length}
+                </Badge>
+              ) : null}
+            </TabsTrigger>
+          </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Steps</CardTitle>
-            <CardDescription>Full log: fetch and process steps (max 30 lines, scroll for more)</CardDescription>
-          </CardHeader>
-          <CardContent>
+          <TabsContent value="overview" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Status & timing</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</p>
+                  <p className="mt-1 font-medium">{job.status}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Type</p>
+                  <p className="mt-1 font-medium">{job.sync_type}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Duration</p>
+                  <p className="mt-1 font-medium">{formatDuration(job.started_at, job.completed_at)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Created</p>
+                  <p className="mt-1 text-sm">{formatDateTime(job.created_at)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Started</p>
+                  <p className="mt-1 text-sm">{job.started_at ? formatDateTime(job.started_at) : '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Completed</p>
+                  <p className="mt-1 text-sm">{job.completed_at ? formatDateTime(job.completed_at) : '—'}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {job.stats && Object.keys(job.stats).length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Import stats</CardTitle>
+                  <CardDescription>Counts from this sync run</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { type: 'Items', imported: job.stats.items_imported, failed: job.stats.items_failed },
+                      { type: 'Orders', imported: job.stats.orders_imported, failed: job.stats.orders_failed },
+                      { type: 'Payments', imported: job.stats.payments_imported, failed: job.stats.payments_failed },
+                    ].map((row) => {
+                      const hasData = typeof row.imported === 'number' || typeof row.failed === 'number';
+                      if (!hasData) return null;
+                      return (
+                        <div key={row.type} className="flex flex-col rounded-lg border bg-card overflow-hidden">
+                          <div className="px-4 py-2 border-b bg-muted/50">
+                            <p className="text-sm font-medium">{row.type}</p>
+                          </div>
+                          <div className="divide-y">
+                            {typeof row.imported === 'number' && (
+                              <div className="flex items-center gap-3 px-4 py-3">
+                                <div className="rounded-full bg-emerald-500/10 p-2 shrink-0">
+                                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                                <div>
+                                  <p className="text-xl font-semibold">{row.imported}</p>
+                                  <p className="text-xs text-muted-foreground">Imported</p>
+                                </div>
+                              </div>
+                            )}
+                            {typeof row.failed === 'number' && (
+                              <div
+                                className={`flex items-center gap-3 px-4 py-3 ${
+                                  row.failed > 0 ? 'bg-destructive/5' : ''
+                                }`}
+                              >
+                                <div
+                                  className={`rounded-full p-2 shrink-0 ${
+                                    row.failed > 0 ? 'bg-destructive/10' : 'bg-muted'
+                                  }`}
+                                >
+                                  {row.failed > 0 ? (
+                                    <XCircle className="h-4 w-4 text-destructive" />
+                                  ) : (
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-xl font-semibold">{row.failed}</p>
+                                  <p className="text-xs text-muted-foreground">Failed</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Collapsible>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="group gap-2 text-muted-foreground">
+                  <Info className="h-4 w-4" />
+                  How sync phases work
+                  <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <Alert className="mt-2 border-muted bg-muted/30">
+                  <AlertDescription className="space-y-2 text-sm">
+                    <p>
+                      <strong>Phase 1 — Fetch:</strong> Data is fetched from the source (catalog, orders, payments) and stored in staging. Steps like &quot;Catalog — page 1&quot; show fetch progress.
+                    </p>
+                    <p>
+                      <strong>Phase 2 — Process:</strong> Staging data is processed in chunks and written to your app. Steps like &quot;Process catalog — chunk 1/5&quot; show chunk progress and totals.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              </CollapsibleContent>
+            </Collapsible>
+          </TabsContent>
+
+          <TabsContent value="steps" className="mt-6 space-y-6">
+            {steps.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Step progress</span>
+                  <span className="font-medium">{steps.filter((s) => s.status === 'done').length} / {steps.length}</span>
+                </div>
+                <Progress value={stepProgress} className="h-2" />
+              </div>
+            )}
+
             {steps.length > 0 ? (
-              <div className="space-y-4 max-h-[75rem] overflow-y-auto pr-1">
+              <div className="space-y-6">
                 {(() => {
                   const fetchSteps = steps.filter((s) => isFetchStep(s.name));
                   const processSteps = steps.filter((s) => !isFetchStep(s.name));
@@ -358,19 +402,23 @@ export default function SyncJobDetailPage() {
                     <>
                       {fetchSteps.length > 0 && (
                         <div>
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                            Fetch
-                          </h4>
-                          <ul className="space-y-2">
+                          <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">Fetch</span>
+                            {fetchSteps.length} steps
+                          </h3>
+                          <ul className="space-y-1.5">
                             {fetchSteps.map((step) => (
                               <li
                                 key={step.sequence}
-                                className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm"
+                                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                                  step.status === 'running' ? 'border-primary/30 bg-primary/5' :
+                                  step.status === 'failed' ? 'border-destructive/30 bg-destructive/5' : ''
+                                }`}
                               >
                                 {stepStatusIcon(step.status)}
-                                <span className="font-medium flex-1">{step.name}</span>
+                                <span className="font-medium flex-1 min-w-0 truncate">{step.name}</span>
                                 {(step.details == null ? 0 : Object.keys(step.details).length) > 0 && (
-                                  <span className="text-muted-foreground text-xs">
+                                  <span className="text-muted-foreground text-xs shrink-0 hidden sm:inline">
                                     {stepDetailsText(step.details)}
                                   </span>
                                 )}
@@ -381,19 +429,23 @@ export default function SyncJobDetailPage() {
                       )}
                       {processSteps.length > 0 && (
                         <div>
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                            Process
-                          </h4>
-                          <ul className="space-y-2">
+                          <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">Process</span>
+                            {processSteps.length} steps
+                          </h3>
+                          <ul className="space-y-1.5">
                             {processSteps.map((step) => (
                               <li
                                 key={step.sequence}
-                                className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm"
+                                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                                  step.status === 'running' ? 'border-primary/30 bg-primary/5' :
+                                  step.status === 'failed' ? 'border-destructive/30 bg-destructive/5' : ''
+                                }`}
                               >
                                 {stepStatusIcon(step.status)}
-                                <span className="font-medium flex-1">{step.name}</span>
+                                <span className="font-medium flex-1 min-w-0 truncate">{step.name}</span>
                                 {(step.details == null ? 0 : Object.keys(step.details).length) > 0 && (
-                                  <span className="text-muted-foreground text-xs">
+                                  <span className="text-muted-foreground text-xs shrink-0 hidden sm:inline">
                                     {stepDetailsText(step.details)}
                                   </span>
                                 )}
@@ -407,50 +459,68 @@ export default function SyncJobDetailPage() {
                 })()}
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm py-2">
-                {isRunning ? 'Steps will appear as the sync runs…' : 'No steps recorded for this job.'}
-              </p>
+              <Card>
+                <CardContent className="py-12 text-center">
+                  {isRunning ? (
+                    <>
+                      <Loader2 className="h-10 w-10 animate-spin text-muted-foreground mx-auto mb-3" />
+                      <p className="text-muted-foreground text-sm">Steps will appear as the sync runs…</p>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">No steps recorded for this job.</p>
+                  )}
+                </CardContent>
+              </Card>
             )}
-          </CardContent>
-        </Card>
+          </TabsContent>
 
-        {job.error_message && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{job.error_message}</AlertDescription>
-          </Alert>
-        )}
-
-        {job.errors && job.errors.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Per-entity errors</CardTitle>
-              <CardDescription>Import failures by source id</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Source ID</TableHead>
-                    <TableHead>Error</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {job.errors.map((err: { data_type: string; source_id: string; error_message: string }, idx: number) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-mono text-xs">{err.data_type}</TableCell>
-                      <TableCell className="font-mono text-xs truncate max-w-[120px]">
-                        {err.source_id}
-                      </TableCell>
-                      <TableCell className="text-destructive text-sm">{err.error_message}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
+          <TabsContent value="errors" className="mt-6">
+            {job.error_message && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{job.error_message}</AlertDescription>
+              </Alert>
+            )}
+            {job.errors && job.errors.length > 0 ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Per-entity errors</CardTitle>
+                  <CardDescription>Import failures by source id</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Source ID</TableHead>
+                          <TableHead>Error</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {job.errors.map((err: { data_type: string; source_id: string; error_message: string }, idx: number) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-mono text-xs">{err.data_type}</TableCell>
+                            <TableCell className="font-mono text-xs truncate max-w-[140px]" title={err.source_id}>
+                              {err.source_id}
+                            </TableCell>
+                            <TableCell className="text-destructive text-sm max-w-[280px]">{err.error_message}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : !job.error_message && (
+              <Card>
+                <CardContent className="py-12 text-center text-muted-foreground text-sm">
+                  No per-entity errors for this job.
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );

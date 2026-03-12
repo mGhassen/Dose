@@ -17,6 +17,7 @@ const fontSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Dose - Financial Management System",
   description: "Financial management and planning system",
+  icons: { icon: "/logo.png" },
 };
 
 export default async function RootLayout({

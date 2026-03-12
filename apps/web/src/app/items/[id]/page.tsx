@@ -82,6 +82,7 @@ function HistoryEntryTable({
   taxPercent,
   resolveTaxRateForDate,
   salesTypes,
+  sellVatRates,
   addLabel,
   valueLabel,
   emptyMessage,
@@ -96,6 +97,7 @@ function HistoryEntryTable({
   taxPercent: number;
   resolveTaxRateForDate?: (date: string) => Promise<number>;
   salesTypes?: { conditionValue: string; label: string }[];
+  sellVatRates?: number[];
   addLabel: string;
   valueLabel: string;
   emptyMessage: string;
@@ -210,7 +212,8 @@ function HistoryEntryTable({
   }
 
   const useTaxRuleColumns = false;
-  const inclLabel = !useTaxRuleColumns && taxPercent > 0 ? `Incl. tax (${taxPercent}%)` : null;
+  const useSellVatColumns = type === 'sell' && sellVatRates != null && sellVatRates.length > 0;
+  const inclLabel = !useTaxRuleColumns && !useSellVatColumns && taxPercent > 0 ? `Incl. tax (${taxPercent}%)` : null;
   const todayStr = new Date().toISOString().slice(0, 10);
   const activeId = entries.find((e) => e.effectiveDate <= todayStr)?.id ?? null;
 
@@ -244,6 +247,9 @@ function HistoryEntryTable({
                   const header = r ? (r.rate > 0 ? `${s.label} (${r.rate}% — tax)` : `${s.label} (Exempt)`) : s.label;
                   return <th key={s.conditionValue} className="text-right font-medium p-3">{header}</th>;
                 })}
+                {useSellVatColumns && sellVatRates?.map((rate) => (
+                  <th key={rate} className="text-right font-medium p-3">Tax ({rate}%)</th>
+                ))}
                 {inclLabel && <th className="text-right font-medium p-3">{inclLabel}</th>}
                 <th className="w-[100px] text-right font-medium p-3">Actions</th>
               </tr>
@@ -278,6 +284,16 @@ function HistoryEntryTable({
                             {taxAmount != null ? (
                               <span title="Tax">{formatCurrency(taxAmount)}</span>
                             ) : '—'}
+                          </td>
+                        );
+                      })}
+                      {useSellVatColumns && sellVatRates?.map((rate) => {
+                        if (e.value == null) return <td key={rate} className="p-3 text-right tabular-nums text-muted-foreground">—</td>;
+                        const excl = e.taxIncluded ? netUnitPriceFromInclusive(e.value, 10) : e.value;
+                        const taxAmount = to2Decimals(excl * (rate / 100));
+                        return (
+                          <td key={rate} className="p-3 text-right tabular-nums text-muted-foreground">
+                            {formatCurrency(taxAmount)}
                           </td>
                         );
                       })}
@@ -1197,6 +1213,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                             return r.rate;
                           }}
                           salesTypes={salesTypeValues.map((st) => ({ conditionValue: st, label: salesTypeLabels[st] ?? st }))}
+                          sellVatRates={[5.5, 10]}
                           addLabel="Add"
                           valueLabel="Price"
                           emptyMessage="Track selling prices by effective date."

@@ -27,14 +27,10 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  Clock,
-  Eye,
-  RotateCcw,
   Activity,
 } from 'lucide-react';
-import { useAllSyncJobs, useRetrySyncJob, useIntegrations } from '@kit/hooks';
+import { useAllSyncJobs, useIntegrations } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
-import { useToast } from '@kit/hooks';
 
 function formatDuration(startedAt?: string | null, completedAt?: string | null): string {
   if (!startedAt || !completedAt) return startedAt ? 'In progress' : '—';
@@ -85,21 +81,10 @@ export default function SyncActivityPage() {
   };
   const { data: jobs = [], isLoading } = useAllSyncJobs(filters);
   const { data: integrations = [] } = useIntegrations();
-  const retrySyncJob = useRetrySyncJob();
-  const { toast } = useToast();
 
   const runningCount = jobs.filter((j) => j.status === 'pending' || j.status === 'processing').length;
   const failedCount = jobs.filter((j) => j.status === 'failed').length;
   const completedCount = jobs.filter((j) => j.status === 'completed').length;
-
-  const handleRetry = async (jobId: number) => {
-    try {
-      await retrySyncJob.mutateAsync(jobId);
-      toast({ title: 'Retry started', description: 'Job has been queued for processing.' });
-    } catch (e: any) {
-      toast({ title: 'Retry failed', description: e?.message || 'Failed to retry', variant: 'destructive' });
-    }
-  };
 
   return (
     <AppLayout>
@@ -212,12 +197,23 @@ export default function SyncActivityPage() {
                     <TableHead>Duration</TableHead>
                     <TableHead>Stats</TableHead>
                     <TableHead>Error</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {jobs.map((job: any) => (
-                    <TableRow key={job.id}>
+                    <TableRow
+                      key={job.id}
+                      role="button"
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => router.push(`/settings/integrations/syncs/${job.id}`)}
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          router.push(`/settings/integrations/syncs/${job.id}`);
+                        }
+                      }}
+                    >
                       <TableCell>
                         <span className="font-medium">{job.integration_name || job.integration_type || '—'}</span>
                         {job.integration_type && (
@@ -259,25 +255,6 @@ export default function SyncActivityPage() {
                             {job.error_message.length > 40 ? job.error_message.slice(0, 40) + '…' : job.error_message}
                           </span>
                         ) : '—'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/settings/integrations/syncs/${job.id}`}>
-                              <Eye className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          {(job.status === 'failed' || job.status === 'completed') && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRetry(job.id)}
-                              disabled={retrySyncJob.isPending}
-                            >
-                              {retrySyncJob.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-                            </Button>
-                          )}
-                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

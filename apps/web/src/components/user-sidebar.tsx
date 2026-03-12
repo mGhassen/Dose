@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
+import Image from 'next/image'
 
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
@@ -95,12 +96,10 @@ export function UserSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) 
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild tooltip="Dose">
               <Link href="/dashboard">
-                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Train className="size-4" />
-                </div>
+                <Image src="/logo_light.png" alt="Dose" width={96} height={32} className="h-8 w-auto dark:hidden" priority />
+                <Image src="/logo_dark.png" alt="Dose" width={96} height={32} className="h-8 w-auto hidden dark:block" priority />
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">Dose</span>
-                  <span className="truncate text-xs">User</span>
+                  <span className="truncate text-xs text-muted-foreground">User</span>
                 </div>
               </Link>
             </SidebarMenuButton>
