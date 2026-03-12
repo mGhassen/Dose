@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
+import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
@@ -15,10 +18,12 @@ import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useSubscriptionById, useUpdateSubscription, useInventorySuppliers, useMetadataEnum, useVariablesByType } from "@kit/hooks";
 import { toast } from "sonner";
-import type { ExpenseCategory, ExpenseRecurrence } from "@kit/types";
-import Link from "next/link";
+import type { ExpenseRecurrence } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
-import { DatePicker } from "@kit/ui/date-picker";
+import {
+  createSubscriptionFormSchema,
+  type CreateSubscriptionFormInput,
+} from "@/shared/zod-schemas";
 
 interface EditSubscriptionPageProps {
   params: Promise<{ id: string }>;
@@ -29,7 +34,8 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: subscription, isLoading } = useSubscriptionById(resolvedParams?.id || "");
   const updateSubscription = useUpdateSubscription();
-  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
+  const [addVendorOpen, setAddVendorOpen] = useState(false);
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: "vendor" });
   const suppliers = suppliersResponse?.data || [];
   const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
   const recurrenceItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
@@ -40,19 +46,27 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
     value: v.value,
   }));
 
-  const [addVendorOpen, setAddVendorOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    category: "" as ExpenseCategory | "",
-    amount: "",
-    recurrence: "monthly" as ExpenseRecurrence,
-    startDate: "",
-    endDate: "",
-    description: "",
-    vendor: "",
-    supplierId: "",
-    defaultTaxRatePercent: "",
-    isActive: true,
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CreateSubscriptionFormInput>({
+    resolver: zodResolver(createSubscriptionFormSchema) as import("react-hook-form").Resolver<CreateSubscriptionFormInput>,
+    defaultValues: {
+      name: "",
+      category: undefined,
+      amount: 0,
+      recurrence: "monthly",
+      startDate: dateToYYYYMMDD(new Date()),
+      endDate: "",
+      description: "",
+      vendor: "",
+      supplierId: undefined,
+      defaultTaxRatePercent: undefined,
+      isActive: true,
+    },
   });
 
   useEffect(() => {
@@ -61,59 +75,46 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
 
   useEffect(() => {
     if (subscription) {
-      setFormData({
+      reset({
         name: subscription.name,
-        category: subscription.category,
-        amount: subscription.amount.toString(),
-        recurrence: subscription.recurrence,
-        startDate: subscription.startDate.split('T')[0],
-        endDate: subscription.endDate ? subscription.endDate.split('T')[0] : "",
+        category: subscription.category as CreateSubscriptionFormInput["category"],
+        amount: subscription.amount,
+        recurrence: subscription.recurrence as ExpenseRecurrence,
+        startDate: subscription.startDate.split("T")[0],
+        endDate: subscription.endDate ? subscription.endDate.split("T")[0] : "",
         description: subscription.description || "",
         vendor: subscription.vendor || "",
-        supplierId: subscription.supplierId?.toString() || "",
-        defaultTaxRatePercent: subscription.defaultTaxRatePercent != null ? String(subscription.defaultTaxRatePercent) : "",
+        supplierId: subscription.supplierId ?? undefined,
+        defaultTaxRatePercent: subscription.defaultTaxRatePercent ?? undefined,
         isActive: subscription.isActive,
       });
     }
-  }, [subscription]);
+  }, [subscription, reset]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const taxRate = formData.defaultTaxRatePercent ? parseFloat(formData.defaultTaxRatePercent) : NaN;
-    if (!formData.name || !formData.category || !formData.amount || !formData.startDate || Number.isNaN(taxRate) || taxRate < 0) {
-      toast.error("Please fill in all required fields, including transaction tax");
-      return;
-    }
-
+  const onSubmit = async (data: CreateSubscriptionFormInput) => {
     if (!resolvedParams?.id) return;
-
     try {
       await updateSubscription.mutateAsync({
         id: resolvedParams.id,
         data: {
-          name: formData.name,
-          category: formData.category as ExpenseCategory,
-          amount: parseFloat(formData.amount),
-          recurrence: formData.recurrence,
-          startDate: formData.startDate,
-          endDate: formData.endDate || undefined,
-          description: formData.description || undefined,
-          vendor: formData.vendor || undefined,
-          supplierId: formData.supplierId ? parseInt(formData.supplierId) : undefined,
-          defaultTaxRatePercent: taxRate,
-          isActive: formData.isActive,
+          name: data.name,
+          category: data.category! as import("@kit/types").ExpenseCategory,
+          amount: data.amount,
+          recurrence: data.recurrence as import("@kit/types").ExpenseRecurrence,
+          startDate: data.startDate,
+          endDate: data.endDate || undefined,
+          description: data.description || undefined,
+          vendor: data.vendor || undefined,
+          supplierId: data.supplierId,
+          defaultTaxRatePercent: data.defaultTaxRatePercent,
+          isActive: data.isActive ?? true,
         },
       });
       toast.success("Subscription updated successfully");
       router.push(`/subscriptions/${resolvedParams.id}`);
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to update subscription");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to update subscription");
     }
-  };
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   if (isLoading || !resolvedParams) {
@@ -134,7 +135,7 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
             <h1 className="text-2xl font-bold">Subscription Not Found</h1>
             <p className="text-muted-foreground">The subscription you're looking for doesn't exist.</p>
           </div>
-          <Button onClick={() => router.push('/subscriptions')}>Back to Subscriptions</Button>
+          <Button onClick={() => router.push("/subscriptions")}>Back to Subscriptions</Button>
         </div>
       </AppLayout>
     );
@@ -151,136 +152,211 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
         <Card>
           <CardHeader>
             <CardTitle>Subscription Information</CardTitle>
-            <CardDescription>Update the details for this subscription</CardDescription>
+            <CardDescription>Enter the details for this subscription</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Name */}
                 <div className="space-y-2">
                   <Label htmlFor="name">Name *</Label>
                   <Input
                     id="name"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    {...register("name")}
                     placeholder="e.g., Office Rent"
-                    required
                   />
+                  {errors.name && (
+                    <p className="text-sm text-destructive">{errors.name.message}</p>
+                  )}
                 </div>
 
-                <CategorySelector
-                  enumName="ExpenseCategory"
-                  label="Category"
-                  required
-                  selectedId={formData.category || undefined}
-                  onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
-                  placeholder="Select category"
-                />
+                <div className="space-y-2">
+                  <Controller
+                    name="category"
+                    control={control}
+                    render={({ field }) => (
+                      <CategorySelector
+                        enumName="ExpenseCategory"
+                        label="Category"
+                        required
+                        selectedId={field.value ?? undefined}
+                        onSelect={(item) =>
+                          field.onChange(item.id === 0 ? undefined : String(item.id))
+                        }
+                        placeholder="Select category"
+                      />
+                    )}
+                  />
+                  {errors.category && (
+                    <p className="text-sm text-destructive">{errors.category.message}</p>
+                  )}
+                </div>
 
-                {/* Amount */}
                 <div className="space-y-2">
                   <Label htmlFor="amount">Amount *</Label>
                   <Input
                     id="amount"
                     type="number"
                     step="0.01"
-                    value={formData.amount}
-                    onChange={(e) => handleInputChange('amount', e.target.value)}
+                    {...register("amount", { valueAsNumber: true })}
                     placeholder="0.00"
-                    required
                   />
+                  {errors.amount && (
+                    <p className="text-sm text-destructive">{errors.amount.message}</p>
+                  )}
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
-                  <UnifiedSelector
-                    label="Transaction tax *"
-                    required
-                    items={transactionTaxItems}
-                    selectedId={transactionTaxVars.find((v) => v.value === parseFloat(formData.defaultTaxRatePercent || ""))?.id}
-                    onSelect={(item) => handleInputChange("defaultTaxRatePercent", String((item as { value: number }).value))}
-                    placeholder="Select transaction tax"
+                <div className="space-y-2">
+                  <Controller
+                    name="recurrence"
+                    control={control}
+                    render={({ field }) => (
+                      <UnifiedSelector
+                        label="Recurrence"
+                        required
+                        type="recurrence"
+                        items={recurrenceItems}
+                        selectedId={field.value ?? undefined}
+                        onSelect={(item) =>
+                          field.onChange(String(item.id) as ExpenseRecurrence)
+                        }
+                        placeholder="Select recurrence"
+                      />
+                    )}
                   />
-                  <p className="text-xs text-muted-foreground">Applied when this subscription generates expense lines (e.g. when a payment is marked paid).</p>
+                  {errors.recurrence && (
+                    <p className="text-sm text-destructive">{errors.recurrence.message}</p>
+                  )}
                 </div>
 
-                <UnifiedSelector
-                  label="Recurrence"
-                  required
-                  type="recurrence"
-                  items={recurrenceItems}
-                  selectedId={formData.recurrence || undefined}
-                  onSelect={(item) => handleInputChange('recurrence', String(item.id) as ExpenseRecurrence)}
-                  placeholder="Select recurrence"
-                />
-
-                {/* Start Date */}
                 <div className="space-y-2">
                   <Label htmlFor="startDate">Start Date *</Label>
-                  <DatePicker
-                    id="startDate"
-                    value={formData.startDate ? new Date(formData.startDate) : undefined}
-                    onChange={(d) => handleInputChange("startDate", d ? dateToYYYYMMDD(d) : "")}
-                    placeholder="Pick a date"
+                  <Controller
+                    name="startDate"
+                    control={control}
+                    render={({ field }) => (
+                      <DatePicker
+                        id="startDate"
+                        value={field.value ? new Date(field.value) : undefined}
+                        onChange={(d) =>
+                          field.onChange(d ? dateToYYYYMMDD(d) : "")
+                        }
+                        placeholder="Pick a date"
+                      />
+                    )}
                   />
+                  {errors.startDate && (
+                    <p className="text-sm text-destructive">{errors.startDate.message}</p>
+                  )}
                 </div>
 
-                {/* End Date */}
                 <div className="space-y-2">
                   <Label htmlFor="endDate">End Date (Optional)</Label>
-                  <DatePicker
-                    id="endDate"
-                    value={formData.endDate ? new Date(formData.endDate) : undefined}
-                    onChange={(d) => handleInputChange("endDate", d ? dateToYYYYMMDD(d) : "")}
-                    placeholder="Pick a date"
+                  <Controller
+                    name="endDate"
+                    control={control}
+                    render={({ field }) => (
+                      <DatePicker
+                        id="endDate"
+                        value={field.value ? new Date(field.value) : undefined}
+                        onChange={(d) =>
+                          field.onChange(d ? dateToYYYYMMDD(d) : "")
+                        }
+                        placeholder="Pick a date"
+                      />
+                    )}
                   />
                   <p className="text-xs text-muted-foreground">
                     Leave empty for ongoing subscriptions
                   </p>
                 </div>
 
-                {/* Supplier/Vendor */}
-                <div className="space-y-2">
-                  <UnifiedSelector
-                    label="Vendor"
-                    type="vendor"
-                    items={suppliers}
-                    selectedId={formData.supplierId ? parseInt(formData.supplierId) : undefined}
-                    onSelect={(item) => handleInputChange('supplierId', item.id === 0 ? '' : String(item.id))}
-                    onCreateNew={() => setAddVendorOpen(true)}
-                    placeholder="Select vendor"
-                    manageLink={formData.supplierId ? { href: `/inventory-suppliers/${formData.supplierId}`, text: "View vendor details →" } : undefined}
+                <div className="space-y-2 md:col-span-2">
+                  <Controller
+                    name="defaultTaxRatePercent"
+                    control={control}
+                    render={({ field }) => (
+                      <UnifiedSelector
+                        label="Transaction tax *"
+                        required
+                        items={transactionTaxItems}
+                        selectedId={transactionTaxVars.find((v) => v.value === field.value)?.id}
+                        onSelect={(item) => field.onChange((item as { value: number }).value)}
+                        placeholder="Select transaction tax"
+                      />
+                    )}
                   />
-                  <AddVendorDialog
-                    open={addVendorOpen}
-                    onOpenChange={setAddVendorOpen}
-                    onCreated={(v) => handleInputChange('supplierId', String(v.id))}
+                  {errors.defaultTaxRatePercent && (
+                    <p className="text-xs text-destructive">{errors.defaultTaxRatePercent.message}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Applied when this subscription generates expense lines (e.g. when a payment is
+                    marked paid).
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Controller
+                    name="supplierId"
+                    control={control}
+                    render={({ field }) => (
+                      <>
+                        <UnifiedSelector
+                          label="Vendor"
+                          type="vendor"
+                          items={suppliers}
+                          selectedId={field.value ?? undefined}
+                          onSelect={(item) =>
+                            field.onChange(item.id === 0 ? undefined : item.id)
+                          }
+                          onCreateNew={() => setAddVendorOpen(true)}
+                          placeholder="Select vendor"
+                          manageLink={
+                            field.value
+                              ? {
+                                  href: `/inventory-suppliers/${field.value}`,
+                                  text: "View vendor details →",
+                                }
+                              : undefined
+                          }
+                        />
+                        <AddVendorDialog
+                          open={addVendorOpen}
+                          onOpenChange={setAddVendorOpen}
+                          onCreated={(v) => field.onChange(v.id)}
+                        />
+                      </>
+                    )}
                   />
                 </div>
 
-                {/* Is Active */}
                 <div className="space-y-2 flex items-center space-x-2 pt-6">
-                  <Checkbox
-                    id="isActive"
-                    checked={formData.isActive}
-                    onCheckedChange={(checked) => handleInputChange('isActive', checked)}
+                  <Controller
+                    name="isActive"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="isActive"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
                   />
-                  <Label htmlFor="isActive" className="cursor-pointer">Active</Label>
+                  <Label htmlFor="isActive" className="cursor-pointer">
+                    Active
+                  </Label>
                 </div>
               </div>
 
-              {/* Description */}
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  {...register("description")}
                   placeholder="Additional notes about this subscription"
                   rows={3}
                 />
               </div>
 
-              {/* Actions */}
               <div className="flex justify-end space-x-4 pt-6">
                 <Button
                   type="button"
@@ -302,4 +378,3 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
     </AppLayout>
   );
 }
-

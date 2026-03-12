@@ -16,6 +16,7 @@ import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
+import { AddVendorDialog } from "@/components/add-vendor-dialog";
 import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
@@ -23,7 +24,7 @@ import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections, useInventorySupplierById, useMetadataEnum } from "@kit/hooks";
+import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections, useInventorySupplierById, useInventorySuppliers, useMetadataEnum, useVariablesByType } from "@kit/hooks";
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -53,8 +54,17 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
   const { data: supplier } = useInventorySupplierById(subscription?.supplierId?.toString() || "");
   const updateSubscription = useUpdateSubscription();
   const deleteMutation = useDeleteSubscription();
+  const [addVendorOpen, setAddVendorOpen] = useState(false);
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: "vendor" });
+  const suppliers = suppliersResponse?.data || [];
   const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
   const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
+  const { data: transactionTaxVars = [] } = useVariablesByType("transaction_tax");
+  const transactionTaxItems = transactionTaxVars.map((v) => ({
+    id: v.id,
+    name: `${v.name} (${v.value}%)`,
+    value: v.value,
+  }));
   const recurrenceItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const categoryLabels: Record<string, string> = Object.fromEntries(
     categoryValues.map((ev) => [ev.name, ev.label ?? ev.name])
@@ -109,6 +119,8 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
     endDate: "",
     description: "",
     vendor: "",
+    supplierId: undefined as number | undefined,
+    defaultTaxRatePercent: undefined as number | undefined,
     isActive: true,
   });
 
@@ -123,6 +135,8 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
         endDate: subscription.endDate ? subscription.endDate.split('T')[0] : "",
         description: subscription.description || "",
         vendor: subscription.vendor || "",
+        supplierId: subscription.supplierId ?? undefined,
+        defaultTaxRatePercent: subscription.defaultTaxRatePercent ?? undefined,
         isActive: subscription.isActive,
       });
     }
@@ -131,8 +145,9 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.category || !formData.amount || !formData.startDate) {
-      toast.error("Please fill in all required fields");
+    const hasTax = formData.defaultTaxRatePercent != null && formData.defaultTaxRatePercent >= 0;
+    if (!formData.name || !formData.category || !formData.amount || !formData.startDate || !hasTax) {
+      toast.error("Please fill in all required fields, including transaction tax");
       return;
     }
 
@@ -148,6 +163,8 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
           endDate: formData.endDate || undefined,
           description: formData.description || undefined,
           vendor: formData.vendor || undefined,
+          supplierId: formData.supplierId,
+          defaultTaxRatePercent: formData.defaultTaxRatePercent,
           isActive: formData.isActive,
         },
       });
@@ -314,16 +331,49 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                       onChange={(d) => handleInputChange("endDate", d ? dateToYYYYMMDD(d) : "")}
                       placeholder="Pick a date"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Leave empty for ongoing subscriptions
+                    </p>
                   </div>
 
-                  {/* Vendor */}
+                  <div className="space-y-2 md:col-span-2">
+                    <UnifiedSelector
+                      label="Transaction tax *"
+                      required
+                      items={transactionTaxItems}
+                      selectedId={transactionTaxVars.find((v) => v.value === formData.defaultTaxRatePercent)?.id}
+                      onSelect={(item) => handleInputChange("defaultTaxRatePercent", (item as { value: number }).value)}
+                      placeholder="Select transaction tax"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Applied when this subscription generates expense lines (e.g. when a payment is marked paid).
+                    </p>
+                  </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="vendor">Vendor</Label>
-                    <Input
-                      id="vendor"
-                      value={formData.vendor}
-                      onChange={(e) => handleInputChange('vendor', e.target.value)}
-                      placeholder="Vendor name"
+                    <UnifiedSelector
+                      label="Vendor"
+                      type="vendor"
+                      items={suppliers}
+                      selectedId={formData.supplierId ?? undefined}
+                      onSelect={(item) =>
+                        handleInputChange("supplierId", item.id === 0 ? undefined : item.id)
+                      }
+                      onCreateNew={() => setAddVendorOpen(true)}
+                      placeholder="Select vendor"
+                      manageLink={
+                        formData.supplierId
+                          ? {
+                              href: `/inventory-suppliers/${formData.supplierId}`,
+                              text: "View vendor details →",
+                            }
+                          : undefined
+                      }
+                    />
+                    <AddVendorDialog
+                      open={addVendorOpen}
+                      onOpenChange={setAddVendorOpen}
+                      onCreated={(v) => handleInputChange("supplierId", v.id)}
                     />
                   </div>
 
