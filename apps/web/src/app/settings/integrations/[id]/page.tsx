@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useIntegrationById, useSyncIntegration, useSyncJobs, useRetrySyncJob, useDisconnectIntegration, useImportBankFile } from '@kit/hooks';
 import AppLayout from '@/components/app-layout';
@@ -35,8 +35,11 @@ import {
   Trash2,
   MoreVertical,
   Activity,
+  Upload,
+  X,
 } from 'lucide-react';
 import { useToast } from '@kit/hooks';
+import { cn } from '@kit/lib/utils';
 import { formatDateTime } from '@kit/lib/date-format';
 import SquareDataView from '../square-data-view';
 import { Alert, AlertDescription } from '@kit/ui/alert';
@@ -68,6 +71,105 @@ function getIntegrationIcon(type: string) {
     default:
       return Settings;
   }
+}
+
+const ACCEPT_CSV_XLSX = '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+function CsvBankImportDropzone({
+  file,
+  onFileChange,
+  onImport,
+  isImporting,
+}: {
+  file: File | null;
+  onFileChange: (f: File | null) => void;
+  onImport: () => void;
+  isImporting: boolean;
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleSelect = (selected: FileList | null) => {
+    const f = selected?.[0] ?? null;
+    if (!f) return;
+    const ok = ['.csv', '.xlsx'].some((ext) => f.name.toLowerCase().endsWith(ext)) ||
+      ['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].includes(f.type);
+    if (ok) onFileChange(f);
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+  const onDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    handleSelect(e.dataTransfer.files);
+  };
+
+  return (
+    <div
+      className={cn(
+        'rounded-lg border-2 border-dashed transition-colors',
+        isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'
+      )}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPT_CSV_XLSX}
+        className="hidden"
+        onChange={(e) => handleSelect(e.target.files)}
+      />
+      <div className="flex flex-col items-center justify-center gap-3 p-6">
+        {!file ? (
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => inputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Choose file
+            </Button>
+            <p className="text-sm text-muted-foreground">or drag and drop CSV/Excel here</p>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 text-sm">
+              <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium truncate max-w-[200px]" title={file.name}>{file.name}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onFileChange(null)}
+                aria-label="Remove file"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <Button
+              onClick={onImport}
+              disabled={isImporting}
+            >
+              {isImporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 mr-2" />}
+              Import file
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function IntegrationDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -384,21 +486,16 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                   <CardTitle>Import bank statement</CardTitle>
                   <CardDescription>Upload a CSV or Excel (.xlsx) file. We’ll store the original file and import its transactions.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <input
-                    type="file"
-                    accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                <CardContent>
+                  <CsvBankImportDropzone
+                    onImport={handleImport}
+                    file={importFile}
+                    onFileChange={setImportFile}
+                    isImporting={importBankFile.isPending}
                   />
-                  <div className="flex items-center gap-2">
-                    <Button onClick={handleImport} disabled={!importFile || importBankFile.isPending}>
-                      {importBankFile.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
-                      Import file
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Each import creates a sync job and bank transactions.
-                    </p>
-                  </div>
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Each import creates a sync job and bank transactions.
+                  </p>
                 </CardContent>
               </Card>
             )}
