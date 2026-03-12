@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
+import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
@@ -20,10 +21,8 @@ export default function CreateItemPage() {
   const createItem = useCreateItem();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const { data: unitsData } = useUnits();
-  const { data: categoryValues = [] } = useMetadataEnum("ItemCategory");
   const { data: variableTypeValues = [], isLoading: variableTypeLoading } = useMetadataEnum("VariableType");
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
-  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const itemTypeItems: { id: ItemType; name: string }[] = [
     { id: "item", name: "Item" },
     { id: "product", name: "Product" },
@@ -116,10 +115,9 @@ export default function CreateItemPage() {
 
                 {/* Category */}
                 <div className="space-y-2">
-                  <UnifiedSelector
+                  <CategorySelector
+                    enumName="ItemCategory"
                     label="Category"
-                    type="category"
-                    items={categoryItems}
                     selectedId={formData.category || undefined}
                     onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
                     placeholder="Select category"

@@ -23,6 +23,7 @@ export interface CreateEnumValueData {
   value?: number;
   displayOrder?: number;
   isActive?: boolean;
+  parentId?: number;
 }
 
 export interface UpdateEnumValueData extends Partial<CreateEnumValueData> {}

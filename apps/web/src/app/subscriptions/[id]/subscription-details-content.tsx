@@ -16,6 +16,7 @@ import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
+import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
@@ -54,7 +55,6 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
   const deleteMutation = useDeleteSubscription();
   const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
   const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
-  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const recurrenceItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const categoryLabels: Record<string, string> = Object.fromEntries(
     categoryValues.map((ev) => [ev.name, ev.label ?? ev.name])
@@ -262,11 +262,10 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                     />
                   </div>
 
-                  <UnifiedSelector
+                  <CategorySelector
+                    enumName="ExpenseCategory"
                     label="Category"
                     required
-                    type="category"
-                    items={categoryItems}
                     selectedId={formData.category || undefined}
                     onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
                     placeholder="Select category"

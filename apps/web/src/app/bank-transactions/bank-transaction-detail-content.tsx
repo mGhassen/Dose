@@ -1,9 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useBankTransaction } from "@kit/hooks";
+import { useEffect, useMemo, useState } from "react";
+import { useBankTransaction, useReconcileBankTransaction, useSales, useExpenses } from "@kit/hooks";
 import { Button } from "@kit/ui/button";
 import { X } from "lucide-react";
+import { UnifiedSelector } from "@/components/unified-selector";
+import { Tabs, TabsList, TabsTrigger } from "@kit/ui/tabs";
+import { toast } from "sonner";
+
+function dateRangeAround(executionDate: string) {
+  const d = new Date(executionDate + "T12:00:00");
+  const start = new Date(d);
+  start.setDate(start.getDate() - 30);
+  const end = new Date(d);
+  end.setDate(end.getDate() + 30);
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+}
 
 interface BankTransactionDetailContentProps {
   transactionId: string;
@@ -99,9 +114,115 @@ export function BankTransactionDetailContent({
         </div>
       </div>
 
-      <p className="mt-2 text-xs text-muted-foreground">
-        Reconcile actions (create expense/sale, link to existing) — coming in next step.
-      </p>
+      <ReconciliationBlock tx={tx} />
+    </div>
+  );
+}
+
+type ReconcilableEntityType = "sale" | "expense";
+
+function ReconciliationBlock({ tx }: { tx: NonNullable<ReturnType<typeof useBankTransaction>["data"]> }) {
+  const [entityType, setEntityType] = useState<ReconcilableEntityType>("sale");
+  const reconcileMutation = useReconcileBankTransaction();
+  const { startDate, endDate } = useMemo(() => dateRangeAround(tx.execution_date), [tx.execution_date]);
+
+  const { data: salesResponse, isLoading: salesLoading } = useSales({
+    startDate,
+    endDate,
+    limit: 200,
+  });
+  const { data: expensesResponse, isLoading: expensesLoading } = useExpenses({
+    startDate,
+    endDate,
+    limit: 200,
+  });
+
+  const sales = salesResponse?.data ?? [];
+  const expenses = expensesResponse?.data ?? [];
+  const candidates = entityType === "sale" ? sales : expenses;
+  const isLoading = entityType === "sale" ? salesLoading : expensesLoading;
+
+  const selectorItems = useMemo(
+    () =>
+      candidates.map((c) => ({
+        id: c.id,
+        name:
+          entityType === "sale"
+            ? `Sale #${c.id} · ${Number((c as { amount: number; date: string }).amount).toFixed(2)} € · ${(c as { date: string }).date}`
+            : `Expense #${c.id} · ${Number((c as { amount: number }).amount).toFixed(2)} € · ${(c as { expenseDate: string }).expenseDate}`,
+      })),
+    [candidates, entityType]
+  );
+
+  const handleLink = (item: { id: number | string }) => {
+    const entityId = typeof item.id === "string" ? parseInt(item.id, 10) : item.id;
+    if (Number.isNaN(entityId)) return;
+    reconcileMutation.mutate(
+      {
+        id: String(tx.id),
+        reconciled_entity_type: entityType,
+        reconciled_entity_id: entityId,
+      },
+      {
+        onSuccess: () => toast.success("Reconciliation saved"),
+        onError: () => toast.error("Failed to save reconciliation"),
+      }
+    );
+  };
+
+  const handleClear = () => {
+    reconcileMutation.mutate(
+      {
+        id: String(tx.id),
+        reconciled_entity_type: null,
+        reconciled_entity_id: null,
+      },
+      {
+        onSuccess: () => toast.success("Reconciliation cleared"),
+        onError: () => toast.error("Failed to clear reconciliation"),
+      }
+    );
+  };
+
+  if (tx.reconciled_entity_type && tx.reconciled_entity_id != null) {
+    return (
+      <div className="rounded-lg border bg-background p-4 space-y-2">
+        <p className="text-xs font-medium text-muted-foreground uppercase">Reconciliation</p>
+        <p className="text-sm">
+          {tx.reconciled_entity_type} #{tx.reconciled_entity_id}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleClear}
+          disabled={reconcileMutation.isPending}
+        >
+          {reconcileMutation.isPending ? "Clearing…" : "Clear reconciliation"}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border bg-background p-4 space-y-3">
+      <p className="text-xs font-medium text-muted-foreground uppercase">Reconciliation</p>
+      <Tabs value={entityType} onValueChange={(v) => setEntityType(v as ReconcilableEntityType)}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="sale">Sale</TabsTrigger>
+          <TabsTrigger value="expense">Expense</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <UnifiedSelector
+        mode="single"
+        type="item"
+        items={selectorItems}
+        isLoading={isLoading}
+        selectedId={undefined}
+        onSelect={(item) => handleLink(item)}
+        placeholder={isLoading ? "Loading…" : `Select ${entityType} to link`}
+        searchPlaceholder="Search by id or amount…"
+        getDisplayName={(item) => (item.name ?? `${entityType} #${item.id}`)}
+      />
     </div>
   );
 }

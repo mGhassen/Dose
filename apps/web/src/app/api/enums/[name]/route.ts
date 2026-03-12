@@ -37,7 +37,7 @@ export async function GET(
     // Then, get all values for this enum
     const { data: values, error: valuesError } = await supabase
       .from('metadata_enum_values')
-      .select('id, name, label, description, value, is_active')
+      .select('id, name, label, description, value, is_active, parent_id')
       .eq('enum_id', enumData.id)
       .eq('is_active', true)
       .order('display_order', { ascending: true })
@@ -55,6 +55,7 @@ export async function GET(
       description: row.description || undefined,
       isActive: row.is_active,
       value: row.value || undefined,
+      parentId: row.parent_id ?? undefined,
     }));
 
     return NextResponse.json(enumValues);

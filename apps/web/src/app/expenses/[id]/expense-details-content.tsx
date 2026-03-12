@@ -32,6 +32,7 @@ import {
   Plus,
 } from "lucide-react";
 import { DatePicker } from "@kit/ui/date-picker";
+import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
 import {
@@ -108,7 +109,6 @@ export function ExpenseDetailContent({
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
-  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const categoryLabels: Record<string, string> = Object.fromEntries(
     categoryValues.map((ev) => [ev.name, ev.label ?? ev.name])
   );
@@ -376,9 +376,8 @@ export function ExpenseDetailContent({
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label>Category *</Label>
-                <UnifiedSelector
-                  type="category"
-                  items={categoryItems}
+                <CategorySelector
+                  enumName="ExpenseCategory"
                   selectedId={formData.category || undefined}
                   onSelect={(item) => setFormData((p) => ({ ...p, category: (item.id === 0 ? "" : String(item.id)) as ExpenseCategory | "" }))}
                   placeholder="Category"

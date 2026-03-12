@@ -28,6 +28,7 @@ export interface MetadataEnumValue {
   description?: string;
   isActive?: boolean;
   value?: number;
+  parentId?: number;
 }
 
 /**

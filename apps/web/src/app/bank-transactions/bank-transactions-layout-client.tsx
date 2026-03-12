@@ -18,8 +18,8 @@ export default function BankTransactionsLayoutClient({
 
   const isListOrPanel = pathname === "/bank-transactions" || txId !== null;
   const showPanel = txId !== null;
-  const rightWidth = showPanel ? "45%" : "0";
-  const leftWidth = showPanel ? "55%" : "100%";
+  const rightWidth = showPanel ? "50%" : "0";
+  const leftWidth = showPanel ? "50%" : "100%";
 
   if (isListOrPanel) {
     return (

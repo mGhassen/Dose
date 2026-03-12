@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
     return NextResponse.json(createPaginatedResponse(data ?? [], count ?? 0, page, limit));
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'Failed to list bank transactions' }, { status: 500 });

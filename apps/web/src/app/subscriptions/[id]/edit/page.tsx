@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
+import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
@@ -29,9 +30,7 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
   const updateSubscription = useUpdateSubscription();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
   const suppliers = suppliersResponse?.data || [];
-  const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
   const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
-  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const recurrenceItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
   const [formData, setFormData] = useState({
@@ -160,11 +159,10 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
                   />
                 </div>
 
-                <UnifiedSelector
+                <CategorySelector
+                  enumName="ExpenseCategory"
                   label="Category"
                   required
-                  type="category"
-                  items={categoryItems}
                   selectedId={formData.category || undefined}
                   onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
                   placeholder="Select category"

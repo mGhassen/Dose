@@ -10,6 +10,22 @@ import { Textarea } from "@kit/ui/textarea";
 import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { Checkbox } from "@kit/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@kit/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@kit/ui/select";
 import { Save, X, Edit, Plus, Trash2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import {
@@ -23,15 +39,6 @@ import {
 } from "@kit/hooks";
 import { toast } from "sonner";
 import type { MetadataEnumValue } from "@kit/hooks";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@kit/ui/dialog";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 interface MetadataEnumDetailContentProps {
@@ -118,6 +125,7 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
     description?: string;
     value?: number;
     displayOrder?: number;
+    parentId?: number;
   }) => {
     if (!enumId) return;
     try {
@@ -344,6 +352,7 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
                     </DialogDescription>
                   </DialogHeader>
                   <CreateValueForm
+                    topLevelValues={enumValues?.filter(v => v.parentId == null) || []}
                     onSubmit={(data) => {
                       handleCreateValue(data);
                     }}
@@ -411,6 +420,7 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
               </DialogHeader>
               <EditValueForm
                 value={editingValue.value}
+                allValues={enumValues || []}
                 onSubmit={(data) => {
                   handleUpdateValue(editingValue.value!.id, data);
                 }}
@@ -447,15 +457,18 @@ export default function MetadataEnumDetailContent({ enumId }: MetadataEnumDetail
 }
 
 function CreateValueForm({
+  topLevelValues,
   onSubmit,
   onCancel,
 }: {
+  topLevelValues: MetadataEnumValue[];
   onSubmit: (data: {
     name: string;
     label: string;
     description?: string;
     value?: number;
     displayOrder?: number;
+    parentId?: number;
   }) => void;
   onCancel: () => void;
 }) {
@@ -464,6 +477,7 @@ function CreateValueForm({
   const [description, setDescription] = useState("");
   const [value, setValue] = useState<string>("");
   const [displayOrder, setDisplayOrder] = useState<string>("");
+  const [parentId, setParentId] = useState<number | "">("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -477,6 +491,7 @@ function CreateValueForm({
       description: description || undefined,
       value: value ? parseInt(value, 10) : undefined,
       displayOrder: displayOrder ? parseInt(displayOrder, 10) : undefined,
+      parentId: parentId === "" ? undefined : parentId,
     });
   };
 
@@ -532,6 +547,25 @@ function CreateValueForm({
             placeholder="Order for display"
           />
         </div>
+        <div className="col-span-2">
+          <Label>Parent (optional)</Label>
+          <Select
+            value={parentId === "" ? "none" : String(parentId)}
+            onValueChange={(v) => setParentId(v === "none" ? "" : Number(v))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="None — top-level value" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None — top-level value</SelectItem>
+              {topLevelValues.map((v) => (
+                <SelectItem key={v.id} value={String(v.id)}>
+                  {v.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>
@@ -545,16 +579,20 @@ function CreateValueForm({
 
 function EditValueForm({
   value,
+  allValues,
   onSubmit,
   onCancel,
 }: {
   value: MetadataEnumValue;
+  allValues: MetadataEnumValue[];
   onSubmit: (data: Partial<MetadataEnumValue>) => void;
   onCancel: () => void;
 }) {
   const [label, setLabel] = useState(value.label);
   const [description, setDescription] = useState(value.description || "");
   const [isActive, setIsActive] = useState(value.isActive ?? true);
+  const [parentId, setParentId] = useState<number | "">(value.parentId ?? "");
+  const topLevelValues = allValues.filter(v => v.parentId == null && v.id !== value.id);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -566,6 +604,7 @@ function EditValueForm({
       label,
       description: description || undefined,
       isActive,
+      parentId: parentId === "" ? undefined : parentId,
     });
   };
 
@@ -605,6 +644,25 @@ function EditValueForm({
           />
           Active
         </Label>
+      </div>
+      <div>
+        <Label>Parent (optional)</Label>
+        <Select
+          value={parentId === "" ? "none" : String(parentId)}
+          onValueChange={(v) => setParentId(v === "none" ? "" : Number(v))}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="None — top-level value" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None — top-level value</SelectItem>
+            {topLevelValues.map((v) => (
+              <SelectItem key={v.id} value={String(v.id)}>
+                {v.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>

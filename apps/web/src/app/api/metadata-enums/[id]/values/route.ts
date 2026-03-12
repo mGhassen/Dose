@@ -14,10 +14,11 @@ function transformEnumValue(row: any): MetadataEnumValue {
     description: row.description || undefined,
     isActive: row.is_active,
     value: row.value || undefined,
+    parentId: row.parent_id ?? undefined,
   };
 }
 
-function transformToSnakeCase(data: Partial<MetadataEnumValue>): any {
+function transformToSnakeCase(data: Partial<MetadataEnumValue> & { parentId?: number }): any {
   return {
     name: data.name,
     label: data.label,
@@ -25,6 +26,7 @@ function transformToSnakeCase(data: Partial<MetadataEnumValue>): any {
     value: data.value,
     is_active: data.isActive ?? true,
     display_order: (data as any).displayOrder ?? 0,
+    ...(data.parentId !== undefined && { parent_id: data.parentId }),
   };
 }
 
@@ -86,12 +88,26 @@ export async function POST(
     if (!parsed.success) return parsed.response;
     const body = parsed.data;
 
-    const authHeader = request.headers.get('authorization');
+    if (body.parentId != null) {
+      const supabaseCheck = supabaseServer();
+      const { data: parentRow, error: parentError } = await supabaseCheck
+        .from('metadata_enum_values')
+        .select('id, enum_id, parent_id')
+        .eq('id', body.parentId)
+        .single();
+      if (parentError || !parentRow || parentRow.enum_id !== enumIdNum || parentRow.parent_id != null) {
+        return NextResponse.json(
+          { error: 'Invalid parentId: must be a top-level value of the same enum' },
+          { status: 400 }
+        );
+      }
+    }
+
     const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('metadata_enum_values')
       .insert({
-        ...transformToSnakeCase(body as Partial<MetadataEnumValue>),
+        ...transformToSnakeCase(body as Partial<MetadataEnumValue> & { parentId?: number }),
         enum_id: enumIdNum,
       })
       .select()

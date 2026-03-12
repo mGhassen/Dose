@@ -7,11 +7,12 @@ import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
+import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
 import { ScrollArea } from "@kit/ui/scroll-area";
 import { Save, X, Plus, Trash2 } from "lucide-react";
-import { useCreateExpense, useInventorySuppliers, useItems, useUnits, useMetadataEnum } from "@kit/hooks";
+import { useCreateExpense, useInventorySuppliers, useItems, useUnits } from "@kit/hooks";
 import { toast } from "sonner";
 import type { CreateExpenseData, ExpenseCategory, ExpenseLineItemInput } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
@@ -34,9 +35,6 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
   const items = itemsResponse?.data ?? [];
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
-  const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
-  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
-
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
@@ -228,11 +226,10 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <UnifiedSelector
+            <CategorySelector
+              enumName="ExpenseCategory"
               label="Category *"
               required
-              type="category"
-              items={categoryItems}
               selectedId={formData.category || undefined}
               onSelect={(item) => handleInputChange("category", item.id === 0 ? "" : String(item.id))}
               placeholder="Select category"

@@ -38,37 +38,27 @@ export default function BankTransactionsContent({
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   const stats = useMemo(() => {
-    let total = 0;
     let credits = 0;
     let debits = 0;
     let net = 0;
-    let matched = 0;
 
     for (const t of list) {
-      total += 1;
       const amount = Number(t.amount) || 0;
       net += amount;
       if (amount > 0) credits += amount;
       if (amount < 0) debits += amount;
-      if (t.reconciled_entity_type) matched += 1;
     }
-
-    const unmatched = total - matched;
-    const matchedPct = total > 0 ? (matched / total) * 100 : 0;
 
     const formatAmount = (value: number) =>
       value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     return {
-      total,
+      totalCount,
       credits: formatAmount(credits),
       debits: formatAmount(Math.abs(debits)),
       net: formatAmount(net),
-      matched,
-      unmatched,
-      matchedPct: matchedPct.toFixed(0),
     };
-  }, [list]);
+  }, [list, totalCount]);
 
   const columns: ColumnDef<BankTransaction>[] = useMemo(
     () => [
@@ -126,21 +116,18 @@ export default function BankTransactionsContent({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex-shrink-0 flex items-center justify-between pb-4">
+      <div className="flex-shrink-0 flex flex-col gap-4 pb-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Bank transactions</h1>
           <p className="text-muted-foreground mt-2">
             Imported from Pennylane. Reconcile with sales, expenses, or other entities.
           </p>
         </div>
-      </div>
-
-      <div className="space-y-4">
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
           <Card>
             <CardContent className="py-3">
-              <p className="text-xs text-muted-foreground">Transactions (page)</p>
-              <p className="text-lg font-semibold">{stats.total}</p>
+              <p className="text-xs text-muted-foreground">Transactions (period)</p>
+              <p className="text-lg font-semibold">{stats.totalCount}</p>
             </CardContent>
           </Card>
           <Card>
@@ -161,34 +148,22 @@ export default function BankTransactionsContent({
               <p className="text-lg font-semibold">{stats.net}</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="py-3">
-              <p className="text-xs text-muted-foreground">Matched</p>
-              <p className="text-lg font-semibold">{stats.matched}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-3">
-              <p className="text-xs text-muted-foreground">Matched % (page)</p>
-              <p className="text-lg font-semibold">{stats.matchedPct}%</p>
-            </CardContent>
-          </Card>
         </div>
+      </div>
 
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <DataTablePage
-            title=""
-            description=""
-            data={list}
-            columns={columns}
-            loading={isLoading}
-            onRowClick={(row) => router.push(`/bank-transactions/${row.id}`)}
-            pagination={pagination}
-            localStoragePrefix="bankTransactions"
-            searchFields={["label", "counterparty_name"]}
-            activeRowId={selectedTransactionId}
-          />
-        </div>
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <DataTablePage
+          title=""
+          description=""
+          data={list}
+          columns={columns}
+          loading={isLoading}
+          onRowClick={(row) => router.push(`/bank-transactions/${row.id}`)}
+          pagination={pagination}
+          localStoragePrefix="bankTransactions"
+          searchFields={["label", "counterparty_name"]}
+          activeRowId={selectedTransactionId}
+        />
       </div>
     </div>
   );

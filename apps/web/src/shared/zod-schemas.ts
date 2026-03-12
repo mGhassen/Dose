@@ -904,6 +904,7 @@ export const createMetadataEnumValueSchema = z.object({
   value: z.union([z.string(), z.number()]).optional(),
   isActive: z.boolean().optional(),
   displayOrder: z.number().optional(),
+  parentId: z.number().optional(),
 });
 export type CreateMetadataEnumValueInput = z.infer<typeof createMetadataEnumValueSchema>;
 export const updateMetadataEnumValueSchema = z.object({
@@ -913,6 +914,7 @@ export const updateMetadataEnumValueSchema = z.object({
   value: z.union([z.string(), z.number()]).optional(),
   isActive: z.boolean().optional(),
   displayOrder: z.number().optional(),
+  parentId: z.number().optional(),
 });
 export type UpdateMetadataEnumValueInput = z.infer<typeof updateMetadataEnumValueSchema>;
 

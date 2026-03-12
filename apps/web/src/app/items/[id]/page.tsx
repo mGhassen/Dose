@@ -15,6 +15,7 @@ import {
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
+import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
@@ -589,10 +590,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     type: "",
   });
   const { data: unitsData } = useUnits();
-  const { data: categoryValues = [] } = useMetadataEnum("ItemCategory");
   const { data: variableTypeValues = [], isLoading: variableTypeLoading } = useMetadataEnum("VariableType");
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
-  const categoryItems = categoryValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const itemTypeItems: { id: ItemType; name: string }[] = [
     { id: "item", name: "Item" },
     { id: "product", name: "Product" },
@@ -818,10 +817,9 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
                   {/* Category */}
                   <div className="space-y-2">
-                    <UnifiedSelector
+                    <CategorySelector
+                      enumName="ItemCategory"
                       label="Category"
-                      type="category"
-                      items={categoryItems}
                       selectedId={formData.category || undefined}
                       onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
                       placeholder="Select category"
