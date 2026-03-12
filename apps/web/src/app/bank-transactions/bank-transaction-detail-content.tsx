@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useBankTransaction, useReconcileBankTransaction, useSales, useExpenses } from "@kit/hooks";
+import { formatDate } from "@kit/lib/date-format";
 import { Button } from "@kit/ui/button";
 import { X } from "lucide-react";
 import { UnifiedSelector } from "@/components/unified-selector";
@@ -80,7 +81,7 @@ export function BankTransactionDetailContent({
           <p className="text-xs font-medium text-muted-foreground uppercase">
             Date
           </p>
-          <p>{tx.execution_date}</p>
+          <p>{formatDate(tx.execution_date)}</p>
         </div>
         <div>
           <p className="text-xs font-medium text-muted-foreground uppercase">

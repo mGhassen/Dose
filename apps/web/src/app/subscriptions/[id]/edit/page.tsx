@@ -7,12 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
+import { AddVendorDialog } from "@/components/add-vendor-dialog";
 import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useSubscriptionById, useUpdateSubscription, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
+import { useSubscriptionById, useUpdateSubscription, useInventorySuppliers, useMetadataEnum, useVariablesByType } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseCategory, ExpenseRecurrence } from "@kit/types";
 import Link from "next/link";
@@ -32,7 +33,14 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
   const suppliers = suppliersResponse?.data || [];
   const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
   const recurrenceItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const { data: transactionTaxVars = [] } = useVariablesByType("transaction_tax");
+  const transactionTaxItems = transactionTaxVars.map((v) => ({
+    id: v.id,
+    name: `${v.name} (${v.value}%)`,
+    value: v.value,
+  }));
 
+  const [addVendorOpen, setAddVendorOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
@@ -72,8 +80,9 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.category || !formData.amount || !formData.startDate) {
-      toast.error("Please fill in all required fields");
+    const taxRate = formData.defaultTaxRatePercent ? parseFloat(formData.defaultTaxRatePercent) : NaN;
+    if (!formData.name || !formData.category || !formData.amount || !formData.startDate || Number.isNaN(taxRate) || taxRate < 0) {
+      toast.error("Please fill in all required fields, including transaction tax");
       return;
     }
 
@@ -92,7 +101,7 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
           description: formData.description || undefined,
           vendor: formData.vendor || undefined,
           supplierId: formData.supplierId ? parseInt(formData.supplierId) : undefined,
-          defaultTaxRatePercent: formData.defaultTaxRatePercent ? parseFloat(formData.defaultTaxRatePercent) : undefined,
+          defaultTaxRatePercent: taxRate,
           isActive: formData.isActive,
         },
       });
@@ -182,18 +191,14 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
                   />
                 </div>
 
-                {/* Tax */}
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="defaultTaxRatePercent">Default tax rate % (optional)</Label>
-                  <Input
-                    id="defaultTaxRatePercent"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={formData.defaultTaxRatePercent}
-                    onChange={(e) => handleInputChange('defaultTaxRatePercent', e.target.value)}
-                    placeholder="e.g. 10"
+                  <UnifiedSelector
+                    label="Transaction tax *"
+                    required
+                    items={transactionTaxItems}
+                    selectedId={transactionTaxVars.find((v) => v.value === parseFloat(formData.defaultTaxRatePercent || ""))?.id}
+                    onSelect={(item) => handleInputChange("defaultTaxRatePercent", String((item as { value: number }).value))}
+                    placeholder="Select transaction tax"
                   />
                   <p className="text-xs text-muted-foreground">Applied when this subscription generates expense lines (e.g. when a payment is marked paid).</p>
                 </div>
@@ -241,8 +246,14 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
                     items={suppliers}
                     selectedId={formData.supplierId ? parseInt(formData.supplierId) : undefined}
                     onSelect={(item) => handleInputChange('supplierId', item.id === 0 ? '' : String(item.id))}
+                    onCreateNew={() => setAddVendorOpen(true)}
                     placeholder="Select vendor"
                     manageLink={formData.supplierId ? { href: `/inventory-suppliers/${formData.supplierId}`, text: "View vendor details →" } : undefined}
+                  />
+                  <AddVendorDialog
+                    open={addVendorOpen}
+                    onOpenChange={setAddVendorOpen}
+                    onCreated={(v) => handleInputChange('supplierId', String(v.id))}
                   />
                 </div>
 

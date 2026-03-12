@@ -3,6 +3,17 @@
  * All currency, locale, and formatting settings should be defined here
  */
 
+import { getUserSettings } from './user-settings';
+
+function getFormattingLocale(): string {
+  if (typeof window === 'undefined') return CURRENCY.locale;
+  try {
+    return getUserSettings().formattingLocale ?? CURRENCY.locale;
+  } catch {
+    return CURRENCY.locale;
+  }
+}
+
 // Currency configuration
 export const CURRENCY = {
   code: process.env.NEXT_PUBLIC_CURRENCY_CODE || '€',
@@ -48,28 +59,25 @@ export const FORMAT_OPTIONS = {
   },
 };
 
-// Utility functions for consistent formatting
 export const formatCurrency = (amount: number | string): string => {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
   if (isNaN(numAmount)) return `0,00 ${CURRENCY.symbol}`;
-  
-  // Format the number with configured locale
-  const formattedNumber = new Intl.NumberFormat(CURRENCY.locale, {
+
+  const locale = getFormattingLocale();
+  const formattedNumber = new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(numAmount);
-  
-  // Use configured currency symbol
-  const result = `${formattedNumber} ${CURRENCY.symbol}`;
-  
-  return result;
+
+  return `${formattedNumber} ${CURRENCY.symbol}`;
 };
 
 export const formatNumber = (amount: number | string): string => {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
   if (isNaN(numAmount)) return '0.00';
-  
-  return new Intl.NumberFormat(FORMAT_OPTIONS.number.locale, {
+
+  const locale = getFormattingLocale();
+  return new Intl.NumberFormat(locale, {
     minimumFractionDigits: FORMAT_OPTIONS.number.minimumFractionDigits,
     maximumFractionDigits: FORMAT_OPTIONS.number.maximumFractionDigits,
   }).format(numAmount);

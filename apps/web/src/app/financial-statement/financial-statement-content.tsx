@@ -10,6 +10,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import AppLayout from "@/components/app-layout";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
+import { useDateFormat } from "@kit/hooks/use-date-format";
 import { 
   useIncomeStatement,
   useBalanceSheet,
@@ -52,6 +53,7 @@ interface IncomeStatementRow {
 export default function FinancialStatementContent() {
   const t = useTranslations('financialStatement');
   const tCommon = useTranslations('common');
+  const { formattingLocale } = useDateFormat();
   const { dateRange } = useDashboardPeriod();
   const selectedYear = dateRange.startDate.slice(0, 4);
   const [selectedPeriod, setSelectedPeriod] = useState<'year' | 'quarter' | 'month'>('year');
@@ -405,7 +407,6 @@ export default function FinancialStatementContent() {
     return `${tCommon('date.from')} 01/01/${selectedYear} ${tCommon('date.to')} 31/12/${selectedYear}`;
   }, [selectedYear, selectedPeriod, selectedMonth, tCommon]);
 
-  // Generate month options
   const monthOptions = useMemo(() => {
     const months = [];
     for (let i = 1; i <= 12; i++) {
@@ -413,11 +414,11 @@ export default function FinancialStatementContent() {
       const date = new Date(parseInt(selectedYear), i - 1, 1);
       months.push({
         value: monthStr,
-        label: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        label: date.toLocaleDateString(formattingLocale, { month: 'long', year: 'numeric' })
       });
     }
     return months;
-  }, [selectedYear]);
+  }, [selectedYear, formattingLocale]);
 
   const handleExport = (statement: IncomeStatementRow[]) => {
     const csv = [
@@ -646,7 +647,7 @@ export default function FinancialStatementContent() {
                         dataKey="month" 
                         tickFormatter={(value) => {
                           const [year, month] = value.split('-');
-                          return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', { month: 'short' });
+                          return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString(formattingLocale, { month: 'short' });
                         }}
                       />
                       <YAxis yAxisId="left" />

@@ -37,9 +37,8 @@ export function cleanTimezone(timezone: string | undefined): string {
  */
 function getDateFormatOptions(format: string, includeTime = false) {
   const settings = getUserSettings();
-  const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
-  
-  // Clean the timezone value to remove any potential prefixes
+  const locale = settings.formattingLocale ?? 'fr-FR';
+
   const cleanedTimezone = cleanTimezone(settings.timezone);
   
   const baseOptions = {
@@ -213,9 +212,9 @@ export function formatTime(date: string | Date | null | undefined): string {
   
   try {
     const settings = getUserSettings();
-    const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+    const locale = settings.formattingLocale ?? 'fr-FR';
     const cleanedTimezone = cleanTimezone(settings.timezone);
-    
+
     return dateObj.toLocaleTimeString(locale, {
       timeZone: cleanedTimezone,
       hour: '2-digit',
@@ -256,9 +255,9 @@ export function formatShortDate(date: string | Date | null | undefined): string 
   
   try {
     const settings = getUserSettings();
-    const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+    const locale = settings.formattingLocale ?? 'fr-FR';
     const cleanedTimezone = cleanTimezone(settings.timezone);
-    
+
     return dateObj.toLocaleDateString(locale, {
       timeZone: cleanedTimezone,
       year: 'numeric',
@@ -266,7 +265,6 @@ export function formatShortDate(date: string | Date | null | undefined): string 
       day: 'numeric'
     });
   } catch (error) {
-    // Fallback to consistent format if settings can't be loaded
     return dateObj.toLocaleDateString('fr-FR', {
       year: 'numeric',
       month: 'short',
@@ -301,9 +299,9 @@ export function formatLongDate(date: string | Date | null | undefined): string {
   
   try {
     const settings = getUserSettings();
-    const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+    const locale = settings.formattingLocale ?? 'fr-FR';
     const cleanedTimezone = cleanTimezone(settings.timezone);
-    
+
     return dateObj.toLocaleDateString(locale, {
       timeZone: cleanedTimezone,
       weekday: 'long',
@@ -346,16 +344,15 @@ export function formatCalendarDate(date: string | Date | null | undefined): stri
   
   try {
     const settings = getUserSettings();
-    const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+    const locale = settings.formattingLocale ?? 'fr-FR';
     const cleanedTimezone = cleanTimezone(settings.timezone);
-    
+
     return dateObj.toLocaleDateString(locale, {
       timeZone: cleanedTimezone,
       day: '2-digit',
       month: 'short'
     });
   } catch (error) {
-    // Fallback to consistent format if settings can't be loaded
     return dateObj.toLocaleDateString('fr-FR', {
       day: '2-digit',
       month: 'short'
@@ -448,9 +445,9 @@ export function formatMonthShort(date: string | Date | null | undefined): string
   
   try {
     const settings = getUserSettings();
-    const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+    const locale = settings.formattingLocale ?? 'fr-FR';
     const cleanedTimezone = cleanTimezone(settings.timezone);
-    
+
     return dateObj.toLocaleDateString(locale, {
       timeZone: cleanedTimezone,
       month: 'short'
@@ -486,9 +483,9 @@ export function formatMonthYear(date: string | Date | null | undefined): string 
   
   try {
     const settings = getUserSettings();
-    const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+    const locale = settings.formattingLocale ?? 'fr-FR';
     const cleanedTimezone = cleanTimezone(settings.timezone);
-    
+
     return dateObj.toLocaleDateString(locale, {
       timeZone: cleanedTimezone,
       month: 'long',
@@ -525,9 +522,9 @@ export function formatWeekday(date: string | Date | null | undefined): string {
   
   try {
     const settings = getUserSettings();
-    const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+    const locale = settings.formattingLocale ?? 'fr-FR';
     const cleanedTimezone = cleanTimezone(settings.timezone);
-    
+
     return dateObj.toLocaleDateString(locale, {
       timeZone: cleanedTimezone,
       weekday: 'long'
@@ -564,9 +561,9 @@ export function formatPrettyDate(date: string | Date | null | undefined): string
   
   try {
     const settings = getUserSettings();
-    const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+    const locale = settings.formattingLocale ?? 'fr-FR';
     const cleanedTimezone = cleanTimezone(settings.timezone);
-    
+
     return dateObj.toLocaleDateString(locale, {
       timeZone: cleanedTimezone,
       year: 'numeric',

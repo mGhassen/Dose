@@ -7,6 +7,7 @@ import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
+import { AddVendorDialog } from "@/components/add-vendor-dialog";
 import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
@@ -35,6 +36,7 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
   const items = itemsResponse?.data ?? [];
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
+  const [addVendorOpen, setAddVendorOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
@@ -428,7 +430,13 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
               items={suppliers}
               selectedId={formData.supplierId ? parseInt(formData.supplierId, 10) : undefined}
               onSelect={(item) => handleInputChange("supplierId", item.id === 0 ? "" : String(item.id))}
+              onCreateNew={() => setAddVendorOpen(true)}
               placeholder="Select vendor"
+            />
+            <AddVendorDialog
+              open={addVendorOpen}
+              onOpenChange={setAddVendorOpen}
+              onCreated={(v) => handleInputChange("supplierId", String(v.id))}
             />
           </div>
 

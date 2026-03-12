@@ -9,13 +9,19 @@ export async function GET(request: NextRequest) {
     const fromDate = searchParams.get('from_date');
     const toDate = searchParams.get('to_date');
     const reconciled = searchParams.get('reconciled');
+    const sortBy = searchParams.get('sort_by') ?? 'execution_date';
+    const sortOrder = searchParams.get('sort_order') ?? 'desc';
     const { page, limit, offset } = getPaginationParams(searchParams);
+
+    const allowedSortColumns = ['execution_date', 'amount', 'label', 'counterparty_name'] as const;
+    const column = allowedSortColumns.includes(sortBy as any) ? sortBy : 'execution_date';
+    const ascending = sortOrder === 'asc';
 
     const supabase = supabaseServer();
     let query = supabase
       .from('bank_transactions')
       .select('*', { count: 'exact' })
-      .order('execution_date', { ascending: false });
+      .order(column, { ascending });
 
     if (integrationId) query = query.eq('integration_id', integrationId);
     if (fromDate) query = query.gte('execution_date', fromDate);

@@ -797,7 +797,7 @@ export default function DataTablePage<T>({
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button

@@ -8,6 +8,8 @@ export function useBankTransactions(params?: {
   from_date?: string;
   to_date?: string;
   reconciled?: 'true' | 'false';
+  sort_by?: 'execution_date' | 'amount' | 'label' | 'counterparty_name';
+  sort_order?: 'asc' | 'desc';
 }) {
   return useQuery({
     queryKey: ['bank-transactions', params],

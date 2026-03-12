@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,12 +10,13 @@ import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
+import { AddVendorDialog } from "@/components/add-vendor-dialog";
 import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateSubscription, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
+import { useCreateSubscription, useInventorySuppliers, useMetadataEnum, useVariablesByType } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseRecurrence } from "@kit/types";
 import Link from "next/link";
@@ -26,11 +28,18 @@ import {
 
 export default function CreateSubscriptionPage() {
   const router = useRouter();
+  const [addVendorOpen, setAddVendorOpen] = useState(false);
   const createSubscription = useCreateSubscription();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: "vendor" });
   const suppliers = suppliersResponse?.data || [];
   const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
   const recurrenceItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const { data: transactionTaxVars = [] } = useVariablesByType("transaction_tax");
+  const transactionTaxItems = transactionTaxVars.map((v) => ({
+    id: v.id,
+    name: `${v.name} (${v.value}%)`,
+    value: v.value,
+  }));
 
   const {
     register,
@@ -206,16 +215,23 @@ export default function CreateSubscriptionPage() {
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="defaultTaxRatePercent">Default tax rate % (optional)</Label>
-                  <Input
-                    id="defaultTaxRatePercent"
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    max={100}
-                    {...register("defaultTaxRatePercent", { valueAsNumber: true })}
-                    placeholder="e.g. 10"
+                  <Controller
+                    name="defaultTaxRatePercent"
+                    control={control}
+                    render={({ field }) => (
+                      <UnifiedSelector
+                        label="Transaction tax *"
+                        required
+                        items={transactionTaxItems}
+                        selectedId={transactionTaxVars.find((v) => v.value === field.value)?.id}
+                        onSelect={(item) => field.onChange((item as { value: number }).value)}
+                        placeholder="Select transaction tax"
+                      />
+                    )}
                   />
+                  {errors.defaultTaxRatePercent && (
+                    <p className="text-xs text-destructive">{errors.defaultTaxRatePercent.message}</p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     Applied when this subscription generates expense lines (e.g. when a payment is
                     marked paid).
@@ -227,24 +243,32 @@ export default function CreateSubscriptionPage() {
                     name="supplierId"
                     control={control}
                     render={({ field }) => (
-                      <UnifiedSelector
-                        label="Vendor"
-                        type="vendor"
-                        items={suppliers}
-                        selectedId={field.value ?? undefined}
-                        onSelect={(item) =>
-                          field.onChange(item.id === 0 ? undefined : item.id)
-                        }
-                        placeholder="Select vendor"
-                        manageLink={
-                          field.value
-                            ? {
-                                href: `/inventory-suppliers/${field.value}`,
-                                text: "View vendor details →",
-                              }
-                            : undefined
-                        }
-                      />
+                      <>
+                        <UnifiedSelector
+                          label="Vendor"
+                          type="vendor"
+                          items={suppliers}
+                          selectedId={field.value ?? undefined}
+                          onSelect={(item) =>
+                            field.onChange(item.id === 0 ? undefined : item.id)
+                          }
+                          onCreateNew={() => setAddVendorOpen(true)}
+                          placeholder="Select vendor"
+                          manageLink={
+                            field.value
+                              ? {
+                                  href: `/inventory-suppliers/${field.value}`,
+                                  text: "View vendor details →",
+                                }
+                              : undefined
+                          }
+                        />
+                        <AddVendorDialog
+                          open={addVendorOpen}
+                          onOpenChange={setAddVendorOpen}
+                          onCreated={(v) => field.onChange(v.id)}
+                        />
+                      </>
                     )}
                   />
                 </div>

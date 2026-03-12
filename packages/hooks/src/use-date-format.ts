@@ -62,37 +62,10 @@ function getDateFormatOptions(format: string, includeTime = false) {
   }
 }
 
-// Helper function to format date according to user's format preference
 function formatDateWithUserFormat(date: Date, format: string, locale: string, timeZone: string): string {
   const options = getDateFormatOptions(format);
-  
-  // For formats with different separators, we need to manually format
-  switch (format) {
-    case 'DD/MM/YYYY':
-      return date.toLocaleDateString(locale, { ...options, timeZone });
-    case 'MM/DD/YYYY':
-      return date.toLocaleDateString('en-US', { ...options, timeZone });
-    case 'YYYY-MM-DD':
-      return date.toLocaleDateString('sv-SE', { ...options, timeZone });
-    case 'DD-MM-YYYY':
-      return date.toLocaleDateString('en-GB', { ...options, timeZone });
-    case 'MM-DD-YYYY':
-      return date.toLocaleDateString('en-US', { ...options, timeZone });
-    case 'DD.MM.YYYY':
-      return date.toLocaleDateString('de-DE', { ...options, timeZone });
-    case 'MM.DD.YYYY':
-      return date.toLocaleDateString('en-US', { ...options, timeZone });
-    case 'DD MMM YYYY':
-      return date.toLocaleDateString(locale, { ...options, timeZone });
-    case 'MMM DD, YYYY':
-      return date.toLocaleDateString('en-US', { ...options, timeZone });
-    case 'DD MMMM YYYY':
-      return date.toLocaleDateString(locale, { ...options, timeZone });
-    case 'MMMM DD, YYYY':
-      return date.toLocaleDateString('en-US', { ...options, timeZone });
-    default:
-      return date.toLocaleDateString(locale, { ...options, timeZone });
-  }
+  const opts = { ...options, timeZone };
+  return date.toLocaleDateString(locale, opts);
 }
 
 export function useDateFormat() {
@@ -123,11 +96,8 @@ export function useDateFormat() {
       }
       
       try {
-        // Use the current settings from the hook context
-        const locale = settings.language === 'en' ? 'en-US' : 'fr-FR';
+        const locale = settings.formattingLocale ?? 'fr-FR';
         const cleanedTimezone = settings.timezone.replace(/^(for|to|in)/, '').trim();
-        
-        // Apply the user's date format preference
         return formatDateWithUserFormat(dateObj, settings.dateFormat, locale, cleanedTimezone);
       } catch (error) {
         // Fallback to consistent format if settings can't be loaded
@@ -138,7 +108,7 @@ export function useDateFormat() {
         });
       }
     };
-  }, [settings.language, settings.timezone, settings.dateFormat, isLoading]);
+  }, [settings.formattingLocale, settings.timezone, settings.dateFormat, isLoading]);
 
   // Simplified other format functions - they can be enhanced later if needed
   const formatDateTime = formatDate;
@@ -162,11 +132,13 @@ export function useDateFormat() {
     dateFormat: settings.dateFormat,
     timeFormat: settings.timeFormat,
     language: settings.language,
+    formattingLocale: settings.formattingLocale ?? 'fr-FR',
     timezone: settings.timezone,
     preferences: {
       dateFormat: settings.dateFormat,
       timeFormat: settings.timeFormat,
       language: settings.language,
+      formattingLocale: settings.formattingLocale ?? 'fr-FR',
       timezone: settings.timezone
     }
   };

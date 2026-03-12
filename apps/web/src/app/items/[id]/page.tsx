@@ -15,6 +15,7 @@ import {
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
+import { AddVendorDialog } from "@/components/add-vendor-dialog";
 import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
@@ -47,6 +48,7 @@ import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
 import { to2Decimals, netUnitPriceFromInclusive, unitPriceExclToIncl } from "@/lib/transaction-tax";
 import { formatDate } from "@kit/lib/date-format";
+import { useDateFormat } from "@kit/hooks/use-date-format";
 import { DatePicker } from "@kit/ui/date-picker";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 import { InputGroupAttached } from "@/components/input-group";
@@ -454,6 +456,7 @@ function HistoryEntryTable({
 
 export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const router = useRouter();
+  const { formattingLocale } = useDateFormat();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -577,6 +580,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     }));
   }, [stockMovementsResponse?.data]);
   
+  const [addVendorOpen, setAddVendorOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -872,7 +876,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       items={suppliersResponse?.data ?? []}
                       selectedId={formData.vendorId ? parseInt(formData.vendorId) : undefined}
                       onSelect={(item) => handleInputChange('vendorId', item.id === 0 ? '' : String(item.id))}
+                      onCreateNew={() => setAddVendorOpen(true)}
                       placeholder="Select vendor"
+                    />
+                    <AddVendorDialog
+                      open={addVendorOpen}
+                      onOpenChange={setAddVendorOpen}
+                      onCreated={(v) => handleInputChange('vendorId', String(v.id))}
                     />
                   </div>
 
@@ -1056,13 +1066,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis 
                               dataKey="date" 
-                              tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              tickFormatter={(value) => new Date(value).toLocaleDateString(formattingLocale, { month: 'short', day: 'numeric' })}
                               style={{ fontSize: '12px' }}
                             />
                             <YAxis style={{ fontSize: '12px' }} />
                             <Tooltip 
                               formatter={(value: number) => value.toFixed(2)}
-                              labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                              labelFormatter={(value) => new Date(value).toLocaleDateString(formattingLocale, { month: 'short', day: 'numeric', year: 'numeric' })}
                             />
                             <Legend />
                             <Area type="monotone" dataKey="in" stroke="#22c55e" fillOpacity={1} fill="url(#colorIn)" name="Stock In" />

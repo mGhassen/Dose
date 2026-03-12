@@ -9,6 +9,7 @@ import { Badge } from '@kit/ui/badge';
 import { Settings } from 'lucide-react';
 import AppLayout from '@/components/app-layout';
 import { cleanTimezone, formatDateTime } from '@kit/lib/date-format';
+import { formatCurrency } from '@kit/lib/config';
 import DateFormatTest from '@/components/date-format-test';
 
 export default function UserSettingsPage() {
@@ -43,6 +44,14 @@ export default function UserSettingsPage() {
           <h3 className="text-sm font-medium mb-2">Aperçu des paramètres actuels</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
+              <span className="text-muted-foreground">Langue (interface):</span>
+              <span className="ml-2 font-medium">{settings.language === 'fr' ? 'Français' : 'English'}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Locale (dates et nombres):</span>
+              <span className="ml-2 font-medium">{settings.formattingLocale === 'en-US' ? 'English (en-US)' : 'Français (fr-FR)'}</span>
+            </div>
+            <div>
               <span className="text-muted-foreground">Fuseau horaire:</span>
               <span className="ml-2 font-medium">{settings.timezone}</span>
             </div>
@@ -54,26 +63,11 @@ export default function UserSettingsPage() {
               <span className="text-muted-foreground">Format d'heure:</span>
               <span className="ml-2 font-medium">{settings.timeFormat}</span>
             </div>
-            <div>
-              <span className="text-muted-foreground">Langue:</span>
-              <span className="ml-2 font-medium">{settings.language === 'fr' ? 'Français' : 'English'}</span>
-            </div>
           </div>
           <div className="mt-3 pt-3 border-t">
             <span className="text-muted-foreground">Exemple:</span>
             <span className="ml-2 font-medium">
-              {(() => {
-                try {
-                  // Clean the timezone value to remove any potential prefixes
-                  const cleanedTimezone = cleanTimezone(settings.timezone);
-                  
-                  return formatDateTime(new Date());
-                } catch (error) {
-                  console.error('Error formatting date with timezone:', error);
-                  // Fallback to default formatting
-                  return formatDateTime(new Date());
-                }
-              })()}
+              {formatDateTime(new Date())} · {formatCurrency(1234.56)}
             </span>
           </div>
         </div>
@@ -114,6 +108,9 @@ export default function UserSettingsPage() {
                 placeholder="Select language"
               />
             </div>
+            <p className="text-sm text-muted-foreground">
+              Langue des menus et libellés de l&apos;interface.
+            </p>
           </CardContent>
         </Card>
 
@@ -126,7 +123,18 @@ export default function UserSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <UnifiedSelector
+                label="Locale (dates et nombres)"
+                type="formattingLocale"
+                items={[
+                  { id: 'fr-FR', name: 'Français (31/12/2024, 1 234,56 €)' },
+                  { id: 'en-US', name: 'English (12/31/2024, 1,234.56 €)' },
+                ]}
+                selectedId={settings.formattingLocale ?? undefined}
+                onSelect={(item) => updateSetting('formattingLocale', String(item.id) as 'fr-FR' | 'en-US')}
+                placeholder="Select locale"
+              />
               <UnifiedSelector
                 label="Fuseau horaire"
                 type="timezone"

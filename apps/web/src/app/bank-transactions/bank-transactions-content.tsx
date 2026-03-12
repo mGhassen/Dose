@@ -6,8 +6,29 @@ import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useBankTransactions } from "@kit/hooks";
 import type { BankTransaction } from "@kit/lib";
+import { formatDate } from "@kit/lib/date-format";
 import { Card, CardContent } from "@kit/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@kit/ui/select";
 import { useDashboardPeriod } from "@/components/dashboard-period-provider";
+
+type ReconciledFilter = "all" | "true" | "false";
+type SortColumn = "execution_date" | "amount" | "label" | "counterparty_name";
+const SORT_OPTIONS: { value: string; by: SortColumn; order: "asc" | "desc"; label: string }[] = [
+  { value: "date_desc", by: "execution_date", order: "desc", label: "Date (newest first)" },
+  { value: "date_asc", by: "execution_date", order: "asc", label: "Date (oldest first)" },
+  { value: "amount_desc", by: "amount", order: "desc", label: "Amount (high to low)" },
+  { value: "amount_asc", by: "amount", order: "asc", label: "Amount (low to high)" },
+  { value: "label_asc", by: "label", order: "asc", label: "Label (A–Z)" },
+  { value: "label_desc", by: "label", order: "desc", label: "Label (Z–A)" },
+  { value: "counterparty_asc", by: "counterparty_name", order: "asc", label: "Counterparty (A–Z)" },
+  { value: "counterparty_desc", by: "counterparty_name", order: "desc", label: "Counterparty (Z–A)" },
+];
 
 interface BankTransactionsContentProps {
   selectedTransactionId?: number;
@@ -20,16 +41,22 @@ export default function BankTransactionsContent({
   const { dateRange } = useDashboardPeriod();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [reconciledFilter, setReconciledFilter] = useState<ReconciledFilter>("all");
+  const [sortValue, setSortValue] = useState("date_desc");
 
   useEffect(() => {
     setPage(1);
-  }, [dateRange.startDate, dateRange.endDate]);
+  }, [dateRange.startDate, dateRange.endDate, reconciledFilter, sortValue]);
 
+  const sortOption = SORT_OPTIONS.find((o) => o.value === sortValue) ?? SORT_OPTIONS[0];
   const { data, isLoading } = useBankTransactions({
     page,
     limit: pageSize,
     from_date: dateRange.startDate,
     to_date: dateRange.endDate,
+    reconciled: reconciledFilter === "all" ? undefined : reconciledFilter,
+    sort_by: sortOption.by,
+    sort_order: sortOption.order,
   });
 
   const list = data?.data ?? [];
@@ -65,7 +92,7 @@ export default function BankTransactionsContent({
       {
         accessorKey: "execution_date",
         header: "Date",
-        cell: ({ row }) => row.original.execution_date,
+        cell: ({ row }) => formatDate(row.original.execution_date),
       },
       {
         accessorKey: "amount",
@@ -95,6 +122,28 @@ export default function BankTransactionsContent({
           );
         },
       },
+    ],
+    []
+  );
+
+  const filterColumns = useMemo(
+    () => [
+      { value: "execution_date", label: "Date", type: "date" as const },
+      { value: "amount", label: "Amount", type: "number" as const },
+      { value: "label", label: "Label", type: "text" as const },
+      { value: "counterparty_name", label: "Counterparty", type: "text" as const },
+      { value: "reconciled_entity_type", label: "Reconciled", type: "text" as const },
+    ],
+    []
+  );
+
+  const sortColumns = useMemo(
+    () => [
+      { value: "execution_date", label: "Date", type: "date" },
+      { value: "amount", label: "Amount", type: "number" },
+      { value: "label", label: "Label", type: "text" },
+      { value: "counterparty_name", label: "Counterparty", type: "text" },
+      { value: "reconciled_entity_type", label: "Reconciled", type: "text" },
     ],
     []
   );
@@ -162,6 +211,8 @@ export default function BankTransactionsContent({
           pagination={pagination}
           localStoragePrefix="bankTransactions"
           searchFields={["label", "counterparty_name"]}
+          filterColumns={filterColumns}
+          sortColumns={sortColumns}
           activeRowId={selectedTransactionId}
         />
       </div>

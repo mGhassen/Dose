@@ -28,6 +28,8 @@ export const bankTransactionsApi = {
     from_date?: string;
     to_date?: string;
     reconciled?: 'true' | 'false';
+    sort_by?: 'execution_date' | 'amount' | 'label' | 'counterparty_name';
+    sort_order?: 'asc' | 'desc';
   }) => {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.append('page', params.page.toString());
@@ -36,6 +38,8 @@ export const bankTransactionsApi = {
     if (params?.from_date) searchParams.append('from_date', params.from_date);
     if (params?.to_date) searchParams.append('to_date', params.to_date);
     if (params?.reconciled) searchParams.append('reconciled', params.reconciled);
+    if (params?.sort_by) searchParams.append('sort_by', params.sort_by);
+    if (params?.sort_order) searchParams.append('sort_order', params.sort_order);
     const query = searchParams.toString();
     return apiRequest<PaginatedResponse<BankTransaction>>('GET', `/api/bank-transactions${query ? `?${query}` : ''}`);
   },

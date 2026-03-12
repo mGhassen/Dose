@@ -142,6 +142,10 @@ export const createSubscriptionFormSchema = z
   .refine((d) => d.category != null, {
     message: "Category is required",
     path: ["category"],
+  })
+  .refine((d) => d.defaultTaxRatePercent != null && d.defaultTaxRatePercent >= 0, {
+    message: "Transaction tax is required",
+    path: ["defaultTaxRatePercent"],
   });
 export type CreateSubscriptionFormInput = z.infer<typeof createSubscriptionFormSchema>;
 

@@ -4,6 +4,7 @@ import { cleanTimezone } from './date-format';
 export const DEFAULT_USER_SETTINGS = {
   theme: 'auto' as 'light' | 'dark' | 'auto',
   language: 'fr' as 'fr' | 'en',
+  formattingLocale: 'fr-FR' as 'fr-FR' | 'en-US',
   timezone: 'Europe/Paris',
   dateFormat: 'DD/MM/YYYY',
   timeFormat: '24h' as '12h' | '24h',

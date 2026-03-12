@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
+import { AddVendorDialog } from "@/components/add-vendor-dialog";
 import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
@@ -28,6 +29,7 @@ export default function CreateItemPage() {
     { id: "product", name: "Product" },
   ];
   const typeItems = (variableTypeValues || []).map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const [addVendorOpen, setAddVendorOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -170,7 +172,13 @@ export default function CreateItemPage() {
                     items={suppliersResponse?.data ?? []}
                     selectedId={formData.vendorId ? parseInt(formData.vendorId) : undefined}
                     onSelect={(item) => handleInputChange('vendorId', item.id === 0 ? '' : String(item.id))}
+                    onCreateNew={() => setAddVendorOpen(true)}
                     placeholder="Select vendor"
+                  />
+                  <AddVendorDialog
+                    open={addVendorOpen}
+                    onOpenChange={setAddVendorOpen}
+                    onCreated={(v) => handleInputChange('vendorId', String(v.id))}
                   />
                 </div>
 

@@ -32,6 +32,7 @@ import {
   Plus,
 } from "lucide-react";
 import { DatePicker } from "@kit/ui/date-picker";
+import { AddVendorDialog } from "@/components/add-vendor-dialog";
 import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
@@ -112,6 +113,7 @@ export function ExpenseDetailContent({
   const categoryLabels: Record<string, string> = Object.fromEntries(
     categoryValues.map((ev) => [ev.name, ev.label ?? ev.name])
   );
+  const [addVendorOpen, setAddVendorOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     category: "" as ExpenseCategory | "",
@@ -569,7 +571,13 @@ export function ExpenseDetailContent({
                 items={suppliers}
                 selectedId={formData.supplierId ? parseInt(formData.supplierId, 10) : undefined}
                 onSelect={(item) => setFormData((p) => ({ ...p, supplierId: item.id === 0 ? "" : String(item.id) }))}
+                onCreateNew={() => setAddVendorOpen(true)}
                 placeholder="Select vendor"
+              />
+              <AddVendorDialog
+                open={addVendorOpen}
+                onOpenChange={setAddVendorOpen}
+                onCreated={(v) => setFormData((p) => ({ ...p, supplierId: String(v.id) }))}
               />
             </div>
             <div className="space-y-2">
