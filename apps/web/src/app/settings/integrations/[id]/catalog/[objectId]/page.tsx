@@ -30,14 +30,14 @@ export default function SquareCatalogDetailPage({
     params.then(setResolved);
   }, [params]);
 
-  const catalogParams = { types: ['ITEM', 'ITEM_VARIATION', 'CATEGORY', 'MODIFIER', 'MODIFIER_LIST', 'TAX'] as const };
+  const catalogParams = { types: ['ITEM', 'ITEM_VARIATION', 'CATEGORY', 'MODIFIER', 'MODIFIER_LIST', 'TAX'] };
   const { data: catalog, isLoading, error } = useSquareCatalog(
     resolved?.id ?? '',
     catalogParams,
     { enabled: !!resolved?.id }
   );
 
-  const processed = processCatalogData(catalog);
+  const processed = processCatalogData(catalog ?? null);
   const item = resolved?.objectId
     ? processed.find((i: any) => i.id === resolved.objectId)
     : null;

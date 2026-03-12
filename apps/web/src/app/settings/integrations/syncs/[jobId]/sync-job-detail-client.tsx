@@ -172,6 +172,16 @@ export function SyncJobDetailClient() {
     );
   }
 
+  if (!job) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[40vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </AppLayout>
+    );
+  }
+
   const steps: SyncJobStep[] = job.steps ?? [];
   const isRunning = job.status === 'pending' || job.status === 'processing';
   const hasErrors = Boolean(job.error_message || (job.errors && job.errors.length > 0));

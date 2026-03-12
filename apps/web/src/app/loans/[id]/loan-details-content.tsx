@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from "@kit/ui/alert-dialog";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import type { LoanStatus } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 import { Checkbox } from "@kit/ui/checkbox";

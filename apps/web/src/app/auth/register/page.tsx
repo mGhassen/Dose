@@ -134,7 +134,7 @@ export default function Register() {
     firstName: string;
     lastName: string;
     googleData: GoogleUserData;
-  }) => {
+  }): Promise<{ account: { accessible_portals?: string[] } }> => {
     throw new Error('Google registration is not available');
   };
 

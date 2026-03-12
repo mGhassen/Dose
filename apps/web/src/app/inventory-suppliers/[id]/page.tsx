@@ -403,15 +403,17 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                   <div className="space-y-3 md:col-span-2">
                     <Label>Supplier Type</Label>
                     <div className="flex gap-4">
-                      {supplierTypeValues.map((ev) => (
+                      {supplierTypeValues.map((ev) => {
+                        const typeValue = ev.name as 'supplier' | 'vendor';
+                        return (
                         <div key={ev.name} className="flex items-center space-x-2">
                           <Checkbox
                             id={`type-${ev.name}`}
-                            checked={formData.supplierType.includes(ev.name)}
+                            checked={formData.supplierType.includes(typeValue)}
                             onCheckedChange={(checked) => {
                               const newTypes = checked
-                                ? [...formData.supplierType.filter(t => t !== ev.name), ev.name]
-                                : formData.supplierType.filter(t => t !== ev.name);
+                                ? [...formData.supplierType.filter(t => t !== typeValue), typeValue]
+                                : formData.supplierType.filter(t => t !== typeValue);
                               handleInputChange('supplierType', newTypes.length > 0 ? newTypes : [supplierTypeValues[0]?.name ?? 'supplier']);
                             }}
                           />
@@ -419,7 +421,8 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                             {ev.label ?? ev.name}
                           </Label>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 

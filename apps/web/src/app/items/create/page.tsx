@@ -61,7 +61,7 @@ export default function CreateItemPage() {
         vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
         notes: formData.notes || undefined,
         isActive: formData.isActive,
-        itemType: formData.itemType,
+        itemType: formData.itemType as 'item' | 'product',
         type: formData.type || undefined,
       });
       toast.success("Item created successfully");
