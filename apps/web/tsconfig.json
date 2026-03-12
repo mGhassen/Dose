@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "types": [],
     "allowJs": true,
     "skipLibCheck": true,
@@ -15,7 +19,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
       {
@@ -23,15 +27,38 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@kit/ui/*": ["../../packages/ui/src/*"],
-      "@kit/hooks/*": ["../../packages/hooks/src/*"],
-      "@kit/lib/*": ["../../packages/lib/src/*"],
-      "@kit/config/*": ["../../packages/config/src/*"],
-      "@kit/mocks/*": ["../../packages/mocks/src/*"],
-      "@kit/types/*": ["../../packages/types/src/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@kit/ui/*": [
+        "../../packages/ui/src/*"
+      ],
+      "@kit/hooks/*": [
+        "../../packages/hooks/src/*"
+      ],
+      "@kit/lib/*": [
+        "../../packages/lib/src/*"
+      ],
+      "@kit/config/*": [
+        "../../packages/config/src/*"
+      ],
+      "@kit/mocks/*": [
+        "../../packages/mocks/src/*"
+      ],
+      "@kit/types/*": [
+        "../../packages/types/src/*"
+      ]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/types/**/*.d.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "src/types/**/*.d.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
