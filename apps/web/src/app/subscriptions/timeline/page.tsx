@@ -50,6 +50,8 @@ export default function SubscriptionsTimelinePage() {
 
   const handleTimelineUpdate = () => {
     queryClient.invalidateQueries({ queryKey: ['actual-payments'] });
+    queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
   };
 
   const [startMonth, setStartMonth] = useState(() => {

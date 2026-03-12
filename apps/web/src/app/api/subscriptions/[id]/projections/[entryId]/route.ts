@@ -76,9 +76,10 @@ export async function PUT(
 
     if (error) throw error;
 
-    // Update corresponding entry if it exists
+    // Update corresponding entry if it exists; create when missing so payment + expense can be created
     if (data) {
-      const { data: entryData, error: entryError } = await supabase
+      let entryData: { id: number } | null = null;
+      const { data: foundEntry, error: entryError } = await supabase
         .from('entries')
         .select('id')
         .eq('reference_id', parseInt(id))
@@ -86,7 +87,38 @@ export async function PUT(
         .eq('entry_type', 'subscription_payment')
         .maybeSingle();
 
-      if (!entryError && entryData) {
+      if (!entryError) entryData = foundEntry;
+
+      if (body.isPaid && body.paidDate && !entryData) {
+        const { data: subscriptionForEntry } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('id', parseInt(id))
+          .single();
+        if (subscriptionForEntry) {
+          const { data: newEntry, error: insertErr } = await supabase
+            .from('entries')
+            .insert({
+              direction: 'output',
+              entry_type: 'subscription_payment',
+              name: `${subscriptionForEntry.name} - ${data.month}`,
+              amount: body.amount !== undefined ? body.amount : parseFloat(existingEntry.amount),
+              description: body.notes || `Subscription payment for ${data.month}`,
+              category: subscriptionForEntry.category,
+              vendor: subscriptionForEntry.vendor,
+              entry_date: body.paidDate || data.month + '-01',
+              due_date: body.paidDate || data.month + '-01',
+              reference_id: parseInt(id),
+              schedule_entry_id: parseInt(entryId),
+              is_active: subscriptionForEntry.is_active,
+            })
+            .select('id')
+            .single();
+          if (!insertErr && newEntry) entryData = newEntry;
+        }
+      }
+
+      if (entryData) {
         if (body.amount !== undefined) {
           await supabase
             .from('entries')
@@ -181,9 +213,6 @@ export async function PUT(
               }
             }
           } else if (!body.isPaid) {
-            // If payment is marked as unpaid, delete the associated expense and payment
-            // Find the expense that was created for this subscription payment
-            // The expense should match the subscription_id and the paid_date/month
             const paidDate = existingEntry.paid_date || data.month + '-01';
             const { data: expenses } = await supabase
               .from('expenses')
@@ -193,7 +222,6 @@ export async function PUT(
               .maybeSingle();
 
             if (expenses) {
-              // Delete the expense
               const { error: expenseDeleteError } = await supabase
                 .from('expenses')
                 .delete()
@@ -204,7 +232,6 @@ export async function PUT(
               }
             }
 
-            // Delete the payment(s) associated with this entry
             const { data: payments } = await supabase
               .from('payments')
               .select('id')

@@ -25,6 +25,7 @@ import { StatusPin } from "@/components/status-pin";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections, useInventorySupplierById, useInventorySuppliers, useMetadataEnum, useVariablesByType } from "@kit/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -106,8 +107,11 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
     };
   });
   
+  const queryClient = useQueryClient();
   const handleTimelineUpdate = () => {
     refetchProjections();
+    queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
   };
   
   const [formData, setFormData] = useState({

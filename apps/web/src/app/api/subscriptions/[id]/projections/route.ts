@@ -177,7 +177,6 @@ export async function POST(
         .single();
 
       if (subscriptionData) {
-        // Check if entry already exists
         const { data: existingEntry } = await supabase
           .from('entries')
           .select('id')
@@ -186,17 +185,16 @@ export async function POST(
           .eq('entry_type', 'subscription_payment')
           .maybeSingle();
 
+        let resolvedEntry: { id: number } | null = existingEntry;
+
         if (!existingEntry) {
-          // Create OUTPUT entry
-          // IMPORTANT: entry amount should always be the projected amount (body.amount), not actualAmount
-          // actualAmount is only for tracking payments, not for the entry's expected amount
-          const { data: entryData, error: entryError } = await supabase
+          const { data: insertedEntry, error: entryError } = await supabase
             .from('entries')
             .insert({
               direction: 'output',
               entry_type: 'subscription_payment',
               name: `${subscriptionData.name} - ${body.month}`,
-              amount: body.amount, // Always use projected amount, not actualAmount
+              amount: body.amount,
               description: body.notes || `Subscription payment for ${body.month}`,
               category: subscriptionData.category,
               vendor: subscriptionData.vendor,
@@ -206,34 +204,57 @@ export async function POST(
               schedule_entry_id: projectionEntry.id,
               is_active: subscriptionData.is_active,
             })
-            .select()
+            .select('id')
             .single();
 
           if (entryError) {
             console.error('Error creating entry for subscription projection:', entryError);
-            // Continue even if entry creation fails
+          } else if (insertedEntry) {
+            resolvedEntry = insertedEntry;
+          }
+        }
+
+        if (body.isPaid && body.paidDate && resolvedEntry) {
+          const { data: existingPayments } = await supabase
+            .from('payments')
+            .select('id')
+            .eq('entry_id', resolvedEntry.id);
+          if (!existingPayments || existingPayments.length === 0) {
+            const { data: existingByDate } = await supabase
+              .from('payments')
+              .select('id')
+              .eq('entry_id', resolvedEntry.id)
+              .eq('payment_date', body.paidDate)
+              .maybeSingle();
+            if (!existingByDate) {
+              await supabase
+                .from('payments')
+                .insert({
+                  entry_id: resolvedEntry.id,
+                  payment_date: body.paidDate,
+                  amount: body.actualAmount || body.amount,
+                  is_paid: true,
+                  paid_date: body.paidDate,
+                  notes: body.notes || null,
+                });
+            }
           }
 
-          // If payment is marked as paid, create payment and expense
-          if (entryData && body.isPaid && body.paidDate) {
-            // Create payment
-            await supabase
-              .from('payments')
-              .insert({
-                entry_id: entryData.id,
-                payment_date: body.paidDate,
-                amount: body.actualAmount || body.amount,
-                is_paid: true,
-                paid_date: body.paidDate,
-                notes: body.notes || null,
-              });
+          const subTotal = body.actualAmount ?? body.amount;
+          const taxRate = subscriptionData.default_tax_rate_percent != null ? parseFloat(String(subscriptionData.default_tax_rate_percent)) : 0;
+          const taxAmount = Math.round(subTotal * (taxRate / 100) * 100) / 100;
+          const totalTax = taxAmount;
+          const amount = Math.round((subTotal + totalTax) * 100) / 100;
 
-            const subTotal = body.actualAmount ?? body.amount;
-            const taxRate = subscriptionData.default_tax_rate_percent != null ? parseFloat(String(subscriptionData.default_tax_rate_percent)) : 0;
-            const taxAmount = Math.round(subTotal * (taxRate / 100) * 100) / 100;
-            const totalTax = taxAmount;
-            const amount = Math.round((subTotal + totalTax) * 100) / 100;
+          const expenseDate = body.paidDate || `${body.month}-01`;
+          const { data: existingExpense } = await supabase
+            .from('expenses')
+            .select('id')
+            .eq('subscription_id', parseInt(id))
+            .eq('expense_date', expenseDate)
+            .maybeSingle();
 
+          if (!existingExpense) {
             const { data: expenseRow, error: expenseErr } = await supabase
               .from('expenses')
               .insert({
@@ -241,10 +262,10 @@ export async function POST(
                 category: subscriptionData.category,
                 amount,
                 subscription_id: parseInt(id),
-                expense_date: body.paidDate || `${body.month}-01`,
+                expense_date: expenseDate,
                 description: body.notes || `Payment for subscription: ${subscriptionData.name} - ${body.month}`,
                 vendor: subscriptionData.vendor || null,
-                start_date: body.paidDate || `${body.month}-01`,
+                start_date: expenseDate,
                 subtotal: subTotal,
                 total_tax: totalTax,
                 total_discount: 0,
