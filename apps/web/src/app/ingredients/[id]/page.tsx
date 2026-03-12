@@ -187,7 +187,6 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-        </div>
 
         <Card>
           <CardHeader>
