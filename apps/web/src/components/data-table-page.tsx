@@ -32,7 +32,7 @@ import {
 import { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from 'next-intl';
+import { useTranslations } from 'use-intl';
 import DataTable from "@kit/ui/data-table";
 import { UnifiedFilter, FilterOption, FilterState } from "@/components/unified-filter";
 import { UnifiedSelector } from "@/components/unified-selector";
