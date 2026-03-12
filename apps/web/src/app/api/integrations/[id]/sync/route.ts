@@ -95,7 +95,7 @@ async function fetchAndStageSquare(
     const catalogTypes = ['ITEM', 'ITEM_VARIATION', 'CATEGORY', 'MODIFIER', 'MODIFIER_LIST', 'TAX'];
     let catalogCursor: string | null = null;
     do {
-      const catalogResponse = await fetch(`${SQUARE_API_BASE}/v2/catalog/search`, {
+      const catalogResponse: Response = await fetch(`${SQUARE_API_BASE}/v2/catalog/search`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ object_types: catalogTypes, cursor: catalogCursor || undefined }),
@@ -110,17 +110,27 @@ async function fetchAndStageSquare(
         }
         return { error: `Failed to fetch catalog: ${errorDetails?.errors?.[0]?.detail || catalogResponse.statusText}` };
       }
-      const catalogData = await catalogResponse.json();
+      const catalogData: { objects?: unknown[]; cursor?: string | null } = await catalogResponse.json();
       const objects = catalogData.objects || [];
       catalogCursor = catalogData.cursor || null;
       if (objects.length > 0) {
-        const { error: insertErr } = await supabase.from('sync_square_data').insert({
+        const rows = objects.map((obj: any) => ({
           job_id: jobId,
-          data_type: 'catalog_batch',
-          source_id: '',
-          payload: objects,
-        });
-        if (insertErr) return { error: `Failed to stage catalog: ${insertErr.message}` };
+          data_type: 'catalog_object',
+          source_id: obj.id || '',
+          payload: obj,
+        }));
+        const { error: upsertErr } = await supabase
+          .from('sync_square_data')
+          .upsert(rows, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
+        if (upsertErr) {
+          if (upsertErr.message?.includes('no unique or exclusion constraint')) {
+            const { error: insertErr } = await supabase.from('sync_square_data').insert(rows);
+            if (insertErr) return { error: `Failed to stage catalog: ${insertErr.message}` };
+          } else {
+            return { error: `Failed to stage catalog: ${upsertErr.message}` };
+          }
+        }
         stats.catalog_batches += 1;
         await insertStep(`Catalog — page ${stats.catalog_batches}`, 'done', { objects: objects.length });
       }
@@ -139,8 +149,14 @@ async function fetchAndStageSquare(
 
   if ((syncType === 'orders' || syncType === 'full') && locationIds.length > 0) {
     const now = new Date();
-    const startDate = new Date(now.getFullYear() - 2, 0, 1);
-    const ranges = getMonthlyDateRanges(startDate, now);
+    const useIncremental = syncType === 'orders' && integration.last_sync_at != null;
+    const lastSync = useIncremental
+      ? new Date(new Date(integration.last_sync_at).getTime() - 5 * 60 * 1000)
+      : null;
+    const ORDER_LOOKBACK_YEARS = 7;
+    const startDate = lastSync ?? new Date(now.getFullYear() - ORDER_LOOKBACK_YEARS, 0, 1);
+    const orderEndDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const ranges = getMonthlyDateRanges(startDate, orderEndDate);
     let ordersStepAdded = false;
 
     for (const range of ranges) {
@@ -183,13 +199,18 @@ async function fetchAndStageSquare(
         const orders = ordersData.orders || [];
         ordersCursor = ordersData.cursor || null;
         for (const order of orders) {
-          const { error: insertErr } = await supabase.from('sync_square_data').insert({
-            job_id: jobId,
-            data_type: 'order',
-            source_id: order.id || '',
-            payload: order,
-          });
-          if (insertErr) return { error: `Failed to stage order: ${insertErr.message}` };
+          const row = { job_id: jobId, data_type: 'order', source_id: order.id || '', payload: order };
+          const { error: upsertErr } = await supabase
+            .from('sync_square_data')
+            .upsert(row, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
+          if (upsertErr) {
+            if (upsertErr.message?.includes('no unique or exclusion constraint')) {
+              const { error: insertErr } = await supabase.from('sync_square_data').insert(row);
+              if (insertErr) return { error: `Failed to stage order: ${insertErr.message}` };
+            } else {
+              return { error: `Failed to stage order: ${upsertErr.message}` };
+            }
+          }
           stats.orders_fetched += 1;
         }
         if (orders.length > 0) {
@@ -203,41 +224,60 @@ async function fetchAndStageSquare(
   }
 
   if (syncType === 'payments' || syncType === 'full') {
-    let paymentsCursor: string | null = null;
-    let paymentsPage = 0;
+    const now = new Date();
+    const paymentsStart = integration.last_sync_at != null
+      ? new Date(integration.last_sync_at)
+      : new Date(now.getFullYear() - 7, 0, 1);
+    const paymentsEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const paymentRanges = getMonthlyDateRanges(paymentsStart, paymentsEnd);
     let paymentsStepAdded = false;
-    do {
-      const payUrl = `${SQUARE_API_BASE}/v2/payments${paymentsCursor ? `?cursor=${paymentsCursor}` : ''}`;
-      const payResponse = await fetch(payUrl, { headers });
-      if (!payResponse.ok) {
-        const errText = await payResponse.text();
-        let errDetails: any;
-        try {
-          errDetails = JSON.parse(errText);
-        } catch {
-          errDetails = errText;
+
+    for (const range of paymentRanges) {
+      const monthLabel = new Date(range.startAt).toISOString().slice(0, 7);
+      let paymentsPageInMonth = 0;
+      let paymentsCursor: string | null = null;
+      do {
+        const payParams = new URLSearchParams();
+        payParams.set('begin_time', range.startAt);
+        payParams.set('end_time', range.endAt);
+        if (paymentsCursor) payParams.set('cursor', paymentsCursor);
+        const payUrl = `${SQUARE_API_BASE}/v2/payments?${payParams.toString()}`;
+        const payResponse = await fetch(payUrl, { headers });
+        if (!payResponse.ok) {
+          const errText = await payResponse.text();
+          let errDetails: any;
+          try {
+            errDetails = JSON.parse(errText);
+          } catch {
+            errDetails = errText;
+          }
+          return { error: `Failed to fetch payments: ${errDetails?.errors?.[0]?.detail || payResponse.statusText}` };
         }
-        return { error: `Failed to fetch payments: ${errDetails?.errors?.[0]?.detail || payResponse.statusText}` };
-      }
-      const payData = await payResponse.json();
-      const payments = payData.payments || [];
-      paymentsCursor = payData.cursor || null;
-      for (const payment of payments) {
-        const { error: insertErr } = await supabase.from('sync_square_data').insert({
-          job_id: jobId,
-          data_type: 'payment',
-          source_id: payment.id || '',
-          payload: payment,
-        });
-        if (insertErr) return { error: `Failed to stage payment: ${insertErr.message}` };
-        stats.payments_fetched += 1;
-      }
-      if (payments.length > 0) {
-        paymentsPage += 1;
-        paymentsStepAdded = true;
-        await insertStep(`Payments — page ${paymentsPage}`, 'done', { payments: payments.length });
-      }
-    } while (paymentsCursor);
+        const payData = await payResponse.json();
+        const payments = payData.payments || [];
+        paymentsCursor = payData.cursor || null;
+        for (const payment of payments) {
+          const row = { job_id: jobId, data_type: 'payment', source_id: payment.id || '', payload: payment };
+          const { error: upsertErr } = await supabase
+            .from('sync_square_data')
+            .upsert(row, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
+          if (upsertErr) {
+            if (upsertErr.message?.includes('no unique or exclusion constraint')) {
+              const { error: insertErr } = await supabase.from('sync_square_data').insert(row);
+              if (insertErr) return { error: `Failed to stage payment: ${insertErr.message}` };
+            } else {
+              return { error: `Failed to stage payment: ${upsertErr.message}` };
+            }
+          }
+          stats.payments_fetched += 1;
+        }
+        if (payments.length > 0) {
+          paymentsPageInMonth += 1;
+          paymentsStepAdded = true;
+          await insertStep(`Payments — ${monthLabel} — page ${paymentsPageInMonth}`, 'done', { payments: payments.length });
+        }
+      } while (paymentsCursor);
+    }
     if (!paymentsStepAdded) await insertStep('Fetch payments', 'done', { payments: 0 });
   }
 

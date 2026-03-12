@@ -58,9 +58,20 @@ function stepStatusIcon(status: string) {
 function stepDetailsText(details?: Record<string, number | string> | null): string {
   if (!details || typeof details !== 'object') return '';
   const parts = Object.entries(details)
-    .filter(([, v]) => typeof v === 'number' && v > 0)
+    .filter(([, v]) => typeof v === 'number' || (typeof v === 'string' && v !== ''))
     .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`);
   return parts.join(', ');
+}
+
+function isFetchStep(name: string): boolean {
+  return (
+    name.startsWith('Catalog —') ||
+    name.startsWith('Orders —') ||
+    name.startsWith('Payments —') ||
+    name === 'Fetch catalog' ||
+    name === 'Fetch orders' ||
+    name === 'Fetch payments'
+  );
 }
 
 export default function SyncJobDetailPage() {
@@ -235,37 +246,6 @@ export default function SyncJobDetailPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Steps</CardTitle>
-            <CardDescription>Fetch and process steps</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {steps.length > 0 ? (
-              <ul className="space-y-2">
-                {steps.map((step) => (
-                  <li
-                    key={step.sequence}
-                    className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm"
-                  >
-                    {stepStatusIcon(step.status)}
-                    <span className="font-medium flex-1">{step.name}</span>
-                    {step.details && Object.keys(step.details).length > 0 && (
-                      <span className="text-muted-foreground text-xs">
-                        {stepDetailsText(step.details)}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground text-sm py-2">
-                {isRunning ? 'Steps will appear as the sync runs…' : 'No steps recorded for this job.'}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
         {job.stats && Object.keys(job.stats).length > 0 && (
           <Card>
             <CardHeader>
@@ -350,6 +330,89 @@ export default function SyncJobDetailPage() {
             </CardContent>
           </Card>
         )}
+
+        <Alert className="border-muted bg-muted/30">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="space-y-2 text-sm">
+            <p>
+              <strong>Phase 1 — Fetch:</strong> Data is fetched from Square (catalog, orders, payments) and stored in staging. Steps like &quot;Catalog — page 1&quot;, &quot;Orders — 2024-01 — page 1&quot; show fetch progress.
+            </p>
+            <p>
+              <strong>Phase 2 — Process:</strong> Staging data is processed in chunks and written to your app (items, sales, payments). Steps like &quot;Process catalog — chunk 1/5&quot;, &quot;Process catalog — complete&quot; show chunk progress and final totals.
+            </p>
+          </AlertDescription>
+        </Alert>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Steps</CardTitle>
+            <CardDescription>Full log: fetch and process steps (max 30 lines, scroll for more)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {steps.length > 0 ? (
+              <div className="space-y-4 max-h-[75rem] overflow-y-auto pr-1">
+                {(() => {
+                  const fetchSteps = steps.filter((s) => isFetchStep(s.name));
+                  const processSteps = steps.filter((s) => !isFetchStep(s.name));
+                  return (
+                    <>
+                      {fetchSteps.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                            Fetch
+                          </h4>
+                          <ul className="space-y-2">
+                            {fetchSteps.map((step) => (
+                              <li
+                                key={step.sequence}
+                                className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm"
+                              >
+                                {stepStatusIcon(step.status)}
+                                <span className="font-medium flex-1">{step.name}</span>
+                                {(step.details == null ? 0 : Object.keys(step.details).length) > 0 && (
+                                  <span className="text-muted-foreground text-xs">
+                                    {stepDetailsText(step.details)}
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {processSteps.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                            Process
+                          </h4>
+                          <ul className="space-y-2">
+                            {processSteps.map((step) => (
+                              <li
+                                key={step.sequence}
+                                className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm"
+                              >
+                                {stepStatusIcon(step.status)}
+                                <span className="font-medium flex-1">{step.name}</span>
+                                {(step.details == null ? 0 : Object.keys(step.details).length) > 0 && (
+                                  <span className="text-muted-foreground text-xs">
+                                    {stepDetailsText(step.details)}
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm py-2">
+                {isRunning ? 'Steps will appear as the sync runs…' : 'No steps recorded for this job.'}
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         {job.error_message && (
           <Alert variant="destructive">

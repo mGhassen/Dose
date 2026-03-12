@@ -47,3 +47,17 @@ CREATE POLICY "Service can insert/update sync job steps"
       )
     )
   );
+
+-- Prevent duplicate (job_id, data_type, source_id) in sync_square_data.
+-- Partial index: only enforce when source_id is set (orders, payments, catalog_object).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sync_square_data_job_type_source
+  ON sync_square_data (job_id, data_type, source_id)
+  WHERE source_id != '';
+
+-- Mark staging rows when processed so we can query only unprocessed and resume safely.
+ALTER TABLE sync_square_data
+  ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ DEFAULT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_sync_square_data_job_unprocessed
+  ON sync_square_data (job_id, id)
+  WHERE processed_at IS NULL;

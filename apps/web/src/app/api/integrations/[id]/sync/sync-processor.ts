@@ -70,16 +70,50 @@ async function completeStep(
     .eq('sequence', sequence);
 }
 
+export type ChunkContext = {
+  chunkIndex: number;
+  totalChunks: number;
+  accumulatedStats: Record<string, number>;
+};
+
+function getCatalogObjectsFromRows(
+  rows: { data_type: string; source_id: string; payload: any }[]
+): any[] {
+  const out: any[] = [];
+  for (const row of rows) {
+    if (row.data_type === 'catalog_batch') {
+      const arr = Array.isArray(row.payload) ? row.payload : [row.payload];
+      out.push(...arr);
+    } else if (row.data_type === 'catalog_object' && row.payload != null) {
+      out.push(row.payload);
+    }
+  }
+  return out;
+}
+
 export async function processSyncJob(
   supabase: SupabaseClient,
   job: { id: number; integration_id: number; sync_type: string },
   integration: any,
-  stagingRows: { data_type: string; source_id: string; payload: any }[]
+  stagingRows: { data_type: string; source_id: string; payload: any }[],
+  chunkContext?: ChunkContext
 ): Promise<{ status: 'completed' | 'failed'; error_message?: string; stats: Record<string, number> }> {
   const jobId = job.id;
   const integrationId = integration.id as number;
   const syncType = job.sync_type;
   const today = new Date().toISOString().split('T')[0];
+  const isChunked = chunkContext != null;
+  const chunkIndex = chunkContext?.chunkIndex ?? 0;
+  const totalChunks = chunkContext?.totalChunks ?? 1;
+  const isLastChunk = chunkIndex === totalChunks - 1;
+  const accumulatedStats = chunkContext?.accumulatedStats ?? {
+    items_imported: 0,
+    items_failed: 0,
+    orders_imported: 0,
+    orders_failed: 0,
+    payments_imported: 0,
+    payments_failed: 0,
+  };
 
   const stats: Record<string, number> = {
     items_imported: 0,
@@ -94,31 +128,45 @@ export async function processSyncJob(
   const { data: unitRow } = await supabase.from('units').select('id').eq('symbol', 'unit').maybeSingle();
   if (unitRow) unitId = unitRow.id;
 
-  const catalogBatches = stagingRows.filter((r) => r.data_type === 'catalog_batch');
-  if (catalogBatches.length > 0 && (syncType === 'catalog' || syncType === 'full')) {
-    let stepSeq = await getNextStepSequence(supabase, jobId);
-    await insertStep(supabase, jobId, stepSeq, 'Process catalog', 'running', {});
-    const catalogStepSeq = stepSeq;
-    const allCatalogObjects: any[] = [];
-    for (const row of catalogBatches) {
-      const arr = Array.isArray(row.payload) ? row.payload : [row.payload];
-      allCatalogObjects.push(...arr);
+  const allCatalogObjects = getCatalogObjectsFromRows(stagingRows);
+  if (allCatalogObjects.length > 0 && (syncType === 'catalog' || syncType === 'full')) {
+    let stepSeq: number;
+    let catalogStepSeq: number;
+    if (isChunked) {
+      stepSeq = await getNextStepSequence(supabase, jobId);
+      catalogStepSeq = stepSeq;
+      await insertStep(
+        supabase,
+        jobId,
+        stepSeq,
+        `Process catalog — chunk ${chunkIndex + 1}/${totalChunks}`,
+        'running',
+        { rows: allCatalogObjects.length }
+      );
+    } else {
+      stepSeq = await getNextStepSequence(supabase, jobId);
+      catalogStepSeq = stepSeq;
+      await insertStep(supabase, jobId, stepSeq, 'Process catalog', 'running', {});
     }
     const itemsMap = new Map<string, any>();
     const variationsMap = new Map<string, any[]>();
     const categoriesMap = new Map<string, any>();
+    const taxInclusionByTaxId = new Map<string, 'ADDITIVE' | 'INCLUSIVE'>();
     for (const obj of allCatalogObjects) {
-      if (obj.type === 'ITEM') {
+      if (obj?.type === 'ITEM') {
         itemsMap.set(obj.id, obj);
         if (!variationsMap.has(obj.id)) variationsMap.set(obj.id, []);
-      } else if (obj.type === 'ITEM_VARIATION') {
+      } else if (obj?.type === 'ITEM_VARIATION') {
         const itemId = obj.item_variation_data?.item_id;
         if (itemId) {
           if (!variationsMap.has(itemId)) variationsMap.set(itemId, []);
           variationsMap.get(itemId)!.push(obj);
         }
-      } else if (obj.type === 'CATEGORY') {
+      } else if (obj?.type === 'CATEGORY') {
         categoriesMap.set(obj.id, obj);
+      } else if (obj?.type === 'TAX') {
+        const inc = obj.tax_data?.inclusion_type;
+        if (inc === 'ADDITIVE' || inc === 'INCLUSIVE') taxInclusionByTaxId.set(obj.id, inc);
       }
     }
     for (const [itemId, itemObj] of itemsMap) {
@@ -169,6 +217,15 @@ export async function processSyncJob(
           const name = variations.length > 1 ? `${itemName} - ${vData.name || variationId}` : itemName;
           const sku = vData.sku || null;
           const priceCents = vData.price_money?.amount;
+          const taxIds = itemObj.item_data?.tax_ids ?? [];
+          const taxIncluded =
+            taxIds.length > 0
+              ? taxIds.some((tid: string) => taxInclusionByTaxId.get(tid) === 'INCLUSIVE')
+                ? true
+                : taxIds.every((tid: string) => taxInclusionByTaxId.get(tid) === 'ADDITIVE')
+                  ? false
+                  : undefined
+              : undefined;
           const { data: newItem, error: insertErr } = await supabase
             .from('items')
             .insert({
@@ -189,7 +246,7 @@ export async function processSyncJob(
             continue;
           }
           if (typeof priceCents === 'number' && priceCents >= 0) {
-            await upsertSellingPrice(supabase, newItem.id, today, centsToDecimal(priceCents));
+            await upsertSellingPrice(supabase, newItem.id, today, centsToDecimal(priceCents), taxIncluded);
           }
           await insertMapping(supabase, integrationId, 'catalog_variation', variationId, 'item', newItem.id);
           stats.items_imported += 1;
@@ -200,6 +257,7 @@ export async function processSyncJob(
       }
     }
     await completeStep(supabase, jobId, catalogStepSeq, {
+      rows: allCatalogObjects.length,
       items_imported: stats.items_imported,
       items_failed: stats.items_failed,
     });
@@ -207,9 +265,24 @@ export async function processSyncJob(
 
   const orderRows = stagingRows.filter((r) => r.data_type === 'order');
   if (orderRows.length > 0 && (syncType === 'orders' || syncType === 'full')) {
-    let stepSeq = await getNextStepSequence(supabase, jobId);
-    await insertStep(supabase, jobId, stepSeq, 'Process orders', 'running', {});
-    const ordersStepSeq = stepSeq;
+    let stepSeq: number;
+    let ordersStepSeq: number;
+    if (isChunked) {
+      stepSeq = await getNextStepSequence(supabase, jobId);
+      ordersStepSeq = stepSeq;
+      await insertStep(
+        supabase,
+        jobId,
+        stepSeq,
+        `Process orders — chunk ${chunkIndex + 1}/${totalChunks}`,
+        'running',
+        { rows: orderRows.length }
+      );
+    } else {
+      stepSeq = await getNextStepSequence(supabase, jobId);
+      ordersStepSeq = stepSeq;
+      await insertStep(supabase, jobId, stepSeq, 'Process orders', 'running', {});
+    }
     for (const row of orderRows) {
       const order = row.payload;
       const orderId = order?.id || row.source_id;
@@ -292,7 +365,7 @@ export async function processSyncJob(
             total_discount: totalDiscount,
             description,
             item_id: firstLine?.itemId ?? null,
-            quantity: sumQty,
+            quantity: Math.round(sumQty),
             unit_price: firstLine?.unitPrice ?? null,
             unit_cost: firstLine?.unitCost ?? null,
           })
@@ -339,6 +412,7 @@ export async function processSyncJob(
       }
     }
     await completeStep(supabase, jobId, ordersStepSeq, {
+      rows: orderRows.length,
       orders_imported: stats.orders_imported,
       orders_failed: stats.orders_failed,
     });
@@ -346,9 +420,24 @@ export async function processSyncJob(
 
   const paymentRows = stagingRows.filter((r) => r.data_type === 'payment');
   if (paymentRows.length > 0 && (syncType === 'payments' || syncType === 'full')) {
-    let stepSeq = await getNextStepSequence(supabase, jobId);
-    await insertStep(supabase, jobId, stepSeq, 'Process payments', 'running', {});
-    const paymentsStepSeq = stepSeq;
+    let stepSeq: number;
+    let paymentsStepSeq: number;
+    if (isChunked) {
+      stepSeq = await getNextStepSequence(supabase, jobId);
+      paymentsStepSeq = stepSeq;
+      await insertStep(
+        supabase,
+        jobId,
+        stepSeq,
+        `Process payments — chunk ${chunkIndex + 1}/${totalChunks}`,
+        'running',
+        { rows: paymentRows.length }
+      );
+    } else {
+      stepSeq = await getNextStepSequence(supabase, jobId);
+      paymentsStepSeq = stepSeq;
+      await insertStep(supabase, jobId, stepSeq, 'Process payments', 'running', {});
+    }
     for (const row of paymentRows) {
       const payment = row.payload;
       const paymentId = payment?.id || row.source_id;
@@ -400,9 +489,40 @@ export async function processSyncJob(
       }
     }
     await completeStep(supabase, jobId, paymentsStepSeq, {
+      rows: paymentRows.length,
       payments_imported: stats.payments_imported,
       payments_failed: stats.payments_failed,
     });
+  }
+
+  if (isLastChunk && isChunked) {
+    const totalItems = accumulatedStats.items_imported + stats.items_imported;
+    const totalItemsFailed = accumulatedStats.items_failed + stats.items_failed;
+    const totalOrders = accumulatedStats.orders_imported + stats.orders_imported;
+    const totalOrdersFailed = accumulatedStats.orders_failed + stats.orders_failed;
+    const totalPayments = accumulatedStats.payments_imported + stats.payments_imported;
+    const totalPaymentsFailed = accumulatedStats.payments_failed + stats.payments_failed;
+    if (syncType === 'catalog' || syncType === 'full') {
+      const seq = await getNextStepSequence(supabase, jobId);
+      await insertStep(supabase, jobId, seq, 'Process catalog — complete', 'done', {
+        items_imported: totalItems,
+        items_failed: totalItemsFailed,
+      });
+    }
+    if (syncType === 'orders' || syncType === 'full') {
+      const seq = await getNextStepSequence(supabase, jobId);
+      await insertStep(supabase, jobId, seq, 'Process orders — complete', 'done', {
+        orders_imported: totalOrders,
+        orders_failed: totalOrdersFailed,
+      });
+    }
+    if (syncType === 'payments' || syncType === 'full') {
+      const seq = await getNextStepSequence(supabase, jobId);
+      await insertStep(supabase, jobId, seq, 'Process payments — complete', 'done', {
+        payments_imported: totalPayments,
+        payments_failed: totalPaymentsFailed,
+      });
+    }
   }
 
   const hasFailures =

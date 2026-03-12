@@ -101,19 +101,19 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
   const handleSync = async (syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'full' = 'full') => {
     try {
       const res = await syncIntegration.mutateAsync({ id, syncType });
-      if (res && 'status' in res && res.status === 'failed') {
-        toast({
-          title: 'Sync Failed',
-          description: res.error_message || 'Fetch failed. See job for details.',
-          variant: 'destructive',
-        });
-      } else {
-        const jobId = res?.job_id;
-        if (jobId != null) {
-          window.location.href = `/settings/integrations/syncs/${jobId}`;
+      const jobId = res?.job_id;
+      if (jobId != null) {
+        window.location.href = `/settings/integrations/syncs/${jobId}`;
+        if (res && 'status' in res && res.status === 'failed') {
+          toast({ title: 'Sync failed', description: res.error_message ?? 'See job for details.', variant: 'destructive' });
+        } else {
           toast({ title: 'Redirecting to sync…', description: `Job #${jobId}` });
-          return;
         }
+        return;
+      }
+      if (res && 'status' in res && res.status === 'failed') {
+        toast({ title: 'Sync Failed', description: res.error_message ?? 'Fetch failed.', variant: 'destructive' });
+      } else {
         toast({ title: 'Sync Started', description: 'Data synchronization has been started.' });
       }
     } catch (error: any) {
