@@ -164,6 +164,18 @@ export function useSyncIntegration() {
   });
 }
 
+export function useImportBankFile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File }) => integrationsApi.importBankFile(id, file),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['integrations'] });
+      queryClient.invalidateQueries({ queryKey: ['integrations', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['integrations', variables.id, 'sync', 'jobs'] });
+    },
+  });
+}
+
 export function useSyncJobs(integrationId: string) {
   return useQuery({
     queryKey: ['integrations', integrationId, 'sync', 'jobs'],

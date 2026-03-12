@@ -390,6 +390,12 @@ export async function POST(
     if (integration.status !== 'connected') {
       return NextResponse.json({ error: 'Integration is not connected' }, { status: 400 });
     }
+    if (integration.integration_type === 'csv_bank') {
+      return NextResponse.json(
+        { error: 'CSV bank integration does not support sync. Use the file import endpoint.' },
+        { status: 400 }
+      );
+    }
     if (!integration.access_token) {
       return NextResponse.json(
         { error: 'Access token not found. Please reconnect the integration.' },

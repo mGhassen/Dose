@@ -135,7 +135,8 @@ export async function POST(request: NextRequest) {
       .insert({
         ...transformToSnakeCase(body),
         account_id: account.id,
-        status: 'pending',
+        status: body.integration_type === 'csv_bank' ? 'connected' : 'pending',
+        is_active: true,
       })
       .select()
       .single();

@@ -2,13 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useIntegrations, useInitiateOAuth, useCompleteOAuth, useManualConnectIntegration } from '@kit/hooks';
+import { useIntegrations, useInitiateOAuth, useCompleteOAuth, useCreateIntegration, useManualConnectIntegration } from '@kit/hooks';
 import { useQueryClient } from '@tanstack/react-query';
+import { integrationsApi } from '@kit/lib';
 import AppLayout from '@/components/app-layout';
 import { Button } from '@kit/ui/button';
+import { Card, CardContent } from '@kit/ui/card';
 import {
   Square,
   Wallet,
+  FileSpreadsheet,
   Link2,
   Loader2,
   Key,
@@ -68,6 +71,7 @@ export function IntegrationsPageClient() {
   const { data: integrations, isLoading, refetch } = useIntegrations();
   const initiateOAuth = useInitiateOAuth();
   const completeOAuth = useCompleteOAuth();
+  const createIntegration = useCreateIntegration();
   const manualConnect = useManualConnectIntegration();
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
@@ -78,6 +82,29 @@ export function IntegrationsPageClient() {
   const [manualLocationId, setManualLocationId] = useState('');
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isOpeningCsvBank, setIsOpeningCsvBank] = useState(false);
+
+  const openCsvBankImport = async () => {
+    try {
+      setIsOpeningCsvBank(true);
+      const existing = await integrationsApi.getByType('csv_bank');
+      if (existing?.id) {
+        router.push(`/settings/integrations/${existing.id}`);
+        return;
+      }
+      const created = await createIntegration.mutateAsync({
+        integration_type: 'csv_bank' as any,
+        name: 'Bank statements (CSV/Excel)',
+        config: {},
+        sync_frequency: 'manual' as any,
+      });
+      if (created?.id) router.push(`/settings/integrations/${created.id}`);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Failed to open import', variant: 'destructive' });
+    } finally {
+      setIsOpeningCsvBank(false);
+    }
+  };
 
   const handleOAuthCallback = React.useCallback(async (code: string, state: string, integrationType: string) => {
     try {
@@ -148,6 +175,7 @@ export function IntegrationsPageClient() {
   const handleConnect = async (integrationType: string) => {
     try {
       setIsConnecting(true);
+
       const result = await initiateOAuth.mutateAsync({
         integrationType,
         redirectUrl: `${window.location.origin}/settings/integrations?integration_type=${integrationType}`,
@@ -280,6 +308,28 @@ export function IntegrationsPageClient() {
               </div>
             </div>
 
+            <Card className="border-violet-200 dark:border-violet-900">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-violet-500/10">
+                      <FileSpreadsheet className="h-5 w-5 text-violet-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold">Import bank statement (CSV/Excel)</h2>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        No connection step. Open the import page, upload a CSV or Excel file, then follow the sync.
+                      </p>
+                    </div>
+                  </div>
+                  <Button onClick={openCsvBankImport} disabled={isOpeningCsvBank}>
+                    {isOpeningCsvBank ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 mr-2" />}
+                    Import file
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {BUILT_IN_INTEGRATIONS.length > 0 && (
               <div className="space-y-4">
                 <div>
@@ -402,7 +452,7 @@ export function IntegrationsPageClient() {
                                     setConnectionMode('oauth');
                                     setShowConnectDialog(true);
                                   }}
-                                  disabled={isConnecting || initiateOAuth.isPending}
+                                  disabled={isConnecting || initiateOAuth.isPending || createIntegration.isPending}
                                 >
                                   {isConnecting && selectedIntegration === integration.type ? (
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

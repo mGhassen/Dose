@@ -60,6 +60,11 @@ export const integrationsApi = {
       undefined,
       { timeout: 120000 }
     ),
+  importBankFile: (id: string, file: File) => {
+    const formData = new FormData();
+    formData.set('file', file);
+    return apiRequest<{ job_id: number; message?: string }>('POST', `/api/integrations/${id}/import-bank-file`, formData, undefined, { timeout: 120000 });
+  },
   getSyncJobs: (integrationId: string) =>
     apiRequest<SyncJob[]>('GET', `/api/integrations/${integrationId}/sync`),
   getSyncJob: (jobId: number) =>

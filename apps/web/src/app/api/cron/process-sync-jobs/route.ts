@@ -87,7 +87,7 @@ async function runProcessor(specificJobId?: number) {
       continue;
     }
 
-    if (integration.integration_type === 'pennylane') {
+    if (integration.integration_type === 'pennylane' || integration.integration_type === 'csv_bank') {
       const { data: pennylaneRows, error: plErr } = await supabase
         .from('sync_pennylane_data')
         .select('data_type, source_id, payload')

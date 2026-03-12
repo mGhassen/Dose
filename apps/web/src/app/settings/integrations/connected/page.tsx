@@ -9,6 +9,7 @@ import { Badge } from '@kit/ui/badge';
 import { 
   Square, 
   Wallet,
+  FileSpreadsheet,
   CheckCircle2, 
   XCircle, 
   Clock,
@@ -22,6 +23,7 @@ import { formatDateTime } from '@kit/lib/date-format';
 const AVAILABLE_INTEGRATIONS = [
   { type: 'square', name: 'Square POS', icon: Square, color: 'text-blue-500' },
   { type: 'pennylane', name: 'Pennylane', icon: Wallet, color: 'text-emerald-600' },
+  { type: 'csv_bank', name: 'Bank statements (CSV/Excel)', icon: FileSpreadsheet, color: 'text-violet-600' },
 ];
 
 function getStatusBadge(status: string) {
@@ -43,6 +45,8 @@ function getIntegrationIcon(type: string) {
   switch (type) {
     case 'square':
       return Square;
+    case 'csv_bank':
+      return FileSpreadsheet;
     default:
       return Settings;
   }

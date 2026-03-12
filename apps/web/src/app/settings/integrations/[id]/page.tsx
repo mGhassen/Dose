@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useIntegrationById, useSyncIntegration, useSyncJobs, useRetrySyncJob, useDisconnectIntegration } from '@kit/hooks';
+import { useIntegrationById, useSyncIntegration, useSyncJobs, useRetrySyncJob, useDisconnectIntegration, useImportBankFile } from '@kit/hooks';
 import AppLayout from '@/components/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { Button } from '@kit/ui/button';
@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { 
   Square, 
   Wallet,
+  FileSpreadsheet,
   Settings,
   RefreshCw, 
   CheckCircle2, 
@@ -62,6 +63,8 @@ function getIntegrationIcon(type: string) {
       return Square;
     case 'pennylane':
       return Wallet;
+    case 'csv_bank':
+      return FileSpreadsheet;
     default:
       return Settings;
   }
@@ -92,8 +95,10 @@ export default function IntegrationDetailPage({ params }: { params: Promise<{ id
 function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string; activeTab: string; setActiveTab: (tab: string) => void }) {
   const router = useRouter();
   const [isDisconnectDialogOpen, setIsDisconnectDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
   const { data: integration, isLoading } = useIntegrationById(id);
   const syncIntegration = useSyncIntegration();
+  const importBankFile = useImportBankFile();
   const { data: syncJobs = [] } = useSyncJobs(id);
   const retrySyncJob = useRetrySyncJob();
   const disconnectIntegration = useDisconnectIntegration();
@@ -125,6 +130,22 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
         description: error.message || 'Failed to sync data',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      toast({ title: 'Missing file', description: 'Pick a CSV or .xlsx file first.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const res = await importBankFile.mutateAsync({ id, file: importFile });
+      if (res?.job_id != null) {
+        window.location.href = `/settings/integrations/syncs/${res.job_id}`;
+        toast({ title: 'Import started', description: `Job #${res.job_id}` });
+      }
+    } catch (e: any) {
+      toast({ title: 'Import failed', description: e?.message || 'Failed to import file', variant: 'destructive' });
     }
   };
 
@@ -230,7 +251,7 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                           </>
                         )}
                       </DropdownMenuItem>
-                    ) : (
+                    ) : integration.integration_type === 'square' ? (
                       <>
                         <DropdownMenuItem
                           onClick={() => handleSync('full')}
@@ -277,7 +298,7 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                           Sync Locations
                         </DropdownMenuItem>
                       </>
-                    )}
+                    ) : null}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={() => setIsDisconnectDialogOpen(true)}
@@ -343,7 +364,7 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
               </CardContent>
             </Card>
 
-            {integration.integration_type === 'pennylane' && (
+            {(integration.integration_type === 'pennylane' || integration.integration_type === 'csv_bank') && (
               <Card>
                 <CardHeader>
                   <CardTitle>Bank transactions</CardTitle>
@@ -353,6 +374,31 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                   <Button variant="outline" asChild>
                     <Link href={`/bank-transactions?integration_id=${integration.id}`}>View bank transactions</Link>
                   </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {integration.integration_type === 'csv_bank' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Import bank statement</CardTitle>
+                  <CardDescription>Upload a CSV or Excel (.xlsx) file. We’ll store the original file and import its transactions.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <input
+                    type="file"
+                    accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button onClick={handleImport} disabled={!importFile || importBankFile.isPending}>
+                      {importBankFile.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
+                      Import file
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Each import creates a sync job and bank transactions.
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             )}
