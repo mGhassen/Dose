@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@kit/ui/button";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
@@ -38,6 +38,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   const [showPayments, setShowPayments] = useState(false);
   const [entryId, setEntryId] = useState<string | null>(null);
+  const scheduleEntryIdRef = useRef<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
   const [dialogPaymentDate, setDialogPaymentDate] = useState<Date>(() => new Date());
   const [dialogExpectedAmount, setDialogExpectedAmount] = useState<number>(0);
@@ -54,23 +55,28 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
   const { data: storedProjections } = useSubscriptionProjections(subscriptionId.toString());
   const projectionEntry: any = storedProjections?.find((p: any) => p.month === projection.month);
   
-  // Fetch the entry ID for this projection entry
+  // Fetch the entry ID for this projection entry. Clear when this row has no stored entry so we never show another row's payments.
   useEffect(() => {
-    const fetchEntryId = async () => {
-      if (projectionEntry?.id) {
-        try {
-          const response = await fetch(`/api/entries?referenceId=${subscriptionId}&scheduleEntryId=${projectionEntry.id}&entryType=subscription_payment`);
-          const data = await response.json();
-          if (data?.data && data.data.length > 0) {
-            setEntryId(data.data[0].id.toString());
-          }
-        } catch (error) {
-          console.error('Error fetching entry ID:', error);
-        }
-      }
+    if (!projectionEntry?.id) {
+      setEntryId(null);
+      return;
+    }
+    const sid = projectionEntry.id;
+    scheduleEntryIdRef.current = sid;
+    let cancelled = false;
+    fetch(`/api/entries?referenceId=${subscriptionId}&scheduleEntryId=${sid}&entryType=subscription_payment`)
+      .then((res) => res.json())
+      .then((data: { data?: { id: number }[] }) => {
+        if (cancelled || scheduleEntryIdRef.current !== sid) return;
+        if (data?.data?.[0]) setEntryId(data.data[0].id.toString());
+      })
+      .catch((err) => {
+        if (!cancelled) console.error('Error fetching entry ID:', err);
+      });
+    return () => {
+      cancelled = true;
     };
-    fetchEntryId();
-  }, [projectionEntry?.id, subscriptionId]);
+  }, [projectionEntry?.id, projection.month, subscriptionId]);
   
   // Fetch all payments for this entry
   const { data: payments = [], refetch: refetchPayments } = usePaymentsByEntry(entryId || '');

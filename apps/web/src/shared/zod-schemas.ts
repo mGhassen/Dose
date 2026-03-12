@@ -705,17 +705,17 @@ export const subscriptionProjectionPostSchema = z.object({
   amount: z.number(),
   isProjected: z.boolean().optional(),
   isPaid: z.boolean().optional(),
-  paidDate: z.string().optional(),
-  actualAmount: z.number().optional(),
-  notes: z.string().optional(),
+  paidDate: z.string().nullish(),
+  actualAmount: z.number().nullish(),
+  notes: z.string().nullish(),
 });
 export const updateSubscriptionProjectionEntrySchema = z.object({
   month: z.string().optional(),
   amount: z.number().optional(),
   isPaid: z.boolean().optional(),
-  paidDate: z.string().optional(),
-  actualAmount: z.number().optional(),
-  notes: z.string().optional(),
+  paidDate: z.string().nullish(),
+  actualAmount: z.number().nullish(),
+  notes: z.string().nullish(),
 });
 
 export const createStockLevelSchema = z
