@@ -162,7 +162,8 @@ export async function PUT(
           }
 
           if (body.isPaid) {
-            const expenseDate = body.paidDate || data.paid_date || data.month + '-01';
+            const expenseDateRaw = body.paidDate || data.paid_date || data.month + '-01';
+            const expenseDate = expenseDateRaw.split('T')[0] || expenseDateRaw;
             const { data: subscriptionData } = await supabase
               .from('subscriptions')
               .select('*')
@@ -179,7 +180,7 @@ export async function PUT(
 
               if (!existingExpense) {
                 const paidAmount = body.actualAmount ?? parseFloat(existingEntry.amount);
-                const dateStr = expenseDate.split('T')[0] || expenseDate;
+                const dateStr = expenseDate;
                 const { getTaxRateAndRuleForExpenseLine } = await import('@/lib/tax-rules-resolve');
                 const { to2Decimals, splitInclusiveTotal } = await import('@/lib/transaction-tax');
                 let taxRule: { rate: number; taxInclusive?: boolean };
@@ -243,10 +244,14 @@ export async function PUT(
                   });
                   if (subscriptionData.item_id != null) {
                     const { upsertCost } = await import('@/lib/items/price-history-upsert');
-                    await upsertCost(supabase, subscriptionData.item_id, expenseDate.split('T')[0] || expenseDate, subTotal);
+                    await upsertCost(supabase, subscriptionData.item_id, expenseDate, subTotal);
                   }
                 } else if (expenseError) {
                   console.error('Error creating expense for subscription payment:', expenseError);
+                  return NextResponse.json(
+                    { error: 'Failed to create expense for subscription payment', details: expenseError.message },
+                    { status: 500 }
+                  );
                 }
               }
             }

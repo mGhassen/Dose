@@ -24,7 +24,7 @@ import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections, useInventorySupplierById, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
+import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections, useInventorySupplierById, useInventorySuppliers, useItemById, useMetadataEnum } from "@kit/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -53,6 +53,7 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: subscription, isLoading } = useSubscriptionById(subscriptionId);
   const { data: supplier } = useInventorySupplierById(subscription?.supplierId?.toString() || "");
+  const { data: item } = useItemById(subscription?.itemId?.toString() || "");
   const updateSubscription = useUpdateSubscription();
   const deleteMutation = useDeleteSubscription();
   const [addVendorOpen, setAddVendorOpen] = useState(false);
@@ -470,6 +471,30 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                         </Link>
                       ) : subscription.vendor ? (
                         <p className="text-base">{subscription.vendor}</p>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Item */}
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Item</label>
+                    <div className="mt-1">
+                      {subscription.itemId && item ? (
+                        <Link
+                          href={`/items/${subscription.itemId}`}
+                          className="text-base text-primary hover:underline"
+                        >
+                          {item.name}
+                        </Link>
+                      ) : subscription.itemId ? (
+                        <Link
+                          href={`/items/${subscription.itemId}`}
+                          className="text-base text-primary hover:underline"
+                        >
+                          Item #{subscription.itemId}
+                        </Link>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}

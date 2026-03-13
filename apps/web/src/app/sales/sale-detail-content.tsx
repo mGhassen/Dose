@@ -34,6 +34,7 @@ import {
   Receipt,
   X,
   Plus,
+  ChevronRight,
 } from "lucide-react";
 import { useSaleById, useUpdateSale, useDeleteSale, useItems, useUnits, useMetadataEnum } from "@kit/hooks";
 import { useRouter } from "next/navigation";
@@ -836,7 +837,8 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                       (
                         line: {
                           id: number;
-                          item?: { name?: string };
+                          itemId?: number;
+                          item?: { id?: number; name?: string };
                           quantity: number;
                           unitPrice: number;
                           lineTotal: number;
@@ -853,9 +855,25 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                           inclusive
                             ? to2Decimals(line.quantity * displayUnitPrice)
                             : Math.round(line.quantity * line.unitPrice * 100) / 100;
+                        const itemId = line.itemId ?? line.item?.id;
+                        const itemLabel = line.item?.name ?? "—";
+                        const hasItemLink = !!(itemId && line.item);
+
                         return (
                           <tr key={line.id} className="border-b last:border-0">
-                            <td className="p-2">{line.item?.name ?? "—"}</td>
+                            <td className="p-2">
+                              {hasItemLink ? (
+                                <Link
+                                  href={`/items/${itemId}`}
+                                  className="group inline-flex items-center gap-1 text-primary hover:underline"
+                                >
+                                  {itemLabel}
+                                  <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                                </Link>
+                              ) : (
+                                itemLabel
+                              )}
+                            </td>
                             <td className="p-2 text-right tabular-nums">{line.quantity}</td>
                             <td className="p-2 text-right tabular-nums">{formatCurrency(displayUnitPrice)}</td>
                             <td className="p-2 text-right tabular-nums">{formatCurrency(displayLineTotal)}</td>

@@ -697,14 +697,44 @@ export function ExpenseDetailContent({
                     {(expense.lineItems && expense.lineItems.length > 0
                       ? expense.lineItems
                       : [{ id: 0, item: undefined, quantity: 1, unitPrice: expense.amount, lineTotal: expense.amount }]
-                    ).map((line: { id: number; item?: { name?: string }; subscription?: { name?: string }; quantity: number; unitPrice: number; lineTotal: number }) => (
-                      <tr key={line.id} className="border-b last:border-0">
-                        <td className="p-2">{line.item?.name ?? line.subscription?.name ?? "—"}</td>
-                        <td className="p-2 text-right tabular-nums">{line.quantity}</td>
-                        <td className="p-2 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
-                        <td className="p-2 text-right tabular-nums">{formatCurrency(line.lineTotal)}</td>
-                      </tr>
-                    ))}
+                    ).map(
+                      (
+                        line: {
+                          id: number;
+                          itemId?: number;
+                          item?: { id?: number; name?: string };
+                          subscription?: { name?: string };
+                          quantity: number;
+                          unitPrice: number;
+                          lineTotal: number;
+                        }
+                      ) => {
+                        const itemId = line.itemId ?? line.item?.id;
+                        const itemLabel = line.item?.name ?? line.subscription?.name ?? "—";
+                        const isItemRow = !!(itemId && line.item);
+
+                        return (
+                          <tr key={line.id} className="border-b last:border-0">
+                            <td className="p-2">
+                              {isItemRow ? (
+                                <Link
+                                  href={`/items/${itemId}`}
+                                  className="group inline-flex items-center gap-1 text-primary hover:underline"
+                                >
+                                  {itemLabel}
+                                  <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                                </Link>
+                              ) : (
+                                itemLabel
+                              )}
+                            </td>
+                            <td className="p-2 text-right tabular-nums">{line.quantity}</td>
+                            <td className="p-2 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
+                            <td className="p-2 text-right tabular-nums">{formatCurrency(line.lineTotal)}</td>
+                          </tr>
+                        );
+                      }
+                    )}
                   </tbody>
                 </table>
               </div>

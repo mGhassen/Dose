@@ -242,12 +242,10 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
           notes: notes || projectionEntry?.notes,
           amount: effectiveExpectedAmount,
         };
-        const storedEntry: any = storedProjections?.find((p: any) => p.month === projection.month);
-        if (isNowFullyPaid && (!storedEntry || !storedEntry.isPaid)) {
+        if (isNowFullyPaid) {
           updateData.isPaid = true;
           updateData.paidDate = paidDate;
         }
-        
         await updateProjectionEntry.mutateAsync({
           subscriptionId: subscriptionId.toString(),
           entryId: entryIdToUpdate.toString(),
