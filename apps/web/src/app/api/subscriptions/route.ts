@@ -135,6 +135,15 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    // Initialize item cost history at subscription start date using subscription amount as unit cost
+    try {
+      const { upsertCost } = await import('@/lib/items/price-history-upsert');
+      const startDate = body.startDate.split('T')[0] || body.startDate;
+      await upsertCost(supabase, itemRow.id, startDate, body.amount);
+    } catch (costError) {
+      console.error('Error creating initial cost history for subscription item:', costError);
+    }
+
     // Create an OUTPUT entry for the subscription
     const { error: entryError } = await supabase
       .from('entries')

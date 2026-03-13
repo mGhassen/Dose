@@ -171,88 +171,79 @@ export async function PUT(
               .single();
 
             if (subscriptionData) {
-              const { data: existingExpense } = await supabase
+              const paidAmount = body.actualAmount ?? parseFloat(existingEntry.amount);
+              const dateStr = expenseDate;
+              const { getTaxRateAndRuleForExpenseLine } = await import('@/lib/tax-rules-resolve');
+              const { to2Decimals, splitInclusiveTotal } = await import('@/lib/transaction-tax');
+              let taxRule: { rate: number; taxInclusive?: boolean };
+              if (subscriptionData.item_id != null) {
+                const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', subscriptionData.item_id).maybeSingle();
+                taxRule = await getTaxRateAndRuleForExpenseLine(supabase, subscriptionData.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+              } else {
+                taxRule = await getTaxRateAndRuleForExpenseLine(supabase, null, subscriptionData.category ?? null, dateStr);
+              }
+              const taxRate = taxRule.rate ?? 0;
+
+              let subTotal: number;
+              let taxAmount: number;
+              let amount: number;
+              if (taxRule.taxInclusive && taxRate > 0) {
+                const split = splitInclusiveTotal(paidAmount, taxRate);
+                subTotal = split.subtotal;
+                taxAmount = split.taxAmount;
+                amount = paidAmount;
+              } else {
+                subTotal = paidAmount;
+                taxAmount = to2Decimals(subTotal * (taxRate / 100));
+                amount = to2Decimals(subTotal + taxAmount);
+              }
+
+              const expenseData = {
+                name: `${subscriptionData.name} - ${data.month}`,
+                category: subscriptionData.category,
+                expense_type: 'subscription',
+                amount,
+                subscription_id: parseInt(id),
+                expense_date: expenseDate,
+                description: body.notes || `Payment for subscription: ${subscriptionData.name} - ${data.month}`,
+                vendor: subscriptionData.vendor || null,
+                start_date: expenseDate,
+                subtotal: subTotal,
+                total_tax: taxAmount,
+                total_discount: 0,
+                is_active: true,
+              };
+
+              const { data: expenseRow, error: expenseError } = await supabase
                 .from('expenses')
-                .select('id')
-                .eq('subscription_id', parseInt(id))
-                .eq('expense_date', expenseDate)
-                .maybeSingle();
+                .insert(expenseData)
+                .select()
+                .single();
 
-              if (!existingExpense) {
-                const paidAmount = body.actualAmount ?? parseFloat(existingEntry.amount);
-                const dateStr = expenseDate;
-                const { getTaxRateAndRuleForExpenseLine } = await import('@/lib/tax-rules-resolve');
-                const { to2Decimals, splitInclusiveTotal } = await import('@/lib/transaction-tax');
-                let taxRule: { rate: number; taxInclusive?: boolean };
-                if (subscriptionData.item_id != null) {
-                  const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', subscriptionData.item_id).maybeSingle();
-                  taxRule = await getTaxRateAndRuleForExpenseLine(supabase, subscriptionData.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
-                } else {
-                  taxRule = await getTaxRateAndRuleForExpenseLine(supabase, null, subscriptionData.category ?? null, dateStr);
-                }
-                const taxRate = taxRule.rate ?? 0;
-
-                let subTotal: number;
-                let taxAmount: number;
-                let amount: number;
-                if (taxRule.taxInclusive && taxRate > 0) {
-                  const split = splitInclusiveTotal(paidAmount, taxRate);
-                  subTotal = split.subtotal;
-                  taxAmount = split.taxAmount;
-                  amount = paidAmount;
-                } else {
-                  subTotal = paidAmount;
-                  taxAmount = to2Decimals(subTotal * (taxRate / 100));
-                  amount = to2Decimals(subTotal + taxAmount);
-                }
-
-                const expenseData = {
-                  name: `${subscriptionData.name} - ${data.month}`,
-                  category: subscriptionData.category,
-                  expense_type: 'subscription',
-                  amount,
+              if (!expenseError && expenseRow) {
+                await supabase.from('expense_line_items').insert({
+                  expense_id: expenseRow.id,
+                  item_id: subscriptionData.item_id ?? null,
                   subscription_id: parseInt(id),
-                  expense_date: expenseDate,
-                  description: body.notes || `Payment for subscription: ${subscriptionData.name} - ${data.month}`,
-                  vendor: subscriptionData.vendor || null,
-                  start_date: expenseDate,
-                  subtotal: subTotal,
-                  total_tax: taxAmount,
-                  total_discount: 0,
-                  is_active: true,
-                };
-
-                const { data: expenseRow, error: expenseError } = await supabase
-                  .from('expenses')
-                  .insert(expenseData)
-                  .select()
-                  .single();
-
-                if (!expenseError && expenseRow) {
-                  await supabase.from('expense_line_items').insert({
-                    expense_id: expenseRow.id,
-                    item_id: subscriptionData.item_id ?? null,
-                    subscription_id: parseInt(id),
-                    quantity: 1,
-                    unit_id: null,
-                    unit_price: subTotal,
-                    unit_cost: null,
-                    tax_rate_percent: taxRate,
-                    tax_amount: taxAmount,
-                    line_total: subTotal,
-                    sort_order: 0,
-                  });
-                  if (subscriptionData.item_id != null) {
-                    const { upsertCost } = await import('@/lib/items/price-history-upsert');
-                    await upsertCost(supabase, subscriptionData.item_id, expenseDate, subTotal);
-                  }
-                } else if (expenseError) {
-                  console.error('Error creating expense for subscription payment:', expenseError);
-                  return NextResponse.json(
-                    { error: 'Failed to create expense for subscription payment', details: expenseError.message },
-                    { status: 500 }
-                  );
+                  quantity: 1,
+                  unit_id: null,
+                  unit_price: subTotal,
+                  unit_cost: null,
+                  tax_rate_percent: taxRate,
+                  tax_amount: taxAmount,
+                  line_total: subTotal,
+                  sort_order: 0,
+                });
+                if (subscriptionData.item_id != null) {
+                  const { upsertCost } = await import('@/lib/items/price-history-upsert');
+                  await upsertCost(supabase, subscriptionData.item_id, expenseDate, subTotal);
                 }
+              } else if (expenseError) {
+                console.error('Error creating expense for subscription payment:', expenseError);
+                return NextResponse.json(
+                  { error: 'Failed to create expense for subscription payment', details: expenseError.message },
+                  { status: 500 }
+                );
               }
             }
           } else if (!body.isPaid) {

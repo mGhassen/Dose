@@ -110,7 +110,7 @@ export async function POST(
 
     const { data, error } = await supabase
       .from(table)
-      .upsert(payload, { onConflict: 'item_id,effective_date' })
+      .insert(payload)
       .select('id, effective_date, ' + valueCol + ', tax_included')
       .single();
 

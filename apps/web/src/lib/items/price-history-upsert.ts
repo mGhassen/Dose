@@ -28,9 +28,6 @@ export async function upsertCost(
 ): Promise<void> {
   const { error } = await supabase
     .from('item_cost_history')
-    .upsert(
-      { item_id: itemId, effective_date: effectiveDate, unit_cost: unitCost },
-      { onConflict: 'item_id,effective_date' }
-    );
+    .insert({ item_id: itemId, effective_date: effectiveDate, unit_cost: unitCost });
   if (error) throw error;
 }

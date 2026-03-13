@@ -107,14 +107,11 @@ export async function POST(
             ? (currentStock * currentCost + receivedQty * unitPrice) / totalQty
             : unitPrice;
 
-        await supabase.from('item_cost_history').upsert(
-          {
-            item_id: itemId,
-            effective_date: effectiveDate,
-            unit_cost: newAvg,
-          },
-          { onConflict: 'item_id,effective_date' }
-        );
+        await supabase.from('item_cost_history').insert({
+          item_id: itemId,
+          effective_date: effectiveDate,
+          unit_cost: newAvg,
+        });
       }
     }
 
