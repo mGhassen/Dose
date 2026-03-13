@@ -106,13 +106,41 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-
     const supabase = supabaseServer();
-    const { error } = await supabase
-      .from('payments')
-      .delete()
-      .eq('id', id);
 
+    const { data: payment, error: fetchError } = await supabase
+      .from('payments')
+      .select('id, entry_id, payment_date')
+      .eq('id', id)
+      .single();
+    if (fetchError || !payment) {
+      if (fetchError?.code === 'PGRST116') {
+        return new NextResponse(null, { status: 204 });
+      }
+      throw fetchError ?? new Error('Payment not found');
+    }
+
+    const { data: entry } = await supabase
+      .from('entries')
+      .select('id, reference_id, entry_type')
+      .eq('id', payment.entry_id)
+      .single();
+
+    if (entry?.entry_type === 'subscription_payment' && entry.reference_id != null && payment.payment_date) {
+      const { count } = await supabase
+        .from('payments')
+        .select('id', { count: 'exact', head: true })
+        .eq('entry_id', payment.entry_id);
+      if (count === 1) {
+        await supabase
+          .from('expenses')
+          .delete()
+          .eq('subscription_id', entry.reference_id)
+          .eq('expense_date', payment.payment_date);
+      }
+    }
+
+    const { error } = await supabase.from('payments').delete().eq('id', id);
     if (error) throw error;
 
     return new NextResponse(null, { status: 204 });

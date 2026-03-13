@@ -16,7 +16,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useSubscriptionById, useUpdateSubscription, useInventorySuppliers, useMetadataEnum, useVariablesByType } from "@kit/hooks";
+import { useSubscriptionById, useUpdateSubscription, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import type { ExpenseRecurrence } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
@@ -39,12 +39,6 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
   const suppliers = suppliersResponse?.data || [];
   const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
   const recurrenceItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
-  const { data: transactionTaxVars = [] } = useVariablesByType("transaction_tax");
-  const transactionTaxItems = transactionTaxVars.map((v) => ({
-    id: v.id,
-    name: `${v.name} (${v.value}%)`,
-    value: v.value,
-  }));
 
   const {
     register,
@@ -267,30 +261,6 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
                   />
                   <p className="text-xs text-muted-foreground">
                     Leave empty for ongoing subscriptions
-                  </p>
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Controller
-                    name="defaultTaxRatePercent"
-                    control={control}
-                    render={({ field }) => (
-                      <UnifiedSelector
-                        label="Transaction tax *"
-                        required
-                        items={transactionTaxItems}
-                        selectedId={transactionTaxVars.find((v) => v.value === field.value)?.id}
-                        onSelect={(item) => field.onChange((item as { value: number }).value)}
-                        placeholder="Select transaction tax"
-                      />
-                    )}
-                  />
-                  {errors.defaultTaxRatePercent && (
-                    <p className="text-xs text-destructive">{errors.defaultTaxRatePercent.message}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Applied when this subscription generates expense lines (e.g. when a payment is
-                    marked paid).
                   </p>
                 </div>
 

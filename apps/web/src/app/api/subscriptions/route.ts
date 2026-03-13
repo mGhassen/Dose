@@ -21,6 +21,7 @@ function transformSubscription(row: any): Subscription {
     supplierId: row.supplier_id || undefined,
     defaultTaxRatePercent: row.default_tax_rate_percent != null ? parseFloat(String(row.default_tax_rate_percent)) : undefined,
     isActive: row.is_active,
+    itemId: row.item_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -111,9 +112,24 @@ export async function POST(request: NextRequest) {
     const body = parsed.data as CreateSubscriptionData;
 
     const supabase = supabaseServer();
+
+    const { data: itemRow, error: itemError } = await supabase
+      .from('items')
+      .insert({
+        name: body.name,
+        description: body.description ?? null,
+        category: body.category,
+        unit: 'unit',
+        item_type: 'item',
+        is_active: true,
+      })
+      .select('id')
+      .single();
+    if (itemError) throw itemError;
+
     const { data, error } = await supabase
       .from('subscriptions')
-      .insert(transformToSnakeCase(body))
+      .insert({ ...transformToSnakeCase(body), item_id: itemRow.id })
       .select()
       .single();
 

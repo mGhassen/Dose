@@ -83,8 +83,10 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
   const { data: paymentMethodValues = [] } = useMetadataEnum("PaymentMethod");
   const paymentMethodItems = paymentMethodValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
-  // Calculate total paid from all payments
-  const totalPaid = payments.reduce((sum, payment) => sum + (payment.isPaid ? payment.amount : 0), 0);
+  // Calculate total paid, preferring the per-month projection actualAmount (server truth)
+  const paymentsTotal = payments.reduce((sum, payment) => sum + (payment.isPaid ? payment.amount : 0), 0);
+  const storedActualAmount = projectionEntry?.actualAmount ?? (projection as any).actualAmount ?? null;
+  const totalPaid = storedActualAmount != null ? storedActualAmount : paymentsTotal;
   const isFullyPaid = totalPaid >= expectedAmount;
   const remainingToPay = Math.max(0, expectedAmount - totalPaid);
   const hasPartialPayment = totalPaid > 0 && !isFullyPaid;

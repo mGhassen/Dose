@@ -37,6 +37,7 @@ function transformExpense(row: any, lineItems?: ExpenseLineItem[]): Expense {
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
+    expenseType: (row.expense_type || 'expense') as Expense['expenseType'],
     subscriptionId: row.subscription_id || undefined,
     description: row.description,
     vendor: row.vendor,
@@ -57,9 +58,10 @@ function transformToSnakeCase(data: CreateExpenseData): any {
     name: data.name,
     category: data.category,
     amount: data.amount,
+    expense_type: data.expenseType ?? 'expense',
     subscription_id: data.subscriptionId || null,
     description: data.description,
-    vendor: data.vendor, // Keep for backward compatibility
+    vendor: data.vendor,
     supplier_id: data.supplierId || null,
     expense_date: data.expenseDate,
     start_date: data.expenseDate,
@@ -171,27 +173,41 @@ export async function POST(request: NextRequest) {
     if ('lineItems' in body && Array.isArray(body.lineItems) && body.lineItems.length > 0) {
       const txBody = body as import('@/shared/zod-schemas').CreateExpenseTransactionInput;
       const supabase = supabaseServer();
-      const { getTaxRateForExpenseLine } = await import('@/lib/tax-rules-resolve');
+      const { getTaxRateAndRuleForExpenseLine } = await import('@/lib/tax-rules-resolve');
+      const { lineTaxAmount, to2Decimals } = await import('@/lib/transaction-tax');
       const dateStr = (txBody.expenseDate || '').split('T')[0] || txBody.expenseDate;
 
       const lines: Array<{ itemId?: number; subscriptionId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxRatePercent: number; taxAmount: number }> = [];
       for (let i = 0; i < txBody.lineItems.length; i++) {
         const line = txBody.lineItems[i];
         let taxRate: number;
+        let taxInclusive = false;
         if (line.subscriptionId) {
-          const { data: sub } = await supabase.from('subscriptions').select('default_tax_rate_percent').eq('id', line.subscriptionId).maybeSingle();
-          taxRate = sub?.default_tax_rate_percent != null ? parseFloat(String(sub.default_tax_rate_percent)) : 0;
+          const { data: sub } = await supabase.from('subscriptions').select('item_id, category').eq('id', line.subscriptionId).maybeSingle();
+          if (sub?.item_id != null) {
+            const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', sub.item_id).maybeSingle();
+            const taxRule = await getTaxRateAndRuleForExpenseLine(supabase, sub.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+            taxRate = taxRule.rate ?? 0;
+            taxInclusive = taxRule.taxInclusive ?? false;
+          } else {
+            const taxRule = await getTaxRateAndRuleForExpenseLine(supabase, null, sub?.category ?? null, dateStr);
+            taxRate = taxRule.rate ?? 0;
+            taxInclusive = taxRule.taxInclusive ?? false;
+          }
         } else if (line.itemId) {
           const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', line.itemId).maybeSingle();
-          const itemCategory = itemRow?.category ?? null;
-          taxRate = await getTaxRateForExpenseLine(supabase, line.itemId, itemCategory, dateStr, itemRow?.created_at ?? null);
+          const taxRule = await getTaxRateAndRuleForExpenseLine(supabase, line.itemId, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+          taxRate = taxRule.rate ?? 0;
+          taxInclusive = taxRule.taxInclusive ?? false;
         } else {
-          taxRate = await getTaxRateForExpenseLine(supabase, null, null, dateStr);
+          const taxRule = await getTaxRateAndRuleForExpenseLine(supabase, null, null, dateStr);
+          taxRate = taxRule.rate ?? 0;
+          taxInclusive = taxRule.taxInclusive ?? false;
         }
         if (line.taxRatePercent != null) taxRate = line.taxRatePercent;
         const qty = typeof line.quantity === 'number' ? line.quantity : parseFloat(String(line.quantity));
-        const lineTotal = Math.round(qty * line.unitPrice * 100) / 100;
-        const taxAmount = Math.round(lineTotal * (taxRate / 100) * 100) / 100;
+        const { lineTotalNet, taxAmount } = lineTaxAmount(qty, line.unitPrice, taxRate, taxInclusive);
+        const lineTotal = to2Decimals(lineTotalNet);
         lines.push({
           itemId: line.itemId,
           subscriptionId: line.subscriptionId,
@@ -201,7 +217,7 @@ export async function POST(request: NextRequest) {
           unitCost: line.unitCost,
           lineTotal,
           taxRatePercent: taxRate,
-          taxAmount,
+          taxAmount: to2Decimals(taxAmount),
         });
       }
       const subtotal = Math.round(lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100;
@@ -221,6 +237,7 @@ export async function POST(request: NextRequest) {
         .insert({
           name: txBody.name,
           category: txBody.category,
+          expense_type: 'expense',
           expense_date: txBody.expenseDate,
           description: txBody.description ?? null,
           supplier_id: txBody.supplierId ?? null,

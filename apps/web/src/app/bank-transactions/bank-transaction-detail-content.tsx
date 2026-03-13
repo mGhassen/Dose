@@ -132,26 +132,80 @@ function ReconciliationBlock({ tx }: { tx: NonNullable<ReturnType<typeof useBank
     endDate,
     limit: 200,
   });
+  const { data: salesFallbackResponse, isLoading: salesFallbackLoading } = useSales({
+    limit: 200,
+  });
   const { data: expensesResponse, isLoading: expensesLoading } = useExpenses({
     startDate,
     endDate,
     limit: 200,
   });
+  const { data: expensesFallbackResponse, isLoading: expensesFallbackLoading } = useExpenses({
+    limit: 200,
+  });
 
-  const sales = salesResponse?.data ?? [];
-  const expenses = expensesResponse?.data ?? [];
-  const candidates = entityType === "sale" ? sales : expenses;
-  const isLoading = entityType === "sale" ? salesLoading : expensesLoading;
+  const salesDateBounded = salesResponse?.data ?? [];
+  const salesFallback = salesFallbackResponse?.data ?? [];
+  const expensesDateBounded = expensesResponse?.data ?? [];
+  const expensesFallback = expensesFallbackResponse?.data ?? [];
+
+  const sales = salesDateBounded.length > 0 ? salesDateBounded : salesFallback;
+  const expenses = expensesDateBounded.length > 0 ? expensesDateBounded : expensesFallback;
+  const rawCandidates = entityType === "sale" ? sales : expenses;
+  const isLoading =
+    entityType === "sale"
+      ? salesLoading || (salesDateBounded.length === 0 && salesFallbackLoading)
+      : expensesLoading || (expensesDateBounded.length === 0 && expensesFallbackLoading);
+
+  const txAmount = Math.abs(Number(tx.amount));
+  const txDate = tx.execution_date ? new Date(tx.execution_date + "T12:00:00").getTime() : 0;
+  const txLabel = (tx.label ?? "").toLowerCase();
+  const txCounterparty = (tx.counterparty_name ?? "").toLowerCase();
+
+  const candidates = useMemo(() => {
+    const score = (c: (typeof rawCandidates)[0]) => {
+      const amount = Number((c as { amount: number }).amount);
+      const amountDiff = Math.abs(txAmount - amount);
+      const scoreAmount = amountDiff === 0 ? 1000 : -amountDiff;
+      const entityDate =
+        entityType === "sale"
+          ? (c as { date: string }).date
+          : (c as { expenseDate: string }).expenseDate;
+      const entityTime = entityDate ? new Date(entityDate + "T12:00:00").getTime() : 0;
+      const daysDiff = txDate ? Math.abs((entityTime - txDate) / (24 * 60 * 60 * 1000)) : 999;
+      const scoreDate = -daysDiff;
+      const nameOrDesc =
+        entityType === "sale"
+          ? ((c as { description?: string }).description ?? "").toLowerCase()
+          : ((c as { name?: string }).name ?? "").toLowerCase();
+      const nameMatch =
+        txLabel && nameOrDesc && (nameOrDesc.includes(txLabel) || txLabel.includes(nameOrDesc))
+          ? 50
+          : 0;
+      const counterpartyMatch =
+        txCounterparty &&
+        nameOrDesc &&
+        (nameOrDesc.includes(txCounterparty) || txCounterparty.includes(nameOrDesc))
+          ? 50
+          : 0;
+      return scoreAmount + scoreDate + nameMatch + counterpartyMatch;
+    };
+    return [...rawCandidates].sort((a, b) => score(b) - score(a));
+  }, [rawCandidates, entityType, txAmount, txDate, txLabel, txCounterparty]);
 
   const selectorItems = useMemo(
     () =>
-      candidates.map((c) => ({
-        id: c.id,
-        name:
-          entityType === "sale"
-            ? `Sale #${c.id} · ${Number((c as { amount: number; date: string }).amount).toFixed(2)} € · ${(c as { date: string }).date}`
-            : `Expense #${c.id} · ${Number((c as { amount: number }).amount).toFixed(2)} € · ${(c as { expenseDate: string }).expenseDate}`,
-      })),
+      candidates.map((c) => {
+        const amount = Number((c as { amount: number }).amount).toFixed(2);
+        if (entityType === "sale") {
+          const s = c as { id: number; date: string; description?: string };
+          const label = (s.description ?? "—").slice(0, 40);
+          return { id: c.id, name: `Sale #${s.id} · ${label} · ${amount} € · ${s.date}` };
+        }
+        const e = c as { id: number; name?: string; expenseDate: string };
+        const name = (e.name ?? "—").slice(0, 40);
+        return { id: c.id, name: `Expense #${e.id} · ${name} · ${amount} € · ${e.expenseDate}` };
+      }),
     [candidates, entityType]
   );
 
@@ -221,7 +275,7 @@ function ReconciliationBlock({ tx }: { tx: NonNullable<ReturnType<typeof useBank
         selectedId={undefined}
         onSelect={(item) => handleLink(item)}
         placeholder={isLoading ? "Loading…" : `Select ${entityType} to link`}
-        searchPlaceholder="Search by id or amount…"
+        searchPlaceholder="Search by name, id, amount, date…"
         getDisplayName={(item) => (item.name ?? `${entityType} #${item.id}`)}
       />
     </div>

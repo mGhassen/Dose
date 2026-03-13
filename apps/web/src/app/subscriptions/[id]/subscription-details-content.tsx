@@ -24,7 +24,7 @@ import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections, useInventorySupplierById, useInventorySuppliers, useMetadataEnum, useVariablesByType } from "@kit/hooks";
+import { useSubscriptionById, useUpdateSubscription, useDeleteSubscription, useSubscriptionProjections, useInventorySupplierById, useInventorySuppliers, useMetadataEnum } from "@kit/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -60,12 +60,6 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
   const suppliers = suppliersResponse?.data || [];
   const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
   const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
-  const { data: transactionTaxVars = [] } = useVariablesByType("transaction_tax");
-  const transactionTaxItems = transactionTaxVars.map((v) => ({
-    id: v.id,
-    name: `${v.name} (${v.value}%)`,
-    value: v.value,
-  }));
   const recurrenceItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const categoryLabels: Record<string, string> = Object.fromEntries(
     categoryValues.map((ev) => [ev.name, ev.label ?? ev.name])
@@ -149,9 +143,8 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const hasTax = formData.defaultTaxRatePercent != null && formData.defaultTaxRatePercent >= 0;
-    if (!formData.name || !formData.category || !formData.amount || !formData.startDate || !hasTax) {
-      toast.error("Please fill in all required fields, including transaction tax");
+    if (!formData.name || !formData.category || !formData.amount || !formData.startDate) {
+      toast.error("Please fill in all required fields");
       return;
     }
 
@@ -337,20 +330,6 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                     />
                     <p className="text-xs text-muted-foreground">
                       Leave empty for ongoing subscriptions
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <UnifiedSelector
-                      label="Transaction tax *"
-                      required
-                      items={transactionTaxItems}
-                      selectedId={transactionTaxVars.find((v) => v.value === formData.defaultTaxRatePercent)?.id}
-                      onSelect={(item) => handleInputChange("defaultTaxRatePercent", (item as { value: number }).value)}
-                      placeholder="Select transaction tax"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Applied when this subscription generates expense lines (e.g. when a payment is marked paid).
                     </p>
                   </div>
 

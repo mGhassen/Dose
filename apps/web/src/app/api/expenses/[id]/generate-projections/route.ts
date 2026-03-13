@@ -11,6 +11,7 @@ function transformExpense(row: any): Expense {
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
+    expenseType: (row.expense_type || 'expense') as Expense['expenseType'],
     expenseDate: row.expense_date ?? row.start_date,
     description: row.description,
     vendor: row.vendor,

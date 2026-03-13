@@ -97,7 +97,7 @@ export function ExpenseDetailContent({
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(initialEditMode);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const { data: expense, isLoading } = useExpenseById(expenseId);
+  const { data: expense, isLoading, isError, error } = useExpenseById(expenseId);
   const { data: subscriptionsResponse } = useSubscriptions();
   const subscriptions = subscriptionsResponse?.data || [];
   const { data: suppliersResponse } = useInventorySuppliers({
@@ -128,6 +128,12 @@ export function ExpenseDetailContent({
   useEffect(() => {
     setIsEditing(initialEditMode);
   }, [initialEditMode]);
+
+  useEffect(() => {
+    if (isError && error && (error as { status?: number }).status === 404) {
+      router.replace("/expenses");
+    }
+  }, [isError, error, router]);
 
   useEffect(() => {
     if (!formData.expenseDate) {
@@ -307,6 +313,7 @@ export function ExpenseDetailContent({
       await deleteMutation.mutateAsync(String(expenseId));
       toast.success("Expense deleted successfully");
       setIsDeleteDialogOpen(false);
+      router.replace("/expenses");
       onDeleted();
     } catch (error) {
       toast.error("Failed to delete expense");
@@ -343,22 +350,8 @@ export function ExpenseDetailContent({
   }
 
   if (!expense) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-6 py-16 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-          <Receipt className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold">Expense not found</h2>
-          <p className="text-sm text-muted-foreground">
-            This expense may have been deleted or doesn't exist.
-          </p>
-        </div>
-        <Button variant="outline" onClick={onClose}>
-          Back to expenses
-        </Button>
-      </div>
-    );
+    router.replace("/expenses");
+    return null;
   }
 
   if (isEditing) {

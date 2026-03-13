@@ -33,6 +33,7 @@ function transformExpense(row: any, lineItems?: ExpenseLineItem[]): Expense {
     name: row.name,
     category: row.category,
     amount: parseFloat(row.amount),
+    expenseType: (row.expense_type || 'expense') as Expense['expenseType'],
     subscriptionId: row.subscription_id || undefined,
     description: row.description,
     vendor: row.vendor,
@@ -53,10 +54,11 @@ function transformToSnakeCase(data: UpdateExpenseData): any {
   if (data.name !== undefined) result.name = data.name;
   if (data.category !== undefined) result.category = data.category;
   if (data.amount !== undefined) result.amount = data.amount;
+  if (data.expenseType !== undefined) result.expense_type = data.expenseType;
   if (data.subscriptionId !== undefined) result.subscription_id = data.subscriptionId || null;
   if (data.expenseDate !== undefined) result.expense_date = data.expenseDate;
   if (data.description !== undefined) result.description = data.description;
-  if (data.vendor !== undefined) result.vendor = data.vendor; // Keep for backward compatibility
+  if (data.vendor !== undefined) result.vendor = data.vendor;
   if (data.supplierId !== undefined) result.supplier_id = data.supplierId || null;
   result.updated_at = new Date().toISOString();
   return result;
@@ -75,26 +77,41 @@ async function updateExpenseAsTransaction(
     discount?: { type: 'amount' | 'percent'; value: number };
   }
 ) {
-  const { getTaxRateForExpenseLine } = await import('@/lib/tax-rules-resolve');
+  const { getTaxRateAndRuleForExpenseLine } = await import('@/lib/tax-rules-resolve');
+  const { lineTaxAmount, to2Decimals } = await import('@/lib/transaction-tax');
   const dateStr = body.expenseDate.split('T')[0] || body.expenseDate;
 
   const lines: Array<{ itemId?: number; subscriptionId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxRatePercent: number; taxAmount: number }> = [];
   for (let i = 0; i < body.lineItems.length; i++) {
     const line = body.lineItems[i];
     let taxRate: number;
+    let taxInclusive = false;
     if (line.subscriptionId) {
-      const { data: sub } = await supabase.from('subscriptions').select('default_tax_rate_percent').eq('id', line.subscriptionId).maybeSingle();
-      taxRate = sub?.default_tax_rate_percent != null ? parseFloat(String(sub.default_tax_rate_percent)) : 0;
+      const { data: sub } = await supabase.from('subscriptions').select('item_id, category').eq('id', line.subscriptionId).maybeSingle();
+      if (sub?.item_id != null) {
+        const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', sub.item_id).maybeSingle();
+        const taxRule = await getTaxRateAndRuleForExpenseLine(supabase, sub.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+        taxRate = taxRule.rate ?? 0;
+        taxInclusive = taxRule.taxInclusive ?? false;
+      } else {
+        const taxRule = await getTaxRateAndRuleForExpenseLine(supabase, null, sub?.category ?? null, dateStr);
+        taxRate = taxRule.rate ?? 0;
+        taxInclusive = taxRule.taxInclusive ?? false;
+      }
     } else if (line.itemId) {
       const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', line.itemId).maybeSingle();
-      taxRate = await getTaxRateForExpenseLine(supabase, line.itemId, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+      const taxRule = await getTaxRateAndRuleForExpenseLine(supabase, line.itemId, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+      taxRate = taxRule.rate ?? 0;
+      taxInclusive = taxRule.taxInclusive ?? false;
     } else {
-      taxRate = await getTaxRateForExpenseLine(supabase, null, null, dateStr);
+      const taxRule = await getTaxRateAndRuleForExpenseLine(supabase, null, null, dateStr);
+      taxRate = taxRule.rate ?? 0;
+      taxInclusive = taxRule.taxInclusive ?? false;
     }
     if (line.taxRatePercent != null) taxRate = line.taxRatePercent;
     const qty = typeof line.quantity === 'number' ? line.quantity : parseFloat(String(line.quantity));
-    const lineTotal = Math.round(qty * line.unitPrice * 100) / 100;
-    const taxAmount = Math.round(lineTotal * (taxRate / 100) * 100) / 100;
+    const { lineTotalNet, taxAmount } = lineTaxAmount(qty, line.unitPrice, taxRate, taxInclusive);
+    const lineTotal = to2Decimals(lineTotalNet);
     lines.push({
       itemId: line.itemId,
       subscriptionId: line.subscriptionId,
@@ -104,7 +121,7 @@ async function updateExpenseAsTransaction(
       unitCost: line.unitCost,
       lineTotal,
       taxRatePercent: taxRate,
-      taxAmount,
+      taxAmount: to2Decimals(taxAmount),
     });
   }
   const subtotal = Math.round(lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100;

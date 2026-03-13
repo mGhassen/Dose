@@ -21,14 +21,14 @@ INSERT INTO variables (name, type, value, unit, effective_date, end_date, descri
 -- ============================================================================
 -- TAX RULES (TVA by dining option and expense)
 -- ============================================================================
-INSERT INTO tax_rules (variable_id, condition_type, condition_value, condition_values, scope_type, rule_type, priority)
-SELECT v.id, 'sales_type', 'on_site', '["on_site"]'::jsonb, 'all', 'taxable', 0
+INSERT INTO tax_rules (variable_id, condition_type, condition_value, condition_values, scope_type, rule_type, priority, calculation_type)
+SELECT v.id, 'sales_type', 'on_site', '["on_site"]'::jsonb, 'all', 'taxable', 0, 'inclusive'
 FROM variables v WHERE v.name = 'TVA' AND v.type = 'transaction_tax' AND v.value = 10.0
 UNION ALL
-SELECT v.id, 'sales_type', NULL, '["delivery","takeaway","catering","other"]'::jsonb, 'all', 'taxable', 0
+SELECT v.id, 'sales_type', NULL, '["delivery","takeaway","catering","other"]'::jsonb, 'all', 'taxable', 0, 'inclusive'
 FROM variables v WHERE v.name = 'TVA' AND v.type = 'transaction_tax' AND v.value = 5.5
 UNION ALL
-SELECT v.id, 'expense', NULL, NULL, 'all', 'taxable', 0
+SELECT v.id, 'expense', NULL, NULL, 'all', 'taxable', 0, 'inclusive'
 FROM variables v WHERE v.name = 'TVA' AND v.type = 'transaction_tax' AND v.value = 20.0;
 
 -- ============================================================================

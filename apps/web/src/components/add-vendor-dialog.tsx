@@ -34,6 +34,7 @@ export function AddVendorDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     const trimmed = name.trim();
     if (!trimmed) {
       toast.error('Name is required');

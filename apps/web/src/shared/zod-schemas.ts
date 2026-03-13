@@ -142,10 +142,6 @@ export const createSubscriptionFormSchema = z
   .refine((d) => d.category != null, {
     message: "Category is required",
     path: ["category"],
-  })
-  .refine((d) => d.defaultTaxRatePercent != null && d.defaultTaxRatePercent >= 0, {
-    message: "Transaction tax is required",
-    path: ["defaultTaxRatePercent"],
   });
 export type CreateSubscriptionFormInput = z.infer<typeof createSubscriptionFormSchema>;
 
@@ -175,10 +171,13 @@ export const createExpenseTransactionSchema = z.object({
 });
 export type CreateExpenseTransactionInput = z.infer<typeof createExpenseTransactionSchema>;
 
+const expenseTypeEnum = z.enum(['expense', 'subscription', 'leasing', 'loan', 'personnel', 'other']);
+
 export const createExpenseSchema = z.object({
   name: z.string().min(1, "Name is required"),
   category: expenseCategoryEnum,
   amount: z.number().min(0),
+  expenseType: expenseTypeEnum.optional(),
   expenseDate: z.string().min(1, "Expense date is required"),
   description: z.string().optional(),
   vendor: z.string().optional(),
@@ -190,6 +189,7 @@ export const updateExpenseSchema = z.object({
   name: z.string().min(1).optional(),
   category: expenseCategoryEnum.optional(),
   amount: z.number().min(0).optional(),
+  expenseType: expenseTypeEnum.optional(),
   expenseDate: z.string().min(1).optional(),
   description: z.string().optional(),
   vendor: z.string().optional(),

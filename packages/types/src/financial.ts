@@ -91,6 +91,7 @@ export interface Subscription {
   supplierId?: number; // Link to supplier (vendor type)
   defaultTaxRatePercent?: number;
   isActive: boolean;
+  itemId?: number; // Item with same name, used on expense line items
   createdAt: string;
   updatedAt: string;
 }
@@ -150,6 +151,8 @@ export interface UpdateVendorData extends Partial<CreateVendorData> {}
 // EXPENSES (Charges d'exploitation - one-time or linked to subscription)
 // ============================================================================
 
+export type ExpenseType = 'expense' | 'subscription' | 'leasing' | 'loan' | 'personnel' | 'other';
+
 export interface ExpenseLineItem {
   id: number;
   expenseId: number;
@@ -174,6 +177,7 @@ export interface Expense {
   name: string;
   category: ExpenseCategory;
   amount: number;
+  expenseType: ExpenseType;
   subscriptionId?: number;
   description?: string;
   vendor?: string;
@@ -201,6 +205,7 @@ export interface CreateExpenseData {
   name: string;
   category: ExpenseCategory;
   amount: number;
+  expenseType?: ExpenseType;
   subscriptionId?: number;
   description?: string;
   vendor?: string;

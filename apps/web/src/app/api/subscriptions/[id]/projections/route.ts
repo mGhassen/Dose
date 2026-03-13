@@ -240,13 +240,34 @@ export async function POST(
             }
           }
 
-          const subTotal = body.actualAmount ?? body.amount;
-          const taxRate = subscriptionData.default_tax_rate_percent != null ? parseFloat(String(subscriptionData.default_tax_rate_percent)) : 0;
-          const taxAmount = Math.round(subTotal * (taxRate / 100) * 100) / 100;
-          const totalTax = taxAmount;
-          const amount = Math.round((subTotal + totalTax) * 100) / 100;
-
+          const paidAmount = body.actualAmount ?? body.amount;
           const expenseDate = body.paidDate || `${body.month}-01`;
+          const dateStr = expenseDate.split('T')[0] || expenseDate;
+          const { getTaxRateAndRuleForExpenseLine } = await import('@/lib/tax-rules-resolve');
+          const { to2Decimals, splitInclusiveTotal } = await import('@/lib/transaction-tax');
+          let taxRule: { rate: number; taxInclusive?: boolean };
+          if (subscriptionData.item_id != null) {
+            const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', subscriptionData.item_id).maybeSingle();
+            taxRule = await getTaxRateAndRuleForExpenseLine(supabase, subscriptionData.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+          } else {
+            taxRule = await getTaxRateAndRuleForExpenseLine(supabase, null, subscriptionData.category ?? null, dateStr);
+          }
+          const taxRate = taxRule.rate ?? 0;
+
+          let subTotal: number;
+          let taxAmount: number;
+          let amount: number;
+          if (taxRule.taxInclusive && taxRate > 0) {
+            const split = splitInclusiveTotal(paidAmount, taxRate);
+            subTotal = split.subtotal;
+            taxAmount = split.taxAmount;
+            amount = paidAmount;
+          } else {
+            subTotal = paidAmount;
+            taxAmount = to2Decimals(subTotal * (taxRate / 100));
+            amount = to2Decimals(subTotal + taxAmount);
+          }
+          const totalTax = taxAmount;
           const { data: existingExpense } = await supabase
             .from('expenses')
             .select('id')
@@ -260,6 +281,7 @@ export async function POST(
               .insert({
                 name: `${subscriptionData.name} - ${body.month}`,
                 category: subscriptionData.category,
+                expense_type: 'subscription',
                 amount,
                 subscription_id: parseInt(id),
                 expense_date: expenseDate,
@@ -277,7 +299,7 @@ export async function POST(
             if (!expenseErr && expenseRow) {
               await supabase.from('expense_line_items').insert({
                 expense_id: expenseRow.id,
-                item_id: null,
+                item_id: subscriptionData.item_id ?? null,
                 subscription_id: parseInt(id),
                 quantity: 1,
                 unit_id: null,
@@ -288,6 +310,10 @@ export async function POST(
                 line_total: subTotal,
                 sort_order: 0,
               });
+              if (subscriptionData.item_id != null) {
+                const { upsertCost } = await import('@/lib/items/price-history-upsert');
+                await upsertCost(supabase, subscriptionData.item_id, expenseDate.split('T')[0] || expenseDate, subTotal);
+              }
             }
           }
         }

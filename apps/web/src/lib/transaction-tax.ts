@@ -54,6 +54,14 @@ export function netUnitPriceFromInclusive(grossUnitPrice: number, taxRatePercent
   return to2Decimals(net);
 }
 
+/** Given total amount including tax and rate, return subtotal (excl.) and tax amount. */
+export function splitInclusiveTotal(totalIncl: number, taxRatePercent: number): { subtotal: number; taxAmount: number } {
+  if (taxRatePercent <= 0) return { subtotal: totalIncl, taxAmount: 0 };
+  const subtotal = to2Decimals(totalIncl / (1 + taxRatePercent / 100));
+  const taxAmount = to2Decimals(totalIncl - subtotal);
+  return { subtotal, taxAmount };
+}
+
 /** Price incl. tax from price excl. tax (for display). */
 export function unitPriceExclToIncl(unitPriceExcl: number, taxRatePercent: number): number {
   if (taxRatePercent <= 0) return unitPriceExcl;
