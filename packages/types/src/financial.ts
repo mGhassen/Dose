@@ -199,6 +199,7 @@ export interface ExpenseLineItemInput {
   unitPrice: number;
   unitCost?: number;
   taxRatePercent?: number;
+  taxInclusive?: boolean;
 }
 
 export interface CreateExpenseData {
@@ -612,19 +613,12 @@ export interface Sale {
   date: string;
   type: SalesType;
   amount: number;
-  quantity?: number;
-  unit?: string;
-  unitId?: number;
   description?: string;
-  itemId?: number;
-  unitPrice?: number;
-  unitCost?: number;
   subtotal?: number;
   totalTax?: number;
   totalDiscount?: number;
   createdAt: string;
   updatedAt: string;
-  item?: Item;
   lineItems?: SaleLineItem[];
 }
 
@@ -642,13 +636,7 @@ export interface CreateSaleData {
   date: string;
   type: SalesType;
   amount: number;
-  quantity?: number;
-  unit?: string;
-  unitId?: number;
   description?: string;
-  itemId?: number;
-  unitPrice?: number;
-  unitCost?: number;
   subtotal?: number;
   totalTax?: number;
   totalDiscount?: number;
@@ -1146,7 +1134,7 @@ export type UpdateRecipeIngredientData = UpdateRecipeItemData;
 // SUPPLIERS
 // ============================================================================
 
-export type SupplierType = 'supplier' | 'vendor';
+export type SupplierType = string;
 
 export interface Supplier {
   id: number;

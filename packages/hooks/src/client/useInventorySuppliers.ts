@@ -4,7 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventorySuppliersApi } from '@kit/lib';
 import type { Supplier, CreateSupplierData, UpdateSupplierData } from '@kit/types';
 
-export function useInventorySuppliers(params?: { page?: number; limit?: number; supplierType?: 'supplier' | 'vendor' }) {
+export function useInventorySuppliers(params?: {
+  page?: number;
+  limit?: number;
+  supplierType?: 'supplier' | 'vendor' | 'lender' | 'customer';
+}) {
   return useQuery({
     queryKey: ['inventory-suppliers', params],
     queryFn: async () => {
