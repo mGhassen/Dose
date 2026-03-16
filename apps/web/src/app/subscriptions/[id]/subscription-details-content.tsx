@@ -101,6 +101,12 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
       notes: stored?.notes,
     };
   });
+
+  const lastHistoryAmount =
+    mergedProjections.length > 0
+      ? (mergedProjections[mergedProjections.length - 1] as any).actualAmount ??
+        mergedProjections[mergedProjections.length - 1].amount
+      : null;
   
   const queryClient = useQueryClient();
   const handleTimelineUpdate = () => {
@@ -435,7 +441,14 @@ export default function SubscriptionDetailsContent({ subscriptionId }: Subscript
                   {/* Amount */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Amount</label>
-                    <p className="text-base font-semibold mt-1">{formatCurrency(subscription.amount)}</p>
+                    <p className="text-base font-semibold mt-1">
+                      {formatCurrency(subscription.amount)}
+                      {lastHistoryAmount != null && (
+                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                          (last: {formatCurrency(lastHistoryAmount)})
+                        </span>
+                      )}
+                    </p>
                   </div>
 
                   {/* Recurrence */}
