@@ -19,19 +19,12 @@ function transformSale(row: any): Sale {
     date: row.date,
     type: row.type,
     amount: parseFloat(row.amount),
-    quantity: row.quantity,
-    unit: row.unit,
-    unitId: row.unit_id,
     description: row.description,
-    itemId: row.item_id,
-    unitPrice: row.unit_price != null ? parseFloat(row.unit_price) : undefined,
-    unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
     subtotal: row.subtotal != null ? parseFloat(row.subtotal) : undefined,
     totalTax: row.total_tax != null ? parseFloat(row.total_tax) : undefined,
     totalDiscount: row.total_discount != null ? parseFloat(row.total_discount) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    item: undefined,
   };
 }
 
@@ -59,13 +52,7 @@ function transformToSnakeCase(data: CreateSaleData): Record<string, unknown> {
     type: data.type,
     amount: data.amount,
     description: data.description ?? null,
-    item_id: data.itemId ?? null,
   };
-  if (data.quantity != null) result.quantity = data.quantity;
-  if (data.unit != null && data.unit !== '') result.unit = data.unit;
-  if (data.unitId != null) result.unit_id = data.unitId;
-  if (data.unitPrice != null) result.unit_price = data.unitPrice;
-  if (data.unitCost != null) result.unit_cost = data.unitCost;
   if (data.subtotal != null) result.subtotal = data.subtotal;
   if (data.totalTax != null) result.total_tax = data.totalTax;
   if (data.totalDiscount != null) result.total_discount = data.totalDiscount;
@@ -132,117 +119,7 @@ export async function GET(request: NextRequest) {
     if (countError) throw countError;
 
     const salesRows = data || [];
-    const saleIdsWithNullItem = salesRows.filter((r: any) => r.item_id == null).map((r: any) => r.id);
-    const firstLineBySale = new Map<number, { item_id: number | null; quantity: number; unit_price: number; unit_cost: number | null }>();
-    if (saleIdsWithNullItem.length > 0) {
-      const { data: lineItemsData } = await supabase
-        .from('sale_line_items')
-        .select('sale_id, item_id, quantity, unit_price, unit_cost, sort_order')
-        .in('sale_id', saleIdsWithNullItem)
-        .order('sort_order');
-      const bySale = new Map<number, any[]>();
-      for (const line of lineItemsData || []) {
-        const sid = line.sale_id;
-        if (!bySale.has(sid)) bySale.set(sid, []);
-        bySale.get(sid)!.push(line);
-      }
-      bySale.forEach((lines, saleId) => {
-        const first = lines[0];
-        if (first) {
-          firstLineBySale.set(saleId, {
-            item_id: first.item_id,
-            quantity: parseFloat(first.quantity),
-            unit_price: parseFloat(first.unit_price),
-            unit_cost: first.unit_cost != null ? parseFloat(first.unit_cost) : null,
-          });
-        }
-      });
-    }
-
-    const itemIds = [...new Set([
-      ...salesRows.map((row: any) => row.item_id).filter(Boolean),
-      ...Array.from(firstLineBySale.values()).map((f) => f.item_id).filter(Boolean),
-    ])];
-    const itemsMap = new Map<number, any>();
-    
-    if (itemIds.length > 0) {
-      // Fetch items
-      const { data: itemsData } = await supabase
-        .from('items')
-        .select('*')
-        .in('id', itemIds);
-      
-      if (itemsData) {
-        itemsData.forEach(item => {
-          itemsMap.set(item.id, item);
-        });
-      }
-      
-      // Fetch recipes for remaining item_ids
-      const foundItemIds = new Set(itemsData?.map(i => i.id) || []);
-      const recipeIds = itemIds.filter(id => !foundItemIds.has(id));
-      
-      if (recipeIds.length > 0) {
-        const { data: recipesData } = await supabase
-          .from('recipes')
-          .select('*')
-          .in('id', recipeIds);
-        
-        if (recipesData) {
-          recipesData.forEach(recipe => {
-            itemsMap.set(recipe.id, { ...recipe, item_type: 'recipe' });
-          });
-        }
-      }
-    }
-
-    // Transform sales with items
-    const sales: Sale[] = salesRows.map((row: any) => {
-      const firstLine = row.item_id == null ? firstLineBySale.get(row.id) : null;
-      const mergedRow = firstLine
-        ? { ...row, item_id: firstLine.item_id, quantity: firstLine.quantity, unit_price: firstLine.unit_price, unit_cost: firstLine.unit_cost }
-        : row;
-      const sale = transformSale(mergedRow);
-      
-      if (sale.itemId && itemsMap.has(sale.itemId)) {
-        const itemData = itemsMap.get(sale.itemId);
-        const sellPrice = sale.unitPrice ?? undefined;
-        const costPrice = sale.unitCost ?? undefined;
-        if (itemData.item_type === 'recipe') {
-          sale.item = {
-            id: itemData.id,
-            name: itemData.name,
-            description: itemData.description,
-            category: itemData.category,
-            sku: undefined,
-            unit: itemData.unit || 'serving',
-            unitPrice: sellPrice,
-            unitCost: costPrice,
-            itemType: 'recipe',
-            isActive: itemData.is_active,
-            createdAt: itemData.created_at,
-            updatedAt: itemData.updated_at,
-          };
-        } else {
-          sale.item = {
-            id: itemData.id,
-            name: itemData.name,
-            description: itemData.description,
-            category: itemData.category,
-            sku: itemData.sku,
-            unit: itemData.unit,
-            unitPrice: sellPrice,
-            unitCost: costPrice,
-            itemType: itemData.item_type,
-            isActive: itemData.is_active,
-            createdAt: itemData.created_at,
-            updatedAt: itemData.updated_at,
-          };
-        }
-      }
-      
-      return sale;
-    });
+    const sales: Sale[] = salesRows.map((row: any) => transformSale(row));
     
     const total = count || 0;
     

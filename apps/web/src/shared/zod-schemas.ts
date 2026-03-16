@@ -86,7 +86,7 @@ export const SYNC_TYPE_NAMES = ["orders", "payments", "catalog", "locations", "t
 export const UNIT_DIMENSION_NAMES = ["mass", "volume", "count", "other"] as const;
 export const ITEM_CATEGORY_NAMES = ["food", "beverage", "supplies", "other"] as const;
 export const SUPPLIER_PAYMENT_TERMS_NAMES = ["net_30", "net_15", "cod", "due_on_receipt", "net_60"] as const;
-export const SUPPLIER_TYPE_NAMES = ["supplier", "vendor"] as const;
+// Supplier types are metadata-driven (not hardcoded here).
 export const GLOBAL_DATE_FILTER_PRESET_NAMES = ["this_month", "this_quarter", "this_year", "custom"] as const;
 
 const expenseCategoryEnum = z.enum(EXPENSE_CATEGORY_NAMES);
@@ -363,8 +363,7 @@ export type CreateVendorInput = z.infer<typeof createVendorSchema>;
 export const updateVendorSchema = createVendorSchema.partial();
 export type UpdateVendorInput = z.infer<typeof updateVendorSchema>;
 
-const supplierTypeEnum = z.enum(SUPPLIER_TYPE_NAMES);
-const supplierTypeArraySchema = z.array(supplierTypeEnum).optional();
+const supplierTypeArraySchema = z.array(z.string().min(1)).optional();
 
 export const createSupplierSchema = z.object({
   name: z.string().min(1, "Name is required"),

@@ -15,16 +15,17 @@ import { useCreateLoan, useInventorySuppliers, useMetadataEnum } from "@kit/hook
 import { toast } from "sonner";
 import type { LoanStatus } from "@kit/types";
 import { Checkbox } from "@kit/ui/checkbox";
-import Link from "next/link";
 import { dateToYYYYMMDD } from "@kit/lib";
+import { AddVendorDialog } from "@/components/add-vendor-dialog";
 
 export default function CreateLoanPage() {
   const router = useRouter();
   const createLoan = useCreateLoan();
-  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'lender' });
   const suppliers = suppliersResponse?.data || [];
   const { data: loanStatusValues = [] } = useMetadataEnum("LoanStatus");
   const statusItems = loanStatusValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const [addLenderOpen, setAddLenderOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     loanNumber: "",
@@ -200,6 +201,7 @@ export default function CreateLoanPage() {
                     selectedId={formData.supplierId ? parseInt(formData.supplierId) : undefined}
                     onSelect={(item) => handleInputChange('supplierId', item.id === 0 ? '' : String(item.id))}
                     placeholder="Select lender"
+                    onCreateNew={() => setAddLenderOpen(true)}
                     manageLink={formData.supplierId ? { href: `/inventory-suppliers/${formData.supplierId}`, text: "View lender details →" } : undefined}
                   />
                 </div>
@@ -281,6 +283,13 @@ export default function CreateLoanPage() {
           </CardContent>
         </Card>
       </div>
+      <AddVendorDialog
+        open={addLenderOpen}
+        onOpenChange={setAddLenderOpen}
+        entityLabel="lender"
+        supplierTypes={['lender']}
+        onCreated={(lender) => handleInputChange('supplierId', String(lender.id))}
+      />
     </AppLayout>
   );
 }

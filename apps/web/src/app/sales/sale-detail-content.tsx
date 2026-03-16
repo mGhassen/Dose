@@ -357,9 +357,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
           })
         );
       } else {
-        const fallbackPrice = sale.unitPrice ?? sale.amount;
-        const unitPriceStr = fallbackPrice != null && Number.isFinite(fallbackPrice) ? String(fallbackPrice) : "";
-        setLineItems([{ itemId: sale.itemId?.toString() ?? "", quantity: String(sale.quantity ?? 1), unitId: sale.unitId ?? null, unitPrice: unitPriceStr, unitCost: sale.unitCost != null ? String(sale.unitCost) : "", taxRatePercent: "", taxInclusive: false }]);
+        setLineItems([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
       }
     }
   }, [sale]);
@@ -833,7 +831,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                   <tbody>
                     {(sale.lineItems && sale.lineItems.length > 0
                       ? sale.lineItems
-                      : [{ id: 0, item: sale.item, quantity: sale.quantity ?? 1, unitPrice: sale.unitPrice ?? sale.amount, lineTotal: sale.amount }]
+                      : [{ id: 0, quantity: 1, unitPrice: sale.amount, lineTotal: sale.amount }]
                     ).map(
                       (
                         line: {
@@ -848,20 +846,22 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                         }
                       ) => {
                         const resolved = resolvedLineTax[line.id];
-                        const rate = resolved?.rate ?? line.taxRatePercent ?? 0;
+                        const rate = (line.taxRatePercent ?? resolved?.rate ?? 0);
                         const inclusive = (resolved?.taxInclusive ?? false) && rate > 0;
                         const displayUnitPrice =
                           inclusive ? unitPriceExclToIncl(line.unitPrice, rate) : line.unitPrice;
-                        const displayLineTotal =
+                        const computedLineTotal =
                           inclusive
                             ? to2Decimals(line.quantity * displayUnitPrice)
                             : Math.round(line.quantity * line.unitPrice * 100) / 100;
-                        const { taxAmount } = lineTaxAmount(
+                        const displayLineTotal = line.lineTotal ?? computedLineTotal;
+                        const computedTaxAmount = lineTaxAmount(
                           line.quantity,
                           line.unitPrice,
                           rate,
                           inclusive
-                        );
+                        ).taxAmount;
+                        const displayTaxAmount = line.taxAmount ?? computedTaxAmount;
                         const itemId = line.itemId ?? line.item?.id;
                         const itemLabel = line.item?.name ?? "—";
                         const hasItemLink = !!(itemId && line.item);
@@ -886,7 +886,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                               {formatCurrency(displayUnitPrice)}
                             </td>
                             <td className="p-2 text-right tabular-nums">
-                              {formatCurrency(taxAmount)}{" "}
+                              {formatCurrency(displayTaxAmount)}{" "}
                               <span className="text-xs text-muted-foreground">
                                 ({rate.toFixed(1)}%)
                               </span>

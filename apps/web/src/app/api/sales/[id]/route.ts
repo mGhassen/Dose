@@ -15,19 +15,12 @@ function transformSale(row: any): Sale {
     date: row.date,
     type: row.type,
     amount: parseFloat(row.amount),
-    quantity: row.quantity,
-    unit: row.unit,
-    unitId: row.unit_id,
     description: row.description,
-    itemId: row.item_id,
-    unitPrice: row.unit_price != null ? parseFloat(row.unit_price) : undefined,
-    unitCost: row.unit_cost != null ? parseFloat(row.unit_cost) : undefined,
     subtotal: row.subtotal != null ? parseFloat(row.subtotal) : undefined,
     totalTax: row.total_tax != null ? parseFloat(row.total_tax) : undefined,
     totalDiscount: row.total_discount != null ? parseFloat(row.total_discount) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    item: undefined,
   };
 }
 
@@ -58,13 +51,7 @@ function transformToSnakeCase(data: UpdateSaleData): any {
   if (data.date !== undefined) result.date = data.date;
   if (data.type !== undefined) result.type = data.type;
   if (data.amount !== undefined) result.amount = data.amount;
-  if (data.quantity !== undefined) result.quantity = data.quantity;
-  if (data.unit !== undefined) result.unit = data.unit;
-  if (data.unitId !== undefined) result.unit_id = data.unitId;
   if (data.description !== undefined) result.description = data.description;
-  if (data.itemId !== undefined) result.item_id = data.itemId;
-  if (data.unitPrice !== undefined) result.unit_price = data.unitPrice;
-  if (data.unitCost !== undefined) result.unit_cost = data.unitCost;
   if (data.subtotal !== undefined) result.subtotal = data.subtotal;
   if (data.totalTax !== undefined) result.total_tax = data.totalTax;
   if (data.totalDiscount !== undefined) result.total_discount = data.totalDiscount;
@@ -118,60 +105,6 @@ export async function GET(
         const item = fromItems ?? fromRecipes;
         return item ? { ...line, item: { id: item.id, name: item.name } as any } : line;
       });
-    }
-
-    // Fetch item if item_id exists (could be from items or recipes table)
-    if (sale.itemId) {
-      // Try items table first
-      const { data: itemData } = await supabase
-        .from('items')
-        .select('*')
-        .eq('id', sale.itemId)
-        .single();
-      
-      if (itemData) {
-        const dateStr = sale.date ? sale.date.split('T')[0] : undefined;
-        const resolvedSell = dateStr ? await getItemSellingPriceAsOf(supabase, itemData.id, dateStr) : null;
-        const sellPrice = sale.unitPrice != null ? sale.unitPrice : (resolvedSell?.unitPrice ?? undefined);
-        const costPrice = sale.unitCost ?? undefined;
-        sale.item = {
-          id: itemData.id,
-          name: itemData.name,
-          description: itemData.description,
-          category: itemData.category,
-          sku: itemData.sku,
-          unit: itemData.unit,
-          unitPrice: sellPrice ?? undefined,
-          unitCost: costPrice ?? undefined,
-          itemType: itemData.item_type,
-          isActive: itemData.is_active,
-          createdAt: itemData.created_at,
-          updatedAt: itemData.updated_at,
-        };
-      } else {
-        const { data: recipeData } = await supabase
-          .from('recipes')
-          .select('*')
-          .eq('id', sale.itemId)
-          .single();
-        
-        if (recipeData) {
-          sale.item = {
-            id: recipeData.id,
-            name: recipeData.name,
-            description: recipeData.description,
-            category: recipeData.category,
-            sku: undefined,
-            unit: recipeData.unit || 'serving',
-            unitPrice: sale.unitPrice ?? undefined,
-            unitCost: sale.unitCost ?? undefined,
-            itemType: 'recipe',
-            isActive: recipeData.is_active,
-            createdAt: recipeData.created_at,
-            updatedAt: recipeData.updated_at,
-          };
-        }
-      }
     }
 
     return NextResponse.json(sale);

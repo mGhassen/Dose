@@ -518,7 +518,10 @@ SELECT e.id, v.name, v.label, v.description, v.display_order, true
 FROM metadata_enums e
 CROSS JOIN (VALUES
   ('supplier', 'Supplier', 'Supplier', 1),
-  ('vendor', 'Vendor', 'Vendor', 2)
+  ('vendor', 'Vendor', 'Vendor', 2),
+  ('lender', 'Lender', 'Lender', 3),
+  ('customer', 'Customer', 'Customer', 4),
+  ('bank', 'Bank', 'Bank', 5)
 ) AS v(name, label, description, display_order)
 WHERE e.name = 'SupplierType'
 ON CONFLICT (enum_id, name) DO NOTHING;

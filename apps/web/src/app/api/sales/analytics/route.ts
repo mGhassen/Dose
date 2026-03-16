@@ -11,7 +11,6 @@ function transformSale(row: any): Sale {
     date: row.date,
     type: row.type,
     amount: parseFloat(row.amount),
-    quantity: row.quantity,
     description: row.description,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -109,7 +108,6 @@ export async function GET(request: NextRequest) {
 
     // Calculate totals and averages
     const totalRevenue = sales.reduce((sum, sale) => sum + sale.amount, 0);
-    const totalQuantity = sales.reduce((sum, sale) => sum + (sale.quantity || 0), 0);
     const averageOrderValue = sales.length > 0 ? totalRevenue / sales.length : 0;
 
     // Best performing days (top 10)
@@ -135,7 +133,6 @@ export async function GET(request: NextRequest) {
       summary: {
         totalRevenue,
         totalSales: sales.length,
-        totalQuantity,
         averageOrderValue,
         averageDailyRevenue: totalRevenue / 365, // Approximate
       },

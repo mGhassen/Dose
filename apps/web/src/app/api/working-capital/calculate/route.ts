@@ -12,7 +12,6 @@ function transformSale(row: any): Sale {
     date: row.date,
     type: row.type,
     amount: parseFloat(row.amount),
-    quantity: row.quantity,
     description: row.description,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

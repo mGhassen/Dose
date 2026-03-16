@@ -19,12 +19,16 @@ export interface AddVendorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: (vendor: { id: number; name: string }) => void;
+  entityLabel?: string;
+  supplierTypes?: ('supplier' | 'vendor' | 'lender' | 'customer')[];
 }
 
 export function AddVendorDialog({
   open,
   onOpenChange,
   onCreated,
+  entityLabel = 'vendor',
+  supplierTypes = ['vendor'],
 }: AddVendorDialogProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -46,10 +50,10 @@ export function AddVendorDialog({
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
         address: address.trim() || undefined,
-        supplierType: ['vendor'],
+        supplierType: supplierTypes,
         isActive: true,
       });
-      toast.success('Vendor added');
+      toast.success(`${entityLabel[0]?.toUpperCase()}${entityLabel.slice(1)} added`);
       setName('');
       setEmail('');
       setPhone('');
@@ -57,7 +61,7 @@ export function AddVendorDialog({
       onOpenChange(false);
       onCreated?.({ id: created.id, name: created.name });
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to add vendor');
+      toast.error(err instanceof Error ? err.message : `Failed to add ${entityLabel}`);
     }
   };
 
@@ -75,7 +79,7 @@ export function AddVendorDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add new vendor</DialogTitle>
+          <DialogTitle>Add new {entityLabel}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -84,7 +88,7 @@ export function AddVendorDialog({
               id="add-vendor-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Vendor name"
+              placeholder={`${entityLabel[0]?.toUpperCase()}${entityLabel.slice(1)} name`}
               required
             />
           </div>
@@ -122,7 +126,7 @@ export function AddVendorDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={createSupplier.isPending || !name.trim()}>
-              {createSupplier.isPending ? 'Adding…' : 'Add vendor'}
+              {createSupplier.isPending ? 'Adding…' : `Add ${entityLabel}`}
             </Button>
           </DialogFooter>
         </form>

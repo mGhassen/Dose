@@ -73,7 +73,16 @@ async function updateExpenseAsTransaction(
     expenseDate: string;
     description?: string;
     supplierId?: number;
-    lineItems: Array<{ itemId?: number; subscriptionId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; taxRatePercent?: number }>;
+    lineItems: Array<{
+      itemId?: number;
+      subscriptionId?: number;
+      quantity: number;
+      unitId?: number;
+      unitPrice: number;
+      unitCost?: number;
+      taxRatePercent?: number;
+      taxInclusive?: boolean;
+    }>;
     discount?: { type: 'amount' | 'percent'; value: number };
   }
 ) {

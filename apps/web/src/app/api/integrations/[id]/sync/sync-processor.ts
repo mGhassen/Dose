@@ -328,8 +328,12 @@ export async function processSyncJob(
           const lineTotalCents = line.total_money?.amount ?? (baseCents ? Math.round(baseCents * qty) : 0);
           const unitPrice = qty > 0 ? centsToDecimal(Math.round(lineTotalCents / qty)) : (baseCents ? centsToDecimal(baseCents) : 0);
           const lineTotal = centsToDecimal(lineTotalCents);
-          const taxAmount = centsToDecimal(line.total_tax_money?.amount ?? 0);
-          const taxPct = lineTotal > 0 && taxAmount > 0 ? (taxAmount / lineTotal) * 100 : 0;
+          const appliedTaxes = Array.isArray(line.applied_taxes) ? line.applied_taxes : [];
+          const appliedTaxCents = appliedTaxes.reduce((sum: number, t: any) => sum + (t?.applied_money?.amount ?? 0), 0);
+          const taxCentsRaw = line.total_tax_money?.amount ?? appliedTaxCents ?? 0;
+          const taxAmount = centsToDecimal(taxCentsRaw);
+          const baseForRate = Math.max(lineTotal - taxAmount, 0);
+          const taxPct = baseForRate > 0 && taxAmount > 0 ? (taxAmount / baseForRate) * 100 : 0;
           let unitCost: number | null = null;
           if (itemId != null) {
             const cost = await getItemCostAsOf(supabase, itemId, dateStr);
@@ -364,10 +368,6 @@ export async function processSyncJob(
             total_tax: totalTax,
             total_discount: totalDiscount,
             description,
-            item_id: firstLine?.itemId ?? null,
-            quantity: Math.round(sumQty),
-            unit_price: firstLine?.unitPrice ?? null,
-            unit_cost: firstLine?.unitCost ?? null,
           })
           .select('id')
           .single();

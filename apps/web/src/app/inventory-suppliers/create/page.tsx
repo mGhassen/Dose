@@ -28,7 +28,7 @@ export default function CreateSupplierPage() {
     contactPerson: "",
     paymentTerms: "",
     notes: "",
-    supplierType: ['supplier'] as ('supplier' | 'vendor')[],
+    supplierType: ['supplier'] as ('supplier' | 'vendor' | 'lender' | 'customer')[],
     isActive: true,
   });
 
@@ -158,7 +158,7 @@ export default function CreateSupplierPage() {
                   <Label>Supplier Type</Label>
                   <div className="flex gap-4">
                     {supplierTypeValues.map((ev) => {
-                      const typeValue = ev.name as 'supplier' | 'vendor';
+                      const typeValue = ev.name as 'supplier' | 'vendor' | 'lender' | 'customer';
                       return (
                       <div key={ev.name} className="flex items-center space-x-2">
                         <Checkbox

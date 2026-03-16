@@ -64,44 +64,11 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
       cell: ({ row }) => formatCurrency(row.original.amount),
     },
     {
-      accessorKey: "quantity",
-      header: "Quantity",
-      cell: ({ row }) => row.original.quantity || <span className="text-muted-foreground">—</span>,
-    },
-    {
-      accessorKey: "item",
-      header: "Item/Recipe",
-      cell: ({ row }) => {
-        const item = row.original.item;
-        if (item) {
-          return (
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{item.name}</span>
-              {item.itemType === 'recipe' && (
-                <Badge variant="secondary" className="text-xs">Recipe</Badge>
-              )}
-            </div>
-          );
-        }
-        return <span className="text-muted-foreground">—</span>;
-      },
-    },
-    {
-      accessorKey: "unitPrice",
-      header: "Sell price",
+      accessorKey: "totalTax",
+      header: "Total tax",
       cell: ({ row }) =>
-        row.original.unitPrice != null ? (
-          formatCurrency(row.original.unitPrice)
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
-    },
-    {
-      accessorKey: "unitCost",
-      header: "Cost price",
-      cell: ({ row }) =>
-        row.original.unitCost != null ? (
-          formatCurrency(row.original.unitCost)
+        row.original.totalTax != null ? (
+          formatCurrency(row.original.totalTax)
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
@@ -139,13 +106,12 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
     const salesToCopy = type === 'selected' ? data : data;
     
     const csv = [
-      ['Date', 'Type', 'Amount', 'Quantity', 'Item/Recipe', 'Description'].join(','),
+      ['Date', 'Type', 'Amount', 'Total tax', 'Description'].join(','),
       ...salesToCopy.map(sale => [
         sale.date,
         sale.type,
         sale.amount,
-        sale.quantity || '',
-        sale.item?.name || '',
+        sale.totalTax ?? '',
         sale.description || '',
       ].join(','))
     ].join('\n');
@@ -158,13 +124,12 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
     const salesToExport = type === 'selected' ? data : data;
     
     const csv = [
-      ['Date', 'Type', 'Amount', 'Quantity', 'Item/Recipe', 'Description'].join(','),
+      ['Date', 'Type', 'Amount', 'Total tax', 'Description'].join(','),
       ...salesToExport.map(sale => [
         sale.date,
         sale.type,
         sale.amount,
-        sale.quantity || '',
-        sale.item?.name || '',
+        sale.totalTax ?? '',
         sale.description || '',
       ].join(','))
     ].join('\n');
@@ -213,18 +178,14 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
             { value: "date", label: "Date" },
             { value: "type", label: "Type", type: "select" },
             { value: "amount", label: "Amount" },
-            { value: "quantity", label: "Quantity" },
-            { value: "unitPrice", label: "Sell price" },
-            { value: "unitCost", label: "Cost price" },
+            { value: "totalTax", label: "Total tax" },
             { value: "description", label: "Description" },
           ]}
           sortColumns={[
             { value: "date", label: "Date", type: "date" },
             { value: "type", label: "Type", type: "character varying" },
             { value: "amount", label: "Amount", type: "numeric" },
-            { value: "quantity", label: "Quantity", type: "numeric" },
-            { value: "unitPrice", label: "Sell price", type: "numeric" },
-            { value: "unitCost", label: "Cost price", type: "numeric" },
+            { value: "totalTax", label: "Total tax", type: "numeric" },
             { value: "description", label: "Description", type: "character varying" },
           ]}
           localStoragePrefix="sales"

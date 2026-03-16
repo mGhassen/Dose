@@ -50,10 +50,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
   const { data: supplierTypeValues = [] } = useMetadataEnum("SupplierType");
   const paymentTermsItems = paymentTermsValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
-  // Check if supplier is a vendor
-  const isVendor = useMemo(() => {
-    return supplier?.supplierType?.includes('vendor') || false;
-  }, [supplier?.supplierType]);
+  const isVendor = useMemo(() => supplier?.supplierType?.includes('vendor') || false, [supplier?.supplierType]);
 
   // Filter vendor-related data
   const vendorExpenses = useMemo(() => {
@@ -169,7 +166,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
     contactPerson: "",
     paymentTerms: "",
     notes: "",
-    supplierType: ['supplier'] as ('supplier' | 'vendor')[],
+    supplierType: ['supplier'] as string[],
     isActive: true,
   });
 
@@ -404,7 +401,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                     <Label>Supplier Type</Label>
                     <div className="flex gap-4">
                       {supplierTypeValues.map((ev) => {
-                        const typeValue = ev.name as 'supplier' | 'vendor';
+                        const typeValue = ev.name as 'supplier' | 'vendor' | 'lender' | 'customer';
                         return (
                         <div key={ev.name} className="flex items-center space-x-2">
                           <Checkbox
@@ -876,12 +873,11 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">Type</label>
                     <div className="mt-1 flex flex-wrap gap-2">
-                      {supplier.supplierType?.includes('supplier') && (
-                        <Badge variant="outline">Supplier</Badge>
-                      )}
-                      {supplier.supplierType?.includes('vendor') && (
-                        <Badge variant="outline">Vendor</Badge>
-                      )}
+                      {(supplier.supplierType || []).map((t) => (
+                        <Badge key={t} variant="outline">
+                          {t.charAt(0).toUpperCase() + t.slice(1)}
+                        </Badge>
+                      ))}
                     </div>
                   </div>
 

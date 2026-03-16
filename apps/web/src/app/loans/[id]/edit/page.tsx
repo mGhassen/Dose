@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { dateToYYYYMMDD } from "@kit/lib";
 import type { LoanStatus } from "@kit/types";
 import { DatePicker } from "@kit/ui/date-picker";
-import Link from "next/link";
+import { AddVendorDialog } from "@/components/add-vendor-dialog";
 
 interface EditLoanPageProps {
   params: Promise<{ id: string }>;
@@ -26,10 +26,11 @@ export default function EditLoanPage({ params }: EditLoanPageProps) {
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: loan, isLoading } = useLoanById(resolvedParams?.id || "");
   const updateLoan = useUpdateLoan();
-  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'lender' });
   const suppliers = suppliersResponse?.data || [];
   const { data: loanStatusValues = [] } = useMetadataEnum("LoanStatus");
   const statusItems = loanStatusValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const [addLenderOpen, setAddLenderOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     loanNumber: "",
@@ -237,6 +238,7 @@ export default function EditLoanPage({ params }: EditLoanPageProps) {
                     selectedId={formData.supplierId ? parseInt(formData.supplierId) : undefined}
                     onSelect={(item) => handleInputChange('supplierId', item.id === 0 ? '' : String(item.id))}
                     placeholder="Select lender"
+                    onCreateNew={() => setAddLenderOpen(true)}
                     manageLink={formData.supplierId ? { href: `/inventory-suppliers/${formData.supplierId}`, text: "View lender details →" } : undefined}
                   />
                 </div>
@@ -273,6 +275,13 @@ export default function EditLoanPage({ params }: EditLoanPageProps) {
           </CardContent>
         </Card>
       </div>
+      <AddVendorDialog
+        open={addLenderOpen}
+        onOpenChange={setAddLenderOpen}
+        entityLabel="lender"
+        supplierTypes={['lender']}
+        onCreated={(lender) => handleInputChange('supplierId', String(lender.id))}
+      />
     </AppLayout>
   );
 }
