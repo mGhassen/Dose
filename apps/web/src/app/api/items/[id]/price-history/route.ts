@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import { parseRequestBody, createItemPriceHistorySchema } from '@/shared/zod-schemas';
-import { getTaxRateAndRuleForSaleLine } from '@/lib/tax-rules-resolve';
+import { getTaxRateAndRuleForSaleLineWithItemTaxes, getTaxRateAndRuleForExpenseLineWithItemTaxes } from '@/lib/item-taxes-resolve';
 
 type HistoryType = 'sell' | 'cost';
 
@@ -32,21 +32,20 @@ export async function GET(
       .from(table)
       .select('id, effective_date, ' + valueCol + taxIncludedCol)
       .eq('item_id', itemId)
-      .order('effective_date', { ascending: false });
+      .order('effective_date', { ascending: false })
+      .order('id', { ascending: false });
 
     if (error) throw error;
 
     let itemCategory: string | null = null;
     let itemCreatedAt: string | null = null;
-    if (type === 'sell') {
-      const { data: item } = await supabase
-        .from('items')
-        .select('category, created_at')
-        .eq('id', itemId)
-        .maybeSingle();
-      itemCategory = (item as { category?: string } | null)?.category ?? null;
-      itemCreatedAt = (item as { created_at?: string } | null)?.created_at ?? null;
-    }
+    const { data: item } = await supabase
+      .from('items')
+      .select('category, created_at')
+      .eq('id', itemId)
+      .maybeSingle();
+    itemCategory = (item as { category?: string } | null)?.category ?? null;
+    itemCreatedAt = (item as { created_at?: string } | null)?.created_at ?? null;
 
     const rows = (data || []) as unknown as Record<string, unknown>[];
     const list = await Promise.all(
@@ -62,7 +61,7 @@ export async function GET(
           const dateStr = String(row.effective_date ?? '').slice(0, 10);
           const resolvedTax: Record<string, { rate: number; taxInclusive: boolean }> = {};
           for (const salesType of SALES_TYPES) {
-            const result = await getTaxRateAndRuleForSaleLine(
+            const result = await getTaxRateAndRuleForSaleLineWithItemTaxes(
               supabase,
               itemId,
               itemCategory,
@@ -73,6 +72,12 @@ export async function GET(
             resolvedTax[salesType] = { rate: result.rate, taxInclusive: result.taxInclusive ?? false };
           }
           entry.resolvedTax = resolvedTax;
+        }
+        if (type === 'cost') {
+          const dateStr = String(row.effective_date ?? '').slice(0, 10);
+          const expenseRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, itemId, itemCategory, dateStr, itemCreatedAt);
+          if (entry.taxIncluded === undefined) entry.taxIncluded = expenseRule.taxInclusive ?? false;
+          entry.resolvedTax = { expense: { rate: expenseRule.rate ?? 0, taxInclusive: expenseRule.taxInclusive ?? false } };
         }
         return entry;
       })

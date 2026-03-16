@@ -79,15 +79,24 @@ export function useCreatePayment() {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['entries', data.entryId.toString()] });
       queryClient.invalidateQueries({ queryKey: ['entries'] });
-      
-      // Also invalidate loan schedules if this is a loan payment
-      // Fetch the entry to check if it's a loan payment
+
+      // Also invalidate related schedules when this payment is linked to a schedule entry
+      // We reuse the same entry lookup for both loan and subscription schedules.
       try {
         const entriesApi = await import('@kit/lib');
         const entry = await entriesApi.entriesApi.getById(data.entryId.toString());
-        if (entry && entry.entryType === 'loan_payment' && entry.referenceId) {
-          queryClient.invalidateQueries({ queryKey: ['loans', entry.referenceId.toString(), 'schedule'] });
-          queryClient.invalidateQueries({ queryKey: ['loans', 'schedules'] });
+
+        if (entry && entry.referenceId) {
+          if (entry.entryType === 'loan_payment') {
+            queryClient.invalidateQueries({ queryKey: ['loans', entry.referenceId.toString(), 'schedule'] });
+            queryClient.invalidateQueries({ queryKey: ['loans', 'schedules'] });
+          }
+
+          if (entry.entryType === 'subscription_payment') {
+            const subscriptionId = entry.referenceId.toString();
+            queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId, 'projections'] });
+            queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId] });
+          }
         }
       } catch (error) {
         // Ignore errors when fetching entry for invalidation
@@ -125,15 +134,23 @@ export function useDeletePayment() {
     onSuccess: async (payment) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['entries'] });
-      
-      // Also invalidate loan schedules if this is a loan payment
+
+      // Also invalidate related schedules when this payment is linked to a schedule entry
       if (payment?.entryId) {
         try {
           const entriesApi = await import('@kit/lib');
           const entry = await entriesApi.entriesApi.getById(payment.entryId.toString());
-          if (entry && entry.entryType === 'loan_payment' && entry.referenceId) {
-            queryClient.invalidateQueries({ queryKey: ['loans', entry.referenceId.toString(), 'schedule'] });
-            queryClient.invalidateQueries({ queryKey: ['loans', 'schedules'] });
+          if (entry && entry.referenceId) {
+            if (entry.entryType === 'loan_payment') {
+              queryClient.invalidateQueries({ queryKey: ['loans', entry.referenceId.toString(), 'schedule'] });
+              queryClient.invalidateQueries({ queryKey: ['loans', 'schedules'] });
+            }
+
+            if (entry.entryType === 'subscription_payment') {
+              const subscriptionId = entry.referenceId.toString();
+              queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId, 'projections'] });
+              queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId] });
+            }
           }
         } catch (error) {
           // Ignore errors when fetching entry for invalidation

@@ -50,6 +50,9 @@ export default function ItemsContent() {
           {row.original.itemType === 'item' && (
             <Badge variant="secondary" className="text-xs">Item</Badge>
           )}
+          {row.original.itemType === 'item_and_product' && (
+            <Badge variant="secondary" className="text-xs">Item & product</Badge>
+          )}
         </div>
       ),
     },
@@ -195,7 +198,7 @@ export default function ItemsContent() {
           filterColumns={[
             { value: "name", label: "Name" },
             { value: "sku", label: "SKU" },
-            { value: "itemType", label: "Type", type: "select", options: [{ value: "item", label: "Item" }, { value: "product", label: "Product" }, { value: "recipe", label: "Recipe" }] },
+            { value: "itemType", label: "Type", type: "select", options: [{ value: "item", label: "Item" }, { value: "product", label: "Product" }, { value: "item_and_product", label: "Item and product" }, { value: "recipe", label: "Recipe" }] },
             { value: "category", label: "Category", type: "select" },
             { value: "unit", label: "Unit", type: "select" },
             { value: "unitPrice", label: "Selling price" },

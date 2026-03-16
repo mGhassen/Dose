@@ -89,7 +89,7 @@ export async function PUT(
       .from('subscriptions')
       .update(transformToSnakeCase(body))
       .eq('id', id)
-      .select()
+      .select('*')
       .single();
 
     if (error) {
@@ -97,6 +97,41 @@ export async function PUT(
         return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
       }
       throw error;
+    }
+
+    // If amount changed, write a new cost history entry for the linked item (if any)
+    if (body.amount !== undefined) {
+      try {
+        const { upsertCost } = await import('@/lib/items/price-history-upsert');
+        const { getTaxRateAndRuleForExpenseLineWithItemTaxes } = await import('@/lib/item-taxes-resolve');
+
+        const subRow = data as {
+          item_id?: number | null;
+          category?: string | null;
+          start_date?: string | null;
+        };
+
+        if (subRow.item_id != null) {
+          const effectiveDateSource = body.startDate ?? subRow.start_date ?? new Date().toISOString().split('T')[0];
+          const effectiveDate = effectiveDateSource.split('T')[0] || effectiveDateSource;
+          const taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(
+            supabase,
+            subRow.item_id,
+            subRow.category ?? null,
+            effectiveDate,
+            null
+          );
+          await upsertCost(
+            supabase,
+            subRow.item_id,
+            effectiveDate,
+            body.amount,
+            taxRule.taxInclusive === true
+          );
+        }
+      } catch (costError) {
+        console.error('Error creating cost history for subscription update:', costError);
+      }
     }
 
     return NextResponse.json(transformSubscription(data));

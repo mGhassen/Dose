@@ -52,13 +52,24 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
   >([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
 
   const [defaultTaxRate, setDefaultTaxRate] = useState(0);
+  const [defaultTaxInclusive, setDefaultTaxInclusive] = useState(false);
   useEffect(() => {
     if (!formData.expenseDate) {
       setDefaultTaxRate(0);
+      setDefaultTaxInclusive(false);
       return;
     }
-    taxRulesApi.resolve({ context: 'expense', date: formData.expenseDate }).then((r) => setDefaultTaxRate(r.rate)).catch(() => setDefaultTaxRate(0));
-  }, [formData.expenseDate]);
+    taxRulesApi
+      .resolve({ context: 'expense', date: formData.expenseDate, itemCategory: formData.category || undefined })
+      .then((r) => {
+        setDefaultTaxRate(r.rate);
+        setDefaultTaxInclusive(r.taxInclusive ?? false);
+      })
+      .catch(() => {
+        setDefaultTaxRate(0);
+        setDefaultTaxInclusive(false);
+      });
+  }, [formData.expenseDate, formData.category]);
 
   const hasAnyItem = lineItems.some((l) => l.itemId !== "");
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
@@ -68,7 +79,8 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : defaultTaxRate;
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, false);
+      const inclusive = line.itemId ? (line.taxInclusive ?? false) : defaultTaxInclusive;
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, inclusive);
       sub += lineTotalNet;
       tax += taxAmount;
     }
@@ -82,7 +94,7 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
     }
     const tot = to2Decimals(sub + tax - disc);
     return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
-  }, [lineItems, defaultTaxRate, formData.discountType, formData.discountValue]);
+  }, [lineItems, defaultTaxRate, defaultTaxInclusive, formData.discountType, formData.discountValue]);
 
   const addLine = () => {
     setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
@@ -128,11 +140,17 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
     const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { category?: string } | undefined;
     fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`)
       .then((r) => r.json())
-      .then((data: { unitCost?: number | null }) => {
+      .then((data: { unitCost?: number | null; costTaxIncluded?: boolean }) => {
         if (data?.unitCost != null) {
           setLineItems((prev) => {
             const next = [...prev];
-            if (next[index]?.itemId === itemId) next[index] = { ...next[index], unitPrice: String(data.unitCost), unitCost: String(data.unitCost) };
+            if (next[index]?.itemId === itemId)
+              next[index] = {
+                ...next[index],
+                unitPrice: String(data.unitCost),
+                unitCost: String(data.unitCost),
+                taxInclusive: data.costTaxIncluded ?? false,
+              };
             return next;
           });
         }
@@ -143,7 +161,8 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
       .then((r) =>
         setLineItems((prev) => {
           const next = [...prev];
-          if (next[index]?.itemId === itemId) next[index] = { ...next[index], taxRatePercent: r.rate.toString() };
+          if (next[index]?.itemId === itemId)
+            next[index] = { ...next[index], taxRatePercent: r.rate.toString() };
           return next;
         })
       )
@@ -173,6 +192,7 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
         unitPrice: price,
         unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
         taxRatePercent: line.taxRatePercent !== "" ? lineRate : undefined,
+        taxInclusive: line.taxInclusive,
       });
     }
     const payload = {
@@ -248,7 +268,7 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
           </div>
 
           <p className="text-xs text-muted-foreground pl-3">
-            Tax: {defaultTaxRate.toFixed(1)}% (from tax rules; not tied to category).
+            Tax: {defaultTaxRate.toFixed(1)}% (from tax rules{defaultTaxInclusive ? ", inclusive" : ", excl. tax"}).
           </p>
 
           <div className="space-y-2">
@@ -302,7 +322,11 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
                         />
                       </div>
                       <div className="col-span-2">
-                        <Label className="text-xs text-muted-foreground">Price (excl. tax)</Label>
+                        <Label className="text-xs text-muted-foreground">
+                          {line.itemId && (line.taxInclusive ?? false) && (parseFloat(line.taxRatePercent || String(defaultTaxRate)) || 0) > 0
+                            ? "Price (incl. tax)"
+                            : "Price (excl. tax)"}
+                        </Label>
                         <Input
                           type="number"
                           step="0.01"

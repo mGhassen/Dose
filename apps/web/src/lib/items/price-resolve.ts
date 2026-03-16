@@ -18,6 +18,7 @@ export async function getItemSellingPriceAsOf(
     .eq('item_id', itemId)
     .lte('effective_date', dateStr)
     .order('effective_date', { ascending: false })
+    .order('id', { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -28,20 +29,29 @@ export async function getItemSellingPriceAsOf(
   };
 }
 
+export interface ItemCostAsOf {
+  unitCost: number | null;
+  taxIncluded: boolean | null;
+}
+
 export async function getItemCostAsOf(
   supabase: { from: (t: string) => any },
   itemId: number,
   dateStr: string
-): Promise<number | null> {
+): Promise<ItemCostAsOf> {
   const { data: historyRow } = await supabase
     .from('item_cost_history')
-    .select('unit_cost')
+    .select('unit_cost, tax_included')
     .eq('item_id', itemId)
     .lte('effective_date', dateStr)
     .order('effective_date', { ascending: false })
+    .order('id', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (historyRow?.unit_cost != null) return parseFloat(historyRow.unit_cost);
-  return null;
+  if (historyRow?.unit_cost == null) return { unitCost: null, taxIncluded: null };
+  return {
+    unitCost: parseFloat(historyRow.unit_cost),
+    taxIncluded: historyRow.tax_included != null ? !!historyRow.tax_included : null,
+  };
 }

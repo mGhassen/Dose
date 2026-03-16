@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@kit/ui/button";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
@@ -42,6 +43,7 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
   const [dialogPaymentDate, setDialogPaymentDate] = useState<Date>(() => new Date());
   const [dialogExpectedAmount, setDialogExpectedAmount] = useState<number>(0);
+  const queryClient = useQueryClient();
 
   const expectedAmount = projection.amount;
 
@@ -128,6 +130,10 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
       }
       
       setIsPaidDialogOpen(false);
+      // Hard refresh subscription projections and related queries so each row recomputes from fresh data
+      await queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId.toString(), 'projections'] });
+      await queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId.toString()] });
+      await queryClient.invalidateQueries({ queryKey: ['payments'] });
       onUpdate();
       toast.success("Payment recorded and expense created");
     } catch (error: any) {
@@ -255,6 +261,10 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
       
       setIsPaidDialogOpen(false);
       refetchPayments();
+      // Hard refresh subscription projections and related queries so table uses fresh data
+      await queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId.toString(), 'projections'] });
+      await queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId.toString()] });
+      await queryClient.invalidateQueries({ queryKey: ['payments'] });
       onUpdate();
       toast.success("Payment recorded successfully");
     } catch (error: any) {

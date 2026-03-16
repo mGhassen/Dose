@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useTaxRules, useDeleteTaxRule, useMetadataEnum } from "@kit/hooks";
+import { useTaxRules, useDeleteTaxRule } from "@kit/hooks";
 import type { TaxRule } from "@kit/types";
 import { toast } from "sonner";
+import { Button } from "@kit/ui/button";
 
 function formatCondition(rule: TaxRule): string {
   if (rule.conditionType === "expense") return "Expense";
@@ -42,6 +43,24 @@ export default function TaxRulesContent({ selectedRuleId }: TaxRulesContentProps
   const router = useRouter();
   const { data: rules = [], isLoading } = useTaxRules();
   const deleteMutation = useDeleteTaxRule();
+  const [applyAllPending, setApplyAllPending] = useState(false);
+
+  const handleApplyToAllItems = async () => {
+    setApplyAllPending(true);
+    try {
+      const res = await fetch("/api/tax-rules/apply-to-items", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Applied tax rules to ${data.applied ?? 0} item(s)`);
+      } else {
+        toast.error(data?.error || "Failed to apply");
+      }
+    } catch {
+      toast.error("Failed to apply tax rules to items");
+    } finally {
+      setApplyAllPending(false);
+    }
+  };
 
   const columns: ColumnDef<TaxRule>[] = useMemo(
     () => [
@@ -107,6 +126,11 @@ export default function TaxRulesContent({ selectedRuleId }: TaxRulesContentProps
       title="Tax rules"
       description="Apply transaction tax variables to items by dining option and scope."
       createHref="/tax-rules/create"
+      headerActions={
+        <Button variant="outline" size="sm" onClick={handleApplyToAllItems} disabled={applyAllPending}>
+          {applyAllPending ? "Applying…" : "Apply tax rules to all items"}
+        </Button>
+      }
       data={rules}
       columns={columns}
       loading={isLoading}

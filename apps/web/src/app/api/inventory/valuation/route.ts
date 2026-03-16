@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
           if (avgUnitPrice === 0) {
             const todayStr = new Date().toISOString().split('T')[0];
             const resolved = await getItemCostAsOf(supabase, itemId, todayStr);
-            if (resolved != null) avgUnitPrice = resolved;
+            if (resolved.unitCost != null) avgUnitPrice = resolved.unitCost;
           }
         }
 

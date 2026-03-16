@@ -27,6 +27,7 @@ export default function CreateItemPage() {
   const itemTypeItems: { id: ItemType; name: string }[] = [
     { id: "item", name: "Item" },
     { id: "product", name: "Product" },
+    { id: "item_and_product", name: "Item and product" },
   ];
   const typeItems = (variableTypeValues || []).map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [addVendorOpen, setAddVendorOpen] = useState(false);
@@ -62,7 +63,7 @@ export default function CreateItemPage() {
         vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
         notes: formData.notes || undefined,
         isActive: formData.isActive,
-        itemType: formData.itemType as 'item' | 'product',
+        itemType: formData.itemType as 'item' | 'product' | 'item_and_product',
         type: formData.type || undefined,
       });
       toast.success("Item created successfully");

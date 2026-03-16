@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
+import {
+  getTaxRateAndRuleForSaleLineWithItemTaxes,
+  getTaxRateAndRuleForExpenseLineWithItemTaxes,
+} from '@/lib/item-taxes-resolve';
 
 export async function GET(
   request: NextRequest,
@@ -18,14 +22,29 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid item id' }, { status: 400 });
     }
     const supabase = supabaseServer();
-    const [selling, unitCost] = await Promise.all([
+    const [selling, cost, itemRow] = await Promise.all([
       getItemSellingPriceAsOf(supabase, itemId, dateStr),
       getItemCostAsOf(supabase, itemId, dateStr),
+      supabase.from('items').select('category, created_at').eq('id', itemId).maybeSingle(),
     ]);
+
+    const itemCategory = (itemRow.data as { category?: string } | null)?.category ?? null;
+    const itemCreatedAt = (itemRow.data as { created_at?: string } | null)?.created_at ?? null;
+
+    const [saleRule, expenseRule] = await Promise.all([
+      getTaxRateAndRuleForSaleLineWithItemTaxes(supabase, itemId, itemCategory, 'on_site', dateStr, itemCreatedAt),
+      getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, itemId, itemCategory, dateStr, itemCreatedAt),
+    ]);
+
+    const effectiveSellingTaxIncluded =
+      selling.taxIncluded != null ? selling.taxIncluded : saleRule.taxInclusive ?? false;
+    const effectiveCostTaxIncluded =
+      cost.taxIncluded != null ? cost.taxIncluded : expenseRule.taxInclusive ?? false;
     return NextResponse.json({
       unitPrice: selling.unitPrice,
-      unitCost,
-      taxIncluded: selling.taxIncluded,
+      unitCost: cost.unitCost,
+      taxIncluded: effectiveSellingTaxIncluded,
+      costTaxIncluded: effectiveCostTaxIncluded,
       date: dateStr,
     });
   } catch (error: any) {

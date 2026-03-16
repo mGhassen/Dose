@@ -74,8 +74,8 @@ export async function POST(
       const unitPrice = parseFloat(String(orderItem.unit_price)) || 0;
 
       const currentStock = await getItemTotalStock(supabase, itemId);
-      const currentCost =
-        (await getItemCostAsOf(supabase, itemId, effectiveDate)) ?? 0;
+      const costResult = await getItemCostAsOf(supabase, itemId, effectiveDate);
+      const currentCost = costResult.unitCost ?? 0;
 
       const { error: itemUpdateError } = await supabase
         .from('supplier_order_items')
@@ -107,10 +107,26 @@ export async function POST(
             ? (currentStock * currentCost + receivedQty * unitPrice) / totalQty
             : unitPrice;
 
+        let taxInclusive = false;
+        try {
+          const { getTaxRateAndRuleForExpenseLineWithItemTaxes } = await import('@/lib/item-taxes-resolve');
+          const expenseRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(
+            supabase,
+            itemId,
+            orderData.category ?? null,
+            effectiveDate,
+            null
+          );
+          taxInclusive = expenseRule.taxInclusive === true;
+        } catch {
+          taxInclusive = false;
+        }
+
         await supabase.from('item_cost_history').insert({
           item_id: itemId,
           effective_date: effectiveDate,
           unit_cost: newAvg,
+          tax_included: taxInclusive,
         });
       }
     }

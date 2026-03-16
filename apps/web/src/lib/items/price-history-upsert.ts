@@ -24,10 +24,15 @@ export async function upsertCost(
   supabase: SupabaseClient,
   itemId: number,
   effectiveDate: string,
-  unitCost: number
+  unitCost: number,
+  taxIncluded: boolean
 ): Promise<void> {
-  const { error } = await supabase
-    .from('item_cost_history')
-    .insert({ item_id: itemId, effective_date: effectiveDate, unit_cost: unitCost });
+  const payload: Record<string, unknown> = {
+    item_id: itemId,
+    effective_date: effectiveDate,
+    unit_cost: unitCost,
+    tax_included: taxIncluded,
+  };
+  const { error } = await supabase.from('item_cost_history').insert(payload);
   if (error) throw error;
 }

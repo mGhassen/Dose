@@ -96,7 +96,7 @@ export async function GET(
         if (avgPricePerRecipeUnit === 0 && ri.item) {
           const todayStr = new Date().toISOString().split('T')[0];
           const resolved = await getItemCostAsOf(supabase, itemId, todayStr);
-          if (resolved != null && resolved > 0) {
+          if (resolved.unitCost != null && resolved.unitCost > 0) {
             const itemUnitId = ri.item.unit_id;
             if (
               recipeUnitId != null &&
@@ -104,9 +104,9 @@ export async function GET(
               getFactor(recipeUnitId) != null &&
               getFactor(itemUnitId) != null
             ) {
-              avgPricePerRecipeUnit = resolved * (getFactor(itemUnitId)! / getFactor(recipeUnitId)!);
+              avgPricePerRecipeUnit = resolved.unitCost * (getFactor(itemUnitId)! / getFactor(recipeUnitId)!);
             } else {
-              avgPricePerRecipeUnit = resolved;
+              avgPricePerRecipeUnit = resolved.unitCost;
             }
             priceSource = 'history';
           }

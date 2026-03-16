@@ -41,7 +41,7 @@ import {
 } from 'recharts';
 import AppLayout from "@/components/app-layout";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
-import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum } from "@kit/hooks";
+import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum, useVariablesByType } from "@kit/hooks";
 import type { ItemType } from "@kit/types";
 import { toast } from "sonner";
 import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
@@ -50,7 +50,7 @@ import { to2Decimals, netUnitPriceFromInclusive, unitPriceExclToIncl } from "@/l
 import { formatDate } from "@kit/lib/date-format";
 import { useDateFormat } from "@kit/hooks/use-date-format";
 import { DatePicker } from "@kit/ui/date-picker";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 import { InputGroupAttached } from "@/components/input-group";
 
 interface ItemDetailPageProps {
@@ -216,7 +216,9 @@ function HistoryEntryTable({
 
   const useTaxRuleColumns = false;
   const useSellVatColumns = type === 'sell' && sellVatRates != null && sellVatRates.length > 0;
-  const inclLabel = !useTaxRuleColumns && !useSellVatColumns && taxPercent > 0 ? `Incl. tax (${taxPercent}%)` : null;
+  const expenseTax = type === 'cost' ? entries[0]?.resolvedTax?.expense : undefined;
+  const useCostTaxColumn = type === 'cost' && expenseTax != null;
+  const inclLabel = !useTaxRuleColumns && !useSellVatColumns && !useCostTaxColumn && taxPercent > 0 ? `Incl. tax (${taxPercent}%)` : null;
   const todayStr = new Date().toISOString().slice(0, 10);
   const activeId = entries.find((e) => e.effectiveDate <= todayStr)?.id ?? null;
 
@@ -244,7 +246,17 @@ function HistoryEntryTable({
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-left font-medium p-3">Effective date</th>
-                <th className="text-right font-medium p-3">{type === 'sell' ? 'Price' : 'Value (excl. tax)'}</th>
+                <th className="text-right font-medium p-3">
+                  {useCostTaxColumn ? 'Price (excl. tax)' : 'Price'}
+                </th>
+                {useCostTaxColumn && (
+                  <th className="text-right font-medium p-3">
+                    {expenseTax!.rate > 0 ? `Tax (${expenseTax!.rate}%)` : 'Tax'}
+                  </th>
+                )}
+                {useCostTaxColumn && (
+                  <th className="text-right font-medium p-3">Total (incl. tax)</th>
+                )}
                 {useTaxRuleColumns && salesTypes?.map((s) => {
                   const r = entries[0]?.resolvedTax?.[s.conditionValue];
                   const header = r ? (r.rate > 0 ? `${s.label} (${r.rate}% — tax)` : `${s.label} (Exempt)`) : s.label;
@@ -265,9 +277,48 @@ function HistoryEntryTable({
                 >
                   <>
                       <td className="p-3 font-medium">{formatDate(e.effectiveDate)}</td>
-                      <td className="p-3 text-right tabular-nums font-medium">
-                        {e.value != null ? formatCurrency(e.value) : '—'}
-                      </td>
+                      {useCostTaxColumn ? (() => {
+                        const r = e.resolvedTax?.expense;
+                        const rate = r?.rate ?? 0;
+                        if (e.value == null || rate <= 0) {
+                          return (
+                            <>
+                              <td className="p-3 text-right tabular-nums font-medium">
+                                {e.value != null ? formatCurrency(e.value) : '—'}
+                              </td>
+                              <td className="p-3 text-right tabular-nums text-muted-foreground">—</td>
+                              <td className="p-3 text-right tabular-nums text-muted-foreground">
+                                {e.value != null ? formatCurrency(e.value) : '—'}
+                              </td>
+                            </>
+                          );
+                        }
+                        const excl = r?.taxInclusive ? netUnitPriceFromInclusive(e.value, rate) : e.value;
+                        const taxAmount = to2Decimals(excl * (rate / 100));
+                        const total = r?.taxInclusive ? e.value : to2Decimals(excl + taxAmount);
+                        return (
+                          <>
+                            <td className="p-3 text-right tabular-nums font-medium">
+                              {formatCurrency(excl)}
+                            </td>
+                            <td className="p-3 text-right tabular-nums text-muted-foreground">
+                              <span className="whitespace-nowrap">
+                                {formatCurrency(taxAmount)}
+                              </span>
+                              <span className="ml-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                {r?.taxInclusive ? 'incl.' : 'add.'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right tabular-nums text-muted-foreground">
+                              {formatCurrency(total)}
+                            </td>
+                          </>
+                        );
+                      })() : (
+                        <td className="p-3 text-right tabular-nums font-medium">
+                          {e.value != null ? formatCurrency(e.value) : '—'}
+                        </td>
+                      )}
                       {useTaxRuleColumns && salesTypes?.map((s) => {
                         const r = e.resolvedTax?.[s.conditionValue];
                         const rate = r?.rate ?? 0;
@@ -454,6 +505,362 @@ function HistoryEntryTable({
   );
 }
 
+const CONDITION_TYPES = [
+  { id: "sales_type", name: "Sales" },
+  { id: "expense", name: "Expense" },
+] as const;
+const CONDITION_VALUES_SALES = [
+  { id: "on_site", name: "On site" },
+  { id: "delivery", name: "Delivery" },
+  { id: "takeaway", name: "Takeaway" },
+  { id: "catering", name: "Catering" },
+  { id: "other", name: "Other" },
+];
+
+function ItemTaxesSection({
+  itemId,
+  itemTaxesList,
+  loading,
+  onRefetch,
+  taxVariableOptions,
+  formatDate,
+}: {
+  itemId: string | undefined;
+  itemTaxesList: { id: number; variableId: number; conditionType: string; conditionValue?: string; calculationType?: string; priority: number; variableName?: string; variableValue?: number }[];
+  loading: boolean;
+  onRefetch: () => void;
+  taxVariableOptions: { id: number; name: string; value: number }[];
+  formatDate: (d: string) => string;
+}) {
+  const [addOpen, setAddOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [editRow, setEditRow] = useState<{ id: number; variableId: number; conditionType: string; conditionValue: string; calculationType: string } | null>(null);
+  const [applyPending, setApplyPending] = useState(false);
+  const [addVariableId, setAddVariableId] = useState<number | "">("");
+  const [addConditionType, setAddConditionType] = useState<string>("expense");
+  const [addConditionValue, setAddConditionValue] = useState<string>("");
+  const [addCalculationType, setAddCalculationType] = useState<string>("inclusive");
+  const [addSaving, setAddSaving] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+
+  const handleAdd = async () => {
+    if (!itemId || addVariableId === "") return;
+    setAddSaving(true);
+    try {
+      const res = await fetch(`/api/items/${itemId}/item-taxes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          variableId: addVariableId,
+          conditionType: addConditionType,
+          conditionValue: addConditionType === "sales_type" ? addConditionValue || null : null,
+          calculationType: addCalculationType,
+        }),
+      });
+      if (res.ok) {
+        setAddOpen(false);
+        setAddVariableId("");
+        setAddConditionType("expense");
+        setAddConditionValue("");
+        setAddCalculationType("inclusive");
+        onRefetch();
+        toast.success("Tax added");
+      } else {
+        const err = await res.json();
+        toast.error(err?.error || "Failed to add");
+      }
+    } catch {
+      toast.error("Failed to add");
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
+  const handleDelete = async (entryId: number) => {
+    if (!itemId) return;
+    try {
+      const res = await fetch(`/api/items/${itemId}/item-taxes/${entryId}`, { method: "DELETE" });
+      if (res.ok) {
+        setDeleteId(null);
+        onRefetch();
+        toast.success("Tax removed");
+      } else toast.error("Failed to delete");
+    } catch {
+      toast.error("Failed to delete");
+    }
+  };
+
+  const startEdit = (row: { id: number; variableId: number; conditionType: string; conditionValue?: string; calculationType?: string }) => {
+    setEditRow({
+      id: row.id,
+      variableId: row.variableId,
+      conditionType: row.conditionType,
+      conditionValue: row.conditionValue ?? "",
+      calculationType: row.calculationType ?? "inclusive",
+    });
+  };
+
+  const handleUpdate = async () => {
+    if (!itemId || !editRow) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/items/${itemId}/item-taxes/${editRow.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          variableId: editRow.variableId,
+          conditionType: editRow.conditionType,
+          conditionValue: editRow.conditionType === "sales_type" ? editRow.conditionValue || null : null,
+          calculationType: editRow.calculationType,
+        }),
+      });
+      if (res.ok) {
+        setEditRow(null);
+        onRefetch();
+        toast.success("Tax updated");
+      } else {
+        const err = await res.json();
+        toast.error(err?.error || "Failed to update");
+      }
+    } catch {
+      toast.error("Failed to update");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleApplyTaxRules = async () => {
+    if (!itemId) return;
+    setApplyPending(true);
+    try {
+      const res = await fetch(`/api/items/${itemId}/apply-tax-rules`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        onRefetch();
+        toast.success(`Applied ${data.applied ?? 0} tax rule(s) to this item`);
+      } else toast.error(data?.error || "Failed to apply");
+    } catch {
+      toast.error("Failed to apply tax rules");
+    } finally {
+      setApplyPending(false);
+    }
+  };
+
+  if (!itemId) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <CardTitle>Item taxes</CardTitle>
+            <CardDescription>Taxes applied to this item by context (sales type or expense). Used in sales, expenses, and subscriptions.</CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleApplyTaxRules} disabled={applyPending}>
+              {applyPending ? "Applying…" : "Apply tax rules to this item"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add tax
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        ) : itemTaxesList.length === 0 ? (
+          <div className="py-8 text-center text-sm text-muted-foreground rounded-md border border-dashed">
+            No taxes assigned. Add one manually or use &quot;Apply tax rules to this item&quot; to copy from global tax rules.
+          </div>
+        ) : (
+          <div className="rounded-md border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left font-medium p-3">Condition</th>
+                  <th className="text-left font-medium p-3">Variable</th>
+                  <th className="text-right font-medium p-3">Rate</th>
+                  <th className="text-left font-medium p-3">Calculation</th>
+                  <th className="w-[100px] text-right" />
+                </tr>
+              </thead>
+              <tbody>
+                {itemTaxesList.map((row) => (
+                  <tr key={row.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="p-3">
+                      <Badge variant="outline">{row.conditionType === "expense" ? "Expense" : "Sales"}</Badge>
+                      {row.conditionType === "sales_type" && row.conditionValue && (
+                        <span className="ml-2 text-muted-foreground">{CONDITION_VALUES_SALES.find((c) => c.id === row.conditionValue)?.name ?? row.conditionValue}</span>
+                      )}
+                    </td>
+                    <td className="p-3">{row.variableName ?? `Variable #${row.variableId}`}</td>
+                    <td className="p-3 text-right font-medium tabular-nums">{row.variableValue != null ? `${row.variableValue}%` : "—"}</td>
+                    <td className="p-3">{row.calculationType === "inclusive" ? "Inclusive" : row.calculationType === "additive" ? "Additive" : "—"}</td>
+                    <td className="p-3 text-right">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => startEdit(row)}>
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(row.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add tax to item</DialogTitle>
+              <DialogDescription>Assign a tax variable to this item for a condition (e.g. expense or sales type).</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Tax variable</Label>
+                <select
+                  className="w-full mt-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={addVariableId}
+                  onChange={(e) => setAddVariableId(e.target.value === "" ? "" : Number(e.target.value))}
+                >
+                  <option value="">Select variable</option>
+                  {taxVariableOptions.map((v) => (
+                    <option key={v.id} value={v.id}>{v.name} ({v.value}%)</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Condition type</Label>
+                <select
+                  className="w-full mt-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={addConditionType}
+                  onChange={(e) => setAddConditionType(e.target.value)}
+                >
+                  {CONDITION_TYPES.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              {addConditionType === "sales_type" && (
+                <div>
+                  <Label>Sales type</Label>
+                  <select
+                    className="w-full mt-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={addConditionValue}
+                    onChange={(e) => setAddConditionValue(e.target.value)}
+                  >
+                    <option value="">Any</option>
+                    {CONDITION_VALUES_SALES.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <Label>Calculation</Label>
+                <select
+                  className="w-full mt-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={addCalculationType}
+                  onChange={(e) => setAddCalculationType(e.target.value)}
+                >
+                  <option value="inclusive">Inclusive</option>
+                  <option value="additive">Additive</option>
+                </select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+              <Button onClick={handleAdd} disabled={addSaving || addVariableId === ""}>Add</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={editRow != null} onOpenChange={(open) => !open && setEditRow(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit tax</DialogTitle>
+              <DialogDescription>Change tax variable, condition, or calculation for this item.</DialogDescription>
+            </DialogHeader>
+            {editRow && (
+              <div className="space-y-4 py-4">
+                <div>
+                  <Label>Tax variable</Label>
+                  <select
+                    className="w-full mt-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={editRow.variableId}
+                    onChange={(e) => setEditRow((r) => r ? { ...r, variableId: Number(e.target.value) } : null)}
+                  >
+                    {taxVariableOptions.map((v) => (
+                      <option key={v.id} value={v.id}>{v.name} ({v.value}%)</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>Condition type</Label>
+                  <select
+                    className="w-full mt-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={editRow.conditionType}
+                    onChange={(e) => setEditRow((r) => r ? { ...r, conditionType: e.target.value } : null)}
+                  >
+                    {CONDITION_TYPES.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {editRow.conditionType === "sales_type" && (
+                  <div>
+                    <Label>Sales type</Label>
+                    <select
+                      className="w-full mt-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={editRow.conditionValue}
+                      onChange={(e) => setEditRow((r) => r ? { ...r, conditionValue: e.target.value } : null)}
+                    >
+                      <option value="">Any</option>
+                      {CONDITION_VALUES_SALES.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <Label>Calculation</Label>
+                  <select
+                    className="w-full mt-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={editRow.calculationType}
+                    onChange={(e) => setEditRow((r) => r ? { ...r, calculationType: e.target.value } : null)}
+                  >
+                    <option value="inclusive">Inclusive</option>
+                    <option value="additive">Additive</option>
+                  </select>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditRow(null)}>Cancel</Button>
+              <Button onClick={handleUpdate} disabled={editSaving}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <ConfirmationDialog
+          open={deleteId != null}
+          onOpenChange={(open) => !open && setDeleteId(null)}
+          onConfirm={() => deleteId != null && handleDelete(deleteId)}
+          title="Remove tax"
+          description="Remove this tax assignment from the item?"
+          confirmText="Remove"
+          cancelText="Cancel"
+          isPending={false}
+          variant="destructive"
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const router = useRouter();
   const { formattingLocale } = useDateFormat();
@@ -599,14 +1006,20 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const itemTypeItems: { id: ItemType; name: string }[] = [
     { id: "item", name: "Item" },
     { id: "product", name: "Product" },
+    { id: "item_and_product", name: "Item and product" },
   ];
   const typeItems = (variableTypeValues || []).map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
-  const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null; taxIncluded?: boolean } | null>(null);
+  const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null; taxIncluded?: boolean; costTaxIncluded?: boolean } | null>(null);
   const [sellHistory, setSellHistory] = useState<PriceHistoryEntry[]>([]);
   const [costHistory, setCostHistory] = useState<PriceHistoryEntry[]>([]);
   const [supplierOrderPrices, setSupplierOrderPrices] = useState<{ id: number; unitPrice: number | null; quantity: number | null; unit: string; orderDate: string | null; orderNumber: string | null }[]>([]);
   const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
+  const [itemTaxesList, setItemTaxesList] = useState<{ id: number; variableId: number; conditionType: string; conditionValue?: string; calculationType?: string; priority: number; variableName?: string; variableValue?: number }[]>([]);
+  const [itemTaxesLoading, setItemTaxesLoading] = useState(false);
+  const { data: transactionTaxVars = [] } = useVariablesByType("transaction_tax");
+  const { data: taxVars = [] } = useVariablesByType("tax");
+  const taxVariableOptions = [...(transactionTaxVars as { id: number; name: string; value: number }[]), ...(taxVars as { id: number; name: string; value: number }[])];
   const fetchPriceHistory = useCallback(async (itemId: string) => {
     setPriceHistoryLoading(true);
     try {
@@ -618,7 +1031,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       ]);
       if (res.ok) {
         const d = await res.json();
-        setResolvedPrice({ unitPrice: d.unitPrice ?? null, unitCost: d.unitCost ?? null, taxIncluded: d.taxIncluded });
+        setResolvedPrice({ unitPrice: d.unitPrice ?? null, unitCost: d.unitCost ?? null, taxIncluded: d.taxIncluded, costTaxIncluded: d.costTaxIncluded });
       } else setResolvedPrice(null);
       if (sell.ok) setSellHistory(await sell.json());
       else setSellHistory([]);
@@ -644,6 +1057,22 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     if (resolvedParams?.id && item != null && !isEditing) fetchPriceHistory(resolvedParams.id);
   }, [resolvedParams?.id, item, isEditing, fetchPriceHistory]);
 
+  const fetchItemTaxes = useCallback(async (itemId: string) => {
+    setItemTaxesLoading(true);
+    try {
+      const res = await fetch(`/api/items/${itemId}/item-taxes`);
+      if (res.ok) setItemTaxesList(await res.json());
+      else setItemTaxesList([]);
+    } catch {
+      setItemTaxesList([]);
+    } finally {
+      setItemTaxesLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (resolvedParams?.id) fetchItemTaxes(resolvedParams.id);
+  }, [resolvedParams?.id, fetchItemTaxes]);
+
   useEffect(() => {
     if (item) {
       setFormData({
@@ -655,7 +1084,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         vendorId: item.vendorId?.toString() || "",
         notes: item.notes || "",
         isActive: item.isActive,
-        itemType: (item.itemType === "product" ? "product" : "item") as ItemType,
+        itemType: (item.itemType === "recipe" ? "item" : item.itemType) as ItemType,
         type: item.type || "",
       });
     }
@@ -757,6 +1186,9 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               )}
               {item.itemType === "item" && (
                 <Badge variant="secondary" className="text-xs">Item</Badge>
+              )}
+              {item.itemType === "item_and_product" && (
+                <Badge variant="secondary" className="text-xs">Item & product</Badge>
               )}
             </div>
             <p className="text-muted-foreground">
@@ -1034,10 +1466,11 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </div>
 
               <Tabs defaultValue="movements" className="w-full">
-                <TabsList className="grid w-full max-w-lg grid-cols-3">
+                <TabsList className="grid w-full max-w-2xl grid-cols-4">
                   <TabsTrigger value="movements">Movements</TabsTrigger>
                   <TabsTrigger value="price">Price</TabsTrigger>
                   <TabsTrigger value="cost">Cost</TabsTrigger>
+                  <TabsTrigger value="taxes">Taxes</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="movements" className="mt-4 space-y-4">
@@ -1229,6 +1662,17 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       )}
                     </CardContent>
                   </Card>
+                </TabsContent>
+
+                <TabsContent value="taxes" className="mt-4 space-y-4">
+                  <ItemTaxesSection
+                    itemId={resolvedParams?.id}
+                    itemTaxesList={itemTaxesList}
+                    loading={itemTaxesLoading}
+                    onRefetch={() => resolvedParams?.id && fetchItemTaxes(resolvedParams.id)}
+                    taxVariableOptions={taxVariableOptions}
+                    formatDate={formatDate}
+                  />
                 </TabsContent>
 
                 <TabsContent value="cost" className="mt-4 space-y-6">
@@ -1425,8 +1869,14 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     {(() => {
                       const raw = (resolvedPrice?.unitCost ?? item.unitCost) ?? null;
                       const rate = applicableTaxes?.expense?.rate ?? 0;
-                      const exclPrice = raw;
-                      const inclPrice = raw != null && rate > 0 ? unitPriceExclToIncl(raw, rate) : raw;
+                      const costTaxIncludedFlag = resolvedPrice?.costTaxIncluded;
+                      const ruleTaxInclusiveFlag = applicableTaxes?.expense?.taxInclusive;
+                      const costIncl =
+                        costTaxIncludedFlag != null
+                          ? costTaxIncludedFlag
+                          : ruleTaxInclusiveFlag === true;
+                      const exclPrice = costIncl && raw != null && rate > 0 ? netUnitPriceFromInclusive(raw, rate) : raw;
+                      const inclPrice = costIncl ? raw : (raw != null && rate > 0 ? unitPriceExclToIncl(raw, rate) : raw);
                       const displayPrice = (rate > 0 ? inclPrice : exclPrice) ?? null;
                       if (displayPrice == null) return <p className="text-2xl font-semibold tabular-nums">—</p>;
                       return (
@@ -1460,6 +1910,11 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                             <span className="text-muted-foreground">{s.label}</span>
                             <span className="tabular-nums font-medium">
                               {s.rate === 0 ? "0% (Exempt)" : `${s.rate}%${s.variableName ? ` (${s.variableName})` : ""}`}
+                              {s.rate > 0 && (
+                                <span className="text-muted-foreground font-normal ml-1">
+                                  — {s.taxInclusive !== false ? "Inclusive" : "Additive"}
+                                </span>
+                              )}
                             </span>
                           </div>
                         ))}
@@ -1474,6 +1929,11 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                             {applicableTaxes.expense.rate === 0
                               ? "0% (Exempt)"
                               : `${applicableTaxes.expense.rate}%${applicableTaxes.expense.variableName ? ` (${applicableTaxes.expense.variableName})` : ""}`}
+                            {applicableTaxes.expense.rate > 0 && (
+                              <span className="text-muted-foreground font-normal ml-1">
+                                — {applicableTaxes.expense.taxInclusive !== false ? "Inclusive" : "Additive"}
+                              </span>
+                            )}
                           </span>
                         </div>
                       </div>

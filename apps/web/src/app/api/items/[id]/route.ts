@@ -13,7 +13,7 @@ function transformItem(row: any): Item {
     unit: row.unit || '',
     unitId: row.unit_id,
     category: row.category,
-    itemType: (row.item_type === 'product' || row.item_type === 'item') ? row.item_type : 'item',
+    itemType: ['item', 'product', 'item_and_product'].includes(row.item_type) ? row.item_type : 'item',
     isActive: row.is_active ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

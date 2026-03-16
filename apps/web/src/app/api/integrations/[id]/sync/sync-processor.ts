@@ -333,7 +333,7 @@ export async function processSyncJob(
           let unitCost: number | null = null;
           if (itemId != null) {
             const cost = await getItemCostAsOf(supabase, itemId, dateStr);
-            if (cost != null) unitCost = cost;
+            if (cost.unitCost != null) unitCost = cost.unitCost;
           }
           lineRows.push({
             itemId,

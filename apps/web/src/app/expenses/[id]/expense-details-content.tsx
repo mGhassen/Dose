@@ -124,6 +124,7 @@ export function ExpenseDetailContent({
     discountValue: "",
   });
   const [defaultTaxRate, setDefaultTaxRate] = useState(0);
+  const [defaultTaxInclusive, setDefaultTaxInclusive] = useState(false);
 
   useEffect(() => {
     setIsEditing(initialEditMode);
@@ -138,10 +139,20 @@ export function ExpenseDetailContent({
   useEffect(() => {
     if (!formData.expenseDate) {
       setDefaultTaxRate(0);
+      setDefaultTaxInclusive(false);
       return;
     }
-    taxRulesApi.resolve({ context: 'expense', date: formData.expenseDate }).then((r) => setDefaultTaxRate(r.rate)).catch(() => setDefaultTaxRate(0));
-  }, [formData.expenseDate]);
+    taxRulesApi
+      .resolve({ context: 'expense', date: formData.expenseDate, itemCategory: formData.category || undefined })
+      .then((r) => {
+        setDefaultTaxRate(r.rate);
+        setDefaultTaxInclusive(r.taxInclusive ?? false);
+      })
+      .catch(() => {
+        setDefaultTaxRate(0);
+        setDefaultTaxInclusive(false);
+      });
+  }, [formData.expenseDate, formData.category]);
 
   const updateExpense = useUpdateExpense();
   const deleteMutation = useDeleteExpense();
@@ -157,7 +168,8 @@ export function ExpenseDetailContent({
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : defaultTaxRate;
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, false);
+      const inclusive = line.itemId ? (line.taxInclusive ?? false) : defaultTaxInclusive;
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, inclusive);
       sub += lineTotalNet;
       tax += taxAmount;
     }
@@ -171,32 +183,45 @@ export function ExpenseDetailContent({
     }
     const tot = to2Decimals(sub + tax - disc);
     return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
-  }, [lineItems, defaultTaxRate, formData.discountType, formData.discountValue]);
+  }, [lineItems, defaultTaxRate, defaultTaxInclusive, formData.discountType, formData.discountValue]);
 
   useEffect(() => {
-    if (expense) {
-      setFormData({
-        name: expense.name,
-        category: expense.category,
-        expenseDate: expense.expenseDate.split("T")[0],
-        description: expense.description || "",
-        supplierId: expense.supplierId?.toString() || "",
-        discountType: "amount",
-        discountValue: expense.totalDiscount && expense.totalDiscount > 0 ? String(expense.totalDiscount) : "",
+    if (!expense) return;
+    setFormData({
+      name: expense.name,
+      category: expense.category,
+      expenseDate: expense.expenseDate.split("T")[0],
+      description: expense.description || "",
+      supplierId: expense.supplierId?.toString() || "",
+      discountType: "amount",
+      discountValue: expense.totalDiscount && expense.totalDiscount > 0 ? String(expense.totalDiscount) : "",
+    });
+    const dateStr = expense.expenseDate.split("T")[0];
+    const lines = expense.lineItems?.length
+      ? expense.lineItems.map((li: { itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; taxRatePercent?: number }) => ({
+          itemId: li.itemId?.toString() ?? "",
+          quantity: String(li.quantity),
+          unitId: li.unitId ?? null,
+          unitPrice: String(li.unitPrice),
+          unitCost: li.unitCost != null ? String(li.unitCost) : "",
+          taxRatePercent: li.taxRatePercent != null ? String(li.taxRatePercent) : "",
+          taxInclusive: false,
+        }))
+      : [{ itemId: "", quantity: "1", unitId: null, unitPrice: String(expense.amount), unitCost: "", taxRatePercent: "", taxInclusive: false }];
+    setLineItems(lines);
+    const withItemIds = lines.map((l, i) => (l.itemId ? { index: i, itemId: l.itemId } : null)).filter(Boolean) as { index: number; itemId: string }[];
+    if (withItemIds.length === 0) return;
+    Promise.all(
+      withItemIds.map(({ index, itemId }) =>
+        taxRulesApi.resolve({ context: 'expense', itemId: parseInt(itemId, 10), date: dateStr }).then((r) => ({ index, taxInclusive: r.taxInclusive ?? false }))
+      )
+    ).then((results) => {
+      setLineItems((prev) => {
+        const next = [...prev];
+        for (const { index, taxInclusive } of results) next[index] = { ...next[index], taxInclusive };
+        return next;
       });
-      const lines = expense.lineItems?.length
-        ? expense.lineItems.map((li: { itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; taxRatePercent?: number }) => ({
-            itemId: li.itemId?.toString() ?? "",
-            quantity: String(li.quantity),
-            unitId: li.unitId ?? null,
-            unitPrice: String(li.unitPrice),
-            unitCost: li.unitCost != null ? String(li.unitCost) : "",
-            taxRatePercent: li.taxRatePercent != null ? String(li.taxRatePercent) : "",
-            taxInclusive: false,
-          }))
-        : [{ itemId: "", quantity: "1", unitId: null, unitPrice: String(expense.amount), unitCost: "", taxRatePercent: "", taxInclusive: false }];
-      setLineItems(lines);
-    }
+    }).catch(() => {});
   }, [expense]);
 
   const addLine = () => {
@@ -239,11 +264,17 @@ export function ExpenseDetailContent({
     const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { category?: string } | undefined;
     fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`)
       .then((r) => r.json())
-      .then((data: { unitCost?: number | null }) => {
+      .then((data: { unitCost?: number | null; costTaxIncluded?: boolean }) => {
         if (data?.unitCost != null) {
           setLineItems((prev) => {
             const next = [...prev];
-            if (next[index]?.itemId === itemId) next[index] = { ...next[index], unitPrice: String(data.unitCost), unitCost: String(data.unitCost) };
+            if (next[index]?.itemId === itemId)
+              next[index] = {
+                ...next[index],
+                unitPrice: String(data.unitCost),
+                unitCost: String(data.unitCost),
+                taxInclusive: data.costTaxIncluded ?? false,
+              };
             return next;
           });
         }
@@ -254,7 +285,8 @@ export function ExpenseDetailContent({
       .then((r) =>
         setLineItems((prev) => {
           const next = [...prev];
-          if (next[index]?.itemId === itemId) next[index] = { ...next[index], taxRatePercent: r.rate.toString() };
+          if (next[index]?.itemId === itemId)
+            next[index] = { ...next[index], taxRatePercent: r.rate.toString() };
           return next;
         })
       )
@@ -267,7 +299,7 @@ export function ExpenseDetailContent({
       toast.error("Name, category and date are required");
       return;
     }
-    const payloadLines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; taxRatePercent?: number }> = [];
+    const payloadLines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; taxRatePercent?: number; taxInclusive?: boolean }> = [];
     for (let i = 0; i < lineItems.length; i++) {
       const line = lineItems[i];
       const qty = parseFloat(line.quantity);
@@ -284,6 +316,7 @@ export function ExpenseDetailContent({
         unitPrice: price,
         unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
         taxRatePercent: line.taxRatePercent !== "" ? lineRate : undefined,
+        taxInclusive: line.taxInclusive,
       });
     }
     const payload = {
@@ -377,7 +410,7 @@ export function ExpenseDetailContent({
                   onSelect={(item) => setFormData((p) => ({ ...p, category: (item.id === 0 ? "" : String(item.id)) as ExpenseCategory | "" }))}
                   placeholder="Category"
                 />
-                <p className="text-xs text-muted-foreground pl-3">Tax: {defaultTaxRate.toFixed(1)}% (from tax rules; not tied to category).</p>
+                <p className="text-xs text-muted-foreground pl-3">Tax: {defaultTaxRate.toFixed(1)}% (from tax rules{defaultTaxInclusive ? ", inclusive" : ", excl. tax"}).</p>
               </div>
               <div className="space-y-2">
                 <Label>Date *</Label>
@@ -439,7 +472,11 @@ export function ExpenseDetailContent({
                           />
                         </div>
                         <div className="col-span-2">
-                          <Label className="text-xs text-muted-foreground">Price (excl. tax)</Label>
+                          <Label className="text-xs text-muted-foreground">
+                            {line.itemId && (line.taxInclusive ?? false) && (parseFloat(line.taxRatePercent || String(defaultTaxRate)) || 0) > 0
+                              ? "Price (incl. tax)"
+                              : "Price (excl. tax)"}
+                          </Label>
                           <Input
                             type="number"
                             step="0.01"

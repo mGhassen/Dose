@@ -243,14 +243,14 @@ export async function POST(
           const paidAmount = body.actualAmount ?? body.amount;
           const expenseDate = body.paidDate || `${body.month}-01`;
           const dateStr = expenseDate.split('T')[0] || expenseDate;
-          const { getTaxRateAndRuleForExpenseLine } = await import('@/lib/tax-rules-resolve');
+          const { getTaxRateAndRuleForExpenseLineWithItemTaxes } = await import('@/lib/item-taxes-resolve');
           const { to2Decimals, splitInclusiveTotal } = await import('@/lib/transaction-tax');
           let taxRule: { rate: number; taxInclusive?: boolean };
           if (subscriptionData.item_id != null) {
             const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', subscriptionData.item_id).maybeSingle();
-            taxRule = await getTaxRateAndRuleForExpenseLine(supabase, subscriptionData.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+            taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, subscriptionData.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
           } else {
-            taxRule = await getTaxRateAndRuleForExpenseLine(supabase, null, subscriptionData.category ?? null, dateStr);
+            taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, null, subscriptionData.category ?? null, dateStr);
           }
           const taxRate = taxRule.rate ?? 0;
 
@@ -312,7 +312,13 @@ export async function POST(
               });
               if (subscriptionData.item_id != null) {
                 const { upsertCost } = await import('@/lib/items/price-history-upsert');
-                await upsertCost(supabase, subscriptionData.item_id, expenseDate.split('T')[0] || expenseDate, subTotal);
+                await upsertCost(
+                  supabase,
+                  subscriptionData.item_id,
+                  expenseDate.split('T')[0] || expenseDate,
+                  amount,
+                  taxRule.taxInclusive === true
+                );
               }
             }
           }

@@ -1005,7 +1005,7 @@ export interface FinancialKPIs {
 // ITEMS (replaces ingredients - can be regular items or recipes)
 // ============================================================================
 
-export type ItemType = 'item' | 'product' | 'recipe';
+export type ItemType = 'item' | 'product' | 'item_and_product' | 'recipe';
 
 export interface Item {
   id: number;
@@ -1047,7 +1047,7 @@ export interface CreateItemData {
   notes?: string;
   defaultTaxRatePercent?: number;
   isActive?: boolean;
-  itemType?: 'item' | 'product';
+  itemType?: 'item' | 'product' | 'item_and_product';
   type?: string;
 }
 

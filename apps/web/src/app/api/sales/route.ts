@@ -9,7 +9,7 @@ import { getItemStock } from '@/lib/stock/get-item-stock';
 import { produceRecipe } from '@/lib/stock/produce-recipe';
 import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-resolve';
 import { upsertSellingPrice, upsertCost } from '@/lib/items/price-history-upsert';
-import { getTaxRateAndRuleForSaleLine } from '@/lib/tax-rules-resolve';
+import { getTaxRateAndRuleForSaleLineWithItemTaxes, getTaxRateAndRuleForExpenseLineWithItemTaxes } from '@/lib/item-taxes-resolve';
 import { lineTaxAmount, netUnitPriceFromInclusive, unitPriceExclToIncl } from '@/lib/transaction-tax';
 import { parseRequestBody, createSaleTransactionSchema } from '@/shared/zod-schemas';
 
@@ -306,12 +306,27 @@ export async function POST(request: NextRequest) {
             }
             if (unitCost == null) {
               const resolved = await getItemCostAsOf(supabase, priceLookupItemId, dateStr);
-              if (resolved != null) unitCost = resolved;
+              if (resolved.unitCost != null) unitCost = resolved.unitCost;
             }
-            if (unitCost != null) await upsertCost(supabase, priceLookupItemId, dateStr, unitCost);
+            if (unitCost != null) {
+              const expenseTaxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(
+                supabase,
+                priceLookupItemId,
+                itemCategory,
+                dateStr,
+                itemCreatedAt
+              );
+              await upsertCost(
+                supabase,
+                priceLookupItemId,
+                dateStr,
+                unitCost,
+                expenseTaxRule.taxInclusive === true
+              );
+            }
           }
         }
-        const taxRule = await getTaxRateAndRuleForSaleLine(supabase, priceLookupItemId ?? line.itemId ?? null, itemCategory, body.type, dateStr, itemCreatedAt);
+        const taxRule = await getTaxRateAndRuleForSaleLineWithItemTaxes(supabase, priceLookupItemId ?? line.itemId ?? null, itemCategory, body.type, dateStr, itemCreatedAt);
         let lineTaxRate = line.taxRatePercent != null ? line.taxRatePercent : taxRule.rate;
         const taxInclusive = taxRule.taxInclusive ?? false;
         let netUnit = unitPrice ?? 0;

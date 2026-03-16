@@ -29,7 +29,7 @@ export function getEffectiveTransactionTaxRate(
   return valid[0]?.value ?? 0;
 }
 
-/** unitPrice is always excl. tax. Returns lineTotalNet (excl.) and taxAmount. */
+/** When taxInclusive: unitPrice is incl. tax. Otherwise unitPrice is excl. tax. Returns lineTotalNet (excl.) and taxAmount. */
 export function lineTaxAmount(
   quantity: number,
   unitPrice: number,
@@ -37,7 +37,7 @@ export function lineTaxAmount(
   taxInclusive: boolean
 ): { lineTotalNet: number; taxAmount: number } {
   if (taxInclusive && taxRatePercent > 0) {
-    const lineTotalIncl = to2Decimals(quantity * unitPrice * (1 + taxRatePercent / 100));
+    const lineTotalIncl = to2Decimals(quantity * unitPrice);
     const lineTotalNet = to2Decimals(lineTotalIncl / (1 + taxRatePercent / 100));
     const taxAmount = to2Decimals(lineTotalIncl - lineTotalNet);
     return { lineTotalNet, taxAmount };

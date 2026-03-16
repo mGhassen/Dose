@@ -77,7 +77,7 @@ async function updateExpenseAsTransaction(
     discount?: { type: 'amount' | 'percent'; value: number };
   }
 ) {
-  const { getTaxRateAndRuleForExpenseLine } = await import('@/lib/tax-rules-resolve');
+  const { getTaxRateAndRuleForExpenseLineWithItemTaxes } = await import('@/lib/item-taxes-resolve');
   const { lineTaxAmount, to2Decimals } = await import('@/lib/transaction-tax');
   const dateStr = body.expenseDate.split('T')[0] || body.expenseDate;
 
@@ -90,23 +90,23 @@ async function updateExpenseAsTransaction(
       const { data: sub } = await supabase.from('subscriptions').select('item_id, category').eq('id', line.subscriptionId).maybeSingle();
       if (sub?.item_id != null) {
         const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', sub.item_id).maybeSingle();
-        const taxRule = await getTaxRateAndRuleForExpenseLine(supabase, sub.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+        const taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, sub.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
         taxRate = taxRule.rate ?? 0;
-        taxInclusive = taxRule.taxInclusive ?? false;
+        taxInclusive = line.taxInclusive ?? taxRule.taxInclusive ?? false;
       } else {
-        const taxRule = await getTaxRateAndRuleForExpenseLine(supabase, null, sub?.category ?? null, dateStr);
+        const taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, null, sub?.category ?? null, dateStr);
         taxRate = taxRule.rate ?? 0;
-        taxInclusive = taxRule.taxInclusive ?? false;
+        taxInclusive = line.taxInclusive ?? taxRule.taxInclusive ?? false;
       }
     } else if (line.itemId) {
       const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', line.itemId).maybeSingle();
-      const taxRule = await getTaxRateAndRuleForExpenseLine(supabase, line.itemId, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+      const taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, line.itemId, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
       taxRate = taxRule.rate ?? 0;
-      taxInclusive = taxRule.taxInclusive ?? false;
+      taxInclusive = line.taxInclusive ?? taxRule.taxInclusive ?? false;
     } else {
-      const taxRule = await getTaxRateAndRuleForExpenseLine(supabase, null, null, dateStr);
+      const taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, null, null, dateStr);
       taxRate = taxRule.rate ?? 0;
-      taxInclusive = taxRule.taxInclusive ?? false;
+      taxInclusive = line.taxInclusive ?? taxRule.taxInclusive ?? false;
     }
     if (line.taxRatePercent != null) taxRate = line.taxRatePercent;
     const qty = typeof line.quantity === 'number' ? line.quantity : parseFloat(String(line.quantity));

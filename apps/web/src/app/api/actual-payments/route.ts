@@ -135,15 +135,15 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!subscriptionError && subscription) {
-        const { getTaxRateAndRuleForExpenseLine } = await import('@/lib/tax-rules-resolve');
+        const { getTaxRateAndRuleForExpenseLineWithItemTaxes } = await import('@/lib/item-taxes-resolve');
         const { to2Decimals, splitInclusiveTotal } = await import('@/lib/transaction-tax');
         const dateStr = (body.paymentDate || '').split('T')[0] || body.paymentDate;
         let taxRule: { rate: number; taxInclusive?: boolean };
         if (subscription.item_id != null) {
           const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', subscription.item_id).maybeSingle();
-          taxRule = await getTaxRateAndRuleForExpenseLine(supabase, subscription.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+          taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, subscription.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
         } else {
-          taxRule = await getTaxRateAndRuleForExpenseLine(supabase, null, subscription.category ?? null, dateStr);
+          taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, null, subscription.category ?? null, dateStr);
         }
         const taxRate = taxRule.rate ?? 0;
 
@@ -198,10 +198,16 @@ export async function POST(request: NextRequest) {
             line_total: subTotal,
             sort_order: 0,
           });
-          if (subscription.item_id != null) {
-            const { upsertCost } = await import('@/lib/items/price-history-upsert');
-            await upsertCost(supabase, subscription.item_id, body.paymentDate.split('T')[0] || body.paymentDate, subTotal);
-          }
+        if (subscription.item_id != null) {
+          const { upsertCost } = await import('@/lib/items/price-history-upsert');
+          await upsertCost(
+            supabase,
+            subscription.item_id,
+            body.paymentDate.split('T')[0] || body.paymentDate,
+            amount,
+            taxRule.taxInclusive === true
+          );
+        }
         } else if (expenseError) {
           console.error('Error creating expense for subscription payment:', expenseError);
         }

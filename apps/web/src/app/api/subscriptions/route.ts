@@ -135,13 +135,27 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
-    // Initialize item cost history at subscription start date using subscription amount as unit cost
     try {
       const { upsertCost } = await import('@/lib/items/price-history-upsert');
+      const { getTaxRateAndRuleForExpenseLineWithItemTaxes } = await import('@/lib/item-taxes-resolve');
       const startDate = body.startDate.split('T')[0] || body.startDate;
-      await upsertCost(supabase, itemRow.id, startDate, body.amount);
+      const taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(
+        supabase,
+        itemRow.id,
+        body.category ?? null,
+        startDate,
+        null
+      );
+      await upsertCost(supabase, itemRow.id, startDate, body.amount, taxRule.taxInclusive === true);
     } catch (costError) {
       console.error('Error creating initial cost history for subscription item:', costError);
+    }
+
+    try {
+      const { applyTaxRulesToItem } = await import('@/lib/item-taxes-resolve');
+      await applyTaxRulesToItem(supabase, itemRow.id, body.category ?? null);
+    } catch (taxError) {
+      console.error('Error applying tax rules to subscription item:', taxError);
     }
 
     // Create an OUTPUT entry for the subscription

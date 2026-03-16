@@ -158,6 +158,7 @@ const expenseLineItemSchema = z.object({
   unitPrice: z.number(),
   unitCost: z.number().optional(),
   taxRatePercent: z.number().optional(),
+  taxInclusive: z.boolean().optional(),
 });
 
 export const createExpenseTransactionSchema = z.object({
@@ -295,7 +296,7 @@ export const createItemSchema = z
     notes: z.string().optional(),
     defaultTaxRatePercent: z.number().optional(),
     isActive: z.boolean().optional(),
-    itemType: z.enum(["item", "product"]).optional(),
+    itemType: z.enum(["item", "product", "item_and_product"]).optional(),
     type: z.string().optional(),
   })
   .refine((d) => (typeof d.unit === "string" && d.unit.trim() !== "") || d.unitId != null, {
