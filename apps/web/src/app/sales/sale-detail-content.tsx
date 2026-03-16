@@ -826,6 +826,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                       <th className="text-left p-2 font-medium">Item</th>
                       <th className="text-right p-2 font-medium">Qty</th>
                       <th className="text-right p-2 font-medium">Price</th>
+                      <th className="text-right p-2 font-medium">Tax</th>
                       <th className="text-right p-2 font-medium">Total</th>
                     </tr>
                   </thead>
@@ -855,6 +856,12 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                           inclusive
                             ? to2Decimals(line.quantity * displayUnitPrice)
                             : Math.round(line.quantity * line.unitPrice * 100) / 100;
+                        const { taxAmount } = lineTaxAmount(
+                          line.quantity,
+                          line.unitPrice,
+                          rate,
+                          inclusive
+                        );
                         const itemId = line.itemId ?? line.item?.id;
                         const itemLabel = line.item?.name ?? "—";
                         const hasItemLink = !!(itemId && line.item);
@@ -875,8 +882,18 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                               )}
                             </td>
                             <td className="p-2 text-right tabular-nums">{line.quantity}</td>
-                            <td className="p-2 text-right tabular-nums">{formatCurrency(displayUnitPrice)}</td>
-                            <td className="p-2 text-right tabular-nums">{formatCurrency(displayLineTotal)}</td>
+                            <td className="p-2 text-right tabular-nums">
+                              {formatCurrency(displayUnitPrice)}
+                            </td>
+                            <td className="p-2 text-right tabular-nums">
+                              {formatCurrency(taxAmount)}{" "}
+                              <span className="text-xs text-muted-foreground">
+                                ({rate.toFixed(1)}%)
+                              </span>
+                            </td>
+                            <td className="p-2 text-right tabular-nums">
+                              {formatCurrency(displayLineTotal)}
+                            </td>
                           </tr>
                         );
                       }
