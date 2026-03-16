@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { TaxRule, UpdateTaxRuleData } from '@kit/types';
 import { parseRequestBody, updateTaxRuleSchema } from '@/shared/zod-schemas';
+import { applyTaxRulesToItems } from '@/lib/item-taxes-resolve';
 
 function transformRule(row: any, variable?: any): TaxRule {
   return {
@@ -113,6 +114,8 @@ export async function PUT(
 
     if (error) throw error;
     if (!row) return NextResponse.json({ error: 'Tax rule not found' }, { status: 404 });
+
+    await applyTaxRulesToItems(supabase);
 
     const { data: variable } = await supabase.from('variables').select('*').eq('id', row.variable_id).single();
     return NextResponse.json(transformRule(row, variable));

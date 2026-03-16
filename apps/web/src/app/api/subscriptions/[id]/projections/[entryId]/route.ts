@@ -171,7 +171,7 @@ export async function PUT(
               .single();
 
             if (subscriptionData) {
-              const paidAmount = body.actualAmount ?? parseFloat(existingEntry.amount);
+              const paidAmount = body.actualAmount ?? parseFloat(existingEntry.amount); // TTC
               const dateStr = expenseDate;
               const { getTaxRateAndRuleForExpenseLineWithItemTaxes } = await import('@/lib/item-taxes-resolve');
               const { to2Decimals, splitInclusiveTotal } = await import('@/lib/transaction-tax');
@@ -186,17 +186,15 @@ export async function PUT(
 
               let subTotal: number;
               let taxAmount: number;
-              let amount: number;
-              if (taxRule.taxInclusive && taxRate > 0) {
+              if (taxRate > 0) {
                 const split = splitInclusiveTotal(paidAmount, taxRate);
                 subTotal = split.subtotal;
                 taxAmount = split.taxAmount;
-                amount = paidAmount;
               } else {
                 subTotal = paidAmount;
-                taxAmount = to2Decimals(subTotal * (taxRate / 100));
-                amount = to2Decimals(subTotal + taxAmount);
+                taxAmount = 0;
               }
+              const amount = paidAmount;
 
               const expenseData = {
                 name: `${subscriptionData.name} - ${data.month}`,
@@ -236,11 +234,13 @@ export async function PUT(
                 });
                 if (subscriptionData.item_id != null) {
                   const { upsertCost } = await import('@/lib/items/price-history-upsert');
+                  const costUnit =
+                    taxRule.taxInclusive === true ? amount : subTotal;
                   await upsertCost(
                     supabase,
                     subscriptionData.item_id,
                     expenseDate,
-                    amount,
+                    costUnit,
                     taxRule.taxInclusive === true
                   );
                 }

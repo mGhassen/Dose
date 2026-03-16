@@ -1875,17 +1875,33 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                         costTaxIncludedFlag != null
                           ? costTaxIncludedFlag
                           : ruleTaxInclusiveFlag === true;
-                      const exclPrice = costIncl && raw != null && rate > 0 ? netUnitPriceFromInclusive(raw, rate) : raw;
-                      const inclPrice = costIncl ? raw : (raw != null && rate > 0 ? unitPriceExclToIncl(raw, rate) : raw);
-                      const displayPrice = (rate > 0 ? inclPrice : exclPrice) ?? null;
-                      if (displayPrice == null) return <p className="text-2xl font-semibold tabular-nums">—</p>;
+
+                      if (raw == null) {
+                        return <p className="text-2xl font-semibold tabular-nums">—</p>;
+                      }
+
+                      if (rate <= 0) {
+                        return (
+                          <p className="text-xl font-semibold tabular-nums">
+                            {formatCurrency(raw)}{' '}
+                            <span className="text-xs font-normal text-muted-foreground">(no tax)</span>
+                          </p>
+                        );
+                      }
+
+                      const exclPrice = costIncl ? netUnitPriceFromInclusive(raw, rate) : raw;
+                      const inclPrice = costIncl ? raw : unitPriceExclToIncl(raw, rate);
+
                       return (
                         <>
-                          <p className="text-xl font-semibold tabular-nums">{formatCurrency(displayPrice)} <span className="text-xs font-normal text-muted-foreground">(incl. tax)</span></p>
-                          {exclPrice != null && rate > 0 && (
+                          <p className="text-xl font-semibold tabular-nums">
+                            {formatCurrency(inclPrice)}{' '}
+                            <span className="text-xs font-normal text-muted-foreground">(incl. tax)</span>
+                          </p>
+                          {exclPrice != null && (
                             <div className="text-sm text-muted-foreground tabular-nums space-y-0.5">
                               <p>{formatCurrency(exclPrice)} excl. tax</p>
-                              <p>{formatCurrency(to2Decimals(displayPrice - exclPrice))} tax</p>
+                              <p>{formatCurrency(to2Decimals(inclPrice - exclPrice))} tax</p>
                             </div>
                           )}
                         </>

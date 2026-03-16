@@ -32,14 +32,39 @@ export async function GET(
     const itemCreatedAt = (itemRow.data as { created_at?: string } | null)?.created_at ?? null;
 
     const [saleRule, expenseRule] = await Promise.all([
-      getTaxRateAndRuleForSaleLineWithItemTaxes(supabase, itemId, itemCategory, 'on_site', dateStr, itemCreatedAt),
-      getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, itemId, itemCategory, dateStr, itemCreatedAt),
+      getTaxRateAndRuleForSaleLineWithItemTaxes(
+        supabase,
+        itemId,
+        itemCategory,
+        'on_site',
+        dateStr,
+        itemCreatedAt
+      ),
+      getTaxRateAndRuleForExpenseLineWithItemTaxes(
+        supabase,
+        itemId,
+        itemCategory,
+        dateStr,
+        itemCreatedAt
+      ),
     ]);
 
     const effectiveSellingTaxIncluded =
       selling.taxIncluded != null ? selling.taxIncluded : saleRule.taxInclusive ?? false;
-    const effectiveCostTaxIncluded =
-      cost.taxIncluded != null ? cost.taxIncluded : expenseRule.taxInclusive ?? false;
+
+    // For costs, treat the expense rule's taxInclusive flag as the source of truth.
+    // If history says "false" but the rule is inclusive, we still interpret the stored
+    // unit cost as tax-inclusive to match how cost history and item taxes work.
+    const historyCostIncluded = cost.taxIncluded;
+    const ruleCostIncluded = expenseRule.taxInclusive ?? null;
+    let effectiveCostTaxIncluded: boolean;
+    if (ruleCostIncluded === true) {
+      effectiveCostTaxIncluded = true;
+    } else if (historyCostIncluded != null) {
+      effectiveCostTaxIncluded = historyCostIncluded;
+    } else {
+      effectiveCostTaxIncluded = ruleCostIncluded ?? false;
+    }
     return NextResponse.json({
       unitPrice: selling.unitPrice,
       unitCost: cost.unitCost,

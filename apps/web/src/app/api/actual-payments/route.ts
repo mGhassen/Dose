@@ -147,19 +147,18 @@ export async function POST(request: NextRequest) {
         }
         const taxRate = taxRule.rate ?? 0;
 
+        const gross = body.amount; // TTC
         let subTotal: number;
         let taxAmount: number;
-        let amount: number;
-        if (taxRule.taxInclusive && taxRate > 0) {
-          const split = splitInclusiveTotal(body.amount, taxRate);
+        if (taxRate > 0) {
+          const split = splitInclusiveTotal(gross, taxRate);
           subTotal = split.subtotal;
           taxAmount = split.taxAmount;
-          amount = body.amount;
         } else {
-          subTotal = body.amount;
-          taxAmount = to2Decimals(subTotal * (taxRate / 100));
-          amount = to2Decimals(subTotal + taxAmount);
+          subTotal = gross;
+          taxAmount = 0;
         }
+        const amount = gross;
 
         const expenseData = {
           name: `${subscription.name} - Payment ${body.month}`,
@@ -200,11 +199,13 @@ export async function POST(request: NextRequest) {
           });
         if (subscription.item_id != null) {
           const { upsertCost } = await import('@/lib/items/price-history-upsert');
+          const costUnit =
+            taxRule.taxInclusive === true ? amount : subTotal;
           await upsertCost(
             supabase,
             subscription.item_id,
             body.paymentDate.split('T')[0] || body.paymentDate,
-            amount,
+            costUnit,
             taxRule.taxInclusive === true
           );
         }

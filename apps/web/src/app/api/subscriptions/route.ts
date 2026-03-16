@@ -138,6 +138,7 @@ export async function POST(request: NextRequest) {
     try {
       const { upsertCost } = await import('@/lib/items/price-history-upsert');
       const { getTaxRateAndRuleForExpenseLineWithItemTaxes } = await import('@/lib/item-taxes-resolve');
+      const { splitInclusiveTotal } = await import('@/lib/transaction-tax');
       const startDate = body.startDate.split('T')[0] || body.startDate;
       const taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(
         supabase,
@@ -146,7 +147,12 @@ export async function POST(request: NextRequest) {
         startDate,
         null
       );
-      await upsertCost(supabase, itemRow.id, startDate, body.amount, taxRule.taxInclusive === true);
+      const rate = taxRule.rate ?? 0;
+      const gross = body.amount; // TTC
+      const net =
+        rate > 0 ? splitInclusiveTotal(gross, rate).subtotal : gross;
+      const costUnit = taxRule.taxInclusive === true ? gross : net;
+      await upsertCost(supabase, itemRow.id, startDate, costUnit, taxRule.taxInclusive === true);
     } catch (costError) {
       console.error('Error creating initial cost history for subscription item:', costError);
     }

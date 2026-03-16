@@ -136,6 +136,9 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
       await queryClient.invalidateQueries({ queryKey: ['payments'] });
       onUpdate();
       toast.success("Payment recorded and expense created");
+      if (typeof window !== "undefined") {
+        window.location.reload();
+      }
     } catch (error: any) {
       toast.error(error?.message || "Failed to record payment");
     }
@@ -267,6 +270,9 @@ export function EditableSubscriptionTimelineRow({ projection, subscriptionId, on
       await queryClient.invalidateQueries({ queryKey: ['payments'] });
       onUpdate();
       toast.success("Payment recorded successfully");
+      if (typeof window !== "undefined") {
+        window.location.reload();
+      }
     } catch (error: any) {
       toast.error(error?.message || "Failed to record payment");
     }
