@@ -189,7 +189,7 @@ export async function processSyncJob(
               category: categoryName || null,
               unit: 'unit',
               unit_id: unitId,
-              item_type: 'item',
+              item_type: 'product',
               is_active: true,
             })
             .select('id')
@@ -235,7 +235,7 @@ export async function processSyncJob(
               sku,
               unit: 'unit',
               unit_id: unitId,
-              item_type: 'item',
+              item_type: 'product',
               is_active: true,
             })
             .select('id')
