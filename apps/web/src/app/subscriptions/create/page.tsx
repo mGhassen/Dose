@@ -45,7 +45,7 @@ export default function CreateSubscriptionPage() {
     defaultValues: {
       name: "",
       category: undefined,
-      amount: 0,
+      amount: undefined,
       recurrence: "monthly",
       startDate: dateToYYYYMMDD(new Date()),
       endDate: "",

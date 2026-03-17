@@ -206,7 +206,13 @@ export async function apiRequest<T>(
           '[API] Server-side fetch failed (e.g. ECONNREFUSED). Set NEXT_PUBLIC_SITE_URL in .env to your app URL (e.g. http://localhost:3000).'
         );
       }
-      console.error('API request error:', error);
+      const status = (error as any)?.status;
+      const isExpected404 = status === 404;
+      const isAbort =
+        error instanceof Error && (error.name === 'AbortError' || (error as any).isAbortError);
+      if (!isExpected404 && !isAbort) {
+        console.error('API request error:', error);
+      }
       throw error;
     }
   };
