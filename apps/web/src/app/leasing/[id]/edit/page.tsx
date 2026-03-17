@@ -18,6 +18,7 @@ import { DatePicker } from "@kit/ui/date-picker";
 import { Checkbox } from "@kit/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@kit/ui/radio-group";
 import Link from "next/link";
+import { AddVendorDialog } from "@/components/add-vendor-dialog";
 
 interface EditLeasingPageProps {
   params: Promise<{ id: string }>;
@@ -28,13 +29,14 @@ export default function EditLeasingPage({ params }: EditLeasingPageProps) {
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const { data: leasing, isLoading } = useLeasingById(resolvedParams?.id || "");
   const updateLeasing = useUpdateLeasing();
-  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'vendor' });
+  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: 'lessor' });
   const suppliers = suppliersResponse?.data || [];
   const { data: leasingTypeValues = [] } = useMetadataEnum("LeasingType");
   const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
   const leasingTypeItems = leasingTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const frequencyItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [amountMode, setAmountMode] = useState<"periodic" | "total">("periodic");
+  const [addLessorOpen, setAddLessorOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -390,6 +392,7 @@ export default function EditLeasingPage({ params }: EditLeasingPageProps) {
                     selectedId={formData.supplierId ? parseInt(formData.supplierId) : undefined}
                     onSelect={(item) => handleInputChange('supplierId', item.id === 0 ? '' : String(item.id))}
                     placeholder="Select lessor"
+                    onCreateNew={() => setAddLessorOpen(true)}
                     manageLink={formData.supplierId ? { href: `/inventory-suppliers/${formData.supplierId}`, text: "View lessor details →" } : undefined}
                   />
                 </div>
@@ -494,6 +497,13 @@ export default function EditLeasingPage({ params }: EditLeasingPageProps) {
           </CardContent>
         </Card>
       </div>
+      <AddVendorDialog
+        open={addLessorOpen}
+        onOpenChange={setAddLessorOpen}
+        entityLabel="lessor"
+        supplierTypes={['lessor']}
+        onCreated={(lessor) => handleInputChange('supplierId', String(lessor.id))}
+      />
     </AppLayout>
   );
 }

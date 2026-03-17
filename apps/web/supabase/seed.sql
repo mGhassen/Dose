@@ -521,7 +521,8 @@ CROSS JOIN (VALUES
   ('vendor', 'Vendor', 'Vendor', 2),
   ('lender', 'Lender', 'Lender', 3),
   ('customer', 'Customer', 'Customer', 4),
-  ('bank', 'Bank', 'Bank', 5)
+  ('bank', 'Bank', 'Bank', 5),
+  ('lessor', 'Lessor', 'Lessor', 6)
 ) AS v(name, label, description, display_order)
 WHERE e.name = 'SupplierType'
 ON CONFLICT (enum_id, name) DO NOTHING;

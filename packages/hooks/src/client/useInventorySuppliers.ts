@@ -7,7 +7,7 @@ import type { Supplier, CreateSupplierData, UpdateSupplierData } from '@kit/type
 export function useInventorySuppliers(params?: {
   page?: number;
   limit?: number;
-  supplierType?: 'supplier' | 'vendor' | 'lender' | 'customer';
+  supplierType?: string;
 }) {
   return useQuery({
     queryKey: ['inventory-suppliers', params],

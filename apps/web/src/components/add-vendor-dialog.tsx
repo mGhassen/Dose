@@ -20,7 +20,7 @@ export interface AddVendorDialogProps {
   onOpenChange: (open: boolean) => void;
   onCreated?: (vendor: { id: number; name: string }) => void;
   entityLabel?: string;
-  supplierTypes?: ('supplier' | 'vendor' | 'lender' | 'customer')[];
+  supplierTypes?: string[];
 }
 
 export function AddVendorDialog({
