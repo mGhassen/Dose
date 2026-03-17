@@ -1,5 +1,3 @@
-// React Query hooks for Items
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { itemsApi } from '@kit/lib';
 import type { Item, CreateItemData, UpdateItemData } from '@kit/types';
@@ -46,18 +44,19 @@ export function useItems(params?: { page?: number; limit?: number; itemType?: st
 }
 
 export function useItemById(id: string) {
-  return useQuery({
+  return useQuery<Item | null>({
     queryKey: ['items', id],
     queryFn: async () => {
       try {
         return await itemsApi.getById(id);
-      } catch (err: any) {
-        if (err?.status === 404) return null;
+      } catch (err) {
+        const maybeErr = err as { status?: number } | undefined;
+        if (maybeErr?.status === 404) return null;
         throw err;
       }
     },
     enabled: !!id,
-    retry: (failureCount, error: any) => error?.status === 404 ? false : failureCount < 3,
+    retry: (failureCount, error) => ((error as { status?: number } | undefined)?.status === 404 ? false : failureCount < 3),
   });
 }
 

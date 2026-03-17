@@ -10,7 +10,7 @@ function transformItem(row: any): Item {
     id: row.id,
     name: row.name,
     description: row.description,
-    unit: row.unit || '',
+    unit: row.units?.symbol || '',
     unitId: row.unit_id,
     category: row.category,
     itemType: ['item', 'product', 'item_and_product'].includes(row.item_type) ? row.item_type : 'item',
@@ -22,7 +22,6 @@ function transformItem(row: any): Item {
     vendorId: row.vendor_id,
     notes: row.notes,
     producedFromRecipeId: row.produced_from_recipe_id,
-    type: row.type ?? undefined,
   };
 }
 
@@ -32,7 +31,6 @@ function transformToSnakeCase(data: UpdateItemData): any {
   
   if (data.name !== undefined) result.name = data.name;
   if (data.description !== undefined) result.description = data.description;
-  if (data.unit !== undefined) result.unit = data.unit;
   if (data.unitId !== undefined) result.unit_id = data.unitId;
   if (data.category !== undefined) result.category = data.category;
   if (data.sku !== undefined) result.sku = data.sku;
@@ -41,7 +39,6 @@ function transformToSnakeCase(data: UpdateItemData): any {
   if (data.isActive !== undefined) result.is_active = data.isActive;
   if (data.producedFromRecipeId !== undefined) result.produced_from_recipe_id = data.producedFromRecipeId;
   if (data.itemType !== undefined) result.item_type = data.itemType;
-  if (data.type !== undefined) result.type = data.type === '' ? null : data.type;
   return result;
 }
 
@@ -56,7 +53,7 @@ export async function GET(
     // Try to find in items table first
     let { data: itemData, error: itemError } = await supabase
       .from('items')
-      .select('*')
+      .select('*, units(symbol, name)')
       .eq('id', id)
       .single();
 
@@ -65,7 +62,7 @@ export async function GET(
       // First check if there's a produced item for this recipe ID
       const { data: producedItemData } = await supabase
         .from('items')
-        .select('*')
+        .select('*, units(symbol, name)')
         .eq('produced_from_recipe_id', id)
         .single();
       
@@ -167,7 +164,7 @@ export async function PUT(
       .from('items')
       .update(transformToSnakeCase(body))
       .eq('id', id)
-      .select()
+      .select('*, units(symbol, name)')
       .single();
 
     if (itemError) throw itemError;

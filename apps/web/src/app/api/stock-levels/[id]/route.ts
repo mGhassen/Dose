@@ -21,7 +21,7 @@ function transformStockLevel(row: any): StockLevel {
       id: row.item.id,
       name: row.item.name,
       description: row.item.description,
-      unit: row.item.unit,
+      unit: row.item.units?.symbol || '',
       category: row.item.category,
       itemType: row.item.item_type || 'item',
       isActive: row.item.is_active,
@@ -54,7 +54,7 @@ export async function GET(
     
     const { data, error } = await supabase
       .from('stock_levels')
-      .select('*, item:items(*)')
+      .select('*, item:items(*, units(symbol, name))')
       .eq('id', id)
       .single();
 

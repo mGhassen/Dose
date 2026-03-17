@@ -1,0 +1,4 @@
+ALTER TABLE public.items
+  DROP COLUMN IF EXISTS unit,
+  DROP COLUMN IF EXISTS type;
+

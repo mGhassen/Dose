@@ -286,7 +286,6 @@ export const createItemSchema = z
   .object({
     name: z.string().min(1, "Name is required"),
     description: z.string().optional(),
-    unit: z.string().optional(),
     unitId: z.number().optional(),
     category: z.string().optional(),
     sku: z.string().optional(),
@@ -297,11 +296,6 @@ export const createItemSchema = z
     defaultTaxRatePercent: z.number().optional(),
     isActive: z.boolean().optional(),
     itemType: z.enum(["item", "product", "item_and_product"]).optional(),
-    type: z.string().optional(),
-  })
-  .refine((d) => (typeof d.unit === "string" && d.unit.trim() !== "") || d.unitId != null, {
-    message: "Provide either unit or unitId",
-    path: ["unit"],
   });
 export type CreateItemInput = z.infer<typeof createItemSchema>;
 
@@ -313,7 +307,6 @@ export type UpdateItemInput = z.infer<typeof updateItemSchema>;
 export const createIngredientSchema = z
   .object({
     name: z.string().min(1, "Name is required"),
-    unit: z.string().optional(),
     unitId: z.number().optional(),
     description: z.string().optional(),
     category: z.string().optional(),
@@ -324,10 +317,6 @@ export const createIngredientSchema = z
     notes: z.string().optional(),
     defaultTaxRatePercent: z.number().optional(),
     isActive: z.boolean().optional(),
-  })
-  .refine((d) => (typeof d.unit === "string" && d.unit.trim() !== "") || d.unitId != null, {
-    message: "Unit is required",
-    path: ["unit"],
   });
 export type CreateIngredientInput = z.infer<typeof createIngredientSchema>;
 

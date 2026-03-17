@@ -13,7 +13,7 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateItem, useInventorySuppliers, useUnits, useMetadataEnum } from "@kit/hooks";
+import { useCreateItem, useInventorySuppliers, useUnits } from "@kit/hooks";
 import type { ItemType } from "@kit/types";
 import { toast } from "sonner";
 
@@ -22,14 +22,12 @@ export default function CreateItemPage() {
   const createItem = useCreateItem();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const { data: unitsData } = useUnits();
-  const { data: variableTypeValues = [], isLoading: variableTypeLoading } = useMetadataEnum("VariableType");
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const itemTypeItems: { id: ItemType; name: string }[] = [
     { id: "item", name: "Item" },
     { id: "product", name: "Product" },
     { id: "item_and_product", name: "Item and product" },
   ];
-  const typeItems = (variableTypeValues || []).map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const [addVendorOpen, setAddVendorOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -41,7 +39,6 @@ export default function CreateItemPage() {
     notes: "",
     isActive: true,
     itemType: "item" as ItemType,
-    type: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,12 +56,10 @@ export default function CreateItemPage() {
         category: formData.category || undefined,
         sku: formData.sku || undefined,
         unitId: formData.unitId ?? undefined,
-        unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
         vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
         notes: formData.notes || undefined,
         isActive: formData.isActive,
         itemType: formData.itemType as 'item' | 'product' | 'item_and_product',
-        type: formData.type || undefined,
       });
       toast.success("Item created successfully");
       router.push('/items');
@@ -136,19 +131,6 @@ export default function CreateItemPage() {
                     selectedId={formData.itemType}
                     onSelect={(item) => handleInputChange('itemType', item.id as ItemType)}
                     placeholder="Select type"
-                  />
-                </div>
-
-                {/* Type (variable type) */}
-                <div className="space-y-2">
-                  <UnifiedSelector
-                    label="Type"
-                    type="type"
-                    items={typeItems}
-                    selectedId={formData.type || undefined}
-                    onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))}
-                    placeholder={variableTypeLoading ? "Loading…" : "Select type"}
-                    manageLink={{ href: '/variables', text: 'Variables' }}
                   />
                 </div>
 

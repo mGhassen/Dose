@@ -936,7 +936,10 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   } | null>(null);
   const { data: salesTypeMeta = [] } = useMetadataEnum("SalesType");
   const salesTypeLabels: Record<string, string> = useMemo(
-    () => Object.fromEntries(salesTypeMeta.map((ev) => [ev.name, ev.label ?? ev.name])),
+    () =>
+      Object.fromEntries(
+        salesTypeMeta.map((ev: { name: string; label?: string | null }) => [ev.name, ev.label ?? ev.name])
+      ),
     [salesTypeMeta]
   );
 
@@ -1055,17 +1058,14 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     notes: "",
     isActive: true,
     itemType: "item" as ItemType,
-    type: "",
   });
   const { data: unitsData } = useUnits();
-  const { data: variableTypeValues = [], isLoading: variableTypeLoading } = useMetadataEnum("VariableType");
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const itemTypeItems: { id: ItemType; name: string }[] = [
     { id: "item", name: "Item" },
     { id: "product", name: "Product" },
     { id: "item_and_product", name: "Item and product" },
   ];
-  const typeItems = (variableTypeValues || []).map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
   const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null; taxIncluded?: boolean; costTaxIncluded?: boolean } | null>(null);
   const [sellHistory, setSellHistory] = useState<PriceHistoryEntry[]>([]);
@@ -1142,7 +1142,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         notes: item.notes || "",
         isActive: item.isActive,
         itemType: (item.itemType === "recipe" ? "item" : item.itemType) as ItemType,
-        type: item.type || "",
       });
     }
   }, [item]);
@@ -1166,12 +1165,10 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           category: formData.category || undefined,
           sku: formData.sku || undefined,
           unitId: formData.unitId ?? undefined,
-          unit: formData.unitId != null ? (unitsData || []).find((u) => u.id === formData.unitId)?.symbol : undefined,
           vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
           notes: formData.notes || undefined,
           isActive: formData.isActive,
           itemType: formData.itemType === 'recipe' ? undefined : formData.itemType,
-          type: formData.type || undefined,
         },
       });
       toast.success("Item updated successfully");
@@ -1328,19 +1325,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       selectedId={formData.itemType}
                       onSelect={(item) => handleInputChange('itemType', item.id as ItemType)}
                       placeholder="Select type"
-                    />
-                  </div>
-
-                  {/* Type (variable type) */}
-                  <div className="space-y-2">
-                    <UnifiedSelector
-                      label="Type"
-                      type="type"
-                      items={typeItems}
-                      selectedId={formData.type || undefined}
-                      onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))}
-                      placeholder={variableTypeLoading ? "Loading…" : "Select type"}
-                      manageLink={{ href: '/variables', text: 'Variables' }}
                     />
                   </div>
 
@@ -1727,7 +1711,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     loading={itemTaxesLoading}
                     onRefetch={() => resolvedParams?.id && fetchItemTaxes(resolvedParams.id)}
                     taxVariableOptions={taxVariableOptions}
-                    salesTypeOptions={salesTypeMeta.map((s) => ({ id: s.name, name: s.label ?? s.name }))}
+                    salesTypeOptions={salesTypeMeta.map((s: { name: string; label?: string | null }) => ({ id: s.name, name: s.label ?? s.name }))}
                   />
                 </TabsContent>
 

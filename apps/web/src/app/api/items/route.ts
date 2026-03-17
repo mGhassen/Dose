@@ -13,7 +13,7 @@ function transformItem(row: any): Item {
     id: row.id,
     name: row.name,
     description: row.description,
-    unit: row.unit || '',
+    unit: row.units?.symbol || '',
     unitId: row.unit_id,
     category: row.category,
     itemType: ['item', 'product', 'item_and_product'].includes(row.item_type) ? row.item_type : 'item',
@@ -25,7 +25,6 @@ function transformItem(row: any): Item {
     vendorId: row.vendor_id,
     notes: row.notes,
     producedFromRecipeId: row.produced_from_recipe_id,
-    type: row.type ?? undefined,
   };
 }
 
@@ -41,8 +40,6 @@ function transformToSnakeCase(data: CreateItemData): any {
     is_active: data.isActive ?? true,
   };
   if (data.unitId != null) result.unit_id = data.unitId;
-  if (data.unit != null) result.unit = data.unit;
-  if (data.type != null && data.type !== '') result.type = data.type;
   return result;
 }
 
@@ -58,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     let itemsQuery = supabase
       .from('items')
-      .select('*');
+      .select('*, units(symbol, name)');
 
     if (itemType) {
       itemsQuery = itemsQuery.eq('item_type', itemType);
@@ -196,7 +193,7 @@ export async function POST(request: NextRequest) {
     const { data: itemData, error } = await supabase
       .from('items')
       .insert(transformToSnakeCase(body))
-      .select()
+      .select('*, units(symbol, name)')
       .single();
 
     if (error) throw error;
