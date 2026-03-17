@@ -7,13 +7,15 @@ import { supabaseServer } from '@kit/lib/supabase';
 import type { Item, CreateItemData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createItemSchema } from '@/shared/zod-schemas';
+import { getUnitVariableMap } from '../_utils/unit-variables';
+import { applyTaxRulesToItem } from '@/lib/item-taxes-resolve';
 
-function transformItem(row: any): Item {
+function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    unit: row.units?.symbol || '',
+    unit: unitMap.get(row.unit_id)?.symbol || '',
     unitId: row.unit_id,
     category: row.category,
     itemType: ['item', 'product', 'item_and_product'].includes(row.item_type) ? row.item_type : 'item',
@@ -55,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     let itemsQuery = supabase
       .from('items')
-      .select('*, units(symbol, name)');
+      .select('*');
 
     if (itemType) {
       itemsQuery = itemsQuery.eq('item_type', itemType);
@@ -83,6 +85,10 @@ export async function GET(request: NextRequest) {
     if (itemsError) throw itemsError;
 
     let allData: any[] = [...(itemsData || [])];
+    const unitMap = await getUnitVariableMap(
+      supabase as any,
+      (itemsData || []).map((r: any) => r.unit_id)
+    );
 
     if (includeRecipes && !producedOnly) {
       // Get produced item recipe IDs to exclude those recipes (avoid duplicates)
@@ -162,7 +168,7 @@ export async function GET(request: NextRequest) {
         };
       } else {
         // Transform regular item
-        return transformItem(row);
+        return transformItem(row, unitMap);
       }
     });
     
@@ -193,12 +199,24 @@ export async function POST(request: NextRequest) {
     const { data: itemData, error } = await supabase
       .from('items')
       .insert(transformToSnakeCase(body))
-      .select('*, units(symbol, name)')
+      .select('*')
       .single();
 
     if (error) throw error;
 
-    return NextResponse.json(transformItem(itemData), { status: 201 });
+    // Auto-assign taxes from global tax rules for newly created items.
+    // This uses the same mechanism as "Apply tax rules to this item".
+    // Best-effort: item creation shouldn't fail if tax application has issues.
+    if (itemData?.id != null) {
+      try {
+        await applyTaxRulesToItem(supabase as any, itemData.id, itemData.category ?? null);
+      } catch (taxErr) {
+        console.error('Error auto-applying tax rules to item:', taxErr);
+      }
+    }
+
+    const unitMap = await getUnitVariableMap(supabase as any, [itemData?.unit_id]);
+    return NextResponse.json(transformItem(itemData, unitMap), { status: 201 });
   } catch (error: any) {
     console.error('Error creating item:', error);
     return NextResponse.json(

@@ -1,345 +1,38 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@kit/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
-import { DatePicker } from "@kit/ui/date-picker";
-import { Input } from "@kit/ui/input";
-import { Label } from "@kit/ui/label";
-import { Textarea } from "@kit/ui/textarea";
-import { UnifiedSelector } from "@/components/unified-selector";
-import { InputGroupAttached } from "@/components/input-group";
-import { Save, X, Plus, Trash2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateSupplierOrder, useInventorySuppliers, useItems } from "@kit/hooks";
+import { useCreateSupplierOrder } from "@kit/hooks";
 import { toast } from "sonner";
-import { formatCurrency } from "@kit/lib/config";
-import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
-import { SupplierOrderStatus } from "@kit/types";
-import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
-
-interface OrderItem {
-  itemId: number;
-  quantity: number;
-  unit: string;
-  unitPrice: number;
-  taxRatePercent?: number;
-  taxInclusive?: boolean;
-  notes?: string;
-}
+import { SupplierOrderEditor } from "../_components/supplier-order-editor";
 
 export default function CreateSupplierOrderPage() {
   const router = useRouter();
   const createOrder = useCreateSupplierOrder();
-  const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
-  const { data: itemsResponse } = useItems({ limit: 1000 });
-  
-  const suppliers = suppliersResponse?.data || [];
-  const allItems = itemsResponse?.data || [];
-  
-  const [formData, setFormData] = useState({
-    supplierId: "",
-    orderNumber: "",
-    orderDate: dateToYYYYMMDD(new Date()),
-    expectedDeliveryDate: "",
-    notes: "",
-  });
-  
-  const [items, setItems] = useState<OrderItem[]>([]);
-  const [defaultTaxRate, setDefaultTaxRate] = useState(0);
-
-  useEffect(() => {
-    if (!formData.orderDate) {
-      setDefaultTaxRate(0);
-      return;
-    }
-    taxRulesApi.resolve({ context: "expense", date: formData.orderDate }).then((r) => setDefaultTaxRate(r.rate)).catch(() => setDefaultTaxRate(0));
-  }, [formData.orderDate]);
-
-  const { subtotal, totalTax, totalAmount } = useMemo(() => {
-    let sub = 0;
-    let tax = 0;
-    for (const item of items) {
-      const rate = item.taxRatePercent ?? defaultTaxRate;
-      const inclusive = item.taxInclusive ?? false;
-      const { lineTotalNet, taxAmount } = lineTaxAmount(item.quantity, item.unitPrice, rate, inclusive);
-      sub += lineTotalNet;
-      tax += taxAmount;
-    }
-    return { subtotal: to2Decimals(sub), totalTax: to2Decimals(tax), totalAmount: to2Decimals(sub + tax) };
-  }, [items, defaultTaxRate]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.supplierId) {
-      toast.error("Please select a supplier");
-      return;
-    }
-
-    if (items.length === 0) {
-      toast.error("Please add at least one item to the order");
-      return;
-    }
-
-    // Validate items
-    for (const item of items) {
-      if (!item.itemId || item.quantity <= 0 || item.unitPrice <= 0) {
-        toast.error("Please fill in all item details correctly");
-        return;
-      }
-    }
-
-    try {
-      await createOrder.mutateAsync({
-        supplierId: parseInt(formData.supplierId),
-        orderNumber: formData.orderNumber || undefined,
-        orderDate: formData.orderDate,
-        expectedDeliveryDate: formData.expectedDeliveryDate || undefined,
-        status: SupplierOrderStatus.PENDING,
-        notes: formData.notes || undefined,
-        items: items.map((item) => ({
-          itemId: item.itemId,
-          quantity: item.quantity,
-          unit: item.unit,
-          unitPrice: item.unitPrice,
-          taxRatePercent: item.taxRatePercent ?? defaultTaxRate,
-          taxInclusive: item.taxInclusive,
-          notes: item.notes,
-        })),
-      });
-      toast.success("Supplier order created successfully");
-      router.push('/supplier-orders');
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to create supplier order");
-    }
-  };
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const addItem = () => {
-    setItems([...items, { itemId: 0, quantity: 0, unit: "", unitPrice: 0, taxInclusive: false }]);
-  };
-
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
-
-  const updateItem = (index: number, field: keyof OrderItem, value: any) => {
-    const updated = [...items];
-    const item = updated[index];
-    
-    if (field === 'itemId') {
-      // Auto-fill unit from item
-      const selectedItem = allItems.find(i => i.id === value);
-      if (selectedItem) {
-        item.unit = selectedItem.unit || '';
-      }
-    }
-    
-    updated[index] = { ...item, [field]: value };
-    setItems(updated);
-  };
 
   return (
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Create Supplier Order</h1>
-          <p className="text-muted-foreground">Place a new order with a supplier</p>
+          <h1 className="text-2xl font-bold">Create supplier order</h1>
+          <p className="text-muted-foreground">Create a new supplier order and line items</p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Order Information</CardTitle>
-            <CardDescription>Enter the details for this supplier order</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <UnifiedSelector
-                    label="Supplier"
-                    required
-                    type="supplier"
-                    items={suppliers.filter(s => s.isActive)}
-                    selectedId={formData.supplierId ? parseInt(formData.supplierId) : undefined}
-                    onSelect={(item) => handleInputChange('supplierId', item.id === 0 ? '' : String(item.id))}
-                    placeholder="Select supplier"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="orderNumber">Order Number</Label>
-                  <Input
-                    id="orderNumber"
-                    value={formData.orderNumber}
-                    onChange={(e) => handleInputChange('orderNumber', e.target.value)}
-                    placeholder="PO-2025-001"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="orderDate">Order Date *</Label>
-                  <DatePicker
-                    id="orderDate"
-                    value={formData.orderDate ? new Date(formData.orderDate) : undefined}
-                    onChange={(d) => handleInputChange("orderDate", d ? dateToYYYYMMDD(d) : "")}
-                    placeholder="Pick a date"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="expectedDeliveryDate">Expected Delivery Date</Label>
-                  <DatePicker
-                    id="expectedDeliveryDate"
-                    value={formData.expectedDeliveryDate ? new Date(formData.expectedDeliveryDate) : undefined}
-                    onChange={(d) => handleInputChange("expectedDeliveryDate", d ? dateToYYYYMMDD(d) : "")}
-                    placeholder="Pick a date"
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes}
-                    onChange={(e) => handleInputChange('notes', e.target.value)}
-                    placeholder="Additional notes about this order"
-                    rows={3}
-                  />
-                </div>
-              </div>
-
-              {/* Order Items */}
-              <div className="space-y-4 border-t pt-6">
-                <div className="flex items-center justify-between">
-                  <Label className="text-base font-semibold">Order Items</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Item
-                  </Button>
-                </div>
-
-                <div className="border rounded-lg px-4">
-                {items.map((item, index) => {
-                  const rate = item.taxRatePercent ?? defaultTaxRate;
-                  const inclusive = item.taxInclusive ?? false;
-                  const { lineTotalNet, taxAmount } = lineTaxAmount(item.quantity, item.unitPrice, rate, inclusive);
-                  const lineTotal = lineTotalNet + taxAmount;
-                  return (
-                    <div key={index} className="grid grid-cols-12 gap-4 items-end py-3 border-b last:border-b-0">
-                      <div className="col-span-12 md:col-span-3">
-                        <UnifiedSelector
-                          label="Item"
-                          required
-                          type="item"
-                          items={allItems.filter((i) => i.isActive && i.itemType === "item").map((it) => ({ ...it, id: it.id, name: `${it.name} (${it.unit})` }))}
-                          selectedId={item.itemId || undefined}
-                          onSelect={(sel) => updateItem(index, "itemId", sel.id === 0 ? 0 : Number(sel.id))}
-                          placeholder="Select item"
-                        />
-                      </div>
-                      <div className="col-span-6 md:col-span-1">
-                        <Label>Qty *</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={item.quantity || ""}
-                          onChange={(e) => updateItem(index, "quantity", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          required
-                        />
-                      </div>
-                      <div className="col-span-6 md:col-span-1">
-                        <Label>Unit *</Label>
-                        <Input value={item.unit} onChange={(e) => updateItem(index, "unit", e.target.value)} placeholder="kg, L" required />
-                      </div>
-                      <div className="col-span-6 md:col-span-1">
-                        <Label className="text-xs text-muted-foreground">Unit price (excl.)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={item.unitPrice || ""}
-                          onChange={(e) => updateItem(index, "unitPrice", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          required
-                        />
-                      </div>
-                      <div className="col-span-4 md:col-span-1">
-                        <InputGroupAttached
-                          label="Tax %"
-                          addonStyle="default"
-                          input={
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              className="text-sm tabular-nums"
-                              value={item.taxRatePercent ?? ""}
-                              onChange={(e) => updateItem(index, "taxRatePercent", e.target.value === "" ? undefined : parseFloat(e.target.value) || 0)}
-                              placeholder={String(defaultTaxRate)}
-                            />
-                          }
-                          addon={<span className="text-muted-foreground text-xs">%</span>}
-                        />
-                      </div>
-                      <div className="col-span-6 md:col-span-1">
-                        <Label>Total</Label>
-                        <div className="h-10 flex items-center px-3 border rounded-md bg-muted text-sm tabular-nums">
-                          {formatCurrency(lineTotal)}
-                        </div>
-                      </div>
-                      <div className="col-span-6 md:col-span-1">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)} className="w-full">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-                </div>
-
-                {items.length > 0 && (
-                  <div className="flex flex-col items-end gap-1 p-4 border rounded-lg bg-muted">
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-muted-foreground">Subtotal (excl. tax):</span>
-                      <span className="tabular-nums">{formatCurrency(subtotal)}</span>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-muted-foreground">Tax:</span>
-                      <span className="tabular-nums">{formatCurrency(totalTax)}</span>
-                    </div>
-                    <div className="flex items-center gap-4 pt-1 border-t mt-1">
-                      <span className="text-muted-foreground">Total:</span>
-                      <span className="text-xl font-bold tabular-nums">{formatCurrency(totalAmount)}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-end space-x-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.push('/supplier-orders')}
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createOrder.isPending}>
-                  <Save className="mr-2 h-4 w-4" />
-                  {createOrder.isPending ? "Creating..." : "Create Order"}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+        <SupplierOrderEditor
+          mode="create"
+          onCancel={() => router.push("/supplier-orders")}
+          onSubmit={async (payload) => {
+            if (payload.kind !== "create") return;
+            try {
+              const created = await createOrder.mutateAsync(payload.data);
+              toast.success("Supplier order created");
+              router.push(`/supplier-orders/${created.id}`);
+            } catch (error: any) {
+              toast.error(error?.message || "Failed to create supplier order");
+            }
+          }}
+          submitLabel={createOrder.isPending ? "Creating..." : "Create order"}
+        />
       </div>
     </AppLayout>
   );

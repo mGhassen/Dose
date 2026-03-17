@@ -11,7 +11,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Badge } from "@kit/ui/badge";
-import { Save, X, Trash2, Package, Truck } from "lucide-react";
+import { Trash2, Package, Truck, Edit } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useSupplierOrderById, useUpdateSupplierOrder, useDeleteSupplierOrder, useReceiveSupplierOrder } from "@kit/hooks";
 import { toast } from "sonner";
@@ -27,6 +27,8 @@ import {
   DialogTitle,
 } from "@kit/ui/dialog";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { SupplierOrderEditorDrawer } from "../_components/supplier-order-editor-drawer";
+import type { SupplierOrderEditorSubmit } from "../_components/supplier-order-editor";
 
 interface SupplierOrderDetailPageProps {
   params: Promise<{ id: string }>;
@@ -36,6 +38,7 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: order, isLoading } = useSupplierOrderById(resolvedParams?.id || "");
   const updateOrder = useUpdateSupplierOrder();
@@ -58,6 +61,18 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
       })));
     }
   }, [order]);
+
+  const handleSaveEdit = async (payload: SupplierOrderEditorSubmit) => {
+    if (!resolvedParams?.id) return;
+    if (payload.kind !== "update") return;
+    try {
+      await updateOrder.mutateAsync({ id: resolvedParams.id, data: payload.data });
+      toast.success("Supplier order updated");
+      setEditOpen(false);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update supplier order");
+    }
+  };
 
   const handleDelete = async () => {
     if (!resolvedParams?.id) return;
@@ -150,6 +165,10 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
             </p>
           </div>
           <div className="flex space-x-2">
+            <Button variant="outline" onClick={() => setEditOpen(true)} disabled={updateOrder.isPending}>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
             {canReceive && (
               <Button
                 onClick={() => setReceiveDialogOpen(true)}
@@ -392,6 +411,14 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
           cancelText="Cancel"
           isPending={deleteMutation.isPending}
           variant="destructive"
+        />
+
+        <SupplierOrderEditorDrawer
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          order={order}
+          onSubmit={handleSaveEdit}
+          saving={updateOrder.isPending}
         />
       </div>
     </AppLayout>

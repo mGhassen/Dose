@@ -38,6 +38,7 @@ function transformExpense(row: any, lineItems?: ExpenseLineItem[]): Expense {
     description: row.description,
     vendor: row.vendor,
     supplierId: row.supplier_id || undefined,
+    supplierOrderId: row.supplier_order_id != null ? parseFloat(row.supplier_order_id) : undefined,
     expenseDate: row.expense_date || row.start_date,
     subtotal: row.subtotal != null ? parseFloat(row.subtotal) : undefined,
     totalTax: row.total_tax != null ? parseFloat(row.total_tax) : undefined,

@@ -4,13 +4,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Item, UpdateItemData } from '@kit/types';
 import { parseRequestBody, updateItemSchema } from '@/shared/zod-schemas';
+import { getUnitVariableMap } from '../../_utils/unit-variables';
 
-function transformItem(row: any): Item {
+function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    unit: row.units?.symbol || '',
+    unit: unitMap.get(row.unit_id)?.symbol || '',
     unitId: row.unit_id,
     category: row.category,
     itemType: ['item', 'product', 'item_and_product'].includes(row.item_type) ? row.item_type : 'item',
@@ -53,7 +54,7 @@ export async function GET(
     // Try to find in items table first
     let { data: itemData, error: itemError } = await supabase
       .from('items')
-      .select('*, units(symbol, name)')
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -62,7 +63,7 @@ export async function GET(
       // First check if there's a produced item for this recipe ID
       const { data: producedItemData } = await supabase
         .from('items')
-        .select('*, units(symbol, name)')
+        .select('*')
         .eq('produced_from_recipe_id', id)
         .single();
       
@@ -137,7 +138,8 @@ export async function GET(
         notes: itemData.notes,
       });
     } else {
-      return NextResponse.json(transformItem(itemData));
+      const unitMap = await getUnitVariableMap(supabase as any, [itemData?.unit_id]);
+      return NextResponse.json(transformItem(itemData, unitMap));
     }
   } catch (error: any) {
     console.error('Error fetching item:', error);
@@ -164,12 +166,13 @@ export async function PUT(
       .from('items')
       .update(transformToSnakeCase(body))
       .eq('id', id)
-      .select('*, units(symbol, name)')
+      .select('*')
       .single();
 
     if (itemError) throw itemError;
 
-    return NextResponse.json(transformItem(itemData));
+    const unitMap = await getUnitVariableMap(supabase as any, [itemData?.unit_id]);
+    return NextResponse.json(transformItem(itemData, unitMap));
   } catch (error: any) {
     console.error('Error updating item:', error);
     return NextResponse.json(

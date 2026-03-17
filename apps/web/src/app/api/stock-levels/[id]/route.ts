@@ -3,8 +3,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { StockLevel, UpdateStockLevelData } from '@kit/types';
+import { getUnitVariableMap } from '../../_utils/unit-variables';
 
-function transformStockLevel(row: any): StockLevel {
+function transformStockLevel(row: any, unitMap: Map<number, { symbol: string }>): StockLevel {
   return {
     id: row.id,
     itemId: row.item_id || row.ingredient_id,
@@ -21,7 +22,7 @@ function transformStockLevel(row: any): StockLevel {
       id: row.item.id,
       name: row.item.name,
       description: row.item.description,
-      unit: row.item.units?.symbol || '',
+      unit: unitMap.get(row.item.unit_id)?.symbol || '',
       category: row.item.category,
       itemType: row.item.item_type || 'item',
       isActive: row.item.is_active,
@@ -54,7 +55,7 @@ export async function GET(
     
     const { data, error } = await supabase
       .from('stock_levels')
-      .select('*, item:items(*, units(symbol, name))')
+      .select('*, item:items(*)')
       .eq('id', id)
       .single();
 
@@ -66,7 +67,8 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(transformStockLevel(data));
+    const unitMap = await getUnitVariableMap(supabase as any, [data.item?.unit_id]);
+    return NextResponse.json(transformStockLevel(data, unitMap));
   } catch (error: any) {
     console.error('Error fetching stock level:', error);
     return NextResponse.json(

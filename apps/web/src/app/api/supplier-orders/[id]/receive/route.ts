@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
-import { SupplierOrderStatus, StockMovementType, StockMovementReferenceType } from '@kit/types';
+import { ExpenseCategory, SupplierOrderStatus, StockMovementType, StockMovementReferenceType } from '@kit/types';
 import { getItemTotalStock } from '@/lib/stock/get-item-stock';
 import { getItemCostAsOf } from '@/lib/items/price-resolve';
 
@@ -44,16 +44,157 @@ export async function POST(
       );
     }
 
-    // Update order status and delivery date
+    const referenceId = Number(id);
+    const effectiveDate =
+      orderData.actual_delivery_date ?? body.actualDeliveryDate ?? (await import('@kit/lib')).dateToYYYYMMDD(new Date());
+
+    const { data: existingStockMovements } = await supabase
+      .from('stock_movements')
+      .select('id')
+      .eq('reference_type', StockMovementReferenceType.SUPPLIER_ORDER)
+      .eq('reference_id', referenceId)
+      .limit(1);
+
+    const hasStockMovements = (existingStockMovements || []).length > 0;
+
+    const { data: existingExpenseRow, error: expenseLookupError } = await supabase
+      .from('expenses')
+      .select('id')
+      .eq('supplier_order_id', referenceId)
+      .maybeSingle();
+
+    if (expenseLookupError) throw expenseLookupError;
+
+    const existingExpenseId: number | undefined = existingExpenseRow?.id;
+
+    const to2 = (n: number) => Math.round(n * 100) / 100;
+
+    const createExpense = async (itemsToUse: any[]) => {
+      const lines = itemsToUse
+        .map((orderItem: any, sortIndex: number) => {
+          const orderedQty = parseFloat(String(orderItem.quantity)) || 0;
+          const receivedQty = parseFloat(String(orderItem.received_quantity ?? 0)) || 0;
+          if (receivedQty <= 0) return null;
+
+          const perUnitNet =
+            orderedQty > 0 ? (parseFloat(String(orderItem.total_price)) || 0) / orderedQty : 0;
+          const perUnitTax =
+            orderedQty > 0 ? (parseFloat(String(orderItem.tax_amount ?? 0)) || 0) / orderedQty : 0;
+
+          return {
+            sortOrder: sortIndex,
+            itemId: orderItem.item_id,
+            quantity: receivedQty,
+            unitId: orderItem.unit_id ?? null,
+            unitPrice: parseFloat(String(orderItem.unit_price)) || 0,
+            unitCost: null,
+            taxRatePercent: orderItem.tax_rate_percent ?? null,
+            taxAmount: perUnitTax * receivedQty,
+            lineTotal: perUnitNet * receivedQty,
+          };
+        })
+        .filter(Boolean) as Array<{
+          sortOrder: number;
+          itemId: number;
+          quantity: number;
+          unitId: number | null;
+          unitPrice: number;
+          unitCost: number | null;
+          taxRatePercent: number | null;
+          taxAmount: number;
+          lineTotal: number;
+        }>;
+
+      const subtotal = to2(lines.reduce((s, l) => s + l.lineTotal, 0));
+      const totalTax = to2(lines.reduce((s, l) => s + l.taxAmount, 0));
+      const amount = to2(subtotal + totalTax);
+
+      const { data: expenseRow, error: expenseInsertError } = await supabase
+        .from('expenses')
+        .insert({
+          name: `Supplier order #${orderData.order_number || orderData.id}`,
+          category: ExpenseCategory.SUPPLIES,
+          expense_type: 'expense',
+          supplier_id: orderData.supplier_id,
+          expense_date: effectiveDate,
+          start_date: effectiveDate,
+          description: orderData.notes ?? null,
+          amount,
+          subtotal,
+          total_tax: totalTax,
+          total_discount: 0,
+          is_active: true,
+          supplier_order_id: referenceId,
+        })
+        .select()
+        .single();
+
+      if (expenseInsertError) throw expenseInsertError;
+      if (!expenseRow) throw new Error('Failed to create expense');
+
+      if (lines.length > 0) {
+        const { error: linesError } = await supabase.from('expense_line_items').insert(
+          lines.map((l) => ({
+            expense_id: expenseRow.id,
+            item_id: l.itemId,
+            subscription_id: null,
+            quantity: l.quantity,
+            unit_id: l.unitId,
+            unit_price: l.unitPrice,
+            unit_cost: l.unitCost,
+            tax_rate_percent: l.taxRatePercent,
+            tax_amount: l.taxAmount,
+            line_total: l.lineTotal,
+            sort_order: l.sortOrder,
+          }))
+        );
+        if (linesError) throw linesError;
+      }
+    };
+
+    if (hasStockMovements) {
+      if (existingExpenseId) {
+        const { data: updatedOrder, error: fetchError } = await supabase
+          .from('supplier_orders')
+          .select('*, items:supplier_order_items(*)')
+          .eq('id', id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        return NextResponse.json({
+          success: true,
+          message: 'Order already received. Returning current state.',
+          order: updatedOrder,
+        });
+      }
+
+      const itemsWithReceivedQty = orderData.items.filter((it: any) => {
+        const v = parseFloat(String(it.received_quantity)) || 0;
+        return v > 0;
+      });
+
+      await createExpense(itemsWithReceivedQty);
+
+      const { data: updatedOrder, error: fetchError } = await supabase
+        .from('supplier_orders')
+        .select('*, items:supplier_order_items(*)')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      return NextResponse.json({
+        success: true,
+        message: 'Order received. Expense created.',
+        order: updatedOrder,
+      });
+    }
+
     const updateData: any = {
       status: SupplierOrderStatus.DELIVERED,
+      actual_delivery_date: effectiveDate,
     };
-    
-    if (body.actualDeliveryDate) {
-      updateData.actual_delivery_date = body.actualDeliveryDate;
-    } else {
-      updateData.actual_delivery_date = (await import('@kit/lib')).dateToYYYYMMDD(new Date());
-    }
 
     const { error: updateError } = await supabase
       .from('supplier_orders')
@@ -62,8 +203,18 @@ export async function POST(
 
     if (updateError) throw updateError;
 
-    const effectiveDate =
-      body.actualDeliveryDate ?? (await import('@kit/lib')).dateToYYYYMMDD(new Date());
+    if (!existingExpenseId) {
+      const receivedQtyByOrderItemId = new Map(
+        body.items.map((it) => [it.itemId, parseFloat(String(it.receivedQuantity)) || 0])
+      );
+
+      const itemsToUse = orderData.items.map((orderItem: any) => ({
+        ...orderItem,
+        received_quantity: receivedQtyByOrderItemId.get(orderItem.id) ?? 0,
+      }));
+
+      await createExpense(itemsToUse);
+    }
 
     for (const receiveItem of body.items) {
       const orderItem = orderData.items.find((item: any) => item.id === receiveItem.itemId);
@@ -92,7 +243,7 @@ export async function POST(
           quantity: receiveItem.receivedQuantity,
           unit: orderItem.unit,
           reference_type: StockMovementReferenceType.SUPPLIER_ORDER,
-          reference_id: Number(id),
+          reference_id: referenceId,
           location: receiveItem.location || null,
           movement_date: new Date().toISOString(),
           notes: `Received from supplier order #${orderData.order_number || id}`,

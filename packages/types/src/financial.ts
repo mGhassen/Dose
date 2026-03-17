@@ -182,6 +182,7 @@ export interface Expense {
   description?: string;
   vendor?: string;
   supplierId?: number;
+  supplierOrderId?: number;
   expenseDate: string;
   subtotal?: number;
   totalTax?: number;

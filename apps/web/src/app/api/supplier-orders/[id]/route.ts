@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { SupplierOrder, SupplierOrderItem, UpdateSupplierOrderData } from '@kit/types';
+import { StockMovementReferenceType } from '@kit/types';
 import { lineTaxAmount } from '@/lib/transaction-tax';
 
 function transformSupplierOrder(row: any): SupplierOrder {
@@ -210,8 +211,25 @@ export async function DELETE(
   try {
     const { id } = await params;
     const supabase = supabaseServer();
-    
-    // Order items will be deleted via CASCADE
+
+    const referenceId = Number(id);
+
+    // Delete linked expense first.
+    const { error: expenseError } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('supplier_order_id', referenceId);
+    if (expenseError) throw expenseError;
+
+    // Delete movements to trigger stock reversal via DB trigger.
+    const { error: movementError } = await supabase
+      .from('stock_movements')
+      .delete()
+      .eq('reference_type', StockMovementReferenceType.SUPPLIER_ORDER)
+      .eq('reference_id', referenceId);
+    if (movementError) throw movementError;
+
+    // Order items will be deleted via CASCADE.
     const { error } = await supabase
       .from('supplier_orders')
       .delete()
