@@ -35,12 +35,10 @@ function ruleValidAt(
 }
 
 function conditionValueMatches(
-  rowConditionValue: string | null,
   rowConditionValues: string[] | null,
   want: string | null
 ): boolean {
-  if (want == null || want === '') return rowConditionValue == null && !rowConditionValues?.length;
-  if (rowConditionValue === want) return true;
+  if (want == null || want === '') return !rowConditionValues?.length;
   if (rowConditionValues && Array.isArray(rowConditionValues)) return rowConditionValues.includes(want);
   return false;
 }
@@ -60,7 +58,7 @@ export async function getItemTaxesForCondition(
 
   const { data: rows, error } = await supabase
     .from('item_taxes')
-    .select('id, variable_id, calculation_type, priority, condition_value, condition_values, effective_date, end_date')
+    .select('id, variable_id, calculation_type, priority, condition_values, effective_date, end_date')
     .eq('item_id', itemId)
     .eq('condition_type', conditionType)
     .order('priority', { ascending: true });
@@ -69,7 +67,7 @@ export async function getItemTaxesForCondition(
 
   const filtered = rows.filter(
     (row: any) =>
-      conditionValueMatches(row.condition_value, row.condition_values, conditionValue) &&
+      conditionValueMatches(row.condition_values, conditionValue) &&
       ruleValidAt(row, date)
   );
 
@@ -195,12 +193,12 @@ export async function applyTaxRulesToItems(supabase: SupabaseClient | any): Prom
     if (r.rule_type === 'exemption') continue;
 
     const itemIds = await getItemIdsInScope(supabase, r);
-    const conditionValue =
-      r.condition_values && Array.isArray(r.condition_values) && r.condition_values.length === 1
-        ? r.condition_values[0]
-        : r.condition_values?.length
-          ? null
-          : (r.condition_value ?? null);
+    const conditionValues: string[] | null =
+      Array.isArray(r.condition_values) && r.condition_values.length > 0
+        ? r.condition_values
+        : r.condition_value != null
+          ? [r.condition_value]
+          : null;
 
     for (const itemId of itemIds) {
       let existingQuery = supabase
@@ -208,12 +206,8 @@ export async function applyTaxRulesToItems(supabase: SupabaseClient | any): Prom
         .select('id')
         .eq('item_id', itemId)
         .eq('condition_type', r.condition_type)
-        .eq('variable_id', r.variable_id);
-      if (conditionValue == null) {
-        existingQuery = existingQuery.is('condition_value', null);
-      } else {
-        existingQuery = existingQuery.eq('condition_value', conditionValue);
-      }
+        .eq('variable_id', r.variable_id)
+        .eq('condition_values', conditionValues);
       const { data: existingRow } = await existingQuery.maybeSingle();
       const existing = existingRow ? { data: existingRow } : null;
 
@@ -221,8 +215,7 @@ export async function applyTaxRulesToItems(supabase: SupabaseClient | any): Prom
         item_id: itemId,
         variable_id: r.variable_id,
         condition_type: r.condition_type,
-        condition_value: conditionValue,
-        condition_values: Array.isArray(r.condition_values) && r.condition_values.length > 0 ? r.condition_values : null,
+        condition_values: conditionValues,
         calculation_type: r.calculation_type ?? null,
         priority: r.priority ?? 0,
         effective_date: r.effective_date ?? null,
@@ -266,24 +259,20 @@ export async function applyTaxRulesToItem(
     if (r.rule_type === 'exemption') continue;
     if (!scopeMatches(r.scope_type, r.scope_item_ids, r.scope_categories, itemId, itemCategory)) continue;
 
-    const conditionValue =
-      r.condition_values && Array.isArray(r.condition_values) && r.condition_values.length === 1
-        ? r.condition_values[0]
-        : r.condition_values?.length
-          ? null
-          : (r.condition_value ?? null);
+    const conditionValues: string[] | null =
+      Array.isArray(r.condition_values) && r.condition_values.length > 0
+        ? r.condition_values
+        : r.condition_value != null
+          ? [r.condition_value]
+          : null;
 
     let existingQuery = supabase
       .from('item_taxes')
       .select('id')
       .eq('item_id', itemId)
       .eq('condition_type', r.condition_type)
-      .eq('variable_id', r.variable_id);
-    if (conditionValue == null) {
-      existingQuery = existingQuery.is('condition_value', null);
-    } else {
-      existingQuery = existingQuery.eq('condition_value', conditionValue);
-    }
+      .eq('variable_id', r.variable_id)
+      .eq('condition_values', conditionValues);
     const { data: existingRow } = await existingQuery.maybeSingle();
     const existing = existingRow ? { data: existingRow } : null;
 
@@ -291,8 +280,7 @@ export async function applyTaxRulesToItem(
       item_id: itemId,
       variable_id: r.variable_id,
       condition_type: r.condition_type,
-      condition_value: conditionValue,
-      condition_values: Array.isArray(r.condition_values) && r.condition_values.length > 0 ? r.condition_values : null,
+      condition_values: conditionValues,
       calculation_type: r.calculation_type ?? null,
       priority: r.priority ?? 0,
       effective_date: r.effective_date ?? null,

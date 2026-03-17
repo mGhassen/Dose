@@ -18,7 +18,6 @@ export async function PATCH(
     const updates: Record<string, unknown> = {};
     if (body.variableId !== undefined) updates.variable_id = body.variableId;
     if (body.conditionType !== undefined) updates.condition_type = body.conditionType;
-    if (body.conditionValue !== undefined) updates.condition_value = body.conditionValue ?? null;
     if (body.conditionValues !== undefined) updates.condition_values = body.conditionValues ?? null;
     if (body.calculationType !== undefined) updates.calculation_type = body.calculationType ?? null;
     if (body.priority !== undefined) updates.priority = body.priority ?? 0;
@@ -49,7 +48,6 @@ export async function PATCH(
       itemId: data.item_id,
       variableId: data.variable_id,
       conditionType: data.condition_type,
-      conditionValue: data.condition_value ?? undefined,
       conditionValues: data.condition_values ?? undefined,
       calculationType: data.calculation_type ?? undefined,
       priority: data.priority ?? 0,

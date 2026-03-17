@@ -7,7 +7,6 @@ function transformRow(row: any) {
     itemId: row.item_id,
     variableId: row.variable_id,
     conditionType: row.condition_type,
-    conditionValue: row.condition_value ?? undefined,
     conditionValues: row.condition_values ?? undefined,
     calculationType: row.calculation_type ?? undefined,
     priority: row.priority ?? 0,
@@ -50,7 +49,9 @@ export async function GET(
 const createItemTaxSchema = {
   variableId: (v: unknown) => typeof v === 'number' && Number.isInteger(v),
   conditionType: (v: unknown) => typeof v === 'string' && v.length > 0,
-  conditionValue: (v: unknown) => v == null || typeof v === 'string',
+  conditionValues: (v: unknown) =>
+    v == null ||
+    (Array.isArray(v) && v.every((x) => typeof x === 'string' && x.length > 0)),
   calculationType: (v: unknown) => v == null || (v === 'inclusive' || v === 'additive'),
   priority: (v: unknown) => v == null || (typeof v === 'number' && Number.isInteger(v)),
   effectiveDate: (v: unknown) => v == null || typeof v === 'string',
@@ -71,13 +72,15 @@ export async function POST(
     if (!createItemTaxSchema.variableId(body.variableId) || !createItemTaxSchema.conditionType(body.conditionType)) {
       return NextResponse.json({ error: 'variableId and conditionType required' }, { status: 400 });
     }
+    if (!createItemTaxSchema.conditionValues(body.conditionValues)) {
+      return NextResponse.json({ error: 'conditionValues must be an array of strings' }, { status: 400 });
+    }
     const supabase = supabaseServer();
 
     const row = {
       item_id: itemId,
       variable_id: body.variableId,
       condition_type: body.conditionType,
-      condition_value: body.conditionValue ?? null,
       condition_values: body.conditionValues ?? null,
       calculation_type: body.calculationType ?? null,
       priority: body.priority ?? 0,

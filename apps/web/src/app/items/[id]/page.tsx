@@ -509,13 +509,6 @@ const CONDITION_TYPES = [
   { id: "sales_type", name: "Sales" },
   { id: "expense", name: "Expense" },
 ] as const;
-const CONDITION_VALUES_SALES = [
-  { id: "on_site", name: "On site" },
-  { id: "delivery", name: "Delivery" },
-  { id: "takeaway", name: "Takeaway" },
-  { id: "catering", name: "Catering" },
-  { id: "other", name: "Other" },
-];
 
 function ItemTaxesSection({
   itemId,
@@ -523,22 +516,22 @@ function ItemTaxesSection({
   loading,
   onRefetch,
   taxVariableOptions,
-  formatDate,
+  salesTypeOptions,
 }: {
   itemId: string | undefined;
-  itemTaxesList: { id: number; variableId: number; conditionType: string; conditionValue?: string; calculationType?: string; priority: number; variableName?: string; variableValue?: number }[];
+  itemTaxesList: { id: number; variableId: number; conditionType: string; conditionValues?: string[]; calculationType?: string; priority: number; variableName?: string; variableValue?: number }[];
   loading: boolean;
   onRefetch: () => void;
   taxVariableOptions: { id: number; name: string; value: number }[];
-  formatDate: (d: string) => string;
+  salesTypeOptions: { id: string; name: string }[];
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [editRow, setEditRow] = useState<{ id: number; variableId: number; conditionType: string; conditionValue: string; calculationType: string } | null>(null);
+  const [editRow, setEditRow] = useState<{ id: number; variableId: number; conditionType: string; conditionValues: string[]; calculationType: string } | null>(null);
   const [applyPending, setApplyPending] = useState(false);
   const [addVariableId, setAddVariableId] = useState<number | "">("");
   const [addConditionType, setAddConditionType] = useState<string>("expense");
-  const [addConditionValue, setAddConditionValue] = useState<string>("");
+  const [addConditionValues, setAddConditionValues] = useState<string[]>([]);
   const [addCalculationType, setAddCalculationType] = useState<string>("inclusive");
   const [addSaving, setAddSaving] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
@@ -553,7 +546,7 @@ function ItemTaxesSection({
         body: JSON.stringify({
           variableId: addVariableId,
           conditionType: addConditionType,
-          conditionValue: addConditionType === "sales_type" ? addConditionValue || null : null,
+          conditionValues: addConditionType === "sales_type" ? (addConditionValues.length ? addConditionValues : null) : null,
           calculationType: addCalculationType,
         }),
       });
@@ -561,7 +554,7 @@ function ItemTaxesSection({
         setAddOpen(false);
         setAddVariableId("");
         setAddConditionType("expense");
-        setAddConditionValue("");
+        setAddConditionValues([]);
         setAddCalculationType("inclusive");
         onRefetch();
         toast.success("Tax added");
@@ -590,12 +583,12 @@ function ItemTaxesSection({
     }
   };
 
-  const startEdit = (row: { id: number; variableId: number; conditionType: string; conditionValue?: string; calculationType?: string }) => {
+  const startEdit = (row: { id: number; variableId: number; conditionType: string; conditionValues?: string[]; calculationType?: string }) => {
     setEditRow({
       id: row.id,
       variableId: row.variableId,
       conditionType: row.conditionType,
-      conditionValue: row.conditionValue ?? "",
+      conditionValues: row.conditionValues ?? [],
       calculationType: row.calculationType ?? "inclusive",
     });
   };
@@ -610,7 +603,7 @@ function ItemTaxesSection({
         body: JSON.stringify({
           variableId: editRow.variableId,
           conditionType: editRow.conditionType,
-          conditionValue: editRow.conditionType === "sales_type" ? editRow.conditionValue || null : null,
+          conditionValues: editRow.conditionType === "sales_type" ? (editRow.conditionValues.length ? editRow.conditionValues : null) : null,
           calculationType: editRow.calculationType,
         }),
       });
@@ -673,34 +666,78 @@ function ItemTaxesSection({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
         ) : itemTaxesList.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground rounded-md border border-dashed">
-            No taxes assigned. Add one manually or use &quot;Apply tax rules to this item&quot; to copy from global tax rules.
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-10 px-4 text-center">
+            <DollarSign className="h-10 w-10 text-muted-foreground/60 mb-3" />
+            <p className="text-sm font-medium text-muted-foreground">No taxes assigned</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-md">
+              Add one manually or use &quot;Apply tax rules to this item&quot; to copy from global tax rules.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleApplyTaxRules} disabled={applyPending}>
+                {applyPending ? "Applying…" : "Apply tax rules"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+                <Plus className="h-4 w-4 mr-1.5" />
+                Add tax
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="rounded-md border overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
+                  <th className="text-left font-medium p-3">Scope</th>
                   <th className="text-left font-medium p-3">Condition</th>
-                  <th className="text-left font-medium p-3">Variable</th>
+                  <th className="text-left font-medium p-3">Tax variable</th>
                   <th className="text-right font-medium p-3">Rate</th>
-                  <th className="text-left font-medium p-3">Calculation</th>
+                  <th className="text-left font-medium p-3">Method</th>
+                  <th className="text-right font-medium p-3">Priority</th>
                   <th className="w-[100px] text-right" />
                 </tr>
               </thead>
               <tbody>
                 {itemTaxesList.map((row) => (
                   <tr key={row.id} className="border-b last:border-0 hover:bg-muted/30">
-                    <td className="p-3">
-                      <Badge variant="outline">{row.conditionType === "expense" ? "Expense" : "Sales"}</Badge>
-                      {row.conditionType === "sales_type" && row.conditionValue && (
-                        <span className="ml-2 text-muted-foreground">{CONDITION_VALUES_SALES.find((c) => c.id === row.conditionValue)?.name ?? row.conditionValue}</span>
+                    <td className="p-3 align-middle">
+                      <Badge variant="outline" className="inline-flex items-center leading-none">
+                        {row.conditionType === "expense" ? "Expense" : "Sales"}
+                      </Badge>
+                    </td>
+                    <td className="p-3 align-middle text-muted-foreground">
+                      {row.conditionType === "sales_type" && row.conditionValues?.length
+                        ? row.conditionValues
+                            .map((v) => salesTypeOptions.find((c) => c.id === v)?.name ?? v)
+                            .join(", ")
+                        : "—"}
+                    </td>
+                    <td className="p-3 align-middle">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-medium">{row.variableName ?? `Variable #${row.variableId}`}</span>
+                      </div>
+                    </td>
+                    <td className="p-3 align-middle text-right tabular-nums">
+                      {row.variableValue != null ? (
+                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium tabular-nums">
+                          {row.variableValue}%
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="p-3">{row.variableName ?? `Variable #${row.variableId}`}</td>
-                    <td className="p-3 text-right font-medium tabular-nums">{row.variableValue != null ? `${row.variableValue}%` : "—"}</td>
-                    <td className="p-3">{row.calculationType === "inclusive" ? "Inclusive" : row.calculationType === "additive" ? "Additive" : "—"}</td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 align-middle">
+                      {row.calculationType === "inclusive" ? (
+                        <Badge variant="secondary" className="font-normal">Inclusive</Badge>
+                      ) : row.calculationType === "additive" ? (
+                        <Badge variant="secondary" className="font-normal">Additive</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="p-3 align-middle text-right tabular-nums">
+                      <span className="text-muted-foreground">{row.priority}</span>
+                    </td>
+                    <td className="p-3 align-middle text-right">
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => startEdit(row)}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -746,19 +783,27 @@ function ItemTaxesSection({
                   ))}
                 </select>
               </div>
+              {addConditionType !== "sales_type" && (
+                <p className="-mt-2 text-xs text-muted-foreground">
+                  No condition values for Expense. Choose <span className="font-medium">Sales</span> to target specific sales types.
+                </p>
+              )}
               {addConditionType === "sales_type" && (
                 <div>
                   <Label>Sales type</Label>
                   <select
                     className="w-full mt-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={addConditionValue}
-                    onChange={(e) => setAddConditionValue(e.target.value)}
+                    multiple
+                    value={addConditionValues}
+                    onChange={(e) =>
+                      setAddConditionValues(Array.from(e.target.selectedOptions).map((o) => o.value))
+                    }
                   >
-                    <option value="">Any</option>
-                    {CONDITION_VALUES_SALES.map((c) => (
+                    {salesTypeOptions.map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
+                  <p className="mt-1 text-xs text-muted-foreground">Optional. Select one or more; leave empty for all.</p>
                 </div>
               )}
               <div>
@@ -811,19 +856,31 @@ function ItemTaxesSection({
                     ))}
                   </select>
                 </div>
+                {editRow.conditionType !== "sales_type" && (
+                  <p className="-mt-2 text-xs text-muted-foreground">
+                    No condition values for Expense. Choose <span className="font-medium">Sales</span> to target specific sales types.
+                  </p>
+                )}
                 {editRow.conditionType === "sales_type" && (
                   <div>
                     <Label>Sales type</Label>
                     <select
                       className="w-full mt-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      value={editRow.conditionValue}
-                      onChange={(e) => setEditRow((r) => r ? { ...r, conditionValue: e.target.value } : null)}
+                      multiple
+                      value={editRow.conditionValues}
+                      onChange={(e) =>
+                        setEditRow((r) =>
+                          r
+                            ? { ...r, conditionValues: Array.from(e.target.selectedOptions).map((o) => o.value) }
+                            : null
+                        )
+                      }
                     >
-                      <option value="">Any</option>
-                      {CONDITION_VALUES_SALES.map((c) => (
+                      {salesTypeOptions.map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
+                    <p className="mt-1 text-xs text-muted-foreground">Optional. Select one or more; leave empty for all.</p>
                   </div>
                 )}
                 <div>
@@ -1015,7 +1072,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [costHistory, setCostHistory] = useState<PriceHistoryEntry[]>([]);
   const [supplierOrderPrices, setSupplierOrderPrices] = useState<{ id: number; unitPrice: number | null; quantity: number | null; unit: string; orderDate: string | null; orderNumber: string | null }[]>([]);
   const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
-  const [itemTaxesList, setItemTaxesList] = useState<{ id: number; variableId: number; conditionType: string; conditionValue?: string; calculationType?: string; priority: number; variableName?: string; variableValue?: number }[]>([]);
+  const [itemTaxesList, setItemTaxesList] = useState<{ id: number; variableId: number; conditionType: string; conditionValues?: string[]; calculationType?: string; priority: number; variableName?: string; variableValue?: number }[]>([]);
   const [itemTaxesLoading, setItemTaxesLoading] = useState(false);
   const { data: transactionTaxVars = [] } = useVariablesByType("transaction_tax");
   const { data: taxVars = [] } = useVariablesByType("tax");
@@ -1165,7 +1222,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     );
   }
 
-  const supplierName = item.vendorId && suppliersResponse?.data?.find(s => s.id === item.vendorId)?.name;
+  const supplierName = item.vendorId && suppliersResponse?.data?.find((s) => s.id === item.vendorId)?.name;
 
   return (
     <AppLayout>
@@ -1371,7 +1428,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           </Card>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Column - Main Content (8 columns) */}
             <div className="lg:col-span-8 space-y-6">
               {/* Hero Stock Card - Large Prominent Display */}
               <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
@@ -1639,27 +1695,27 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       <CardDescription>Selling price uses price history by effective date, or the item default. Add or edit entries below.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {resolvedParams?.id && (
-                        <HistoryEntryTable
-                          itemId={resolvedParams.id}
-                          type="sell"
-                          entries={sellHistory}
-                          loading={priceHistoryLoading}
-                          onRefetch={() => fetchPriceHistory(resolvedParams.id)}
-                          formatCurrency={formatCurrency}
-                          formatDate={formatDate}
-                          taxPercent={applicableTaxes?.sales?.find((s) => s.conditionValue === "on_site")?.rate ?? 0}
-                          resolveTaxRateForDate={async (date) => {
-                            const r = await taxRulesApi.resolve({ context: 'sale', salesType: 'on_site', itemId: item.id, date });
-                            return r.rate;
-                          }}
-                          salesTypes={salesTypeValues.map((st) => ({ conditionValue: st, label: salesTypeLabels[st] ?? st }))}
-                          sellVatRates={[5.5, 10]}
-                          addLabel="Add"
-                          valueLabel="Price"
-                          emptyMessage="Track selling prices by effective date."
-                        />
-                      )}
+        {resolvedParams?.id && (
+          <HistoryEntryTable
+            itemId={resolvedParams.id}
+            type="sell"
+            entries={sellHistory}
+            loading={priceHistoryLoading}
+            onRefetch={() => fetchPriceHistory(resolvedParams.id)}
+            formatCurrency={formatCurrency}
+            formatDate={formatDate}
+            taxPercent={applicableTaxes?.sales?.find((s) => s.conditionValue === "on_site")?.rate ?? 0}
+            resolveTaxRateForDate={async (date) => {
+              const r = await taxRulesApi.resolve({ context: 'sale', salesType: 'on_site', itemId: item.id, date });
+              return r.rate;
+            }}
+            salesTypes={salesTypeValues.map((st) => ({ conditionValue: st, label: salesTypeLabels[st] ?? st }))}
+            sellVatRates={[5.5, 10]}
+            addLabel="Add"
+            valueLabel="Price"
+            emptyMessage="Track selling prices by effective date."
+          />
+        )}
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -1671,7 +1727,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     loading={itemTaxesLoading}
                     onRefetch={() => resolvedParams?.id && fetchItemTaxes(resolvedParams.id)}
                     taxVariableOptions={taxVariableOptions}
-                    formatDate={formatDate}
+                    salesTypeOptions={salesTypeMeta.map((s) => ({ id: s.name, name: s.label ?? s.name }))}
                   />
                 </TabsContent>
 
@@ -1737,16 +1793,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </Tabs>
             </div>
 
-            {/* Right Column - Sidebar (4 columns) */}
             <div className="lg:col-span-4 space-y-6">
-              {/* Item Information Card */}
               <Card>
                 <CardHeader>
                   <CardTitle>Item Details</CardTitle>
                   <CardDescription>Basic information</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Name */}
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">Name</label>
                     <div className="flex items-center gap-2 mt-1">
@@ -1755,7 +1808,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     </div>
                   </div>
 
-                  {/* SKU */}
                   {item.sku && (
                     <>
                       <Separator />
@@ -1766,7 +1818,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     </>
                   )}
 
-                  {/* Category */}
                   {item.category && (
                     <>
                       <Separator />
@@ -1777,7 +1828,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     </>
                   )}
 
-                  {/* Unit */}
                   {item.unit && (
                     <>
                       <Separator />
@@ -1788,7 +1838,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     </>
                   )}
 
-                  {/* Vendor */}
                   {supplierName && (
                     <>
                       <Separator />
@@ -1801,7 +1850,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     </>
                   )}
 
-                  {/* Produced From Recipe */}
                   {item.producedFromRecipeId && (
                     <>
                       <Separator />
@@ -1820,7 +1868,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
                   <Separator />
 
-                  {/* Metadata */}
                   <div className="space-y-2 text-xs text-muted-foreground">
                     <div>
                       <span className="font-medium">Created:</span> {formatDate(item.createdAt)}
@@ -1832,7 +1879,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 </CardContent>
               </Card>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Selling price (today)</CardTitle>
@@ -1847,7 +1894,10 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       if (inclPrice == null) return <p className="text-2xl font-semibold tabular-nums">—</p>;
                       return (
                         <>
-                          <p className="text-xl font-semibold tabular-nums">{formatCurrency(inclPrice)} <span className="text-xs font-normal text-muted-foreground">(incl. tax)</span></p>
+                          <p className="text-xl font-semibold tabular-nums">
+                            {formatCurrency(inclPrice)}{" "}
+                            <span className="text-xs font-normal text-muted-foreground">(incl. tax)</span>
+                          </p>
                           {exclPrice != null && rate > 0 && (
                             <div className="text-sm text-muted-foreground tabular-nums space-y-0.5">
                               <p>{formatCurrency(exclPrice)} excl. tax</p>
@@ -1859,9 +1909,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     })()}
                   </CardContent>
                 </Card>
+
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground" title="Weighted average of current stock; updated when supplier orders are received">
+                    <CardTitle
+                      className="text-sm font-medium text-muted-foreground"
+                      title="Weighted average of current stock; updated when supplier orders are received"
+                    >
                       Buying price (today)
                     </CardTitle>
                   </CardHeader>
@@ -1872,18 +1926,14 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       const costTaxIncludedFlag = resolvedPrice?.costTaxIncluded;
                       const ruleTaxInclusiveFlag = applicableTaxes?.expense?.taxInclusive;
                       const costIncl =
-                        costTaxIncludedFlag != null
-                          ? costTaxIncludedFlag
-                          : ruleTaxInclusiveFlag === true;
+                        costTaxIncludedFlag != null ? costTaxIncludedFlag : ruleTaxInclusiveFlag === true;
 
-                      if (raw == null) {
-                        return <p className="text-2xl font-semibold tabular-nums">—</p>;
-                      }
+                      if (raw == null) return <p className="text-2xl font-semibold tabular-nums">—</p>;
 
                       if (rate <= 0) {
                         return (
                           <p className="text-xl font-semibold tabular-nums">
-                            {formatCurrency(raw)}{' '}
+                            {formatCurrency(raw)}{" "}
                             <span className="text-xs font-normal text-muted-foreground">(no tax)</span>
                           </p>
                         );
@@ -1895,7 +1945,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       return (
                         <>
                           <p className="text-xl font-semibold tabular-nums">
-                            {formatCurrency(inclPrice)}{' '}
+                            {formatCurrency(inclPrice)}{" "}
                             <span className="text-xs font-normal text-muted-foreground">(incl. tax)</span>
                           </p>
                           {exclPrice != null && (
@@ -1910,79 +1960,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   </CardContent>
                 </Card>
               </div>
-
-              {applicableTaxes && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Applicable tax (from rules)</CardTitle>
-                    <CardDescription className="text-xs">Selling = price incl. tax. Cost = price incl. tax (when rule applies).</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1.5">Selling</p>
-                      <div className="space-y-1">
-                        {applicableTaxes.sales.map((s) => (
-                          <div key={s.conditionValue} className="flex justify-between">
-                            <span className="text-muted-foreground">{s.label}</span>
-                            <span className="tabular-nums font-medium">
-                              {s.rate === 0 ? "0% (Exempt)" : `${s.rate}%${s.variableName ? ` (${s.variableName})` : ""}`}
-                              {s.rate > 0 && (
-                                <span className="text-muted-foreground font-normal ml-1">
-                                  — {s.taxInclusive !== false ? "Inclusive" : "Additive"}
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {applicableTaxes.expense != null && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1.5">Cost</p>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Expense</span>
-                          <span className="tabular-nums font-medium">
-                            {applicableTaxes.expense.rate === 0
-                              ? "0% (Exempt)"
-                              : `${applicableTaxes.expense.rate}%${applicableTaxes.expense.variableName ? ` (${applicableTaxes.expense.variableName})` : ""}`}
-                            {applicableTaxes.expense.rate > 0 && (
-                              <span className="text-muted-foreground font-normal ml-1">
-                                — {applicableTaxes.expense.taxInclusive !== false ? "Inclusive" : "Additive"}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Description & Notes */}
-              {(item.description || item.notes) && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Additional Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {item.description && (
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground mb-2 block">Description</label>
-                        <p className="text-sm whitespace-pre-wrap">{item.description}</p>
-                      </div>
-                    )}
-                    {item.notes && (
-                      <>
-                        {item.description && <Separator />}
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-2 block">Notes</label>
-                          <p className="text-sm whitespace-pre-wrap">{item.notes}</p>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </div>
         )}
