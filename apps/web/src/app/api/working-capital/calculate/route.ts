@@ -7,11 +7,15 @@ import { calculateWorkingCapital } from '@/lib/calculations/financial-statements
 import type { WorkingCapital, Sale } from '@kit/types';
 
 function transformSale(row: any): Sale {
+  const subtotal = row.subtotal != null ? parseFloat(row.subtotal) : 0;
+  const totalTax = row.total_tax != null ? parseFloat(row.total_tax) : 0;
+  const totalDiscount = row.total_discount != null ? parseFloat(row.total_discount) : 0;
+  const amount = Math.round((subtotal + totalTax - totalDiscount) * 100) / 100;
   return {
     id: row.id,
     date: row.date,
     type: row.type,
-    amount: parseFloat(row.amount),
+    amount,
     description: row.description,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

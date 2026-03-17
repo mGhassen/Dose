@@ -3,7 +3,7 @@
  * Used by the cron (or triggered) processor route.
  *
  * Square → app mapping (orders):
- * - Order totals: net_amounts.total_money, tax_money, discount_money → sales.amount, total_tax, total_discount, subtotal.
+ * - Order totals: net_amounts → sales.subtotal, total_tax, total_discount (amount = subtotal + total_tax - total_discount).
  * - Line item: base_price_money (per-unit), total_money, total_tax_money, catalog_object_id → item_id via integration_entity_mapping.
  * - Tax inclusion: order.taxes[].type === 'INCLUSIVE' → sale_line_items.tax_included true; else ADDITIVE/unknown → false/null.
  */
@@ -363,7 +363,6 @@ export async function processSyncJob(
           .insert({
             date: dateStr,
             type: 'retail',
-            amount,
             subtotal,
             total_tax: totalTax,
             total_discount: totalDiscount,

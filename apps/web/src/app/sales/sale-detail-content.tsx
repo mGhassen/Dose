@@ -46,6 +46,13 @@ import { lineTaxAmount, to2Decimals, netUnitPriceFromInclusive, unitPriceExclToI
 import { taxRulesApi } from "@kit/lib";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
+function displayTaxRate(pct: number): number {
+  if (pct <= 0) return 0;
+  if (Math.abs(pct - 10) <= 0.5) return 10;
+  if (Math.abs(pct - 5.5) <= 0.5) return 5.5;
+  return pct;
+}
+
 interface SaleDetailContentProps {
   saleId: string;
   initialEditMode?: boolean;
@@ -888,7 +895,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                             <td className="p-2 text-right tabular-nums">
                               {formatCurrency(displayTaxAmount)}{" "}
                               <span className="text-xs text-muted-foreground">
-                                ({rate.toFixed(1)}%)
+                                ({displayTaxRate(rate).toFixed(1)}%)
                               </span>
                             </td>
                             <td className="p-2 text-right tabular-nums">
@@ -912,7 +919,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                       Tax
                       {detailTotals.subtotal > 0 && (
                         <span className="ml-1 font-normal text-muted-foreground/80">
-                          ({((sale.totalTax / detailTotals.subtotal) * 100).toFixed(1)}%)
+                          ({displayTaxRate((sale.totalTax / detailTotals.subtotal) * 100).toFixed(1)}%)
                         </span>
                       )}
                     </span>

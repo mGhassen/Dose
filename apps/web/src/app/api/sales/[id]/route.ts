@@ -10,11 +10,15 @@ import { lineTaxAmount, netUnitPriceFromInclusive, unitPriceExclToIncl } from '@
 import { parseRequestBody, updateSaleTransactionSchema } from '@/shared/zod-schemas';
 
 function transformSale(row: any): Sale {
+  const subtotal = row.subtotal != null ? parseFloat(row.subtotal) : 0;
+  const totalTax = row.total_tax != null ? parseFloat(row.total_tax) : 0;
+  const totalDiscount = row.total_discount != null ? parseFloat(row.total_discount) : 0;
+  const amount = Math.round((subtotal + totalTax - totalDiscount) * 100) / 100;
   return {
     id: row.id,
     date: row.date,
     type: row.type,
-    amount: parseFloat(row.amount),
+    amount,
     description: row.description,
     subtotal: row.subtotal != null ? parseFloat(row.subtotal) : undefined,
     totalTax: row.total_tax != null ? parseFloat(row.total_tax) : undefined,
@@ -50,7 +54,6 @@ function transformToSnakeCase(data: UpdateSaleData): any {
   const result: any = { updated_at: new Date().toISOString() };
   if (data.date !== undefined) result.date = data.date;
   if (data.type !== undefined) result.type = data.type;
-  if (data.amount !== undefined) result.amount = data.amount;
   if (data.description !== undefined) result.description = data.description;
   if (data.subtotal !== undefined) result.subtotal = data.subtotal;
   if (data.totalTax !== undefined) result.total_tax = data.totalTax;
@@ -241,7 +244,6 @@ export async function PUT(
       .update({
         date: body.date,
         type: body.type,
-        amount: total,
         subtotal,
         total_tax: totalTax,
         total_discount: discountAmount,
