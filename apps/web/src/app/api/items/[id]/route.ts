@@ -23,6 +23,7 @@ function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item
     vendorId: row.vendor_id,
     notes: row.notes,
     producedFromRecipeId: row.produced_from_recipe_id,
+    isCatalogParent: row.is_catalog_parent ?? false,
   };
 }
 

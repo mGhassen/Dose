@@ -2,12 +2,13 @@ import { apiRequest } from './api';
 import type { Item, CreateItemData, UpdateItemData, PaginatedResponse, PaginationParams } from '@kit/types';
 
 export const itemsApi = {
-  getAll: (params?: PaginationParams & { includeRecipes?: boolean; producedOnly?: boolean }) => {
+  getAll: (params?: PaginationParams & { includeRecipes?: boolean; producedOnly?: boolean; excludeCatalogParents?: boolean }) => {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.includeRecipes) searchParams.append('includeRecipes', 'true');
     if (params?.producedOnly) searchParams.append('producedOnly', 'true');
+    if (params?.excludeCatalogParents) searchParams.append('excludeCatalogParents', 'true');
     const query = searchParams.toString();
     return apiRequest<PaginatedResponse<Item>>('GET', `/api/items${query ? `?${query}` : ''}`);
   },

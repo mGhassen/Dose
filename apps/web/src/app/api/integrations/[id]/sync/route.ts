@@ -92,7 +92,15 @@ async function fetchAndStageSquare(
   };
 
   if (syncType === 'catalog' || syncType === 'full') {
-    const catalogTypes = ['ITEM', 'ITEM_VARIATION', 'CATEGORY', 'MODIFIER', 'MODIFIER_LIST', 'TAX'];
+    const catalogTypes = [
+      'ITEM',
+      'ITEM_VARIATION',
+      'CATEGORY',
+      'MODIFIER',
+      'MODIFIER_LIST',
+      'TAX',
+      'MEASUREMENT_UNIT',
+    ];
     let catalogCursor: string | null = null;
     do {
       const catalogResponse: Response = await fetch(`${SQUARE_API_BASE}/v2/catalog/search`, {

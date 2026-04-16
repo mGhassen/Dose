@@ -23,6 +23,7 @@ import { AddSupplierDialog } from "@/components/add-supplier-dialog";
 import { useInventorySuppliers, useItems, useUnits, useVariablesByType } from "@kit/hooks";
 import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
+import { toast } from "sonner";
 import type { CreateSupplierOrderData, SupplierOrder, SupplierOrderItem, UpdateSupplierOrderData } from "@kit/types";
 import { SupplierOrderStatus } from "@kit/types";
 import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
@@ -153,6 +154,22 @@ export function SupplierOrderEditor(props: {
       items: [],
     };
   });
+
+  const lineErrors = useMemo(() => {
+    return state.items.map((it) => {
+      if (!it.itemId) return { ok: false, message: "Item is required" };
+      if (it.quantity <= 0) return { ok: false, message: "Quantity must be > 0" };
+      if (it.unitPrice < 0) return { ok: false, message: "Unit price must be >= 0" };
+      if (!it.unit) return { ok: false, message: "Unit is required" };
+      return { ok: true, message: "" };
+    });
+  }, [state.items]);
+
+  const isOrderValid = useMemo(() => {
+    if (!state.supplierId) return false;
+    if (state.items.length === 0) return false;
+    return lineErrors.every((e) => e.ok);
+  }, [state.supplierId, state.items.length, lineErrors]);
 
   const autoTaxSignature = useMemo(() => {
     return state.items
@@ -320,7 +337,11 @@ export function SupplierOrderEditor(props: {
   const submit = async () => {
     if (!state.supplierId) return;
     if (state.items.length === 0) return;
-    if (state.items.some((it) => !it.itemId || it.quantity <= 0 || it.unitPrice < 0 || !it.unit)) return;
+    if (!isOrderValid) {
+      const first = lineErrors.find((e) => !e.ok);
+      toast.error(first?.message ?? "Please complete the order form");
+      return;
+    }
 
     if (props.mode === "create") {
       await props.onSubmit({ kind: "create", data: supplierOrderStateToCreatePayload(state, defaultTaxRate) });
@@ -465,7 +486,7 @@ export function SupplierOrderEditor(props: {
             <Button
               type="button"
               onClick={submit}
-              disabled={!state.supplierId || state.items.length === 0}
+                disabled={!isOrderValid}
             >
               {props.submitLabel ?? (props.mode === "create" ? "Create order" : "Save changes")}
             </Button>
@@ -547,7 +568,9 @@ export function SupplierOrderEditor(props: {
                               value={it.unitId != null ? String(it.unitId) : ""}
                               onValueChange={(v) => updateItem(idx, { unitId: v ? Number(v) : undefined })}
                             >
-                              <SelectTrigger className="h-10">
+                              <SelectTrigger
+                                className={`h-10 ${!it.unit ? "border-destructive" : ""}`}
+                              >
                                 <SelectValue placeholder="Unit" />
                               </SelectTrigger>
                               <SelectContent>

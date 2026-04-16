@@ -53,6 +53,9 @@ export default function ItemsContent() {
           {row.original.itemType === 'item_and_product' && (
             <Badge variant="secondary" className="text-xs">Item & product</Badge>
           )}
+          {row.original.isCatalogParent && (
+            <Badge variant="outline" className="text-xs">Catalog group</Badge>
+          )}
         </div>
       ),
     },

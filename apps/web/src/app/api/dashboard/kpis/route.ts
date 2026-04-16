@@ -6,10 +6,15 @@ import { supabaseServer } from '@kit/lib/supabase';
 import { getMonthsInRange } from '@kit/lib/date-periods';
 
 function transformSale(row: any) {
+  const subtotal = row.subtotal != null ? parseFloat(row.subtotal) : null;
+  const totalTax = row.total_tax != null ? parseFloat(row.total_tax) : 0;
+  const totalDiscount = row.total_discount != null ? parseFloat(row.total_discount) : 0;
+  const headerTotal =
+    Math.round(((subtotal ?? 0) + totalTax - totalDiscount) * 100) / 100;
   return {
     date: row.date,
-    amount: parseFloat(row.amount),
-    subtotal: row.subtotal != null ? parseFloat(row.subtotal) : null,
+    amount: headerTotal,
+    subtotal,
   };
 }
 
@@ -78,7 +83,7 @@ export async function GET(request: NextRequest) {
     while (salesHasMore) {
       const { data: salesPageData, error: salesErr } = await supabase
         .from('sales')
-        .select('date, amount, subtotal')
+        .select('date, subtotal, total_tax, total_discount')
         .gte('date', startDate)
         .lte('date', endDate)
         .range(salesPage * salesPageSize, (salesPage + 1) * salesPageSize - 1);

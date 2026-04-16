@@ -54,6 +54,8 @@ interface UnifiedSelectorProps {
   className?: string;
   renderItem?: (item: UnifiedSelectorItem, isSelected?: boolean) => React.ReactNode;
   getDisplayName?: (item: UnifiedSelectorItem) => string;
+  /** When type is item, exclude Square catalog parent rows unless true (default false). */
+  includeCatalogParents?: boolean;
 }
 
 export function UnifiedSelector({
@@ -80,6 +82,7 @@ export function UnifiedSelector({
   manageLink,
   renderItem,
   getDisplayName,
+  includeCatalogParents = false,
   id,
   className
 }: UnifiedSelectorProps) {
@@ -88,6 +91,11 @@ export function UnifiedSelector({
   const commandListRef = useRef<HTMLDivElement>(null);
   const selectedItemRef = useRef<HTMLDivElement>(null);
   const tCommon = useTranslations('common');
+
+  const sourceItems =
+    type === 'item' && !includeCatalogParents
+      ? items.filter((item) => !(item as { isCatalogParent?: boolean }).isCatalogParent)
+      : items;
 
   const filterItems = (list: UnifiedSelectorItem[]) =>
     list.filter(item => {
@@ -110,7 +118,7 @@ export function UnifiedSelector({
       );
     });
 
-  const filteredItems = filterItems(items);
+  const filteredItems = filterItems(sourceItems);
 
   const handleSelect = (item: UnifiedSelectorItem) => {
     setOpen(false);
@@ -262,12 +270,12 @@ export function UnifiedSelector({
   if (mode === 'single') {
     const hasSelectedId = selectedId != null && selectedId !== '' && (typeof selectedId === 'string' || !Number.isNaN(Number(selectedId)));
     const itemsIncludingPrefill = (() => {
-      if (!hasSelectedId || items.some(item => String(item.id) === String(selectedId))) return items;
+      if (!hasSelectedId || sourceItems.some(item => String(item.id) === String(selectedId))) return sourceItems;
       const stub: UnifiedSelectorItem = {
         id: selectedId,
         name: selectedDisplayName ?? `${tCommon('item')} ${selectedId}`,
       };
-      return [stub, ...items];
+      return [stub, ...sourceItems];
     })();
     const selectedItem = hasSelectedId ? itemsIncludingPrefill.find(item => String(item.id) === String(selectedId)) : null;
     const filteredSingle = filterItems(itemsIncludingPrefill);
@@ -489,7 +497,7 @@ export function UnifiedSelector({
       {selectedIds.length > 0 && (
         <div className="flex flex-wrap gap-2 mt-2">
           {selectedIds.map(itemId => {
-            const item = items.find((i) => String(i.id) === String(itemId));
+            const item = sourceItems.find((i) => String(i.id) === String(itemId)) ?? items.find((i) => String(i.id) === String(itemId));
             if (!item) return null;
             const name = getDisplayName ? getDisplayName(item) : (item.name || item.code || `${tCommon('item')} ${item.id}`);
             return (

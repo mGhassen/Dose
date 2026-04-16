@@ -98,7 +98,7 @@ export async function PUT(
         last_updated: new Date().toISOString(),
       })
       .eq('id', id)
-      .select()
+      .select('*, item:items(*)')
       .single();
 
     if (error) throw error;
@@ -109,7 +109,8 @@ export async function PUT(
       );
     }
 
-    return NextResponse.json(transformStockLevel(data));
+    const unitMap = await getUnitVariableMap(supabase as any, [data.item?.unit_id]);
+    return NextResponse.json(transformStockLevel(data, unitMap));
   } catch (error: any) {
     console.error('Error updating stock level:', error);
     return NextResponse.json(

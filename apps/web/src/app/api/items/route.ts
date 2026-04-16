@@ -27,6 +27,7 @@ function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item
     vendorId: row.vendor_id,
     notes: row.notes,
     producedFromRecipeId: row.produced_from_recipe_id,
+    isCatalogParent: row.is_catalog_parent ?? false,
   };
 }
 
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
     const itemType = searchParams.get('itemType');
     const includeRecipes = searchParams.get('includeRecipes') === 'true';
     const producedOnly = searchParams.get('producedOnly') === 'true';
+    const excludeCatalogParents = searchParams.get('excludeCatalogParents') === 'true';
 
     const supabase = supabaseServer();
 
@@ -85,6 +87,9 @@ export async function GET(request: NextRequest) {
     if (itemsError) throw itemsError;
 
     let allData: any[] = [...(itemsData || [])];
+    if (excludeCatalogParents) {
+      allData = allData.filter((r: any) => !r.is_catalog_parent);
+    }
     const unitMap = await getUnitVariableMap(
       supabase as any,
       (itemsData || []).map((r: any) => r.unit_id)

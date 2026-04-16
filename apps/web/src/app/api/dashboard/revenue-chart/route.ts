@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     while (hasMore) {
       const { data, error } = await supabase
         .from('sales')
-        .select('date, amount, subtotal')
+        .select('date, subtotal, total_tax, total_discount')
         .gte('date', startDate)
         .lte('date', endDate)
         .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -63,7 +63,11 @@ export async function GET(request: NextRequest) {
       (allSales || []).forEach((sale: any) => {
         const month = sale.date?.slice(0, 7);
         if (month && monthlyData[month] !== undefined) {
-          const amt = sale.subtotal != null ? parseFloat(sale.subtotal) : parseFloat(sale.amount);
+          const sub = sale.subtotal != null ? parseFloat(sale.subtotal) : null;
+          const tax = sale.total_tax != null ? parseFloat(sale.total_tax) : 0;
+          const disc = sale.total_discount != null ? parseFloat(sale.total_discount) : 0;
+          const headerTotal = Math.round(((sub ?? 0) + tax - disc) * 100) / 100;
+          const amt = sub != null ? sub : headerTotal;
           monthlyData[month] += amt;
         }
       });

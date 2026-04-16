@@ -9,6 +9,10 @@
  */
 
 import { getMappedAppEntityId, insertMapping, centsToDecimal } from './square-import';
+import {
+  getDefaultUnitVariableId,
+  resolveSquareMeasurementUnitId,
+} from './square-measurement-unit';
 import { upsertSellingPrice } from '@/lib/items/price-history-upsert';
 import { getItemCostAsOf } from '@/lib/items/price-resolve';
 
@@ -124,9 +128,7 @@ export async function processSyncJob(
     payments_failed: 0,
   };
 
-  let unitId: number | null = null;
-  const { data: unitRow } = await supabase.from('units').select('id').eq('symbol', 'unit').maybeSingle();
-  if (unitRow) unitId = unitRow.id;
+  const defaultUnitVariableId = await getDefaultUnitVariableId(supabase);
 
   const allCatalogObjects = getCatalogObjectsFromRows(stagingRows);
   if (allCatalogObjects.length > 0 && (syncType === 'catalog' || syncType === 'full')) {
@@ -152,34 +154,109 @@ export async function processSyncJob(
     const variationsMap = new Map<string, any[]>();
     const categoriesMap = new Map<string, any>();
     const taxInclusionByTaxId = new Map<string, 'ADDITIVE' | 'INCLUSIVE'>();
+    const measurementUnitMap = new Map<string, any>();
     for (const obj of allCatalogObjects) {
       if (obj?.type === 'ITEM') {
         itemsMap.set(obj.id, obj);
         if (!variationsMap.has(obj.id)) variationsMap.set(obj.id, []);
       } else if (obj?.type === 'ITEM_VARIATION') {
-        const itemId = obj.item_variation_data?.item_id;
-        if (itemId) {
-          if (!variationsMap.has(itemId)) variationsMap.set(itemId, []);
-          variationsMap.get(itemId)!.push(obj);
+        const iid = obj.item_variation_data?.item_id;
+        if (iid) {
+          if (!variationsMap.has(iid)) variationsMap.set(iid, []);
+          variationsMap.get(iid)!.push(obj);
         }
       } else if (obj?.type === 'CATEGORY') {
         categoriesMap.set(obj.id, obj);
       } else if (obj?.type === 'TAX') {
         const inc = obj.tax_data?.inclusion_type;
         if (inc === 'ADDITIVE' || inc === 'INCLUSIVE') taxInclusionByTaxId.set(obj.id, inc);
+      } else if (obj?.type === 'MEASUREMENT_UNIT' && obj.id) {
+        measurementUnitMap.set(obj.id, obj);
       }
     }
-    for (const [itemId, itemObj] of itemsMap) {
+
+    for (const obj of allCatalogObjects) {
+      if (obj?.type !== 'MODIFIER_LIST' || obj.is_deleted) continue;
+      const sqListId = obj.id;
+      try {
+        const existingList = await getMappedAppEntityId(supabase, integrationId, 'catalog_modifier_list', sqListId);
+        if (existingList != null) continue;
+        const { data: listRow, error: listErr } = await supabase
+          .from('modifier_lists')
+          .insert({
+            integration_id: integrationId,
+            square_modifier_list_id: sqListId,
+            name: obj.modifier_list_data?.name ?? null,
+            selection_type: obj.modifier_list_data?.selection_type ?? null,
+            ordinal: obj.modifier_list_data?.ordinal ?? null,
+            raw_payload: obj,
+          })
+          .select('id')
+          .single();
+        if (listErr) {
+          await recordImportError(supabase, jobId, 'catalog_modifier_list', sqListId, listErr.message);
+          continue;
+        }
+        await insertMapping(supabase, integrationId, 'catalog_modifier_list', sqListId, 'modifier_list', listRow.id);
+      } catch (e: any) {
+        await recordImportError(supabase, jobId, 'catalog_modifier_list', sqListId, e?.message || String(e));
+      }
+    }
+
+    for (const obj of allCatalogObjects) {
+      if (obj?.type !== 'MODIFIER' || obj.is_deleted) continue;
+      const sqModId = obj.id;
+      try {
+        const existingMod = await getMappedAppEntityId(supabase, integrationId, 'catalog_modifier', sqModId);
+        if (existingMod != null) continue;
+        const listSqId = obj.modifier_data?.modifier_list_id;
+        if (!listSqId) continue;
+        const listDbId = await getMappedAppEntityId(supabase, integrationId, 'catalog_modifier_list', listSqId);
+        if (listDbId == null) continue;
+        const priceCents = obj.modifier_data?.price_money?.amount;
+        const { data: modRow, error: modErr } = await supabase
+          .from('modifiers')
+          .insert({
+            modifier_list_id: listDbId,
+            square_modifier_id: sqModId,
+            name: obj.modifier_data?.name ?? null,
+            price_amount_cents: typeof priceCents === 'number' ? priceCents : null,
+            sort_order: obj.modifier_data?.ordinal ?? 0,
+            raw_payload: obj,
+          })
+          .select('id')
+          .single();
+        if (modErr) {
+          await recordImportError(supabase, jobId, 'catalog_modifier', sqModId, modErr.message);
+          continue;
+        }
+        await insertMapping(supabase, integrationId, 'catalog_modifier', sqModId, 'modifier', modRow.id);
+      } catch (e: any) {
+        await recordImportError(supabase, jobId, 'catalog_modifier', sqModId, e?.message || String(e));
+      }
+    }
+
+    for (const [squareItemId, itemObj] of itemsMap) {
       if (itemObj.is_deleted) continue;
-      const variations = variationsMap.get(itemId) || [];
+      const variations = (variationsMap.get(squareItemId) || []).filter((v: any) => !v.is_deleted);
       const categoryId = itemObj.item_data?.category_id;
       const categoryName = categoryId ? (categoriesMap.get(categoryId)?.category_data?.name || '') : '';
       const itemName = itemObj.item_data?.name || 'Unnamed';
       const itemDesc = itemObj.item_data?.description || '';
 
+      const taxIds = itemObj.item_data?.tax_ids ?? [];
+      const taxIncludedForItem =
+        taxIds.length > 0
+          ? taxIds.some((tid: string) => taxInclusionByTaxId.get(tid) === 'INCLUSIVE')
+            ? true
+            : taxIds.every((tid: string) => taxInclusionByTaxId.get(tid) === 'ADDITIVE')
+              ? false
+              : undefined
+          : undefined;
+
       if (variations.length === 0) {
         try {
-          const existing = await getMappedAppEntityId(supabase, integrationId, 'catalog_item', itemId);
+          const existing = await getMappedAppEntityId(supabase, integrationId, 'catalog_item', squareItemId);
           if (existing != null) continue;
           const { data: newItem, error: insertErr } = await supabase
             .from('items')
@@ -187,56 +264,153 @@ export async function processSyncJob(
               name: itemName,
               description: itemDesc,
               category: categoryName || null,
-              unit: 'unit',
-              unit_id: unitId,
+              unit_id: defaultUnitVariableId,
               item_type: 'product',
               is_active: true,
+              is_catalog_parent: false,
             })
             .select('id')
             .single();
           if (insertErr) {
-            await recordImportError(supabase, jobId, 'catalog_item', itemId, insertErr.message);
+            await recordImportError(supabase, jobId, 'catalog_item', squareItemId, insertErr.message);
             stats.items_failed += 1;
             continue;
           }
-          await insertMapping(supabase, integrationId, 'catalog_item', itemId, 'item', newItem.id);
+          await insertMapping(supabase, integrationId, 'catalog_item', squareItemId, 'item', newItem.id);
           stats.items_imported += 1;
         } catch (e: any) {
-          await recordImportError(supabase, jobId, 'catalog_item', itemId, e?.message || String(e));
+          await recordImportError(supabase, jobId, 'catalog_item', squareItemId, e?.message || String(e));
           stats.items_failed += 1;
+        }
+        continue;
+      }
+
+      let parentItemId: number | null = await getMappedAppEntityId(
+        supabase,
+        integrationId,
+        'catalog_item_parent',
+        squareItemId
+      );
+      if (parentItemId == null) {
+        try {
+          const { data: parentRow, error: parentErr } = await supabase
+            .from('items')
+            .insert({
+              name: itemName,
+              description: itemDesc || null,
+              category: categoryName || null,
+              unit_id: defaultUnitVariableId,
+              item_type: 'product',
+              is_active: true,
+              is_catalog_parent: true,
+            })
+            .select('id')
+            .single();
+          if (parentErr) {
+            await recordImportError(supabase, jobId, 'catalog_item_parent', squareItemId, parentErr.message);
+            stats.items_failed += 1;
+            continue;
+          }
+          parentItemId = parentRow.id as number;
+          await insertMapping(
+            supabase,
+            integrationId,
+            'catalog_item_parent',
+            squareItemId,
+            'item',
+            parentItemId
+          );
+          stats.items_imported += 1;
+        } catch (e: any) {
+          await recordImportError(supabase, jobId, 'catalog_item_parent', squareItemId, e?.message || String(e));
+          stats.items_failed += 1;
+          continue;
         }
       }
 
-      for (const variation of variations) {
-        if (variation.is_deleted) continue;
+      const modInfos = itemObj.item_data?.modifier_list_info || [];
+      for (let mi = 0; mi < modInfos.length; mi++) {
+        const info = modInfos[mi];
+        const listSqId = info?.modifier_list_id;
+        if (!listSqId) continue;
+        const listDbId = await getMappedAppEntityId(supabase, integrationId, 'catalog_modifier_list', listSqId);
+        if (listDbId == null || parentItemId == null) continue;
+        const { error: linkErr } = await supabase.from('item_modifier_list_links').upsert(
+          {
+            item_id: parentItemId,
+            modifier_list_id: listDbId,
+            min_selected: info.min_selected_modifiers ?? null,
+            max_selected: info.max_selected_modifiers ?? null,
+            enabled: info.enabled !== false,
+            modifier_overrides: info.modifier_overrides ?? null,
+            sort_order: mi,
+          },
+          { onConflict: 'item_id,modifier_list_id' }
+        );
+        if (linkErr) {
+          await recordImportError(
+            supabase,
+            jobId,
+            'item_modifier_list_link',
+            `${parentItemId}:${listDbId}`,
+            linkErr.message
+          );
+        }
+      }
+
+      for (let vi = 0; vi < variations.length; vi++) {
+        const variation = variations[vi];
         const variationId = variation.id;
+        const vData = variation.item_variation_data || {};
+        const displayName =
+          variations.length > 1 ? `${itemName} - ${vData.name || variationId}` : itemName;
+        const sku = vData.sku || null;
+        const priceCents = vData.price_money?.amount;
+        const muId = vData.measurement_unit_id as string | undefined;
+        const muObj = muId ? measurementUnitMap.get(muId) : null;
+
         try {
-          const existing = await getMappedAppEntityId(supabase, integrationId, 'catalog_variation', variationId);
-          if (existing != null) continue;
-          const vData = variation.item_variation_data || {};
-          const name = variations.length > 1 ? `${itemName} - ${vData.name || variationId}` : itemName;
-          const sku = vData.sku || null;
-          const priceCents = vData.price_money?.amount;
-          const taxIds = itemObj.item_data?.tax_ids ?? [];
-          const taxIncluded =
-            taxIds.length > 0
-              ? taxIds.some((tid: string) => taxInclusionByTaxId.get(tid) === 'INCLUSIVE')
-                ? true
-                : taxIds.every((tid: string) => taxInclusionByTaxId.get(tid) === 'ADDITIVE')
-                  ? false
-                  : undefined
-              : undefined;
+          const existingChild = await getMappedAppEntityId(supabase, integrationId, 'catalog_variation', variationId);
+          if (existingChild != null && parentItemId != null) {
+            const { data: ivRow } = await supabase
+              .from('item_variations')
+              .select('id')
+              .eq('variant_item_id', existingChild)
+              .maybeSingle();
+            if (!ivRow) {
+              await supabase.from('item_variations').insert({
+                parent_item_id: parentItemId,
+                variant_item_id: existingChild,
+                square_variation_id: variationId,
+                sort_order: vData.ordinal ?? vi,
+                name_snapshot: vData.name || null,
+              });
+            }
+            continue;
+          }
+          if (existingChild != null) continue;
+
+          const resolvedUnitId = muId
+            ? await resolveSquareMeasurementUnitId(
+                supabase,
+                integrationId,
+                muId,
+                muObj ?? null,
+                defaultUnitVariableId
+              )
+            : defaultUnitVariableId;
+
           const { data: newItem, error: insertErr } = await supabase
             .from('items')
             .insert({
-              name,
+              name: displayName,
               description: itemDesc || null,
               category: categoryName || null,
               sku,
-              unit: 'unit',
-              unit_id: unitId,
+              unit_id: resolvedUnitId,
               item_type: 'product',
               is_active: true,
+              is_catalog_parent: false,
             })
             .select('id')
             .single();
@@ -246,10 +420,20 @@ export async function processSyncJob(
             continue;
           }
           if (typeof priceCents === 'number' && priceCents >= 0) {
-            await upsertSellingPrice(supabase, newItem.id, today, centsToDecimal(priceCents), taxIncluded);
+            await upsertSellingPrice(supabase, newItem.id, today, centsToDecimal(priceCents), taxIncludedForItem);
           }
           await insertMapping(supabase, integrationId, 'catalog_variation', variationId, 'item', newItem.id);
           stats.items_imported += 1;
+
+          if (parentItemId != null) {
+            await supabase.from('item_variations').insert({
+              parent_item_id: parentItemId,
+              variant_item_id: newItem.id,
+              square_variation_id: variationId,
+              sort_order: vData.ordinal ?? vi,
+              name_snapshot: vData.name || null,
+            });
+          }
         } catch (e: any) {
           await recordImportError(supabase, jobId, 'catalog_variation', variationId, e?.message || String(e));
           stats.items_failed += 1;

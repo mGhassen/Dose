@@ -1016,6 +1016,8 @@ export interface Item {
   producedFromRecipeId?: number;
   defaultTaxRatePercent?: number;
   type?: string; // Variable type (same as in variables), e.g. unit, other
+  /** Square catalog: parent row for a product with variations (not a sellable SKU). */
+  isCatalogParent?: boolean;
   // Recipe-specific fields (only when itemType === 'recipe')
   servingSize?: number;
   preparationTime?: number;
