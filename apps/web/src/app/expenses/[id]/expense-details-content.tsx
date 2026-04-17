@@ -235,15 +235,6 @@ export function ExpenseDetailContent({
     [formData.name, formData.category, formData.expenseDate, lineItems, total, paymentRows]
   );
 
-  const lineItemNameById = useMemo(() => {
-    const m = new Map<number, string>();
-    for (const i of selectorItems) {
-      const n = (i as { name?: string }).name;
-      if (n?.trim()) m.set(i.id, n);
-    }
-    return m;
-  }, [selectorItems]);
-
   useEffect(() => {
     if (!expense) return;
     setFormData({
@@ -895,9 +886,8 @@ export function ExpenseDetailContent({
                         const emb = Array.isArray(rawItem) ? rawItem[0] : rawItem;
                         const itemId = line.itemId ?? line.item_id ?? emb?.id;
                         const itemLabel =
-                          emb?.name ??
-                          (itemId != null ? lineItemNameById.get(itemId) : undefined) ??
-                          line.subscription?.name ??
+                          emb?.name?.trim() ??
+                          line.subscription?.name?.trim() ??
                           (itemId != null ? `Item #${itemId}` : "—");
                         const isItemLink = itemId != null && !line.subscription;
 

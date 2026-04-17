@@ -16,6 +16,8 @@ import {
   type PaymentSliceInput,
 } from '@/shared/zod-schemas';
 import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
+import { toPositiveItemId } from '@/lib/merge-selector-items';
+import { hydrateExpenseLineItemItems } from '@/lib/expenses/hydrate-expense-line-item-items';
 
 function transformLineItem(row: any): ExpenseLineItem {
   const subscription = row.subscription;
@@ -24,7 +26,7 @@ function transformLineItem(row: any): ExpenseLineItem {
   return {
     id: row.id,
     expenseId: row.expense_id,
-    itemId: row.item_id ?? undefined,
+    itemId: toPositiveItemId(row.item_id),
     subscriptionId: row.subscription_id ?? undefined,
     quantity: parseFloat(row.quantity),
     unitId: row.unit_id ?? undefined,
@@ -316,11 +318,9 @@ export async function POST(request: NextRequest) {
 
       const itemIds = [...new Set(lines.filter((l) => l.itemId != null && l.quantity > 0).map((l) => l.itemId!))];
       if (itemIds.length > 0) {
-        const { data: items } = await supabase.from('items').select('id, unit').in('id', itemIds);
-        const unitByItemId = new Map((items || []).map((i) => [i.id, i.unit || 'unit']));
         for (const l of lines) {
           if (!l.itemId || l.quantity <= 0) continue;
-          const unit = unitByItemId.get(l.itemId) ?? 'unit';
+          const unit = 'unit';
           const { error: outError } = await supabase.from('stock_movements').insert({
             item_id: l.itemId,
             movement_type: StockMovementType.OUT,
@@ -335,8 +335,12 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_types), subscription:subscriptions(id, name)').eq('expense_id', expenseRow.id).order('sort_order', { ascending: true });
-      const lineItems = (lineRows || []).map(transformLineItem);
+      const { data: lineRows } = await supabase
+        .from('expense_line_items')
+        .select('*, subscription:subscriptions(id, name)')
+        .eq('expense_id', expenseRow.id)
+        .order('sort_order', { ascending: true });
+      const lineItems = await hydrateExpenseLineItemItems(supabase, (lineRows || []).map(transformLineItem));
       return NextResponse.json(transformExpense(expenseRow, lineItems), { status: 201 });
     }
 
@@ -378,8 +382,12 @@ export async function POST(request: NextRequest) {
       if (payErr) console.error('Error creating payments for expense entry:', payErr);
     }
 
-    const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_types), subscription:subscriptions(id, name)').eq('expense_id', data.id).order('sort_order', { ascending: true });
-    const lineItems = (lineRows || []).map(transformLineItem);
+    const { data: lineRows } = await supabase
+      .from('expense_line_items')
+      .select('*, subscription:subscriptions(id, name)')
+      .eq('expense_id', data.id)
+      .order('sort_order', { ascending: true });
+    const lineItems = await hydrateExpenseLineItemItems(supabase, (lineRows || []).map(transformLineItem));
     return NextResponse.json(transformExpense(data, lineItems), { status: 201 });
   } catch (error: any) {
     console.error('Error creating expense:', error);

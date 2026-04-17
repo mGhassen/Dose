@@ -4,7 +4,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Expense, UpdateExpenseData, ExpenseLineItem } from '@kit/types';
 import { parseRequestBody, updateExpenseSchema, type PaymentSliceInput } from '@/shared/zod-schemas';
+import { toPositiveItemId } from '@/lib/merge-selector-items';
 import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
+import { hydrateExpenseLineItemItems } from '@/lib/expenses/hydrate-expense-line-item-items';
 
 function transformLineItem(row: any): ExpenseLineItem {
   const subscription = row.subscription;
@@ -13,7 +15,7 @@ function transformLineItem(row: any): ExpenseLineItem {
   return {
     id: row.id,
     expenseId: row.expense_id,
-    itemId: row.item_id ?? undefined,
+    itemId: toPositiveItemId(row.item_id),
     subscriptionId: row.subscription_id ?? undefined,
     quantity: parseFloat(row.quantity),
     unitId: row.unit_id ?? undefined,
@@ -200,8 +202,12 @@ async function updateExpenseAsTransaction(
     if (payErr) throw new Error(payErr);
   }
 
-  const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_types), subscription:subscriptions(id, name)').eq('expense_id', id).order('sort_order', { ascending: true });
-  const lineItems = (lineRows || []).map(transformLineItem);
+  const { data: lineRows } = await supabase
+    .from('expense_line_items')
+    .select('*, subscription:subscriptions(id, name)')
+    .eq('expense_id', id)
+    .order('sort_order', { ascending: true });
+  const lineItems = await hydrateExpenseLineItemItems(supabase, (lineRows || []).map(transformLineItem));
   return transformExpense(expenseRow, lineItems);
 }
 
@@ -228,15 +234,11 @@ export async function GET(
 
     const { data: lineRows } = await supabase
       .from('expense_line_items')
-      .select(`
-        *,
-        item:items(id, name, category, unit, unit_id, item_types),
-        subscription:subscriptions(id, name)
-      `)
+      .select('*, subscription:subscriptions(id, name)')
       .eq('expense_id', id)
       .order('sort_order', { ascending: true });
 
-    const lineItems = (lineRows || []).map(transformLineItem);
+    const lineItems = await hydrateExpenseLineItemItems(supabase, (lineRows || []).map(transformLineItem));
     return NextResponse.json(transformExpense(expenseRow, lineItems));
   } catch (error: any) {
     console.error('Error fetching expense:', error);
@@ -287,8 +289,12 @@ export async function PUT(
       throw error;
     }
 
-    const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_types)').eq('expense_id', id).order('sort_order', { ascending: true });
-    const lineItems = (lineRows || []).map(transformLineItem);
+    const { data: lineRows } = await supabase
+      .from('expense_line_items')
+      .select('*, subscription:subscriptions(id, name)')
+      .eq('expense_id', id)
+      .order('sort_order', { ascending: true });
+    const lineItems = await hydrateExpenseLineItemItems(supabase, (lineRows || []).map(transformLineItem));
     return NextResponse.json(transformExpense(data, lineItems));
   } catch (error: any) {
     console.error('Error updating expense:', error);

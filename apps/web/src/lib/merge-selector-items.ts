@@ -2,9 +2,18 @@
 type EmbeddedItem = { id?: number; name?: string; unit?: string; unitId?: number; category?: string } | null;
 
 export type LineWithOptionalItemEmbed = {
-  itemId?: number | null;
+  itemId?: number | string | null;
+  /** Snake_case when line objects are still raw from PostgREST */
+  item_id?: number | string | null;
   item?: EmbeddedItem | EmbeddedItem[] | null;
 };
+
+export function toPositiveItemId(raw: unknown): number | undefined {
+  if (raw == null || raw === "") return undefined;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return Math.trunc(n);
+}
 
 function normalizeEmbed(emb: EmbeddedItem | EmbeddedItem[] | null | undefined): EmbeddedItem | null {
   if (emb == null) return null;
@@ -19,15 +28,18 @@ export function mergeSelectorItemsWithLineEmbeds<T extends { id: number; name?: 
   base: T[],
   lines: LineWithOptionalItemEmbed[] | null | undefined
 ): T[] {
-  const map = new Map<number, T>(base.map((i) => [i.id, i]));
+  const map = new Map<number, T>(base.map((i) => [Number(i.id), i]));
   if (!lines?.length) return base;
   for (const li of lines) {
-    const id = li.itemId ?? undefined;
+    const id =
+      toPositiveItemId(li.itemId) ??
+      toPositiveItemId(li.item_id) ??
+      toPositiveItemId(normalizeEmbed(li.item ?? null)?.id);
     if (id == null) continue;
     if (map.has(id)) continue;
     const emb = normalizeEmbed(li.item ?? null);
     const name = emb?.name?.trim() ? emb.name : `Item #${id}`;
-    map.set(id, { id, ...emb, name } as T);
+    map.set(id, { ...emb, id, name } as T);
   }
   return Array.from(map.values());
 }
