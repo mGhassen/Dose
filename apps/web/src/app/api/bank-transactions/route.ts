@@ -9,6 +9,10 @@ export async function GET(request: NextRequest) {
     const fromDate = searchParams.get('from_date');
     const toDate = searchParams.get('to_date');
     const reconciled = searchParams.get('reconciled');
+    const q = searchParams.get('q')?.trim();
+    const minAmount = searchParams.get('min_amount');
+    const maxAmount = searchParams.get('max_amount');
+    const reconciledEntityType = searchParams.get('reconciled_entity_type')?.trim();
     const sortBy = searchParams.get('sort_by') ?? 'execution_date';
     const sortOrder = searchParams.get('sort_order') ?? 'desc';
     const { page, limit, offset } = getPaginationParams(searchParams);
@@ -28,6 +32,20 @@ export async function GET(request: NextRequest) {
     if (toDate) query = query.lte('execution_date', toDate);
     if (reconciled === 'true') query = query.not('reconciled_entity_type', 'is', null);
     if (reconciled === 'false') query = query.is('reconciled_entity_type', null);
+    if (reconciledEntityType) query = query.eq('reconciled_entity_type', reconciledEntityType);
+    if (minAmount != null && minAmount !== '') {
+      const n = Number(minAmount);
+      if (!Number.isNaN(n)) query = query.gte('amount', n);
+    }
+    if (maxAmount != null && maxAmount !== '') {
+      const n = Number(maxAmount);
+      if (!Number.isNaN(n)) query = query.lte('amount', n);
+    }
+    if (q) {
+      const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const pattern = `%${esc(q)}%`;
+      query = query.or(`label.ilike."${pattern}",counterparty_name.ilike."${pattern}"`);
+    }
 
     const { data, error, count } = await query.range(offset, offset + limit - 1);
     if (error) {

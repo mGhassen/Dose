@@ -22,7 +22,7 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { StockMovementType } from "@kit/types";
-import { Save, X, Trash2, MoreVertical, Edit2, Package, TrendingUp, TrendingDown, Plus, DollarSign, ChevronRight } from "lucide-react";
+import { Save, X, Trash2, MoreVertical, Edit2, Package, TrendingUp, TrendingDown, Plus, DollarSign, ChevronRight, Link2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import { Separator } from "@kit/ui/separator";
 import {
@@ -41,7 +41,7 @@ import {
 } from 'recharts';
 import AppLayout from "@/components/app-layout";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
-import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum, useVariablesByType } from "@kit/hooks";
+import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum, useVariablesByType, useRecipes, useUpdateRecipe } from "@kit/hooks";
 import type { ItemKind } from "@kit/types";
 
 function toggleItemKind(current: ItemKind[], k: ItemKind): ItemKind[] {
@@ -55,7 +55,7 @@ const ITEM_KIND_OPTIONS: { id: ItemKind; label: string }[] = [
   { id: "modifier", label: "Modifier" },
 ];
 import { toast } from "sonner";
-import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
+import { dateToYYYYMMDD, taxRulesApi, recipesApi } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
 import { to2Decimals, netUnitPriceFromInclusive, unitPriceExclToIncl } from "@/lib/transaction-tax";
 import { formatDate } from "@kit/lib/date-format";
@@ -969,7 +969,11 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const { data: item, isLoading } = useItemById(resolvedParams?.id || "");
+  const [linkRecipeOpen, setLinkRecipeOpen] = useState(false);
+  const [linkRecipeId, setLinkRecipeId] = useState<number | null>(null);
+  const { data: item, isLoading, refetch: refetchItem } = useItemById(resolvedParams?.id || "");
+  const { data: recipesListResponse } = useRecipes({ page: 1, limit: 500 });
+  const updateRecipe = useUpdateRecipe();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const { data: stockMovementsResponse } = useStockMovements({ itemId: resolvedParams?.id || "", limit: 1000 });
   const updateItem = useUpdateItem();
@@ -1532,17 +1536,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </Card>
 
               {/* Quick Stats Row */}
-              <div className="grid grid-cols-3 gap-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs font-medium">Total Movements</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{stockMovementsResponse?.data?.length || 0}</div>
-                    <p className="text-xs text-muted-foreground">All time</p>
-                  </CardContent>
-                </Card>
+              <div className="grid grid-cols-2 gap-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-xs font-medium">Stock In</CardTitle>
@@ -2048,17 +2042,67 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     </>
                   )}
 
-                  {item.producedFromRecipeId && (
+                  {item.itemTypes?.includes("product") && !item.isCatalogParent && !isEditing && (
                     <>
                       <Separator />
                       <div>
-                        <label className="text-xs font-medium text-muted-foreground">Source Recipe</label>
-                        <div className="mt-2">
-                          <Link href={`/recipes/${item.producedFromRecipeId}`}>
-                            <Button variant="outline" size="sm" className="w-full">
-                              View Recipe
-                            </Button>
-                          </Link>
+                        <label className="text-xs font-medium text-muted-foreground">Recipe output</label>
+                        <div className="mt-2 flex flex-col gap-2">
+                          {item.producedFromRecipeId ? (
+                            <>
+                              <Link href={`/recipes/${item.producedFromRecipeId}`} className="w-full">
+                                <Button variant="outline" size="sm" className="w-full">
+                                  View recipe
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive"
+                                disabled={updateRecipe.isPending}
+                                onClick={async () => {
+                                  const rid = item.producedFromRecipeId;
+                                  if (!rid || !item.id) return;
+                                  try {
+                                    const recipe = await recipesApi.getById(String(rid));
+                                    const currentIds =
+                                      (recipe as { producedItems?: { id: number }[] }).producedItems?.map(
+                                        (p) => p.id
+                                      ) ?? [];
+                                    const nextIds = currentIds.filter((id) => id !== item.id);
+                                    await updateRecipe.mutateAsync({
+                                      id: String(rid),
+                                      data: { producedItemIds: nextIds },
+                                    });
+                                    await refetchItem();
+                                    toast.success("Unlinked from recipe");
+                                  } catch (e: unknown) {
+                                    toast.error(e instanceof Error ? e.message : "Failed to unlink");
+                                  }
+                                }}
+                              >
+                                Unlink from recipe
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button variant="outline" size="sm" className="w-full" asChild>
+                                <Link href={`/recipes/create?producedItemId=${item.id}`}>Create recipe</Link>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full"
+                                onClick={() => {
+                                  setLinkRecipeId(null);
+                                  setLinkRecipeOpen(true);
+                                }}
+                              >
+                                <Link2 className="mr-2 h-4 w-4" />
+                                Link existing recipe
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </>
@@ -2166,6 +2210,68 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
             </div>
           </div>
         )}
+        <Dialog
+          open={linkRecipeOpen}
+          onOpenChange={(open) => {
+            setLinkRecipeOpen(open);
+            if (!open) setLinkRecipeId(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Link to recipe</DialogTitle>
+              <DialogDescription>
+                This product will be added as an output of the recipe you select.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <UnifiedSelector
+                label="Recipe"
+                type="recipe"
+                items={(recipesListResponse?.data ?? []).map((r) => ({
+                  id: r.id,
+                  name: r.name,
+                }))}
+                selectedId={linkRecipeId ?? undefined}
+                onSelect={(sel) => setLinkRecipeId(sel.id === 0 ? null : Number(sel.id))}
+                placeholder="Select recipe"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setLinkRecipeOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={!linkRecipeId || !item?.id || updateRecipe.isPending}
+                onClick={async () => {
+                  if (!linkRecipeId || !item?.id) return;
+                  try {
+                    const recipe = await recipesApi.getById(String(linkRecipeId));
+                    const currentIds =
+                      (recipe as { producedItems?: { id: number }[] }).producedItems?.map((p) => p.id) ?? [];
+                    if (currentIds.includes(item.id)) {
+                      toast.error("Already linked to this recipe");
+                      return;
+                    }
+                    await updateRecipe.mutateAsync({
+                      id: String(linkRecipeId),
+                      data: { producedItemIds: [...currentIds, item.id] },
+                    });
+                    await refetchItem();
+                    setLinkRecipeOpen(false);
+                    setLinkRecipeId(null);
+                    toast.success("Linked to recipe");
+                  } catch (e: unknown) {
+                    toast.error(e instanceof Error ? e.message : "Failed to link");
+                  }
+                }}
+              >
+                Link
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <ConfirmationDialog
           open={isDeleteDialogOpen}
           onOpenChange={setIsDeleteDialogOpen}

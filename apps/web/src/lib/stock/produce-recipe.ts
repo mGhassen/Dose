@@ -88,6 +88,23 @@ export async function produceRecipe(
     if (!error) producedItem = data;
   }
 
+  if (!producedItem) {
+    const legacyId = recipeData.produced_item_id;
+    if (legacyId) {
+      const { data, error } = await supabase.from('items').select('*').eq('id', legacyId).single();
+      if (!error) producedItem = data;
+    }
+  }
+  if (!producedItem) {
+    const { data: byRecipe } = await supabase
+      .from('items')
+      .select('*')
+      .eq('produced_from_recipe_id', Number(recipeId))
+      .limit(1)
+      .maybeSingle();
+    if (byRecipe) producedItem = byRecipe;
+  }
+
   if (!producedItem && linkedItemIds.length === 0) {
     const name = (producedItemName ?? recipeData.name ?? '').trim();
     if (!name) throw new Error('Name of the item product is required when the recipe has no linked items.');
@@ -109,43 +126,6 @@ export async function produceRecipe(
     if (!newItem) throw new Error('Failed to create produced item');
     producedItem = newItem;
     await supabase.from('recipe_produced_items').insert({ recipe_id: Number(recipeId), item_id: newItem.id });
-  }
-
-  if (!producedItem) {
-    const legacyId = recipeData.produced_item_id;
-    if (legacyId) {
-      const { data, error } = await supabase.from('items').select('*').eq('id', legacyId).single();
-      if (!error) producedItem = data;
-    }
-    if (!producedItem) {
-      const { data: existingItem, error: itemCheckError } = await supabase
-        .from('items')
-        .select('*')
-        .eq('produced_from_recipe_id', Number(recipeId))
-        .single();
-      if (!itemCheckError && existingItem) producedItem = existingItem;
-      else if (itemCheckError?.code === 'PGRST116' && (producedItemName ?? recipeData.name)) {
-        const name = (producedItemName ?? recipeData.name ?? '').trim();
-        const { data: newItem, error: createErr } = await supabase
-          .from('items')
-          .insert({
-            name,
-            description: recipeData.description || `Produced from recipe: ${recipeData.name}`,
-            category: recipeData.category,
-            unit: recipeData.unit || 'serving',
-            unit_id: recipeData.unit_id,
-            produced_from_recipe_id: Number(recipeId),
-            item_types: ['product'],
-            is_active: true,
-          })
-          .select()
-          .single();
-        if (!createErr && newItem) {
-          producedItem = newItem;
-          await supabase.from('recipe_produced_items').insert({ recipe_id: Number(recipeId), item_id: newItem.id });
-        }
-      }
-    }
   }
 
   if (!producedItem) throw new Error('Produced item not found');

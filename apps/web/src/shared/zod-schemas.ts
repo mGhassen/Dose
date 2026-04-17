@@ -217,6 +217,36 @@ export const createExpenseSchema = z.object({
 });
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
 
+/** Body for POST /api/bank-transactions/:id/create-expense (orchestrates draft supplier order + expense + reconcile). */
+export const bankTransactionCreateExpenseBodySchema = createExpenseSchema.extend({
+  supplierOrderId: z.number().int().positive().optional(),
+});
+export type BankTransactionCreateExpenseBody = z.infer<typeof bankTransactionCreateExpenseBodySchema>;
+
+export const bankTransactionAllocatePaymentBodySchema = z.object({
+  entryId: z.number().int().positive(),
+  amount: z.number().positive("Amount must be positive"),
+  paymentDate: z.string().min(1, "Payment date is required"),
+  notes: z.string().optional(),
+  paymentMethod: paymentMethodEnum.optional(),
+});
+export type BankTransactionAllocatePaymentBody = z.infer<typeof bankTransactionAllocatePaymentBodySchema>;
+
+export const bankTransactionAllocateReceiptsBulkBodySchema = z.object({
+  allocations: z
+    .array(
+      z.object({
+        entryId: z.number().int().positive(),
+        amount: z.number().positive("Amount must be positive"),
+        notes: z.string().optional(),
+      })
+    )
+    .min(1, "At least one allocation is required"),
+  paymentDate: z.string().min(1, "Payment date is required"),
+  paymentMethod: paymentMethodEnum.optional(),
+});
+export type BankTransactionAllocateReceiptsBulkBody = z.infer<typeof bankTransactionAllocateReceiptsBulkBodySchema>;
+
 export const updateExpenseSchema = z.object({
   name: z.string().min(1).optional(),
   category: expenseCategoryEnum.optional(),
@@ -253,6 +283,10 @@ export const createSaleTransactionSchema = z.object({
   paymentSlices: z.array(paymentSliceSchema).min(1).optional(),
 });
 export type CreateSaleTransactionInput = z.infer<typeof createSaleTransactionSchema>;
+
+/** Body for POST /api/bank-transactions/:id/create-sale (same shape as create sale transaction; payments linked server-side). */
+export const bankTransactionCreateSaleBodySchema = createSaleTransactionSchema;
+export type BankTransactionCreateSaleBody = z.infer<typeof bankTransactionCreateSaleBodySchema>;
 
 export const updateSaleTransactionSchema = z.object({
   date: z.string().min(1).optional(),

@@ -1,5 +1,5 @@
 // Export utility hooks
-export * from './use-debounce';
+export { useDebounce } from './use-debounce';
 export * from './use-disclosure';
 export * from './use-mobile';
 export * from './use-auth';

@@ -4,6 +4,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Recipe, CreateRecipeData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
+import {
+  producedIdsFromCreateBody,
+  validateProducedOutputItems,
+  insertRecipeProducedLinks,
+} from '@/lib/recipes/produced-item-output-links';
 
 function transformRecipe(row: any): Recipe {
   return {
@@ -41,6 +46,13 @@ function transformToSnakeCase(data: CreateRecipeData): any {
   if (data.unitId != null) result.unit_id = data.unitId;
   if (data.producedItemId !== undefined) result.produced_item_id = data.producedItemId;
   return result;
+}
+
+function recipeInsertRow(body: CreateRecipeData): Record<string, unknown> {
+  const producedIds = producedIdsFromCreateBody(body);
+  const row = transformToSnakeCase(body) as Record<string, unknown>;
+  row.produced_item_id = producedIds.length === 1 ? producedIds[0] : null;
+  return row;
 }
 
 export async function GET(request: NextRequest) {
@@ -100,11 +112,11 @@ export async function POST(request: NextRequest) {
     const body = parsed.data as CreateRecipeData;
 
     const supabase = supabaseServer();
-    
-    // Insert recipe into recipes table
+    const producedIds = producedIdsFromCreateBody(body);
+
     const { data: recipeData, error: recipeError } = await supabase
       .from('recipes')
-      .insert(transformToSnakeCase(body))
+      .insert(recipeInsertRow(body))
       .select()
       .single();
 
@@ -152,6 +164,19 @@ export async function POST(request: NextRequest) {
         // Rollback: delete the recipe
         await supabase.from('recipes').delete().eq('id', recipeData.id);
         throw itemsError;
+      }
+    }
+
+    if (producedIds.length > 0) {
+      const v = await validateProducedOutputItems(supabase, producedIds, Number(recipeData.id));
+      if (!v.ok) {
+        await supabase.from('recipes').delete().eq('id', recipeData.id);
+        return NextResponse.json({ error: v.message }, { status: v.status });
+      }
+      const linkErr = await insertRecipeProducedLinks(supabase, Number(recipeData.id), producedIds);
+      if (linkErr.error) {
+        await supabase.from('recipes').delete().eq('id', recipeData.id);
+        throw new Error(linkErr.error);
       }
     }
 

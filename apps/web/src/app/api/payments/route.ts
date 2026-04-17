@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createPaymentSchema, type CreatePaymentInput } from '@/shared/zod-schemas';
+import { assertBankAllocationWithinCap } from '@/lib/ledger/bank-allocation-cap';
 
 export interface Payment {
   id: number;
@@ -82,40 +83,6 @@ async function resolveDocumentEntryId(
     .limit(1);
   if (error) throw error;
   return rows?.[0]?.id ?? null;
-}
-
-async function assertBankAllocationWithinCap(
-  supabase: ReturnType<typeof supabaseServer>,
-  bankTransactionId: number,
-  additionalAmount: number,
-  excludePaymentId?: number
-) {
-  const { data: bt, error: btErr } = await supabase
-    .from('bank_transactions')
-    .select('amount')
-    .eq('id', bankTransactionId)
-    .single();
-  if (btErr || !bt) {
-    return { ok: false as const, status: 404 as const, message: 'Bank transaction not found' };
-  }
-  let q = supabase.from('payments').select('id, amount').eq('bank_transaction_id', bankTransactionId);
-  const { data: slices, error: sumErr } = await q;
-  if (sumErr) throw sumErr;
-  let sumExisting = 0;
-  for (const r of slices || []) {
-    if (excludePaymentId != null && Number(r.id) === excludePaymentId) continue;
-    sumExisting += parseFloat(String(r.amount));
-  }
-  const cap = Math.abs(parseFloat(String(bt.amount)));
-  const total = sumExisting + additionalAmount;
-  if (total > cap + 0.005) {
-    return {
-      ok: false as const,
-      status: 400 as const,
-      message: `Allocations for this bank line exceed its amount (cap ${cap.toFixed(2)}, already ${sumExisting.toFixed(2)})`,
-    };
-  }
-  return { ok: true as const };
 }
 
 export async function GET(request: NextRequest) {

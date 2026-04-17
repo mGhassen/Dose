@@ -51,6 +51,8 @@ export const entriesApi = {
     entryType?: string; 
     category?: string; 
     month?: string;
+    fromDate?: string;
+    toDate?: string;
     includePayments?: boolean;
     referenceId?: number;
     scheduleEntryId?: number;
@@ -62,6 +64,8 @@ export const entriesApi = {
     if (params?.entryType) searchParams.append('entryType', params.entryType);
     if (params?.category) searchParams.append('category', params.category);
     if (params?.month) searchParams.append('month', params.month);
+    if (params?.fromDate) searchParams.append('fromDate', params.fromDate);
+    if (params?.toDate) searchParams.append('toDate', params.toDate);
     if (params?.includePayments) searchParams.append('includePayments', 'true');
     if (params?.referenceId) searchParams.append('referenceId', params.referenceId.toString());
     if (params?.scheduleEntryId) searchParams.append('scheduleEntryId', params.scheduleEntryId.toString());

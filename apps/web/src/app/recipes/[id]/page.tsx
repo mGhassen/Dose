@@ -951,14 +951,16 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
           <DialogHeader>
             <DialogTitle>Link to existing item</DialogTitle>
             <DialogDescription>
-              Select an item to use as this recipe&apos;s output. The item will be marked as produced by this recipe and used when you produce it.
+              Select a product SKU as this recipe&apos;s output. It will be marked as produced by this recipe and used when you produce it.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <UnifiedSelector
               label="Item"
               type="item"
-              items={allItems.filter((i) => i.itemTypes?.includes("item"))}
+              items={allItems.filter(
+                (i) => i.itemTypes?.includes("product") && !(i as { isCatalogParent?: boolean }).isCatalogParent
+              )}
               selectedId={linkItemId ?? undefined}
               onSelect={(sel) => setLinkItemId(sel.id === 0 ? null : Number(sel.id))}
               placeholder="Select item"

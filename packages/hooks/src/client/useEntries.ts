@@ -11,6 +11,8 @@ export function useEntries(params?: {
   entryType?: string; 
   category?: string; 
   month?: string;
+  fromDate?: string;
+  toDate?: string;
   includePayments?: boolean;
   referenceId?: number;
   scheduleEntryId?: number;

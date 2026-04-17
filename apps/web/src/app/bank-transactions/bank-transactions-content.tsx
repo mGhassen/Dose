@@ -4,10 +4,12 @@ import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
-import { useBankTransactions } from "@kit/hooks";
+import { useBankTransactions, useDebounce } from "@kit/hooks";
 import type { BankTransaction } from "@kit/lib";
 import { formatDate } from "@kit/lib/date-format";
 import { Card, CardContent } from "@kit/ui/card";
+import { Input } from "@kit/ui/input";
+import { Label } from "@kit/ui/label";
 import {
   Select,
   SelectContent,
@@ -43,10 +45,24 @@ export default function BankTransactionsContent({
   const [pageSize, setPageSize] = useState(20);
   const [reconciledFilter, setReconciledFilter] = useState<ReconciledFilter>("all");
   const [sortValue, setSortValue] = useState("date_desc");
+  const [listSearch, setListSearch] = useState("");
+  const [minAmount, setMinAmount] = useState("");
+  const [maxAmount, setMaxAmount] = useState("");
+  const [linkedEntityType, setLinkedEntityType] = useState<string>("all");
+  const debouncedListSearch = useDebounce(listSearch, 400);
 
   useEffect(() => {
     setPage(1);
-  }, [dateRange.startDate, dateRange.endDate, reconciledFilter, sortValue]);
+  }, [
+    dateRange.startDate,
+    dateRange.endDate,
+    reconciledFilter,
+    sortValue,
+    debouncedListSearch,
+    minAmount,
+    maxAmount,
+    linkedEntityType,
+  ]);
 
   const sortOption = SORT_OPTIONS.find((o) => o.value === sortValue) ?? SORT_OPTIONS[0];
   const { data, isLoading } = useBankTransactions({
@@ -57,6 +73,11 @@ export default function BankTransactionsContent({
     reconciled: reconciledFilter === "all" ? undefined : reconciledFilter,
     sort_by: sortOption.by,
     sort_order: sortOption.order,
+    q: debouncedListSearch.trim() || undefined,
+    min_amount: minAmount.trim() || undefined,
+    max_amount: maxAmount.trim() || undefined,
+    reconciled_entity_type:
+      linkedEntityType === "all" || !linkedEntityType ? undefined : linkedEntityType,
   });
 
   const list = data?.data ?? [];
@@ -198,6 +219,54 @@ export default function BankTransactionsContent({
             </CardContent>
           </Card>
         </div>
+        <Card>
+          <CardContent className="py-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="text-xs text-muted-foreground">Search label / counterparty</Label>
+              <Input
+                className="h-9"
+                value={listSearch}
+                onChange={(e) => setListSearch(e.target.value)}
+                placeholder="Server filter (debounced)…"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Min amount</Label>
+              <Input
+                className="h-9"
+                type="number"
+                step="0.01"
+                value={minAmount}
+                onChange={(e) => setMinAmount(e.target.value)}
+                placeholder="e.g. -500"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Max amount</Label>
+              <Input
+                className="h-9"
+                type="number"
+                step="0.01"
+                value={maxAmount}
+                onChange={(e) => setMaxAmount(e.target.value)}
+                placeholder="e.g. -10"
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2 lg:col-span-4">
+              <Label className="text-xs text-muted-foreground">Linked document type</Label>
+              <Select value={linkedEntityType} onValueChange={setLinkedEntityType}>
+                <SelectTrigger className="h-9 w-full max-w-xs">
+                  <SelectValue placeholder="Any" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any</SelectItem>
+                  <SelectItem value="sale">sale</SelectItem>
+                  <SelectItem value="expense">expense</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">

@@ -123,6 +123,8 @@ export async function GET(request: NextRequest) {
     const entryType = searchParams.get('entryType');
     const category = searchParams.get('category');
     const month = searchParams.get('month');
+    const fromDate = searchParams.get('fromDate');
+    const toDate = searchParams.get('toDate');
     const referenceId = searchParams.get('referenceId');
     const scheduleEntryId = searchParams.get('scheduleEntryId');
     const includePayments = searchParams.get('includePayments') === 'true';
@@ -180,6 +182,15 @@ export async function GET(request: NextRequest) {
       countQuery = countQuery
         .gte('entry_date', startOfMonth)
         .lte('entry_date', endDate);
+    }
+
+    if (fromDate) {
+      query = query.gte('entry_date', fromDate);
+      countQuery = countQuery.gte('entry_date', fromDate);
+    }
+    if (toDate) {
+      query = query.lte('entry_date', toDate);
+      countQuery = countQuery.lte('entry_date', toDate);
     }
 
     // Apply pagination

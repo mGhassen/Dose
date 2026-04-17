@@ -5,6 +5,12 @@ import { supabaseServer } from '@kit/lib/supabase';
 import type { Recipe, RecipeWithItems, UpdateRecipeData, RecipeItem } from '@kit/types';
 import { normalizeItemKinds } from '@kit/types';
 import { getItemSellingPriceAsOf } from '@/lib/items/price-resolve';
+import {
+  validateProducedOutputItems,
+  updateItemsProducedFromRecipe,
+  clearProducedFromRecipeOnItems,
+  syncRecipeProducedItemIdColumn,
+} from '@/lib/recipes/produced-item-output-links';
 
 function transformRecipe(row: any): Recipe {
   return {
@@ -232,13 +238,42 @@ export async function PUT(
     }
 
     if (body.producedItemIds !== undefined) {
+      const newIds = [...new Set(body.producedItemIds.filter((n) => typeof n === 'number'))];
+      const { data: oldLinkRows } = await supabase
+        .from('recipe_produced_items')
+        .select('item_id')
+        .eq('recipe_id', id);
+      const oldIds = (oldLinkRows || []).map((r: { item_id: number }) => r.item_id);
+
+      const v = await validateProducedOutputItems(supabase, newIds, Number(id));
+      if (!v.ok) {
+        return NextResponse.json({ error: v.message }, { status: v.status });
+      }
+
       await supabase.from('recipe_produced_items').delete().eq('recipe_id', id);
-      if (body.producedItemIds.length > 0) {
+      if (newIds.length > 0) {
         const { error: linkError } = await supabase.from('recipe_produced_items').insert(
-          body.producedItemIds.map((itemId: number) => ({ recipe_id: Number(id), item_id: itemId }))
+          newIds.map((itemId: number) => ({ recipe_id: Number(id), item_id: itemId }))
         );
         if (linkError) throw linkError;
       }
+
+      const removed = oldIds.filter((oid) => !newIds.includes(oid));
+      const clearErr = await clearProducedFromRecipeOnItems(supabase, Number(id), removed);
+      if (clearErr.error) throw new Error(clearErr.error);
+
+      const setErr = await updateItemsProducedFromRecipe(supabase, Number(id), newIds);
+      if (setErr.error) throw new Error(setErr.error);
+
+      const colErr = await syncRecipeProducedItemIdColumn(supabase, Number(id), newIds);
+      if (colErr.error) throw new Error(colErr.error);
+
+      const { data: refreshed, error: refErr } = await supabase
+        .from('recipes')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (!refErr && refreshed) recipeData = refreshed;
     }
 
     return NextResponse.json(transformRecipe(recipeData));

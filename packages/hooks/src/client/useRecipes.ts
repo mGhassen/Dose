@@ -55,11 +55,12 @@ export function useRecipeById(id: string) {
 
 export function useCreateRecipe() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: recipesApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['items'] });
     },
   });
 }
@@ -73,6 +74,7 @@ export function useUpdateRecipe() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       queryClient.invalidateQueries({ queryKey: ['recipes', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['items'] });
     },
   });
 }
