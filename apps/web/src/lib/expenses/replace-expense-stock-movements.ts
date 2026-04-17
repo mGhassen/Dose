@@ -35,20 +35,24 @@ export async function replaceExpenseStockMovements(
     (l) => l.itemId != null && l.quantity > 0 && l.subscriptionId == null
   );
   const ids = [...new Set(itemLines.map((l) => l.itemId!))];
-  const unitMap = new Map<number, string>();
+  const unitIdMap = new Map<number, number | null>();
   if (ids.length > 0) {
-    const { data: items, error: itemErr } = await supabase.from("items").select("id, unit").in("id", ids);
+    const { data: items, error: itemErr } = await supabase
+      .from("items")
+      .select("id, unit_id")
+      .in("id", ids);
     if (itemErr) return { ok: false, message: itemErr.message };
-    for (const row of items || []) unitMap.set(row.id, row.unit || "unit");
+    for (const row of items || []) unitIdMap.set(row.id, row.unit_id ?? null);
   }
 
   for (const l of itemLines) {
-    const unit = unitMap.get(l.itemId!) ?? "unit";
+    const unitId = unitIdMap.get(l.itemId!) ?? null;
     const { error: insErr } = await supabase.from("stock_movements").insert({
       item_id: l.itemId,
       movement_type: StockMovementType.IN,
       quantity: l.quantity,
-      unit,
+      unit: "unit",
+      unit_id: unitId,
       reference_type: StockMovementReferenceType.EXPENSE,
       reference_id: expenseId,
       movement_date: movementDate,

@@ -29,41 +29,61 @@ export async function replaceSaleStockMovements(
     .eq("reference_id", saleId);
   if (delErr) return { ok: false, message: delErr.message };
 
+  const rollback = async () => {
+    await supabase
+      .from("stock_movements")
+      .delete()
+      .eq("reference_type", StockMovementReferenceType.SALE)
+      .eq("reference_id", saleId);
+  };
+
   for (const l of lines) {
     if (!l.itemId || l.quantity <= 0) continue;
     const [itemResult, recipeResult] = await Promise.all([
-      supabase.from("items").select("id, unit, produced_from_recipe_id").eq("id", l.itemId).single(),
-      supabase.from("recipes").select("id, unit").eq("id", l.itemId).single(),
+      supabase
+        .from("items")
+        .select("id, unit_id, produced_from_recipe_id")
+        .eq("id", l.itemId)
+        .maybeSingle(),
+      supabase.from("recipes").select("id, unit_id").eq("id", l.itemId).maybeSingle(),
     ]);
+    if (itemResult.error) {
+      await rollback();
+      return { ok: false, message: itemResult.error.message };
+    }
+    if (recipeResult.error) {
+      await rollback();
+      return { ok: false, message: recipeResult.error.message };
+    }
+
     if (itemResult.data) {
-      const targetItemId = itemResult.data.id;
-      const unit = itemResult.data.unit || "unit";
       const { error: outError } = await supabase.from("stock_movements").insert({
-        item_id: targetItemId,
+        item_id: itemResult.data.id,
         movement_type: StockMovementType.OUT,
         quantity: l.quantity,
-        unit,
+        unit: "unit",
+        unit_id: itemResult.data.unit_id ?? null,
         reference_type: StockMovementReferenceType.SALE,
         reference_id: saleId,
         movement_date: movementDate,
         notes: `Sale #${saleId}`,
       });
       if (outError) {
-        await supabase
-          .from("stock_movements")
-          .delete()
-          .eq("reference_type", StockMovementReferenceType.SALE)
-          .eq("reference_id", saleId);
+        await rollback();
         return { ok: false, message: outError.message };
       }
     } else if (recipeResult.data) {
-      const { data: producedItem } = await supabase
+      const { data: producedItem, error: producedErr } = await supabase
         .from("items")
-        .select("id, unit")
+        .select("id, unit_id")
         .eq("produced_from_recipe_id", l.itemId)
-        .single();
+        .maybeSingle();
+      if (producedErr) {
+        await rollback();
+        return { ok: false, message: producedErr.message };
+      }
       let producedItemId: number;
-      let producedItemUnit: string;
+      let producedItemUnitId: number | null;
       if (!producedItem) {
         const result = await produceRecipe(supabase, String(l.itemId), {
           quantity: l.quantity,
@@ -71,10 +91,10 @@ export async function replaceSaleStockMovements(
           notes: `Sale #${saleId}`,
         });
         producedItemId = result.producedItemId;
-        producedItemUnit = recipeResult.data.unit || "unit";
+        producedItemUnitId = recipeResult.data.unit_id ?? null;
       } else {
         producedItemId = producedItem.id;
-        producedItemUnit = producedItem.unit || "unit";
+        producedItemUnitId = producedItem.unit_id ?? null;
         const stock = await getItemStock(supabase, producedItem.id, null);
         if (stock < l.quantity) {
           await produceRecipe(supabase, String(l.itemId), {
@@ -88,18 +108,15 @@ export async function replaceSaleStockMovements(
         item_id: producedItemId,
         movement_type: StockMovementType.OUT,
         quantity: l.quantity,
-        unit: producedItemUnit,
+        unit: "unit",
+        unit_id: producedItemUnitId,
         reference_type: StockMovementReferenceType.SALE,
         reference_id: saleId,
         movement_date: movementDate,
         notes: `Sale #${saleId}`,
       });
       if (recipeMoveErr) {
-        await supabase
-          .from("stock_movements")
-          .delete()
-          .eq("reference_type", StockMovementReferenceType.SALE)
-          .eq("reference_id", saleId);
+        await rollback();
         return { ok: false, message: recipeMoveErr.message };
       }
     }

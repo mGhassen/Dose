@@ -172,6 +172,8 @@ async function runProcessor(specificJobId?: number) {
       orders_failed: 0,
       payments_imported: 0,
       payments_failed: 0,
+      stock_reconciled: 0,
+      stock_reconcile_failed: 0,
     };
 
     try {
@@ -200,6 +202,8 @@ async function runProcessor(specificJobId?: number) {
         accumulatedStats.orders_failed += result.stats.orders_failed;
         accumulatedStats.payments_imported += result.stats.payments_imported;
         accumulatedStats.payments_failed += result.stats.payments_failed;
+        accumulatedStats.stock_reconciled += result.stats.stock_reconciled ?? 0;
+        accumulatedStats.stock_reconcile_failed += result.stats.stock_reconcile_failed ?? 0;
 
         const ids = rows.map((r: { id: number }) => r.id);
         await supabase

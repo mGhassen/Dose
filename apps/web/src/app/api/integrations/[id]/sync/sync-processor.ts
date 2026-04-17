@@ -123,6 +123,8 @@ export async function processSyncJob(
     orders_failed: 0,
     payments_imported: 0,
     payments_failed: 0,
+    stock_reconciled: 0,
+    stock_reconcile_failed: 0,
   };
 
   const stats: Record<string, number> = {
@@ -132,6 +134,8 @@ export async function processSyncJob(
     orders_failed: 0,
     payments_imported: 0,
     payments_failed: 0,
+    stock_reconciled: 0,
+    stock_reconcile_failed: 0,
   };
 
   const defaultUnitVariableId = await getDefaultUnitVariableId(supabase);
@@ -600,6 +604,7 @@ export async function processSyncJob(
       ordersStepSeq = stepSeq;
       await insertStep(supabase, jobId, stepSeq, 'Process orders', 'running', {});
     }
+    const touchedSales: { saleId: number; date: string }[] = [];
     for (const row of orderRows) {
       const order = row.payload;
       const orderId = order?.id || row.source_id;
@@ -789,15 +794,65 @@ export async function processSyncJob(
 
         await insertMapping(supabase, integrationId, 'order', orderId, 'sale', saleId);
         stats.orders_imported += 1;
+        touchedSales.push({ saleId, date: dateStr });
       } catch (e: any) {
         await recordImportError(supabase, jobId, 'order', orderId, e?.message || String(e));
         stats.orders_failed += 1;
       }
     }
+
+    if (touchedSales.length > 0) {
+      const reconcileSeq = await getNextStepSequence(supabase, jobId);
+      await insertStep(supabase, jobId, reconcileSeq, 'Reconcile sale stock movements', 'running', {
+        sales: touchedSales.length,
+      });
+      for (const { saleId, date } of touchedSales) {
+        const { data: linesFresh } = await supabase
+          .from('sale_line_items')
+          .select('item_id, quantity')
+          .eq('sale_id', saleId);
+        const lines: { itemId?: number; quantity: number }[] = (linesFresh || []).map(
+          (r: { item_id: number | null; quantity: number | string }) => ({
+            itemId: r.item_id ?? undefined,
+            quantity: Number(r.quantity) || 0,
+          })
+        );
+        const hasAnyMappedItem = lines.some((l) => l.itemId != null && l.quantity > 0);
+        if (!hasAnyMappedItem) {
+          await recordImportError(
+            supabase,
+            jobId,
+            'sale_stock',
+            String(saleId),
+            'No mapped line items (catalog mapping missing) — no stock movements created'
+          );
+          stats.stock_reconcile_failed += 1;
+          continue;
+        }
+        const res = await replaceSaleStockMovements(supabase as unknown as DbSupabaseClient, {
+          saleId,
+          movementDate: date,
+          lines,
+        });
+        if (!res.ok) {
+          await recordImportError(supabase, jobId, 'sale_stock', String(saleId), res.message);
+          stats.stock_reconcile_failed += 1;
+          continue;
+        }
+        stats.stock_reconciled += 1;
+      }
+      await completeStep(supabase, jobId, reconcileSeq, {
+        stock_reconciled: stats.stock_reconciled,
+        stock_reconcile_failed: stats.stock_reconcile_failed,
+      });
+    }
+
     await completeStep(supabase, jobId, ordersStepSeq, {
       rows: orderRows.length,
       orders_imported: stats.orders_imported,
       orders_failed: stats.orders_failed,
+      stock_reconciled: stats.stock_reconciled,
+      stock_reconcile_failed: stats.stock_reconcile_failed,
     });
   }
 
@@ -885,6 +940,8 @@ export async function processSyncJob(
     const totalOrdersFailed = accumulatedStats.orders_failed + stats.orders_failed;
     const totalPayments = accumulatedStats.payments_imported + stats.payments_imported;
     const totalPaymentsFailed = accumulatedStats.payments_failed + stats.payments_failed;
+    const totalStockReconciled = accumulatedStats.stock_reconciled + stats.stock_reconciled;
+    const totalStockReconcileFailed = accumulatedStats.stock_reconcile_failed + stats.stock_reconcile_failed;
     if (syncType === 'catalog' || syncType === 'full') {
       const seq = await getNextStepSequence(supabase, jobId);
       await insertStep(supabase, jobId, seq, 'Process catalog — complete', 'done', {
@@ -897,6 +954,8 @@ export async function processSyncJob(
       await insertStep(supabase, jobId, seq, 'Process orders — complete', 'done', {
         orders_imported: totalOrders,
         orders_failed: totalOrdersFailed,
+        stock_reconciled: totalStockReconciled,
+        stock_reconcile_failed: totalStockReconcileFailed,
       });
     }
     if (syncType === 'payments' || syncType === 'full') {
