@@ -7,7 +7,15 @@ import type { Expense, CreateExpenseData, PaginatedResponse, ExpenseLineItem } f
 import { StockMovementType, StockMovementReferenceType } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { z } from "zod";
-import { parseBody, createExpenseTransactionSchema, createExpenseSchema, type CreateExpenseTransactionInput, type CreateExpenseInput } from '@/shared/zod-schemas';
+import {
+  parseBody,
+  createExpenseTransactionSchema,
+  createExpenseSchema,
+  type CreateExpenseTransactionInput,
+  type CreateExpenseInput,
+  type PaymentSliceInput,
+} from '@/shared/zod-schemas';
+import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
 
 function transformLineItem(row: any): ExpenseLineItem {
   const subscription = row.subscription;
@@ -233,6 +241,11 @@ export async function POST(request: NextRequest) {
       }
       const amount = Math.round((subtotal + totalTax - discountAmount) * 100) / 100;
 
+      const slices = txBody.paymentSlices;
+      if (slices != null && slices.length > 0 && !paymentSlicesSumMatchesTotal(slices, amount)) {
+        return NextResponse.json({ error: 'Payment slices must sum to expense total' }, { status: 400 });
+      }
+
       const { data: expenseRow, error: insertError } = await supabase
         .from('expenses')
         .insert({
@@ -270,19 +283,34 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      const { error: entryError } = await supabase.from('entries').insert({
-        direction: 'output',
-        entry_type: 'expense',
-        name: txBody.name,
-        amount,
-        description: txBody.description,
-        category: txBody.category,
-        supplier_id: txBody.supplierId ?? null,
-        entry_date: txBody.expenseDate,
-        reference_id: expenseRow.id,
-        is_active: true,
-      });
+      const { data: entryInserted, error: entryError } = await supabase
+        .from('entries')
+        .insert({
+          direction: 'output',
+          entry_type: 'expense',
+          name: txBody.name,
+          amount,
+          description: txBody.description,
+          category: txBody.category,
+          supplier_id: txBody.supplierId ?? null,
+          entry_date: txBody.expenseDate,
+          reference_id: expenseRow.id,
+          is_active: true,
+        })
+        .select('id')
+        .single();
       if (entryError) console.error('Error creating entry for expense:', entryError);
+      else if (entryInserted?.id) {
+        const toPersist: PaymentSliceInput[] =
+          slices != null && slices.length > 0
+            ? slices
+            : [{ amount, paymentDate: txBody.expenseDate }];
+        const { error: payErr } = await replacePaymentsForEntry(supabase, entryInserted.id, toPersist);
+        if (payErr) {
+          console.error('Error creating payments for expense entry:', payErr);
+          return NextResponse.json({ error: 'Failed to persist payments', details: payErr }, { status: 500 });
+        }
+      }
 
       const itemIds = [...new Set(lines.filter((l) => l.itemId != null && l.quantity > 0).map((l) => l.itemId!))];
       if (itemIds.length > 0) {
@@ -321,7 +349,7 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
-    const { error: entryError } = await supabase
+    const { data: legacyEntry, error: entryError } = await supabase
       .from('entries')
       .insert({
         direction: 'output',
@@ -335,10 +363,17 @@ export async function POST(request: NextRequest) {
         entry_date: bodyLegacy.expenseDate,
         reference_id: data.id,
         is_active: true,
-      });
+      })
+      .select('id')
+      .single();
 
     if (entryError) {
       console.error('Error creating entry for expense:', entryError);
+    } else if (legacyEntry?.id) {
+      const { error: payErr } = await replacePaymentsForEntry(supabase, legacyEntry.id, [
+        { amount: bodyLegacy.amount, paymentDate: bodyLegacy.expenseDate },
+      ]);
+      if (payErr) console.error('Error creating payments for expense entry:', payErr);
     }
 
     const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_types), subscription:subscriptions(id, name)').eq('expense_id', data.id).order('sort_order', { ascending: true });

@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
 import { Plus, Trash2, MoreVertical } from "lucide-react";
-import { useCreateActualPayment, useDeleteActualPayment, useActualPayments } from "@kit/hooks";
+import { useCreatePayment, useDeletePayment, usePayments } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { dateToYYYYMMDD } from "@kit/lib";
@@ -34,34 +34,35 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
   const [showPayments, setShowPayments] = useState(false);
   const [dialogPaymentDate, setDialogPaymentDate] = useState<Date>(() => new Date());
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
-  
-  const { data: actualPayments } = useActualPayments({
-    paymentType: 'expense',
+
+  const { data: paymentsPage } = usePayments({
+    entryType: "expense",
     referenceId: String(projection.expenseId),
     month: projection.month,
+    limit: 500,
+    page: 1,
   });
-  
-  const totalPaid = actualPayments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+  const slicePayments = paymentsPage?.data ?? [];
+
+  const totalPaid = slicePayments.reduce((sum, p) => sum + p.amount, 0) || 0;
   const isFullyPaid = totalPaid >= projection.amount;
   const remainingToPay = Math.max(0, projection.amount - totalPaid);
-  
-  const createPayment = useCreateActualPayment();
-  const deletePayment = useDeleteActualPayment();
+
+  const createPayment = useCreatePayment();
+  const deletePayment = useDeletePayment();
 
   const handleAddPayment = async (paidDate: string, amount: number, notes?: string) => {
     try {
       await createPayment.mutateAsync({
-        paymentType: 'expense',
-        direction: 'output', // Expense payments are output (money going out)
+        entryType: "expense",
         referenceId: projection.expenseId,
-        month: projection.month,
         paymentDate: paidDate,
-        amount: amount,
+        amount,
         isPaid: true,
         paidDate: paidDate,
-        notes: notes,
+        notes,
       });
-      
+
       setIsPaidDialogOpen(false);
       onUpdate();
       toast.success("Payment recorded");
@@ -81,8 +82,8 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
     }
   };
 
-  const [year, month] = projection.month.split('-');
-  const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+  const [year, month] = projection.month.split("-");
+  const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
   const isProjected = projection.isProjected;
   const isPastDue = date < new Date() && !isFullyPaid;
 
@@ -93,10 +94,14 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
           <div className="flex items-center space-x-2">
             {formatMonthYear(date)}
             {isProjected && !isFullyPaid && (
-              <Badge variant="secondary" className="text-xs">(Projected)</Badge>
+              <Badge variant="secondary" className="text-xs">
+                (Projected)
+              </Badge>
             )}
             {totalPaid > 0 && (
-              <Badge variant="default" className="text-xs">(Actual)</Badge>
+              <Badge variant="default" className="text-xs">
+                (Actual)
+              </Badge>
             )}
           </div>
         </TableCell>
@@ -128,11 +133,11 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
                 <Plus className="mr-2 h-4 w-4" />
                 Add Payment
               </DropdownMenuItem>
-              {actualPayments && actualPayments.length > 0 && (
+              {slicePayments.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setShowPayments(!showPayments)}>
-                    {showPayments ? 'Hide' : 'Show'} Payments ({actualPayments.length})
+                    {showPayments ? "Hide" : "Show"} Payments ({slicePayments.length})
                   </DropdownMenuItem>
                 </>
               )}
@@ -140,27 +145,20 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
           </DropdownMenu>
         </TableCell>
       </TableRow>
-      
-      {/* Show partial payments */}
-      {showPayments && actualPayments && actualPayments.length > 0 && (
+
+      {showPayments && slicePayments.length > 0 && (
         <TableRow>
           <TableCell colSpan={4} className="bg-muted/30 p-4">
             <div className="space-y-2 py-2">
               <div className="text-sm font-medium">Partial Payments:</div>
-              {actualPayments.map((payment) => (
+              {slicePayments.map((payment) => (
                 <div key={payment.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2">
                     <span>{formatDate(payment.paymentDate)}</span>
                     <span className="font-semibold">{formatCurrency(payment.amount)}</span>
-                    {payment.notes && (
-                      <span className="text-muted-foreground">- {payment.notes}</span>
-                    )}
+                    {payment.notes && <span className="text-muted-foreground">- {payment.notes}</span>}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setPaymentToDelete(payment.id)}
-                  >
+                  <Button size="sm" variant="ghost" onClick={() => setPaymentToDelete(payment.id)}>
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
@@ -169,7 +167,7 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
           </TableCell>
         </TableRow>
       )}
-      
+
       <Dialog open={isPaidDialogOpen} onOpenChange={setIsPaidDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -199,36 +197,24 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
                 max={remainingToPay > 0 ? remainingToPay : projection.amount}
               />
               <p className="text-xs text-muted-foreground">
-                Total due: {formatCurrency(projection.amount)} | 
-                Already paid: {formatCurrency(totalPaid)} | 
-                Remaining: {formatCurrency(remainingToPay)}
+                Total due: {formatCurrency(projection.amount)} | Already paid: {formatCurrency(totalPaid)} | Remaining:{" "}
+                {formatCurrency(remainingToPay)}
               </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="paymentNotes">Notes (optional)</Label>
-              <Input
-                id="paymentNotes"
-                type="text"
-                placeholder="Payment reference, check number, etc."
-              />
+              <Input id="paymentNotes" type="text" placeholder="Payment reference, check number, etc." />
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsPaidDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setIsPaidDialogOpen(false)}>
               Cancel
             </Button>
             <Button
               onClick={() => {
-                const amountInput = document.getElementById('paymentAmount') as HTMLInputElement;
-                const notesInput = document.getElementById('paymentNotes') as HTMLInputElement;
-                handleAddPayment(
-                  dateToYYYYMMDD(dialogPaymentDate),
-                  parseFloat(amountInput?.value || '0'),
-                  notesInput?.value || undefined
-                );
+                const amountInput = document.getElementById("paymentAmount") as HTMLInputElement;
+                const notesInput = document.getElementById("paymentNotes") as HTMLInputElement;
+                handleAddPayment(dateToYYYYMMDD(dialogPaymentDate), parseFloat(amountInput?.value || "0"), notesInput?.value || undefined);
               }}
               disabled={createPayment.isPending}
             >
@@ -251,4 +237,3 @@ export function EditableExpenseTimelineRow({ projection, onUpdate }: EditableExp
     </>
   );
 }
-

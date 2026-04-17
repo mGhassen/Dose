@@ -28,6 +28,13 @@ export interface SaleCreateContentProps {
 import { lineTaxAmount, to2Decimals, netUnitPriceFromInclusive, unitPriceExclToIncl } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
 import { createSaleTransactionSchema } from "@/shared/zod-schemas";
+import {
+  DocumentPaymentSlicesEditor,
+  defaultPaymentSliceRows,
+  rowsToPaymentSlices,
+  type DocumentPaymentSliceRow,
+} from "@/components/document-payment-slices-editor";
+import { paymentSlicesSumMatchesTotal } from "@/lib/ledger/replace-entry-payments";
 
 export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps) {
   const router = useRouter();
@@ -95,6 +102,9 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
       modifiers: [],
     },
   ]);
+  const [paymentRows, setPaymentRows] = useState<DocumentPaymentSliceRow[]>(() =>
+    defaultPaymentSliceRows(0, dateToYYYYMMDD(now))
+  );
   const lineItemsRef = useRef(lineItems);
   lineItemsRef.current = lineItems;
 
@@ -439,6 +449,15 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
       }
     }
     const dateTimeIso = new Date(`${formData.date}T${formData.time}`).toISOString();
+    const slices = rowsToPaymentSlices(paymentRows);
+    if (!slices) {
+      toast.error("Each payment needs a positive amount and date");
+      return;
+    }
+    if (!paymentSlicesSumMatchesTotal(slices, total)) {
+      toast.error("Payment slices must sum to document total");
+      return;
+    }
     const payload = {
       date: dateTimeIso,
       type: formData.type as SalesType,
@@ -448,6 +467,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
         formData.discountValue && parseFloat(formData.discountValue) > 0
           ? { type: formData.discountType as "amount" | "percent", value: parseFloat(formData.discountValue) }
           : undefined,
+      paymentSlices: slices,
     };
     const parsed = createSaleTransactionSchema.safeParse(payload);
     if (!parsed.success) {
@@ -795,6 +815,13 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
               </div>
             )}
           </div>
+
+          <DocumentPaymentSlicesEditor
+            total={total}
+            defaultDate={formData.date}
+            rows={paymentRows}
+            onRowsChange={setPaymentRows}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>

@@ -8,6 +8,7 @@ import { upsertSellingPrice, upsertCost } from '@/lib/items/price-history-upsert
 import { getTaxRateAndRuleForSaleLineWithItemTaxes, getTaxRateAndRuleForExpenseLineWithItemTaxes } from '@/lib/item-taxes-resolve';
 import { lineTaxAmount, netUnitPriceFromInclusive, unitPriceExclToIncl } from '@/lib/transaction-tax';
 import { parseRequestBody, updateSaleTransactionSchema } from '@/shared/zod-schemas';
+import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
 
 function transformSale(row: any): Sale {
   const subtotal = row.subtotal != null ? parseFloat(row.subtotal) : 0;
@@ -251,6 +252,10 @@ export async function PUT(
     }
     const total = Math.round((subtotal + totalTax - discountAmount) * 100) / 100;
 
+    if (body.paymentSlices != null && body.paymentSlices.length > 0 && !paymentSlicesSumMatchesTotal(body.paymentSlices, total)) {
+      return NextResponse.json({ error: 'Payment slices must sum to sale total' }, { status: 400 });
+    }
+
     const { data: saleRow, error: updateError } = await supabase
       .from('sales')
       .update({
@@ -301,6 +306,14 @@ export async function PUT(
     const { data: entries } = await supabase.from('entries').select('id').eq('entry_type', 'sale').eq('reference_id', id);
     if (entries?.length) {
       await supabase.from('entries').update({ amount: total, updated_at: new Date().toISOString() }).eq('id', entries[0].id);
+    }
+
+    const entryId = entries?.[0]?.id;
+    if (entryId != null && body.paymentSlices != null) {
+      const { error: payErr } = await replacePaymentsForEntry(supabase, entryId, body.paymentSlices);
+      if (payErr) {
+        return NextResponse.json({ error: 'Failed to persist payments', details: payErr }, { status: 500 });
+      }
     }
 
     const { data: lineItemsData } = await supabase.from('sale_line_items').select('*').eq('sale_id', id).order('sort_order');

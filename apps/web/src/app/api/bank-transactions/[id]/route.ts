@@ -16,7 +16,18 @@ export async function GET(
     if (error || !data) {
       return NextResponse.json({ error: 'Bank transaction not found' }, { status: 404 });
     }
-    return NextResponse.json(data);
+    const { data: payRows } = await supabase
+      .from('payments')
+      .select('amount')
+      .eq('bank_transaction_id', id);
+    let allocated = 0;
+    for (const r of payRows || []) {
+      allocated += parseFloat(String((r as { amount: string }).amount));
+    }
+    return NextResponse.json({
+      ...data,
+      allocated_payments_total: Math.round(allocated * 100) / 100,
+    });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'Failed to get bank transaction' }, { status: 500 });
   }

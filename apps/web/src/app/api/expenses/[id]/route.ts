@@ -3,7 +3,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Expense, UpdateExpenseData, ExpenseLineItem } from '@kit/types';
-import { parseRequestBody, updateExpenseSchema } from '@/shared/zod-schemas';
+import { parseRequestBody, updateExpenseSchema, type PaymentSliceInput } from '@/shared/zod-schemas';
+import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
 
 function transformLineItem(row: any): ExpenseLineItem {
   const subscription = row.subscription;
@@ -85,6 +86,7 @@ async function updateExpenseAsTransaction(
       taxInclusive?: boolean;
     }>;
     discount?: { type: 'amount' | 'percent'; value: number };
+    paymentSlices?: PaymentSliceInput[] | null;
   }
 ) {
   const { getTaxRateAndRuleForExpenseLineWithItemTaxes } = await import('@/lib/item-taxes-resolve');
@@ -188,6 +190,14 @@ async function updateExpenseAsTransaction(
     await supabase.from('entries').update({ amount, updated_at: new Date().toISOString() }).eq('id', entryRow.id);
   }
 
+  if (entryRow && body.paymentSlices != null) {
+    if (!paymentSlicesSumMatchesTotal(body.paymentSlices, amount)) {
+      throw new Error('Payment slices must sum to expense total');
+    }
+    const { error: payErr } = await replacePaymentsForEntry(supabase, entryRow.id, body.paymentSlices);
+    if (payErr) throw new Error(payErr);
+  }
+
   const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_types), subscription:subscriptions(id, name)').eq('expense_id', id).order('sort_order', { ascending: true });
   const lineItems = (lineRows || []).map(transformLineItem);
   return transformExpense(expenseRow, lineItems);
@@ -255,6 +265,7 @@ export async function PUT(
         supplierId: body.supplierId,
         lineItems: body.lineItems,
         discount: body.discount,
+        paymentSlices: body.paymentSlices,
       });
       return NextResponse.json(updated);
     }
@@ -279,8 +290,12 @@ export async function PUT(
     return NextResponse.json(transformExpense(data, lineItems));
   } catch (error: any) {
     console.error('Error updating expense:', error);
+    const msg = error?.message || String(error);
+    if (msg === 'Payment slices must sum to expense total') {
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
     return NextResponse.json(
-      { error: 'Failed to update expense', details: error.message },
+      { error: 'Failed to update expense', details: msg },
       { status: 500 }
     );
   }

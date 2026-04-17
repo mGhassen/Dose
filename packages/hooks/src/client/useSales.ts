@@ -94,6 +94,7 @@ export function useCreateSale() {
     mutationFn: salesApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
     },
   });
 }
@@ -107,6 +108,7 @@ export function useUpdateSale() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['sales', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
     },
   });
 }

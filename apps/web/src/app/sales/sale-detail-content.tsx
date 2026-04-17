@@ -36,7 +36,7 @@ import {
   Plus,
   ChevronRight,
 } from "lucide-react";
-import { useSaleById, useUpdateSale, useDeleteSale, useItems, useUnits, useMetadataEnum } from "@kit/hooks";
+import { useSaleById, useUpdateSale, useDeleteSale, useItems, useUnits, useMetadataEnum, usePayments } from "@kit/hooks";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -45,6 +45,14 @@ import type { SalesType, SaleLineItem, SaleLineItemInput } from "@kit/types";
 import { lineTaxAmount, to2Decimals, netUnitPriceFromInclusive, unitPriceExclToIncl } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import {
+  DocumentPaymentSlicesEditor,
+  defaultPaymentSliceRows,
+  paymentRowFromApi,
+  rowsToPaymentSlices,
+  type DocumentPaymentSliceRow,
+} from "@/components/document-payment-slices-editor";
+import { paymentSlicesSumMatchesTotal } from "@/lib/ledger/replace-entry-payments";
 
 function displayTaxRate(pct: number): number {
   if (pct <= 0) return 0;
@@ -89,6 +97,13 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
   const [isEditing, setIsEditing] = useState(initialEditMode);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: sale, isLoading } = useSaleById(saleId);
+  const { data: salePaymentsPage, isLoading: salePaymentsLoading } = usePayments({
+    entryType: "sale",
+    referenceId: saleId,
+    limit: 500,
+    page: 1,
+  });
+  const salePayments = salePaymentsPage?.data ?? [];
 
   useEffect(() => {
     setIsEditing(initialEditMode);
@@ -149,6 +164,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
     modifiers: ModifierLine[];
   };
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [paymentRows, setPaymentRows] = useState<DocumentPaymentSliceRow[]>([]);
   const lineItemsRef = useRef(lineItems);
   lineItemsRef.current = lineItems;
 
@@ -473,6 +489,20 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
   const hasAnyItem = lineItems.some((l) => l.itemId !== "");
 
   useEffect(() => {
+    if (!isEditing || !sale || salePaymentsLoading) return;
+    setPaymentRows((prev) => {
+      if (salePayments.length > 0) {
+        const next = salePayments.map(paymentRowFromApi);
+        const prevSig = prev.map((r) => `${r.id ?? ""}:${r.amount}:${r.paymentDate}`).join("|");
+        const nextSig = next.map((r) => `${r.id ?? ""}:${r.amount}:${r.paymentDate}`).join("|");
+        return prevSig === nextSig ? prev : next;
+      }
+      if (prev.length > 1) return prev;
+      return defaultPaymentSliceRows(sale.amount, sale.date.split("T")[0]);
+    });
+  }, [isEditing, sale, salePaymentsLoading, salePayments]);
+
+  useEffect(() => {
     if (sale) {
       const hasTime = sale.date.includes("T");
       setFormData({
@@ -596,6 +626,15 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
           });
         }
       }
+      const slices = rowsToPaymentSlices(paymentRows);
+      if (!slices) {
+        toast.error("Each payment needs a positive amount and date");
+        return;
+      }
+      if (!paymentSlicesSumMatchesTotal(slices, total)) {
+        toast.error("Payment slices must sum to document total");
+        return;
+      }
       await updateSale.mutateAsync({
         id: saleId,
         data: {
@@ -607,6 +646,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
             formData.discountValue && parseFloat(formData.discountValue) > 0
               ? { type: formData.discountType as "amount" | "percent", value: parseFloat(formData.discountValue) }
               : undefined,
+          paymentSlices: slices,
         },
       });
       toast.success("Sale updated successfully");
@@ -975,6 +1015,12 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                 </div>
               )}
             </div>
+            <DocumentPaymentSlicesEditor
+              total={total}
+              defaultDate={formData.date}
+              rows={paymentRows}
+              onRowsChange={setPaymentRows}
+            />
             <div className="space-y-2">
               <Label>Description</Label>
               <Textarea value={formData.description} onChange={(e) => handleInputChange("description", e.target.value)} placeholder="Notes" rows={2} className="resize-none" />

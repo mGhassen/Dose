@@ -45,6 +45,9 @@ import {
   useItems,
   useUnits,
   useMetadataEnum,
+  usePayments,
+  useCreatePayment,
+  useDeletePayment,
 } from "@kit/hooks";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -56,6 +59,15 @@ import type { ExpenseCategory } from "@kit/types";
 import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import {
+  DocumentPaymentSlicesEditor,
+  defaultPaymentSliceRows,
+  paymentRowFromApi,
+  rowsToPaymentSlices,
+  type DocumentPaymentSliceRow,
+} from "@/components/document-payment-slices-editor";
+import { paymentSlicesSumMatchesTotal } from "@/lib/ledger/replace-entry-payments";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 
 function DetailRow({
   icon: Icon,
@@ -97,7 +109,23 @@ export function ExpenseDetailContent({
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(initialEditMode);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
+  const [paymentDialogDate, setPaymentDialogDate] = useState<Date>(() => new Date());
   const { data: expense, isLoading, isError, error } = useExpenseById(expenseId);
+  const { data: paymentsPage, isLoading: paymentsLoading } = usePayments({
+    entryType: "expense",
+    referenceId: expenseId,
+    limit: 500,
+    page: 1,
+  });
+  const expensePayments = paymentsPage?.data ?? [];
+  const totalPaidTowardExpense = useMemo(
+    () => expensePayments.reduce((s, p) => s + p.amount, 0),
+    [expensePayments]
+  );
+  const createPayment = useCreatePayment();
+  const deletePayment = useDeletePayment();
   const { data: subscriptionsResponse } = useSubscriptions();
   const subscriptions = subscriptionsResponse?.data || [];
   const { data: suppliersResponse } = useInventorySuppliers({
@@ -159,6 +187,8 @@ export function ExpenseDetailContent({
   const [lineItems, setLineItems] = useState<
     Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string; taxInclusive: boolean }>
   >([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
+
+  const [paymentRows, setPaymentRows] = useState<DocumentPaymentSliceRow[]>([]);
 
   const hasAnyItem = lineItems.some((l) => l.itemId !== "");
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
@@ -223,6 +253,20 @@ export function ExpenseDetailContent({
       });
     }).catch(() => {});
   }, [expense]);
+
+  useEffect(() => {
+    if (!isEditing || !expense || paymentsLoading) return;
+    setPaymentRows((prev) => {
+      if (expensePayments.length > 0) {
+        const next = expensePayments.map(paymentRowFromApi);
+        const prevSig = prev.map((r) => `${r.id ?? ""}:${r.amount}:${r.paymentDate}`).join("|");
+        const nextSig = next.map((r) => `${r.id ?? ""}:${r.amount}:${r.paymentDate}`).join("|");
+        return prevSig === nextSig ? prev : next;
+      }
+      if (prev.length > 1) return prev;
+      return defaultPaymentSliceRows(expense.amount, expense.expenseDate.split("T")[0]);
+    });
+  }, [isEditing, expense, paymentsLoading, expensePayments]);
 
   const addLine = () => {
     setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
@@ -319,6 +363,15 @@ export function ExpenseDetailContent({
         taxInclusive: line.taxInclusive,
       });
     }
+    const slices = rowsToPaymentSlices(paymentRows);
+    if (!slices) {
+      toast.error("Each payment needs a positive amount and date");
+      return;
+    }
+    if (!paymentSlicesSumMatchesTotal(slices, total)) {
+      toast.error("Payment slices must sum to document total");
+      return;
+    }
     const payload = {
       name: formData.name,
       category: formData.category as ExpenseCategory,
@@ -330,6 +383,7 @@ export function ExpenseDetailContent({
         formData.discountValue && parseFloat(formData.discountValue) > 0
           ? { type: formData.discountType as "amount" | "percent", value: parseFloat(formData.discountValue) }
           : undefined,
+      paymentSlices: slices,
     };
     try {
       await updateExpense.mutateAsync({ id: expenseId, data: payload as any });
@@ -594,6 +648,12 @@ export function ExpenseDetailContent({
                 </div>
               )}
             </div>
+            <DocumentPaymentSlicesEditor
+              total={total}
+              defaultDate={formData.expenseDate}
+              rows={paymentRows}
+              onRowsChange={setPaymentRows}
+            />
             <div className="space-y-2">
               <Label>Vendor</Label>
               <UnifiedSelector
@@ -658,6 +718,10 @@ export function ExpenseDetailContent({
                   <Edit2 className="mr-2 h-4 w-4" />
                   Edit expense
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setAddPaymentOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add payment
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => setIsDeleteDialogOpen(true)}
@@ -699,6 +763,19 @@ export function ExpenseDetailContent({
                 <Badge variant="secondary" className="font-normal">
                   {categoryLabels[expense.category] || expense.category}
                 </Badge>
+                {totalPaidTowardExpense >= expense.amount ? (
+                  <Badge variant="default" className="font-normal">
+                    Paid
+                  </Badge>
+                ) : totalPaidTowardExpense > 0 ? (
+                  <Badge variant="outline" className="font-normal tabular-nums">
+                    Partial · {formatCurrency(totalPaidTowardExpense)} / {formatCurrency(expense.amount)}
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="font-normal">
+                    Unpaid
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
@@ -845,6 +922,32 @@ export function ExpenseDetailContent({
                 </DetailRow>
               </>
             )}
+            <Separator />
+            <div className="py-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Payments</p>
+              {expensePayments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No payments recorded yet.</p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {expensePayments.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2">
+                      <div className="min-w-0">
+                        <span className="font-medium tabular-nums">{formatCurrency(p.amount)}</span>
+                        <span className="text-muted-foreground"> · {formatDate(p.paymentDate)}</span>
+                        {p.notes ? <p className="text-xs text-muted-foreground truncate">{p.notes}</p> : null}
+                      </div>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setPaymentToDelete(p.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground tabular-nums">
+                Total paid {formatCurrency(totalPaidTowardExpense)}
+                {totalPaidTowardExpense < expense.amount && ` · Remaining ${formatCurrency(Math.max(0, expense.amount - totalPaidTowardExpense))}`}
+              </p>
+            </div>
           </div>
 
           <Separator />
@@ -870,6 +973,94 @@ export function ExpenseDetailContent({
         confirmText="Delete"
         cancelText="Cancel"
         isPending={deleteMutation.isPending}
+        variant="destructive"
+      />
+
+      <Dialog open={addPaymentOpen} onOpenChange={setAddPaymentOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add payment</DialogTitle>
+            <DialogDescription>
+              Record a cash allocation against this expense (ledger entry). Remaining:{" "}
+              {formatCurrency(Math.max(0, expense.amount - totalPaidTowardExpense))}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Payment date</Label>
+              <DatePicker value={paymentDialogDate} onChange={(d) => setPaymentDialogDate(d ?? new Date())} placeholder="Pick a date" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="expPayAmount">Amount</Label>
+              <Input
+                id="expPayAmount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                defaultValue={String(Math.max(0.01, expense.amount - totalPaidTowardExpense))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="expPayNotes">Notes (optional)</Label>
+              <Input id="expPayNotes" type="text" placeholder="Reference, memo…" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAddPaymentOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={createPayment.isPending}
+              onClick={async () => {
+                const amtEl = document.getElementById("expPayAmount") as HTMLInputElement;
+                const notesEl = document.getElementById("expPayNotes") as HTMLInputElement;
+                const amt = parseFloat(amtEl?.value || "0");
+                if (!(amt > 0)) {
+                  toast.error("Amount must be positive");
+                  return;
+                }
+                try {
+                  await createPayment.mutateAsync({
+                    entryType: "expense",
+                    referenceId: Number(expenseId),
+                    paymentDate: dateToYYYYMMDD(paymentDialogDate),
+                    amount: amt,
+                    isPaid: true,
+                    paidDate: dateToYYYYMMDD(paymentDialogDate),
+                    notes: notesEl?.value?.trim() || undefined,
+                  });
+                  toast.success("Payment added");
+                  setAddPaymentOpen(false);
+                } catch (e: unknown) {
+                  toast.error((e as { message?: string })?.message || "Failed to add payment");
+                }
+              }}
+            >
+              {createPayment.isPending ? "Saving…" : "Add payment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmationDialog
+        open={paymentToDelete != null}
+        onOpenChange={(o) => !o && setPaymentToDelete(null)}
+        onConfirm={async () => {
+          if (paymentToDelete == null) return;
+          try {
+            await deletePayment.mutateAsync(String(paymentToDelete));
+            toast.success("Payment removed");
+            setPaymentToDelete(null);
+          } catch (e: unknown) {
+            toast.error((e as { message?: string })?.message || "Failed to delete payment");
+          }
+        }}
+        title="Delete payment"
+        description="Remove this payment slice from the expense?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        isPending={deletePayment.isPending}
         variant="destructive"
       />
     </div>

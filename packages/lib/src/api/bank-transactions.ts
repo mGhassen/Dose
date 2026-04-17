@@ -18,6 +18,8 @@ export interface BankTransaction {
   state: string | null;
   reconciled_entity_type: string | null;
   reconciled_entity_id: number | null;
+  /** Sum of `payments.amount` linked via `bank_transaction_id` (split allocations). */
+  allocated_payments_total?: number;
   created_at: string;
   updated_at: string;
 }

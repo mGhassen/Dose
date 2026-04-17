@@ -192,6 +192,15 @@ export interface Expense {
   updatedAt: string;
 }
 
+export interface LedgerPaymentSliceInput {
+  id?: number;
+  amount: number;
+  paymentDate: string;
+  notes?: string;
+  bankTransactionId?: number;
+  paymentGroupId?: string;
+}
+
 export interface ExpenseLineItemInput {
   itemId?: number;
   subscriptionId?: number;
@@ -223,9 +232,14 @@ export interface CreateExpenseTransactionPayload {
   supplierId?: number;
   lineItems: ExpenseLineItemInput[];
   discount?: TransactionDiscount;
+  paymentSlices?: LedgerPaymentSliceInput[];
 }
 
-export interface UpdateExpenseData extends Partial<CreateExpenseData> {}
+export interface UpdateExpenseData extends Partial<CreateExpenseData> {
+  lineItems?: ExpenseLineItemInput[];
+  discount?: TransactionDiscount;
+  paymentSlices?: LedgerPaymentSliceInput[];
+}
 
 export interface SubscriptionProjection {
   month: string; // YYYY-MM
@@ -645,6 +659,7 @@ export interface CreateSaleData {
   totalDiscount?: number;
   lineItems?: SaleLineItemInput[];
   discount?: TransactionDiscount;
+  paymentSlices?: LedgerPaymentSliceInput[];
 }
 
 export interface SaleLineItemInput {
@@ -669,6 +684,7 @@ export interface CreateTransactionPayload {
   lineItems: SaleLineItemInput[];
   discount?: TransactionDiscount;
   description?: string;
+  paymentSlices?: LedgerPaymentSliceInput[];
 }
 
 export interface UpdateSaleData extends Partial<CreateSaleData> {}

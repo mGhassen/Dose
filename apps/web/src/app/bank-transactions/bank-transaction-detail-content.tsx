@@ -113,6 +113,19 @@ export function BankTransactionDetailContent({
               : "—"}
           </p>
         </div>
+        {tx.allocated_payments_total != null && tx.allocated_payments_total > 0 && (
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase">
+              Allocated via payments
+            </p>
+            <p className="tabular-nums">
+              {Number(tx.allocated_payments_total).toFixed(2)} {tx.currency}
+              <span className="block text-xs font-normal text-muted-foreground mt-1">
+                Sum of payment slices linked to this line (splits allowed). Reconciled fields above may still reference a single primary entity.
+              </span>
+            </p>
+          </div>
+        )}
       </div>
 
       <ReconciliationBlock tx={tx} />

@@ -11,7 +11,8 @@ import { getItemSellingPriceAsOf, getItemCostAsOf } from '@/lib/items/price-reso
 import { upsertSellingPrice, upsertCost } from '@/lib/items/price-history-upsert';
 import { getTaxRateAndRuleForSaleLineWithItemTaxes, getTaxRateAndRuleForExpenseLineWithItemTaxes } from '@/lib/item-taxes-resolve';
 import { lineTaxAmount, netUnitPriceFromInclusive, unitPriceExclToIncl } from '@/lib/transaction-tax';
-import { parseRequestBody, createSaleTransactionSchema } from '@/shared/zod-schemas';
+import { parseRequestBody, createSaleTransactionSchema, type PaymentSliceInput } from '@/shared/zod-schemas';
+import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
 
 function transformSale(row: any): Sale {
   const subtotal = row.subtotal != null ? parseFloat(row.subtotal) : 0;
@@ -257,6 +258,11 @@ export async function POST(request: NextRequest) {
       }
       const total = Math.round((subtotal + totalTax - discountAmount) * 100) / 100;
 
+      const paySlices = body.paymentSlices;
+      if (paySlices != null && paySlices.length > 0 && !paymentSlicesSumMatchesTotal(paySlices, total)) {
+        return NextResponse.json({ error: 'Payment slices must sum to sale total' }, { status: 400 });
+      }
+
       const { data: saleRow, error: saleError } = await supabase
         .from('sales')
         .insert({
@@ -298,16 +304,30 @@ export async function POST(request: NextRequest) {
         insertedLineIds[i] = insRow.id as number;
       }
 
-      await supabase.from('entries').insert({
-        direction: 'input',
-        entry_type: 'sale',
-        name: body.description || `Sale - ${body.type}`,
-        amount: total,
-        description: body.description,
-        entry_date: dateStr,
-        reference_id: saleRow.id,
-        is_active: true,
-      });
+      const { data: saleEntry, error: saleEntryErr } = await supabase
+        .from('entries')
+        .insert({
+          direction: 'input',
+          entry_type: 'sale',
+          name: body.description || `Sale - ${body.type}`,
+          amount: total,
+          description: body.description,
+          entry_date: dateStr,
+          reference_id: saleRow.id,
+          is_active: true,
+        })
+        .select('id')
+        .single();
+      if (saleEntryErr) console.error('Error creating entry for sale:', saleEntryErr);
+      else if (saleEntry?.id) {
+        const toPersist: PaymentSliceInput[] =
+          paySlices != null && paySlices.length > 0 ? paySlices : [{ amount: total, paymentDate: body.date }];
+        const { error: payErr } = await replacePaymentsForEntry(supabase, saleEntry.id, toPersist);
+        if (payErr) {
+          console.error('Error creating payments for sale entry:', payErr);
+          return NextResponse.json({ error: 'Failed to persist payments', details: payErr }, { status: 500 });
+        }
+      }
 
       for (const l of lines) {
         if (!l.itemId || l.quantity <= 0) continue;

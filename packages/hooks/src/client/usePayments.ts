@@ -4,11 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { paymentsApi, type CreatePaymentData, type UpdatePaymentData } from '@kit/lib';
 import type { Payment } from '@kit/lib';
 
-export function usePayments(params?: { 
-  page?: number; 
-  limit?: number; 
-  entryId?: string; 
-  isPaid?: boolean; 
+export function usePayments(params?: {
+  page?: number;
+  limit?: number;
+  entryId?: string;
+  loanId?: string;
+  entryType?: 'expense' | 'sale';
+  referenceId?: string;
+  bankTransactionId?: string;
+  isPaid?: boolean;
   month?: string;
 }) {
   return useQuery({
@@ -79,6 +83,8 @@ export function useCreatePayment() {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['entries', data.entryId.toString()] });
       queryClient.invalidateQueries({ queryKey: ['entries'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
 
       // Also invalidate related schedules when this payment is linked to a schedule entry
       // We reuse the same entry lookup for both loan and subscription schedules.
@@ -97,6 +103,14 @@ export function useCreatePayment() {
             queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId, 'projections'] });
             queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId] });
           }
+
+          if (entry.entryType === 'expense') {
+            queryClient.invalidateQueries({ queryKey: ['expenses', entry.referenceId.toString()] });
+          }
+
+          if (entry.entryType === 'sale') {
+            queryClient.invalidateQueries({ queryKey: ['sales', entry.referenceId.toString()] });
+          }
         }
       } catch (error) {
         // Ignore errors when fetching entry for invalidation
@@ -114,6 +128,8 @@ export function useUpdatePayment() {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       if (data.entryId) {
         queryClient.invalidateQueries({ queryKey: ['entries', data.entryId.toString()] });
       }
@@ -134,6 +150,8 @@ export function useDeletePayment() {
     onSuccess: async (payment) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['entries'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
 
       // Also invalidate related schedules when this payment is linked to a schedule entry
       if (payment?.entryId) {
@@ -150,6 +168,14 @@ export function useDeletePayment() {
               const subscriptionId = entry.referenceId.toString();
               queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId, 'projections'] });
               queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId] });
+            }
+
+            if (entry.entryType === 'expense') {
+              queryClient.invalidateQueries({ queryKey: ['expenses', entry.referenceId.toString()] });
+            }
+
+            if (entry.entryType === 'sale') {
+              queryClient.invalidateQueries({ queryKey: ['sales', entry.referenceId.toString()] });
             }
           }
         } catch (error) {

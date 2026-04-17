@@ -117,6 +117,7 @@ export function useCreateExpense() {
     mutationFn: expensesApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
     },
   });
 }
@@ -130,6 +131,7 @@ export function useUpdateExpense() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expenses', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
     },
   });
 }

@@ -127,37 +127,27 @@ export async function PUT(
             .eq('id', entryData.id);
         }
 
-        // Update the entry's payment status
-        // Only create payment if paidDate is provided AND no payments exist yet
-        // This prevents duplicate payments when payments are managed separately
         if (body.isPaid !== undefined) {
           const paidDateForPayment = body.paidDate || data.paid_date || data.month + '-01';
           if (body.isPaid && paidDateForPayment) {
-            const { data: existingPayments } = await supabase
+            const sliceAmount = body.actualAmount ?? parseFloat(existingEntry.amount);
+            const { data: dup } = await supabase
               .from('payments')
               .select('id')
-              .eq('entry_id', entryData.id);
+              .eq('entry_id', entryData.id)
+              .eq('payment_date', paidDateForPayment)
+              .eq('amount', sliceAmount)
+              .maybeSingle();
 
-            if (!existingPayments || existingPayments.length === 0) {
-              const { data: payments } = await supabase
-                .from('payments')
-                .select('id')
-                .eq('entry_id', entryData.id)
-                .eq('payment_date', paidDateForPayment)
-                .maybeSingle();
-
-              if (!payments) {
-                await supabase
-                  .from('payments')
-                  .insert({
-                    entry_id: entryData.id,
-                    payment_date: paidDateForPayment,
-                    amount: body.actualAmount || parseFloat(existingEntry.amount),
-                    is_paid: true,
-                    paid_date: paidDateForPayment,
-                    notes: body.notes || null,
-                  });
-              }
+            if (!dup) {
+              await supabase.from('payments').insert({
+                entry_id: entryData.id,
+                payment_date: paidDateForPayment,
+                amount: sliceAmount,
+                is_paid: true,
+                paid_date: paidDateForPayment,
+                notes: body.notes || null,
+              });
             }
           }
 
@@ -171,6 +161,16 @@ export async function PUT(
               .single();
 
             if (subscriptionData) {
+              const { data: existingMonthExpense } = await supabase
+                .from('expenses')
+                .select('id')
+                .eq('subscription_id', parseInt(id))
+                .eq('expense_date', expenseDate)
+                .maybeSingle();
+
+              if (existingMonthExpense) {
+                // Expense already exists for this month; skip duplicate insert (e.g. partial payments).
+              } else {
               const paidAmount = body.actualAmount ?? parseFloat(existingEntry.amount); // TTC
               const dateStr = expenseDate;
               const { getTaxRateAndRuleForExpenseLineWithItemTaxes } = await import('@/lib/item-taxes-resolve');
@@ -250,6 +250,7 @@ export async function PUT(
                   { error: 'Failed to create expense for subscription payment', details: expenseError.message },
                   { status: 500 }
                 );
+              }
               }
             }
           } else if (!body.isPaid) {

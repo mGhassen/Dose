@@ -15,6 +15,8 @@ function transformPayment(row: any): Payment {
     paidDate: row.paid_date,
     paymentMethod: row.payment_method,
     notes: row.notes,
+    bankTransactionId: row.bank_transaction_id != null ? Number(row.bank_transaction_id) : undefined,
+    paymentGroupId: row.payment_group_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -22,13 +24,15 @@ function transformPayment(row: any): Payment {
 
 function transformToSnakeCase(data: UpdatePaymentData): any {
   const result: any = {};
-  if ('entryId' in data) result.entry_id = data.entryId;
-  if ('paymentDate' in data) result.payment_date = data.paymentDate;
-  if ('amount' in data) result.amount = data.amount;
-  if ('isPaid' in data) result.is_paid = data.isPaid !== undefined ? data.isPaid : false;
-  if ('paidDate' in data) result.paid_date = data.paidDate || null;
-  if ('paymentMethod' in data) result.payment_method = data.paymentMethod || null;
-  if ('notes' in data) result.notes = data.notes || null;
+  if (data.entryId !== undefined) result.entry_id = data.entryId;
+  if (data.paymentDate !== undefined) result.payment_date = data.paymentDate;
+  if (data.amount !== undefined) result.amount = data.amount;
+  if (data.isPaid !== undefined) result.is_paid = data.isPaid;
+  if (data.paidDate !== undefined) result.paid_date = data.paidDate;
+  if (data.paymentMethod !== undefined) result.payment_method = data.paymentMethod;
+  if (data.notes !== undefined) result.notes = data.notes;
+  if (data.bankTransactionId !== undefined) result.bank_transaction_id = data.bankTransactionId;
+  if (data.paymentGroupId !== undefined) result.payment_group_id = data.paymentGroupId;
   return result;
 }
 
@@ -75,6 +79,50 @@ export async function PUT(
     const body = parsed.data as UpdatePaymentData;
 
     const supabase = supabaseServer();
+
+    const { data: existing, error: exErr } = await supabase
+      .from('payments')
+      .select('id, amount, bank_transaction_id')
+      .eq('id', id)
+      .single();
+    if (exErr || !existing) {
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
+    }
+
+    const nextBankId =
+      body.bankTransactionId !== undefined
+        ? body.bankTransactionId
+        : existing.bank_transaction_id != null
+          ? Number(existing.bank_transaction_id)
+          : null;
+    const nextAmount =
+      body.amount !== undefined ? body.amount : parseFloat(String(existing.amount));
+
+    if (nextBankId != null) {
+      const { data: bt } = await supabase.from('bank_transactions').select('amount').eq('id', nextBankId).single();
+      if (!bt) {
+        return NextResponse.json({ error: 'Bank transaction not found' }, { status: 404 });
+      }
+      const { data: slices } = await supabase
+        .from('payments')
+        .select('id, amount')
+        .eq('bank_transaction_id', nextBankId);
+      let sumExisting = 0;
+      for (const r of slices || []) {
+        if (Number(r.id) === Number(id)) continue;
+        sumExisting += parseFloat(String(r.amount));
+      }
+      const cap = Math.abs(parseFloat(String(bt.amount)));
+      if (sumExisting + nextAmount > cap + 0.005) {
+        return NextResponse.json(
+          {
+            error: `Allocations for this bank line exceed its amount (cap ${cap.toFixed(2)}, other slices ${sumExisting.toFixed(2)})`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const { data, error } = await supabase
       .from('payments')
       .update(transformToSnakeCase(body))

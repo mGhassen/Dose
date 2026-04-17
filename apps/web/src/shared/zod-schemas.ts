@@ -111,18 +111,38 @@ export const updateSubscriptionSchema = createSubscriptionSchema.partial();
 export type UpdateSubscriptionInput = z.infer<typeof updateSubscriptionSchema>;
 
 const paymentMethodEnum = z.enum(PAYMENT_METHOD_NAMES);
-export const createPaymentSchema = z.object({
-  entryId: z.number().int().positive("Entry is required"),
-  paymentDate: z.string().min(1, "Payment date is required"),
-  amount: z.number(),
-  isPaid: z.boolean().optional(),
-  paidDate: z.string().optional(),
-  paymentMethod: paymentMethodEnum.optional(),
-  notes: z.string().optional(),
-});
+export const createPaymentSchema = z
+  .object({
+    entryId: z.number().int().positive().optional(),
+    entryType: z.enum(["expense", "sale"]).optional(),
+    referenceId: z.number().int().positive().optional(),
+    paymentDate: z.string().min(1, "Payment date is required"),
+    amount: z.number().positive("Amount must be positive"),
+    isPaid: z.boolean().optional(),
+    paidDate: z.string().optional(),
+    paymentMethod: paymentMethodEnum.optional(),
+    notes: z.string().optional(),
+    bankTransactionId: z.number().int().positive().optional(),
+    paymentGroupId: z.string().uuid().optional(),
+  })
+  .refine(
+    (d) =>
+      d.entryId != null || (d.entryType != null && d.referenceId != null),
+    { message: "Provide entryId or entryType + referenceId", path: ["entryId"] }
+  );
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>;
 
-export const updatePaymentSchema = createPaymentSchema.partial();
+export const updatePaymentSchema = z.object({
+  entryId: z.number().int().positive().optional(),
+  paymentDate: z.string().min(1).optional(),
+  amount: z.number().optional(),
+  isPaid: z.boolean().optional(),
+  paidDate: z.string().optional().nullable(),
+  paymentMethod: paymentMethodEnum.optional().nullable(),
+  notes: z.string().optional().nullable(),
+  bankTransactionId: z.number().int().positive().nullable().optional(),
+  paymentGroupId: z.string().uuid().nullable().optional(),
+});
 export type UpdatePaymentInput = z.infer<typeof updatePaymentSchema>;
 
 export const createSubscriptionFormSchema = z
@@ -161,6 +181,16 @@ const expenseLineItemSchema = z.object({
   taxInclusive: z.boolean().optional(),
 });
 
+export const paymentSliceSchema = z.object({
+  id: z.number().int().positive().optional(),
+  amount: z.number().positive(),
+  paymentDate: z.string().min(1),
+  notes: z.string().optional(),
+  bankTransactionId: z.number().int().positive().optional(),
+  paymentGroupId: z.string().uuid().optional(),
+});
+export type PaymentSliceInput = z.infer<typeof paymentSliceSchema>;
+
 export const createExpenseTransactionSchema = z.object({
   name: z.string().min(1, "Name is required"),
   category: expenseCategoryEnum,
@@ -169,6 +199,7 @@ export const createExpenseTransactionSchema = z.object({
   supplierId: z.number().optional(),
   lineItems: z.array(expenseLineItemSchema).min(1, "At least one line item is required"),
   discount: transactionDiscountSchema.optional(),
+  paymentSlices: z.array(paymentSliceSchema).min(1).optional(),
 });
 export type CreateExpenseTransactionInput = z.infer<typeof createExpenseTransactionSchema>;
 
@@ -197,6 +228,7 @@ export const updateExpenseSchema = z.object({
   supplierId: z.number().optional(),
   lineItems: z.array(expenseLineItemSchema).optional(),
   discount: transactionDiscountSchema.optional(),
+  paymentSlices: z.array(paymentSliceSchema).min(1).optional(),
 });
 export type UpdateExpenseInput = z.infer<typeof updateExpenseSchema>;
 
@@ -218,6 +250,7 @@ export const createSaleTransactionSchema = z.object({
   lineItems: z.array(saleLineItemSchema).min(1, "At least one line item is required"),
   discount: transactionDiscountSchema.optional(),
   description: z.string().optional(),
+  paymentSlices: z.array(paymentSliceSchema).min(1).optional(),
 });
 export type CreateSaleTransactionInput = z.infer<typeof createSaleTransactionSchema>;
 
@@ -227,6 +260,7 @@ export const updateSaleTransactionSchema = z.object({
   lineItems: z.array(saleLineItemSchema).optional(),
   discount: transactionDiscountSchema.optional(),
   description: z.string().optional(),
+  paymentSlices: z.array(paymentSliceSchema).min(1).optional(),
 });
 export type UpdateSaleTransactionInput = z.infer<typeof updateSaleTransactionSchema>;
 

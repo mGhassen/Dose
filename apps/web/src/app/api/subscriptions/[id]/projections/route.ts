@@ -215,29 +215,23 @@ export async function POST(
         }
 
         if (body.isPaid && body.paidDate && resolvedEntry) {
-          const { data: existingPayments } = await supabase
+          const sliceAmount = body.actualAmount ?? body.amount;
+          const { data: dupPay } = await supabase
             .from('payments')
             .select('id')
-            .eq('entry_id', resolvedEntry.id);
-          if (!existingPayments || existingPayments.length === 0) {
-            const { data: existingByDate } = await supabase
-              .from('payments')
-              .select('id')
-              .eq('entry_id', resolvedEntry.id)
-              .eq('payment_date', body.paidDate)
-              .maybeSingle();
-            if (!existingByDate) {
-              await supabase
-                .from('payments')
-                .insert({
-                  entry_id: resolvedEntry.id,
-                  payment_date: body.paidDate,
-                  amount: body.actualAmount || body.amount,
-                  is_paid: true,
-                  paid_date: body.paidDate,
-                  notes: body.notes || null,
-                });
-            }
+            .eq('entry_id', resolvedEntry.id)
+            .eq('payment_date', body.paidDate)
+            .eq('amount', sliceAmount)
+            .maybeSingle();
+          if (!dupPay) {
+            await supabase.from('payments').insert({
+              entry_id: resolvedEntry.id,
+              payment_date: body.paidDate,
+              amount: sliceAmount,
+              is_paid: true,
+              paid_date: body.paidDate,
+              notes: body.notes || null,
+            });
           }
 
           const paidAmount = body.actualAmount ?? body.amount; // TTC

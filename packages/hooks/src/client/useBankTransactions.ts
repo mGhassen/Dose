@@ -40,6 +40,7 @@ export function useReconcileBankTransaction() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-transactions', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
     },
   });
 }

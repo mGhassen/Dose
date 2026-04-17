@@ -26,6 +26,13 @@ export interface ExpenseCreateContentProps {
 import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
 import { createExpenseTransactionSchema } from "@/shared/zod-schemas";
+import {
+  DocumentPaymentSlicesEditor,
+  defaultPaymentSliceRows,
+  rowsToPaymentSlices,
+  type DocumentPaymentSliceRow,
+} from "@/components/document-payment-slices-editor";
+import { paymentSlicesSumMatchesTotal } from "@/lib/ledger/replace-entry-payments";
 
 export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateContentProps) {
   const router = useRouter();
@@ -50,6 +57,10 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
   const [lineItems, setLineItems] = useState<
     Array<{ itemId: string; quantity: string; unitId: number | null; unitPrice: string; unitCost: string; taxRatePercent: string; taxInclusive: boolean }>
   >([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
+
+  const [paymentRows, setPaymentRows] = useState<DocumentPaymentSliceRow[]>(() =>
+    defaultPaymentSliceRows(0, dateToYYYYMMDD(new Date()))
+  );
 
   const [defaultTaxRate, setDefaultTaxRate] = useState(0);
   const [defaultTaxInclusive, setDefaultTaxInclusive] = useState(false);
@@ -195,6 +206,15 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
         taxInclusive: line.taxInclusive,
       });
     }
+    const slices = rowsToPaymentSlices(paymentRows);
+    if (!slices) {
+      toast.error("Each payment needs a positive amount and date");
+      return;
+    }
+    if (!paymentSlicesSumMatchesTotal(slices, total)) {
+      toast.error("Payment slices must sum to document total");
+      return;
+    }
     const payload = {
       name: formData.name,
       category: formData.category as ExpenseCategory,
@@ -206,6 +226,7 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
         formData.discountValue && parseFloat(formData.discountValue) > 0
           ? { type: formData.discountType as "amount" | "percent", value: parseFloat(formData.discountValue) }
           : undefined,
+      paymentSlices: slices,
     };
     const parsed = createExpenseTransactionSchema.safeParse(payload);
     if (!parsed.success) {
@@ -446,6 +467,13 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
               </div>
             )}
           </div>
+
+          <DocumentPaymentSlicesEditor
+            total={total}
+            defaultDate={formData.expenseDate}
+            rows={paymentRows}
+            onRowsChange={setPaymentRows}
+          />
 
           <div className="space-y-2">
             <UnifiedSelector
