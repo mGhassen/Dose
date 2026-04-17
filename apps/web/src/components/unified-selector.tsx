@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Button } from '@kit/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@kit/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@kit/ui/popover';
@@ -88,9 +88,18 @@ export function UnifiedSelector({
 }: UnifiedSelectorProps) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
+  /** Increment when the list panel opens so cmdk remounts and applies defaultValue (scroll-to-highlight). */
+  const [commandListEpoch, setCommandListEpoch] = useState(0);
   const commandListRef = useRef<HTMLDivElement>(null);
-  const selectedItemRef = useRef<HTMLDivElement>(null);
   const tCommon = useTranslations('common');
+
+  const handlePanelOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next) {
+      setSearchValue('');
+      setCommandListEpoch((e) => e + 1);
+    }
+  };
 
   const sourceItems =
     type === 'item' && !includeCatalogParents
@@ -120,6 +129,12 @@ export function UnifiedSelector({
 
   const filteredItems = filterItems(sourceItems);
 
+  const singleHasSelectedId =
+    selectedId != null &&
+    selectedId !== '' &&
+    (typeof selectedId === 'string' || !Number.isNaN(Number(selectedId)));
+  const selectedIdsDep = selectedIds.join(',');
+
   const handleSelect = (item: UnifiedSelectorItem) => {
     setOpen(false);
     setSearchValue('');
@@ -146,16 +161,17 @@ export function UnifiedSelector({
     onCreateNew?.();
   };
 
-  useEffect(() => {
-    if (open && mode === 'single' && selectedItemRef.current) {
-      setTimeout(() => {
-        selectedItemRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center'
-        });
-      }, 100);
-    }
-  }, [open, mode]);
+  /** After open, cmdk marks the default value row; scroll that row into view inside the list (no reorder). */
+  useLayoutEffect(() => {
+    if (!open) return;
+    const list = commandListRef.current;
+    if (!list) return;
+    const run = () => {
+      const active = list.querySelector('[cmdk-item=""][aria-selected="true"]') as HTMLElement | null;
+      active?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    };
+    requestAnimationFrame(() => requestAnimationFrame(run));
+  }, [open, commandListEpoch, mode, searchValue, sourceItems.length, selectedId, selectedIdsDep]);
 
   useEffect(() => {
     if (!open || !hasMore || !onLoadMore || loadingMore) return;
@@ -268,7 +284,7 @@ export function UnifiedSelector({
   };
 
   if (mode === 'single') {
-    const hasSelectedId = selectedId != null && selectedId !== '' && (typeof selectedId === 'string' || !Number.isNaN(Number(selectedId)));
+    const hasSelectedId = singleHasSelectedId;
     const itemsIncludingPrefill = (() => {
       if (!hasSelectedId || sourceItems.some(item => String(item.id) === String(selectedId))) return sourceItems;
       const stub: UnifiedSelectorItem = {
@@ -305,7 +321,7 @@ export function UnifiedSelector({
             <Label htmlFor={id}>{displayLabel}</Label>
           )
         )}
-        <Popover open={disabled ? false : open} onOpenChange={disabled ? undefined : setOpen}>
+        <Popover open={disabled ? false : open} onOpenChange={disabled ? undefined : handlePanelOpenChange}>
           <PopoverTrigger asChild>
             <button
               type="button"
@@ -320,7 +336,11 @@ export function UnifiedSelector({
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-96 p-0" align="start" sideOffset={5}>
-          <Command>
+          <Command
+            key={commandListEpoch}
+            shouldFilter={false}
+            defaultValue={hasSelectedId ? String(selectedId) : undefined}
+          >
             <div className="flex items-center border-b px-3">
               <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <input
@@ -338,6 +358,7 @@ export function UnifiedSelector({
               
               <CommandGroup>
                 <CommandItem
+                  value="__none__"
                   onSelect={handleClearSelection}
                   className="cursor-pointer px-3 py-2"
                 >
@@ -356,7 +377,6 @@ export function UnifiedSelector({
                         onSelect={() => handleSelect(item)}
                         className={`cursor-pointer p-0 ${isSelected ? 'bg-accent' : ''}`}
                         onMouseDown={(e) => e.preventDefault()}
-                        ref={isSelected ? selectedItemRef : undefined}
                       >
                         {renderItem ? renderItem(item) : defaultSingleRenderItem(item)}
                       </CommandItem>
@@ -432,12 +452,16 @@ export function UnifiedSelector({
           <Label htmlFor={id}>{displayLabel}</Label>
         )
       )}
-      <Select open={open} onOpenChange={setOpen}>
+      <Select open={open} onOpenChange={handlePanelOpenChange}>
         <SelectTrigger id={id} className={cn("h-10 w-full shadow-none text-base md:text-sm justify-start [&_svg]:hidden", className)}>
           <SelectValue placeholder={selectedIds.length > 0 ? `${selectedIds.length} ${tCommon('item')}${selectedIds.length !== 1 ? 's' : ''} ${tCommon('selected')}` : placeholder || tCommon('selectItemsMultiple')} />
         </SelectTrigger>
         <SelectContent className="p-0" align="start">
-          <Command>
+          <Command
+            key={commandListEpoch}
+            shouldFilter={false}
+            defaultValue={selectedIds.length > 0 ? String(selectedIds[0]) : undefined}
+          >
             <div className="flex items-center border-b px-3">
               <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <input
