@@ -373,6 +373,37 @@ function CreateRecipeForm() {
           </Card>
         </div>
       </div>
+      <CreateItemMultiStepDialog
+        open={createItemDialogOpen}
+        onOpenChange={(open) => {
+          setCreateItemDialogOpen(open);
+          if (!open) setCreateItemTargetIndex(null);
+        }}
+        defaultItemTypes={["item"]}
+        onCreated={(created) => {
+          setItems((prev) => {
+            const next = [...prev];
+            const row = {
+              itemId: created.id,
+              quantity: 0,
+              unit: created.unit ?? "",
+              unitId: created.unitId,
+              notes: undefined as string | undefined,
+            };
+            if (createItemTargetIndex != null && next[createItemTargetIndex]) {
+              next[createItemTargetIndex] = {
+                ...next[createItemTargetIndex],
+                itemId: row.itemId,
+                unit: row.unit,
+                unitId: row.unitId,
+              };
+            } else {
+              next.push(row);
+            }
+            return next;
+          });
+        }}
+      />
     </AppLayout>
   );
 }

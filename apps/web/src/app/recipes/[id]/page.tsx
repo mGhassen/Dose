@@ -10,6 +10,7 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { UnifiedSelector } from "@/components/unified-selector";
+import { CreateItemMultiStepDialog } from "@/components/create-item-multistep-dialog";
 import { StatusPin } from "@/components/status-pin";
 import { Save, X, Trash2, Plus, ChefHat, MoreVertical, Edit2, AlertTriangle, CheckCircle, Package, Link2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
@@ -59,6 +60,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const produceRecipe = useProduceRecipe();
   const [linkItemDialogOpen, setLinkItemDialogOpen] = useState(false);
   const [linkItemId, setLinkItemId] = useState<number | null>(null);
+  const [createItemDialogOpen, setCreateItemDialogOpen] = useState(false);
+  const [createItemTargetIndex, setCreateItemTargetIndex] = useState<number | null>(null);
   const { data: allItemsResponse } = useItems({ limit: 1000 });
   const allItems = allItemsResponse?.data ?? [];
   
@@ -480,6 +483,10 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                                 items={itemsResponse?.data?.filter((i) => i.itemTypes?.includes("item")) ?? []}
                                 selectedId={item.itemId || undefined}
                                 onSelect={(sel) => updateItem(index, 'itemId', sel.id === 0 ? 0 : Number(sel.id))}
+                                onCreateNew={() => {
+                                  setCreateItemTargetIndex(index);
+                                  setCreateItemDialogOpen(true);
+                                }}
                                 placeholder="Select item"
                               />
                             </div>
@@ -999,6 +1006,37 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
           </div>
         </DialogContent>
       </Dialog>
+
+      <CreateItemMultiStepDialog
+        open={createItemDialogOpen}
+        onOpenChange={(open) => {
+          setCreateItemDialogOpen(open);
+          if (!open) setCreateItemTargetIndex(null);
+        }}
+        defaultItemTypes={["item"]}
+        onCreated={(created) => {
+          setItems((prev) => {
+            const next = [...prev];
+            if (createItemTargetIndex != null && next[createItemTargetIndex]) {
+              next[createItemTargetIndex] = {
+                ...next[createItemTargetIndex],
+                itemId: created.id,
+                unit: created.unit ?? "",
+                unitId: created.unitId,
+              };
+            } else {
+              next.push({
+                itemId: created.id,
+                quantity: 0,
+                unit: created.unit ?? "",
+                unitId: created.unitId,
+                notes: undefined,
+              });
+            }
+            return next;
+          });
+        }}
+      />
 
       <ConfirmationDialog
         open={isDeleteDialogOpen}
