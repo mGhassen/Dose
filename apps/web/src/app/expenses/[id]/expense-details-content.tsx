@@ -54,7 +54,8 @@ import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { dateToYYYYMMDD } from "@kit/lib";
-import type { ExpenseCategory } from "@kit/types";
+import type { ExpenseCategory, Item } from "@kit/types";
+import { mergeSelectorItemsWithLineEmbeds } from "@/lib/merge-selector-items";
 
 import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
@@ -133,8 +134,12 @@ export function ExpenseDetailContent({
     supplierType: "vendor",
   });
   const suppliers = suppliersResponse?.data || [];
-  const { data: itemsResponse } = useItems({ limit: 1000 });
-  const items = itemsResponse?.data ?? [];
+  const { data: itemsResponse } = useItems({ limit: 2500 });
+  const itemsBase = itemsResponse?.data ?? [];
+  const selectorItems = useMemo(
+    () => mergeSelectorItemsWithLineEmbeds<Item>(itemsBase, expense?.lineItems),
+    [itemsBase, expense?.lineItems]
+  );
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
@@ -293,7 +298,7 @@ export function ExpenseDetailContent({
         line.unitPrice = "";
         line.taxRatePercent = "";
       } else {
-        const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; category?: string; defaultTaxRatePercent?: number } | undefined;
+        const item = selectorItems.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; category?: string; defaultTaxRatePercent?: number } | undefined;
         line.quantity = "1";
         line.unitId = item?.unitId ?? null;
         line.unitPrice = "";
@@ -305,7 +310,7 @@ export function ExpenseDetailContent({
     });
     if (!itemId) return;
     const dateStr = formData.expenseDate || new Date().toISOString().slice(0, 10);
-    const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { category?: string } | undefined;
+    const item = selectorItems.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { category?: string } | undefined;
     fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`)
       .then((r) => r.json())
       .then((data: { unitCost?: number | null; costTaxIncluded?: boolean }) => {
@@ -489,7 +494,7 @@ export function ExpenseDetailContent({
                       <UnifiedSelector
                         label=""
                         type="item"
-                        items={items}
+                        items={selectorItems}
                         selectedId={line.itemId ? parseInt(line.itemId, 10) : undefined}
                         onSelect={(item) => handleItemSelect(index, item.id === 0 ? "" : String(item.id))}
                         onCreateNew={() => router.push("/items/create")}
@@ -824,13 +829,16 @@ export function ExpenseDetailContent({
                         }
                       ) => {
                         const itemId = line.itemId ?? line.item?.id;
-                        const itemLabel = line.item?.name ?? line.subscription?.name ?? "—";
-                        const isItemRow = !!(itemId && line.item);
+                        const itemLabel =
+                          line.item?.name ??
+                          line.subscription?.name ??
+                          (itemId != null ? `Item #${itemId}` : "—");
+                        const isItemLink = itemId != null && !line.subscription;
 
                         return (
                           <tr key={line.id} className="border-b last:border-0">
                             <td className="p-2">
-                              {isItemRow ? (
+                              {isItemLink ? (
                                 <Link
                                   href={`/items/${itemId}`}
                                   className="group inline-flex items-center gap-1 text-primary hover:underline"

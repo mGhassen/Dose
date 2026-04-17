@@ -41,7 +41,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatDateTime } from "@kit/lib/date-format";
-import type { SalesType, SaleLineItem, SaleLineItemInput } from "@kit/types";
+import type { SalesType, SaleLineItem, SaleLineItemInput, Item } from "@kit/types";
+import { mergeSelectorItemsWithLineEmbeds } from "@/lib/merge-selector-items";
 import { lineTaxAmount, to2Decimals, netUnitPriceFromInclusive, unitPriceExclToIncl } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
@@ -108,13 +109,17 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
   useEffect(() => {
     setIsEditing(initialEditMode);
   }, [initialEditMode]);
-  const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
+  const { data: itemsResponse } = useItems({ limit: 2500, includeRecipes: true });
   const { data: modifierItemsResponse } = useItems({ limit: 500, itemType: "modifier" });
   const modifierItems = modifierItemsResponse?.data ?? [];
   const { data: unitsData } = useUnits();
   const updateSale = useUpdateSale();
   const deleteMutation = useDeleteSale();
-  const items = itemsResponse?.data ?? [];
+  const itemsBase = itemsResponse?.data ?? [];
+  const selectorItems = useMemo(
+    () => mergeSelectorItemsWithLineEmbeds<Item>(itemsBase, sale?.lineItems),
+    [itemsBase, sale?.lineItems]
+  );
   const unitItems = (unitsData || []).map((u: { id: number; symbol?: string; name?: string }) => ({ id: u.id, name: `${u.symbol ?? ""} (${u.name ?? ""})` }));
   const { data: salesTypeValues = [] } = useMetadataEnum("SalesType");
   const typeOptions = salesTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
@@ -375,7 +380,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
         line.taxConditionValue = undefined;
         line.modifiers = [];
       } else {
-        const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; unit_price?: number; unitPrice?: number; defaultTaxRatePercent?: number } | undefined;
+        const item = selectorItems.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; unit_price?: number; unitPrice?: number; defaultTaxRatePercent?: number } | undefined;
         line.quantity = "1";
         line.unitId = item?.unitId ?? null;
         line.unitPrice = "";
@@ -781,7 +786,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                       )}
                       <UnifiedSelector
                         type="item"
-                        items={items}
+                        items={selectorItems}
                         selectedId={line.itemId ? parseInt(line.itemId) : undefined}
                         onSelect={(item) => handleItemSelect(index, item.id === 0 ? "" : String(item.id))}
                         placeholder="Item (optional)"
@@ -1169,8 +1174,8 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                         ).taxAmount;
                         const displayTaxAmount = line.taxAmount ?? computedTaxAmount;
                         const itemId = line.itemId ?? line.item?.id;
-                        const itemLabel = line.item?.name ?? "—";
-                        const hasItemLink = !!(itemId && line.item);
+                        const itemLabel = line.item?.name ?? (itemId != null ? `Item #${itemId}` : "—");
+                        const hasItemLink = itemId != null;
 
                         return (
                           <tr key={line.id} className={`border-b last:border-0 ${isModifierLine ? "bg-muted/15" : ""}`}>

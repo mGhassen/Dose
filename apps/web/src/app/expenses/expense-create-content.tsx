@@ -39,7 +39,7 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
   const createExpense = useCreateExpense();
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000, supplierType: "vendor" });
   const suppliers = suppliersResponse?.data || [];
-  const { data: itemsResponse } = useItems({ limit: 1000 });
+  const { data: itemsResponse } = useItems({ limit: 2500 });
   const items = itemsResponse?.data ?? [];
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));

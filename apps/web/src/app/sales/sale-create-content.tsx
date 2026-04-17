@@ -39,7 +39,7 @@ import { paymentSlicesSumMatchesTotal } from "@/lib/ledger/replace-entry-payment
 export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps) {
   const router = useRouter();
   const createSale = useCreateSale();
-  const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
+  const { data: itemsResponse } = useItems({ limit: 2500, includeRecipes: true });
   const items = itemsResponse?.data ?? [];
   const { data: modifierItemsResponse } = useItems({ limit: 500, itemType: "modifier" });
   const modifierItems = modifierItemsResponse?.data ?? [];

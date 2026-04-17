@@ -8,6 +8,8 @@ import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/led
 
 function transformLineItem(row: any): ExpenseLineItem {
   const subscription = row.subscription;
+  const rawItem = row.item;
+  const item = Array.isArray(rawItem) ? rawItem[0] ?? undefined : rawItem;
   return {
     id: row.id,
     expenseId: row.expense_id,
@@ -23,7 +25,7 @@ function transformLineItem(row: any): ExpenseLineItem {
     sortOrder: row.sort_order ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    item: row.item,
+    item,
     subscription: subscription ? { id: subscription.id, name: subscription.name } : undefined,
   };
 }
