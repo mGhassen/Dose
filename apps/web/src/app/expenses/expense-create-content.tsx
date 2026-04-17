@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
+import { Alert, AlertDescription } from "@kit/ui/alert";
 import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
@@ -33,6 +34,7 @@ import {
   type DocumentPaymentSliceRow,
 } from "@/components/document-payment-slices-editor";
 import { paymentSlicesSumMatchesTotal } from "@/lib/ledger/replace-entry-payments";
+import { expenseFormSubmitBlockReason } from "@/lib/expense-form-submit-block-reason";
 
 export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateContentProps) {
   const router = useRouter();
@@ -106,6 +108,19 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
     const tot = to2Decimals(sub + tax - disc);
     return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
   }, [lineItems, defaultTaxRate, defaultTaxInclusive, formData.discountType, formData.discountValue]);
+
+  const submitBlockReason = useMemo(
+    () =>
+      expenseFormSubmitBlockReason({
+        name: formData.name,
+        category: formData.category,
+        expenseDate: formData.expenseDate,
+        lineItems,
+        total,
+        paymentRows,
+      }),
+    [formData.name, formData.category, formData.expenseDate, lineItems, total, paymentRows]
+  );
 
   const addLine = () => {
     setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
@@ -308,6 +323,11 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
                       type="item"
                       items={items}
                       selectedId={line.itemId ? parseInt(line.itemId, 10) : undefined}
+                      selectedDisplayName={
+                        line.itemId
+                          ? (items.find((i) => String(i.id) === line.itemId) as { name?: string } | undefined)?.name
+                          : undefined
+                      }
                       onSelect={(item) => handleItemSelect(index, item.id === 0 ? "" : String(item.id))}
                       onCreateNew={() => router.push("/items/create")}
                       placeholder="Item (optional)"
@@ -503,11 +523,16 @@ export function ExpenseCreateContent({ onClose, onCreated }: ExpenseCreateConten
             />
           </div>
 
+          {submitBlockReason && !createExpense.isPending && (
+            <Alert variant="destructive">
+              <AlertDescription>{submitBlockReason}</AlertDescription>
+            </Alert>
+          )}
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancel
             </Button>
-            <Button type="submit" disabled={createExpense.isPending || (hasAnyItem ? total <= 0 : (parseFloat(lineItems[0]?.unitPrice ?? "0") || 0) <= 0)} className="flex-1">
+            <Button type="submit" disabled={createExpense.isPending || submitBlockReason != null} className="flex-1">
               {createExpense.isPending ? "Creating…" : "Create expense"}
             </Button>
           </div>

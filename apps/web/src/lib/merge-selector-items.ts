@@ -26,9 +26,8 @@ export function mergeSelectorItemsWithLineEmbeds<T extends { id: number; name?: 
     if (id == null) continue;
     if (map.has(id)) continue;
     const emb = normalizeEmbed(li.item ?? null);
-    const name = emb?.name;
-    if (!name) continue;
-    map.set(id, { id, name, ...emb } as T);
+    const name = emb?.name?.trim() ? emb.name : `Item #${id}`;
+    map.set(id, { id, ...emb, name } as T);
   }
   return Array.from(map.values());
 }

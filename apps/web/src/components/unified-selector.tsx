@@ -13,6 +13,15 @@ import RelatedDataLink from '@/components/related-data-link';
 import { useTranslations } from 'next-intl';
 import { cn } from '@kit/lib/utils';
 
+function dedupeSelectorItemsById(list: UnifiedSelectorItem[]): UnifiedSelectorItem[] {
+  const byId = new Map<string, UnifiedSelectorItem>();
+  for (const item of list) {
+    const k = String(item.id);
+    if (!byId.has(k)) byId.set(k, item);
+  }
+  return [...byId.values()];
+}
+
 interface UnifiedSelectorItem {
   id: number | string;
   name?: string;
@@ -101,10 +110,13 @@ export function UnifiedSelector({
     }
   };
 
-  const sourceItems =
-    type === 'item' && !includeCatalogParents
-      ? items.filter((item) => !(item as { isCatalogParent?: boolean }).isCatalogParent)
-      : items;
+  const sourceItems = (() => {
+    const base =
+      type === 'item' && !includeCatalogParents
+        ? items.filter((item) => !(item as { isCatalogParent?: boolean }).isCatalogParent)
+        : items;
+    return type === 'item' ? dedupeSelectorItemsById(base) : base;
+  })();
 
   const filterItems = (list: UnifiedSelectorItem[]) =>
     list.filter(item => {
@@ -161,16 +173,52 @@ export function UnifiedSelector({
     onCreateNew?.();
   };
 
-  /** After open, cmdk marks the default value row; scroll that row into view inside the list (no reorder). */
+  /** Center the cmdk-highlighted row in the actual scrollable list (cmdk runs its own scrollIntoView after mount — we re-apply with delays). */
   useLayoutEffect(() => {
     if (!open) return;
-    const list = commandListRef.current;
-    if (!list) return;
-    const run = () => {
-      const active = list.querySelector('[cmdk-item=""][aria-selected="true"]') as HTMLElement | null;
-      active?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    const root = commandListRef.current;
+    if (!root) return;
+
+    const findScrollable = (active: HTMLElement): HTMLElement => {
+      let n: HTMLElement | null = active;
+      while (n) {
+        const { overflowY } = window.getComputedStyle(n);
+        const y = overflowY === 'auto' || overflowY === 'scroll';
+        if (y && n.scrollHeight > n.clientHeight + 1) return n;
+        n = n.parentElement;
+      }
+      return root;
     };
-    requestAnimationFrame(() => requestAnimationFrame(run));
+
+    const run = () => {
+      const active = root.querySelector('[cmdk-item=""][aria-selected="true"]') as HTMLElement | null;
+      if (!active) return;
+      const scrollEl = findScrollable(active);
+      const sr = scrollEl.getBoundingClientRect();
+      const ir = active.getBoundingClientRect();
+      const itemTopInContent = scrollEl.scrollTop + (ir.top - sr.top);
+      const nextTop = itemTopInContent + ir.height / 2 - scrollEl.clientHeight / 2;
+      const maxTop = Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
+      scrollEl.scrollTo({ top: Math.max(0, Math.min(nextTop, maxTop)), behavior: 'instant' });
+    };
+
+    run();
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(run);
+    });
+    const t0 = window.setTimeout(run, 0);
+    const t1 = window.setTimeout(run, 32);
+    const t2 = window.setTimeout(run, 64);
+    const t3 = window.setTimeout(run, 96);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      window.clearTimeout(t0);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+    };
   }, [open, commandListEpoch, mode, searchValue, sourceItems.length, selectedId, selectedIdsDep]);
 
   useEffect(() => {

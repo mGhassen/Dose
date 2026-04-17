@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
+import { Alert, AlertDescription } from "@kit/ui/alert";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,7 +55,7 @@ import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
 import { dateToYYYYMMDD } from "@kit/lib";
-import type { ExpenseCategory, Item } from "@kit/types";
+import type { ExpenseCategory, ExpenseLineItem, Item } from "@kit/types";
 import { mergeSelectorItemsWithLineEmbeds } from "@/lib/merge-selector-items";
 
 import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
@@ -68,6 +69,7 @@ import {
   type DocumentPaymentSliceRow,
 } from "@/components/document-payment-slices-editor";
 import { paymentSlicesSumMatchesTotal } from "@/lib/ledger/replace-entry-payments";
+import { expenseFormSubmitBlockReason } from "@/lib/expense-form-submit-block-reason";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 
 function DetailRow({
@@ -220,6 +222,28 @@ export function ExpenseDetailContent({
     return { subtotal: sub, totalTax: tax, discountAmount: disc, total: tot };
   }, [lineItems, defaultTaxRate, defaultTaxInclusive, formData.discountType, formData.discountValue]);
 
+  const submitBlockReason = useMemo(
+    () =>
+      expenseFormSubmitBlockReason({
+        name: formData.name,
+        category: formData.category,
+        expenseDate: formData.expenseDate,
+        lineItems,
+        total,
+        paymentRows,
+      }),
+    [formData.name, formData.category, formData.expenseDate, lineItems, total, paymentRows]
+  );
+
+  const lineItemNameById = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const i of selectorItems) {
+      const n = (i as { name?: string }).name;
+      if (n?.trim()) m.set(i.id, n);
+    }
+    return m;
+  }, [selectorItems]);
+
   useEffect(() => {
     if (!expense) return;
     setFormData({
@@ -233,15 +257,37 @@ export function ExpenseDetailContent({
     });
     const dateStr = expense.expenseDate.split("T")[0];
     const lines = expense.lineItems?.length
-      ? expense.lineItems.map((li: { itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; taxRatePercent?: number }) => ({
-          itemId: li.itemId?.toString() ?? "",
-          quantity: String(li.quantity),
-          unitId: li.unitId ?? null,
-          unitPrice: String(li.unitPrice),
-          unitCost: li.unitCost != null ? String(li.unitCost) : "",
-          taxRatePercent: li.taxRatePercent != null ? String(li.taxRatePercent) : "",
-          taxInclusive: false,
-        }))
+      ? expense.lineItems.map((li) => {
+          const r = li as ExpenseLineItem & {
+            item_id?: number;
+            unit_id?: number;
+            tax_rate_percent?: number;
+            unit_cost?: number;
+          };
+          const rawItem = r.item;
+          const emb = Array.isArray(rawItem) ? rawItem[0] : rawItem;
+          const fromEmb = emb && typeof emb === "object" && "id" in emb ? (emb as { id?: number }).id : undefined;
+          const idNum =
+            typeof r.itemId === "number"
+              ? r.itemId
+              : typeof r.item_id === "number"
+                ? r.item_id
+                : typeof r.item_id === "string" && r.item_id !== ""
+                  ? Number(r.item_id)
+                  : fromEmb;
+          const itemIdStr =
+            idNum != null && !Number.isNaN(Number(idNum)) && Number(idNum) > 0 ? String(idNum) : "";
+          return {
+            itemId: itemIdStr,
+            quantity: String(r.quantity),
+            unitId: r.unitId ?? r.unit_id ?? null,
+            unitPrice: String(r.unitPrice),
+            unitCost: r.unitCost != null ? String(r.unitCost) : r.unit_cost != null ? String(r.unit_cost) : "",
+            taxRatePercent:
+              r.taxRatePercent != null ? String(r.taxRatePercent) : r.tax_rate_percent != null ? String(r.tax_rate_percent) : "",
+            taxInclusive: false,
+          };
+        })
       : [{ itemId: "", quantity: "1", unitId: null, unitPrice: String(expense.amount), unitCost: "", taxRatePercent: "", taxInclusive: false }];
     setLineItems(lines);
     const withItemIds = lines.map((l, i) => (l.itemId ? { index: i, itemId: l.itemId } : null)).filter(Boolean) as { index: number; itemId: string }[];
@@ -496,6 +542,15 @@ export function ExpenseDetailContent({
                         type="item"
                         items={selectorItems}
                         selectedId={line.itemId ? parseInt(line.itemId, 10) : undefined}
+                        selectedDisplayName={(() => {
+                          if (!line.itemId) return undefined;
+                          const hit = selectorItems.find((i) => String(i.id) === line.itemId) as { name?: string } | undefined;
+                          if (hit?.name?.trim()) return hit.name;
+                          const li = expense.lineItems?.[index] as { item?: unknown } | undefined;
+                          const raw = li?.item;
+                          const rowEmb = Array.isArray(raw) ? raw[0] : raw;
+                          return (rowEmb as { name?: string } | undefined)?.name;
+                        })()}
                         onSelect={(item) => handleItemSelect(index, item.id === 0 ? "" : String(item.id))}
                         onCreateNew={() => router.push("/items/create")}
                         placeholder="Item (optional)"
@@ -681,13 +736,20 @@ export function ExpenseDetailContent({
             </div>
           </div>
         </ScrollArea>
-        <div className="flex shrink-0 gap-3 border-t bg-background p-4 -mx-6">
-          <Button type="button" variant="outline" onClick={() => router.push(`/expenses/${expenseId}`)} className="flex-1">
-            Cancel
-          </Button>
-          <Button type="submit" disabled={updateExpense.isPending || (hasAnyItem ? total <= 0 : (parseFloat(lineItems[0]?.unitPrice ?? "0") || 0) <= 0)} className="flex-1">
-            {updateExpense.isPending ? "Saving…" : "Save changes"}
-          </Button>
+        <div className="flex shrink-0 flex-col gap-3 border-t bg-background p-4 -mx-6">
+          {submitBlockReason && !updateExpense.isPending && (
+            <Alert variant="destructive">
+              <AlertDescription>{submitBlockReason}</AlertDescription>
+            </Alert>
+          )}
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" onClick={() => router.push(`/expenses/${expenseId}`)} className="flex-1">
+              Cancel
+            </Button>
+            <Button type="submit" disabled={updateExpense.isPending || submitBlockReason != null} className="flex-1">
+              {updateExpense.isPending ? "Saving…" : "Save changes"}
+            </Button>
+          </div>
         </div>
       </form>
     );
@@ -821,16 +883,20 @@ export function ExpenseDetailContent({
                         line: {
                           id: number;
                           itemId?: number;
-                          item?: { id?: number; name?: string };
+                          item_id?: number;
+                          item?: { id?: number; name?: string } | { id?: number; name?: string }[];
                           subscription?: { name?: string };
                           quantity: number;
                           unitPrice: number;
                           lineTotal: number;
                         }
                       ) => {
-                        const itemId = line.itemId ?? line.item?.id;
+                        const rawItem = line.item;
+                        const emb = Array.isArray(rawItem) ? rawItem[0] : rawItem;
+                        const itemId = line.itemId ?? line.item_id ?? emb?.id;
                         const itemLabel =
-                          line.item?.name ??
+                          emb?.name ??
+                          (itemId != null ? lineItemNameById.get(itemId) : undefined) ??
                           line.subscription?.name ??
                           (itemId != null ? `Item #${itemId}` : "—");
                         const isItemLink = itemId != null && !line.subscription;
