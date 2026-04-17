@@ -20,16 +20,17 @@ export async function replacePaymentsForEntry(
 
   for (const s of slices) {
     const dateStr = s.paymentDate.split('T')[0] || s.paymentDate;
-    const { error: insErr } = await supabase.from('payments').insert({
+    const row: Record<string, unknown> = {
       entry_id: entryId,
       payment_date: dateStr,
       amount: s.amount,
       is_paid: true,
       paid_date: dateStr,
       notes: s.notes ?? null,
-      bank_transaction_id: s.bankTransactionId ?? null,
-      payment_group_id: s.paymentGroupId ?? null,
-    });
+    };
+    if (s.bankTransactionId != null) row.bank_transaction_id = s.bankTransactionId;
+    if (s.paymentGroupId != null && s.paymentGroupId !== "") row.payment_group_id = s.paymentGroupId;
+    const { error: insErr } = await supabase.from("payments").insert(row as never);
     if (insErr) return { error: insErr.message };
   }
   return { error: null };

@@ -54,7 +54,7 @@ function transformPayment(row: any): Payment {
 }
 
 function insertPayloadFromBody(body: CreatePaymentInput, entryId: number) {
-  return {
+  const row: Record<string, unknown> = {
     entry_id: entryId,
     payment_date: body.paymentDate,
     amount: body.amount,
@@ -62,9 +62,10 @@ function insertPayloadFromBody(body: CreatePaymentInput, entryId: number) {
     paid_date: body.paidDate ?? body.paymentDate,
     payment_method: body.paymentMethod ?? null,
     notes: body.notes ?? null,
-    bank_transaction_id: body.bankTransactionId ?? null,
-    payment_group_id: body.paymentGroupId ?? null,
   };
+  if (body.bankTransactionId != null) row.bank_transaction_id = body.bankTransactionId;
+  if (body.paymentGroupId != null && body.paymentGroupId !== "") row.payment_group_id = body.paymentGroupId;
+  return row;
 }
 
 async function resolveDocumentEntryId(
