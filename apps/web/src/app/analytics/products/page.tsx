@@ -26,8 +26,20 @@ import {
 } from "recharts";
 import { formatCurrency } from "@kit/lib/config";
 import { useProductAnalytics, type MenuClassification } from "@kit/hooks";
+import Link from "next/link";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#82ca9d", "#ffc658"];
+
+function ItemLink({ itemId, name }: { itemId: number; name: string }) {
+  return (
+    <Link
+      href={`/items/${itemId}`}
+      className="font-medium text-primary hover:underline"
+    >
+      {name}
+    </Link>
+  );
+}
 
 const CLASS_COLORS: Record<MenuClassification, string> = {
   star: "#22c55e",
@@ -203,7 +215,9 @@ export default function ProductAnalyticsPage() {
                         <TableBody>
                           {topByRevenue.map((p) => (
                             <TableRow key={p.itemId}>
-                              <TableCell className="font-medium">{p.name}</TableCell>
+                              <TableCell>
+                                <ItemLink itemId={p.itemId} name={p.name} />
+                              </TableCell>
                               <TableCell className="text-right">{formatCurrency(p.revenue)}</TableCell>
                               <TableCell className="text-right">{p.units.toLocaleString()}</TableCell>
                             </TableRow>
@@ -231,7 +245,9 @@ export default function ProductAnalyticsPage() {
                       <TableBody>
                         {topByUnits.map((p) => (
                           <TableRow key={p.itemId}>
-                            <TableCell className="font-medium">{p.name}</TableCell>
+                            <TableCell>
+                              <ItemLink itemId={p.itemId} name={p.name} />
+                            </TableCell>
                             <TableCell className="text-right">{p.units.toLocaleString()}</TableCell>
                             <TableCell className="text-right">{formatCurrency(p.revenue)}</TableCell>
                           </TableRow>
@@ -319,7 +335,9 @@ export default function ProductAnalyticsPage() {
                       <TableBody>
                         {marginSorted.map((p) => (
                           <TableRow key={p.itemId}>
-                            <TableCell className="font-medium">{p.name}</TableCell>
+                            <TableCell>
+                              <ItemLink itemId={p.itemId} name={p.name} />
+                            </TableCell>
                             <TableCell>
                               <span
                                 className="rounded px-2 py-0.5 text-xs font-medium text-white"
@@ -386,7 +404,9 @@ export default function ProductAnalyticsPage() {
                       <TableBody>
                         {(pa.data?.deadStock ?? []).map((d) => (
                           <TableRow key={d.itemId}>
-                            <TableCell className="font-medium">{d.name}</TableCell>
+                            <TableCell>
+                              <ItemLink itemId={d.itemId} name={d.name} />
+                            </TableCell>
                             <TableCell>{d.category}</TableCell>
                             <TableCell className="text-right">
                               {d.daysSinceLastSale == null ? "Never" : d.daysSinceLastSale}
@@ -456,7 +476,9 @@ export default function ProductAnalyticsPage() {
                         <TableBody>
                           {(pa.data?.modifierRevenue.items ?? []).map((m) => (
                             <TableRow key={m.itemId}>
-                              <TableCell className="font-medium">{m.name}</TableCell>
+                              <TableCell>
+                                <ItemLink itemId={m.itemId} name={m.name} />
+                              </TableCell>
                               <TableCell className="text-right">{formatCurrency(m.revenue)}</TableCell>
                               <TableCell className="text-right">{m.units.toLocaleString()}</TableCell>
                             </TableRow>
@@ -484,7 +506,9 @@ export default function ProductAnalyticsPage() {
                           {(pa.data?.attachRate ?? []).slice(0, 20).map((a) => (
                             <TableRow key={`${a.itemAId}-${a.itemBId}`}>
                               <TableCell>
-                                {a.itemAName} + {a.itemBName}
+                                <ItemLink itemId={a.itemAId} name={a.itemAName} />
+                                <span className="mx-1 text-muted-foreground">+</span>
+                                <ItemLink itemId={a.itemBId} name={a.itemBName} />
                               </TableCell>
                               <TableCell className="text-right">{a.pairCount}</TableCell>
                               <TableCell className="text-right">{a.lift}</TableCell>
@@ -557,7 +581,9 @@ export default function ProductAnalyticsPage() {
                             <TableBody>
                               {b.topItems.map((t) => (
                                 <TableRow key={t.itemId}>
-                                  <TableCell>{t.name}</TableCell>
+                                  <TableCell>
+                                    <ItemLink itemId={t.itemId} name={t.name} />
+                                  </TableCell>
                                   <TableCell className="text-right">{formatCurrency(t.revenue)}</TableCell>
                                 </TableRow>
                               ))}
