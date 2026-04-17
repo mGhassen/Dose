@@ -1,5 +1,3 @@
-// React Query hook for Sales Analytics
-
 import { useQuery } from '@tanstack/react-query';
 
 export interface SalesAnalytics {
@@ -16,13 +14,21 @@ export interface SalesAnalytics {
   };
 }
 
-export function useSalesAnalytics(year?: string) {
-  const currentYear = year || new Date().getFullYear().toString();
+export interface UseSalesAnalyticsParams {
+  startDate?: string;
+  endDate?: string;
+}
+
+export function useSalesAnalytics(params: UseSalesAnalyticsParams = {}) {
+  const { startDate, endDate } = params;
 
   return useQuery<SalesAnalytics>({
-    queryKey: ['sales-analytics', currentYear],
+    queryKey: ['sales-analytics', startDate, endDate],
     queryFn: async ({ signal }) => {
-      const response = await fetch(`/api/sales/analytics?year=${currentYear}`, {
+      const search = new URLSearchParams();
+      if (startDate) search.set('startDate', startDate);
+      if (endDate) search.set('endDate', endDate);
+      const response = await fetch(`/api/sales/analytics?${search.toString()}`, {
         signal,
       });
       if (!response.ok) {
@@ -30,6 +36,6 @@ export function useSalesAnalytics(year?: string) {
       }
       return response.json();
     },
+    enabled: Boolean(startDate && endDate),
   });
 }
-

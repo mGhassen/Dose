@@ -37,8 +37,9 @@ import {
   BarChart3,
   FileWarning,
   Info,
+  Wrench,
 } from 'lucide-react';
-import { useSyncJob, useRetrySyncJob } from '@kit/hooks';
+import { useSyncJob, useRetrySyncJob, useBackfillSaleItems } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
 import { useToast } from '@kit/hooks';
 import type { SyncJobStep } from '@kit/types';
@@ -98,14 +99,78 @@ export function SyncJobDetailClient() {
   const jobId = params?.jobId != null ? Number(params.jobId) : null;
   const { data: job, isLoading, error, isError } = useSyncJob(jobId);
   const retrySyncJob = useRetrySyncJob();
+  const backfillSaleItems = useBackfillSaleItems();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
+  const [backfillProgress, setBackfillProgress] = useState<{ processed: number; total: number | null } | null>(null);
+  type BackfillEvent = {
+    saleId: number;
+    squareOrderId: string;
+    status: 'missing_payload' | 'unmapped' | 'updated' | 'no_change' | 'error';
+    lines_updated: number;
+    movements_written: number;
+    total_lines: number;
+    message?: string;
+  };
+  const [backfillEvents, setBackfillEvents] = useState<BackfillEvent[]>([]);
+  const [backfillTotals, setBackfillTotals] = useState<{
+    sales_scanned: number;
+    lines_updated: number;
+    movements_written: number;
+    missing_payload: number;
+    unmapped_items: number;
+    errors: number;
+  } | null>(null);
 
   useEffect(() => {
     if (params?.jobId != null && isNaN(Number(params.jobId))) {
       router.replace('/settings/integrations/syncs');
     }
   }, [params?.jobId, router]);
+
+  const handleBackfill = async () => {
+    const integrationId = job?.integration_id;
+    if (!integrationId) {
+      toast({ title: 'Backfill failed', description: 'Missing integration id on job.', variant: 'destructive' });
+      return;
+    }
+    setBackfillEvents([]);
+    setBackfillTotals(null);
+    try {
+      let offset = 0;
+      const limit = 200;
+      const totals = {
+        sales_scanned: 0,
+        lines_updated: 0,
+        movements_written: 0,
+        missing_payload: 0,
+        unmapped_items: 0,
+        errors: 0,
+      };
+      setBackfillProgress({ processed: 0, total: null });
+      while (true) {
+        const res = await backfillSaleItems.mutateAsync({ id: String(integrationId), offset, limit });
+        for (const k of Object.keys(totals) as (keyof typeof totals)[]) {
+          totals[k] += res.results[k] ?? 0;
+        }
+        setBackfillTotals({ ...totals });
+        if (res.events?.length) {
+          setBackfillEvents((prev) => [...prev, ...res.events].slice(-2000));
+        }
+        setBackfillProgress({ processed: offset + res.processed, total: res.total });
+        if (!res.has_more || res.next_offset == null) break;
+        offset = res.next_offset;
+      }
+      toast({
+        title: 'Backfill complete',
+        description: `Scanned ${totals.sales_scanned} sales, patched ${totals.lines_updated} lines, wrote ${totals.movements_written} movements. Unmapped: ${totals.unmapped_items}, errors: ${totals.errors}.`,
+      });
+    } catch (e: any) {
+      toast({ title: 'Backfill failed', description: e?.message || 'Failed', variant: 'destructive' });
+    } finally {
+      setBackfillProgress(null);
+    }
+  };
 
   const handleRetry = async () => {
     if (jobId == null) return;
@@ -230,14 +295,35 @@ export function SyncJobDetailClient() {
             </div>
           </div>
           {(job.status === 'failed' || job.status === 'completed') && (
-            <Button onClick={handleRetry} disabled={retrySyncJob.isPending} size="sm">
-              {retrySyncJob.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <RotateCcw className="h-4 w-4 mr-2" />
-              )}
-              Retry
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleBackfill}
+                disabled={backfillSaleItems.isPending || backfillProgress != null}
+                size="sm"
+                variant="outline"
+              >
+                {backfillProgress ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Backfilling {backfillProgress.processed}
+                    {backfillProgress.total != null ? `/${backfillProgress.total}` : ''}…
+                  </>
+                ) : (
+                  <>
+                    <Wrench className="h-4 w-4 mr-2" />
+                    Backfill stock
+                  </>
+                )}
+              </Button>
+              <Button onClick={handleRetry} disabled={retrySyncJob.isPending} size="sm">
+                {retrySyncJob.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                )}
+                Retry
+              </Button>
+            </div>
           )}
         </div>
 
@@ -312,12 +398,19 @@ export function SyncJobDetailClient() {
                   <CardDescription>Counts from this sync run</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[
                       { type: 'Items', imported: job.stats.items_imported, failed: job.stats.items_failed },
                       { type: 'Orders', imported: job.stats.orders_imported, failed: job.stats.orders_failed },
                       { type: 'Payments', imported: job.stats.payments_imported, failed: job.stats.payments_failed },
-                    ].map((row) => {
+                      {
+                        type: 'Stock movements',
+                        imported: job.stats.stock_reconciled,
+                        failed: job.stats.stock_reconcile_failed,
+                        importedLabel: 'Reconciled',
+                        failedLabel: 'Failed',
+                      },
+                    ].map((row: { type: string; imported?: number; failed?: number; importedLabel?: string; failedLabel?: string }) => {
                       const hasData = typeof row.imported === 'number' || typeof row.failed === 'number';
                       if (!hasData) return null;
                       return (
@@ -333,7 +426,7 @@ export function SyncJobDetailClient() {
                                 </div>
                                 <div>
                                   <p className="text-xl font-semibold">{row.imported}</p>
-                                  <p className="text-xs text-muted-foreground">Imported</p>
+                                  <p className="text-xs text-muted-foreground">{row.importedLabel ?? 'Imported'}</p>
                                 </div>
                               </div>
                             )}
@@ -356,7 +449,7 @@ export function SyncJobDetailClient() {
                                 </div>
                                 <div>
                                   <p className="text-xl font-semibold">{row.failed}</p>
-                                  <p className="text-xs text-muted-foreground">Failed</p>
+                                  <p className="text-xs text-muted-foreground">{row.failedLabel ?? 'Failed'}</p>
                                 </div>
                               </div>
                             )}
@@ -365,6 +458,57 @@ export function SyncJobDetailClient() {
                       );
                     })}
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {(backfillProgress || backfillEvents.length > 0 || backfillTotals) && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Wrench className="h-4 w-4" />
+                    Backfill log
+                    {backfillProgress ? (
+                      <Badge variant="secondary" className="gap-1.5">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        {backfillProgress.processed}
+                        {backfillProgress.total != null ? `/${backfillProgress.total}` : ''}
+                      </Badge>
+                    ) : (
+                      <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600/90 text-white">Done</Badge>
+                    )}
+                  </CardTitle>
+                  {backfillTotals && (
+                    <CardDescription>
+                      scanned {backfillTotals.sales_scanned} · lines patched {backfillTotals.lines_updated} · movements {backfillTotals.movements_written} · unmapped {backfillTotals.unmapped_items} · missing payload {backfillTotals.missing_payload} · errors {backfillTotals.errors}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {backfillEvents.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Waiting for first batch…</p>
+                  ) : (
+                    <div className="max-h-80 overflow-auto rounded-md border bg-muted/30 font-mono text-xs">
+                      {backfillEvents.slice().reverse().map((e, i) => {
+                        const color =
+                          e.status === 'error' ? 'text-destructive' :
+                          e.status === 'unmapped' || e.status === 'missing_payload' ? 'text-amber-600 dark:text-amber-400' :
+                          e.status === 'updated' ? 'text-emerald-600 dark:text-emerald-400' :
+                          'text-muted-foreground';
+                        return (
+                          <div key={`${e.saleId}-${i}`} className="flex items-start gap-3 px-3 py-1.5 border-b last:border-b-0">
+                            <span className={`shrink-0 uppercase tracking-wider ${color}`}>{e.status}</span>
+                            <span className="shrink-0 text-muted-foreground">sale #{e.saleId}</span>
+                            <span className="shrink-0 text-muted-foreground truncate max-w-[160px]" title={e.squareOrderId}>order {e.squareOrderId.slice(0, 10)}…</span>
+                            <span className="shrink-0 text-muted-foreground">lines {e.total_lines} · patched {e.lines_updated} · mov {e.movements_written}</span>
+                            {e.message && (
+                              <span className={`truncate ${color}`} title={e.message}>{e.message}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

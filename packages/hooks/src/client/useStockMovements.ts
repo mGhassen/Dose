@@ -45,6 +45,63 @@ export function useStockMovements(params?: { page?: number; limit?: number; item
   });
 }
 
+export type StockMovementsAnalyticsResponse = {
+  totals: {
+    total_count: number;
+    total_in_qty: number;
+    total_out_qty: number;
+    total_waste_qty: number;
+    total_expired_qty: number;
+    total_adj_qty: number;
+    count_in: number;
+    count_out: number;
+    count_waste: number;
+    count_expired: number;
+    net: number;
+  } | null;
+  daily: Array<{
+    date: string;
+    qty_in: number;
+    qty_out: number;
+    qty_waste: number;
+    qty_expired: number;
+    qty_adj: number;
+    count: number;
+    net: number;
+  }>;
+  by_type: Array<{ type: string; count: number; qty: number }>;
+  by_category: Array<{ name: string; qty_in: number; qty_out: number; net: number; count: number }>;
+  by_location: Array<{ name: string; value: number }>;
+  by_reference: Array<{ name: string; value: number }>;
+  top_items: Array<{
+    item_id: number;
+    name: string;
+    unit: string;
+    qty_in: number;
+    qty_out: number;
+    net: number;
+    count: number;
+  }>;
+  weekday: Array<{ dow: number; count: number; qty: number }>;
+};
+
+export function useStockMovementsAnalytics(
+  params?: {
+    itemId?: string;
+    movementType?: string;
+    startDate?: string;
+    endDate?: string;
+  },
+  options?: { enabled?: boolean }
+) {
+  const enabled = options?.enabled ?? params != null;
+  return useQuery({
+    queryKey: ['stock-movements-analytics', params],
+    queryFn: () => stockMovementsApi.getAnalytics(params) as Promise<StockMovementsAnalyticsResponse>,
+    enabled,
+  });
+}
+
 export function useStockMovementById(id: string) {
   return useQuery({
     queryKey: ['stock-movements', id],
@@ -60,6 +117,7 @@ export function useCreateStockMovement() {
     mutationFn: stockMovementsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements-analytics'] });
       queryClient.invalidateQueries({ queryKey: ['stock-levels'] });
     },
   });
@@ -74,6 +132,7 @@ export function useUpdateStockMovement() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
       queryClient.invalidateQueries({ queryKey: ['stock-movements', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements-analytics'] });
       queryClient.invalidateQueries({ queryKey: ['stock-levels'] });
     },
   });
@@ -86,6 +145,7 @@ export function useDeleteStockMovement() {
     mutationFn: stockMovementsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements-analytics'] });
       queryClient.invalidateQueries({ queryKey: ['stock-levels'] });
     },
   });

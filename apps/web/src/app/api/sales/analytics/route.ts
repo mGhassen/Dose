@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import { getMonthsInRange } from '@kit/lib/date-periods';
 import type { Sale } from '@kit/types';
 
 function transformSale(row: any): Sale {
@@ -21,16 +22,27 @@ function transformSale(row: any): Sale {
   };
 }
 
+function daysBetween(startDate: string, endDate: string): number {
+  const start = new Date(`${startDate}T00:00:00Z`).getTime();
+  const end = new Date(`${endDate}T00:00:00Z`).getTime();
+  return Math.max(1, Math.round((end - start) / 86400000) + 1);
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const year = searchParams.get('year') || new Date().getFullYear().toString();
-    const startDate = `${year}-01-01`;
-    const endDate = `${year}-12-31`;
+    const yearParam = searchParams.get('year');
+    let startDate = searchParams.get('startDate');
+    let endDate = searchParams.get('endDate');
+
+    if (!startDate || !endDate) {
+      const year = yearParam || new Date().getFullYear().toString();
+      startDate = `${year}-01-01`;
+      endDate = `${year}-12-31`;
+    }
 
     const supabase = supabaseServer();
 
-    // Fetch all sales for the year (with pagination to get all records)
     let allSales: any[] = [];
     let page = 0;
     const pageSize = 1000;
@@ -56,80 +68,60 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const data = allSales;
+    const sales = allSales.map(transformSale);
 
-    const sales = (data || []).map(transformSale);
-
-    // Calculate type breakdown
     const typeBreakdown: Record<string, number> = {};
     sales.forEach(sale => {
       typeBreakdown[sale.type] = (typeBreakdown[sale.type] || 0) + sale.amount;
     });
 
-    // Group by month
+    const monthKeys = getMonthsInRange(startDate, endDate);
     const monthlyData: Record<string, { total: number; count: number; byType: Record<string, number> }> = {};
-    const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
-    
-    months.forEach(month => {
-      monthlyData[month] = { total: 0, count: 0, byType: {} };
+    monthKeys.forEach(key => {
+      monthlyData[key] = { total: 0, count: 0, byType: {} };
     });
 
     sales.forEach(sale => {
-      const month = sale.date.slice(5, 7);
-      if (monthlyData[month]) {
-        monthlyData[month].total += sale.amount;
-        monthlyData[month].count += 1;
-        monthlyData[month].byType[sale.type] = (monthlyData[month].byType[sale.type] || 0) + sale.amount;
+      const key = sale.date.slice(0, 7);
+      if (monthlyData[key]) {
+        monthlyData[key].total += sale.amount;
+        monthlyData[key].count += 1;
+        monthlyData[key].byType[sale.type] = (monthlyData[key].byType[sale.type] || 0) + sale.amount;
       }
     });
 
-    // Format monthly data for chart
-    const monthlyChartData = months.map(month => ({
-      month: `${year}-${month}`,
-      revenue: monthlyData[month].total,
-      count: monthlyData[month].count,
-      average: monthlyData[month].count > 0 ? monthlyData[month].total / monthlyData[month].count : 0,
-      ...monthlyData[month].byType,
+    const monthlyChartData = monthKeys.map(key => ({
+      month: key,
+      revenue: monthlyData[key].total,
+      count: monthlyData[key].count,
+      average: monthlyData[key].count > 0 ? monthlyData[key].total / monthlyData[key].count : 0,
+      ...monthlyData[key].byType,
     }));
 
-    // Daily breakdown for current month
-    const currentMonth = new Date().getMonth() + 1;
-    const currentMonthStr = String(currentMonth).padStart(2, '0');
     const dailyData: Record<string, number> = {};
-    sales
-      .filter(sale => sale.date.startsWith(`${year}-${currentMonthStr}`))
-      .forEach(sale => {
-        const day = sale.date.slice(8, 10);
-        dailyData[day] = (dailyData[day] || 0) + sale.amount;
-      });
+    sales.forEach(sale => {
+      dailyData[sale.date] = (dailyData[sale.date] || 0) + sale.amount;
+    });
 
     const dailyChartData = Object.entries(dailyData)
-      .map(([day, amount]) => ({
-        day: `${year}-${currentMonthStr}-${day}`,
-        revenue: amount,
-      }))
+      .map(([day, revenue]) => ({ day, revenue }))
       .sort((a, b) => a.day.localeCompare(b.day));
 
-    // Calculate totals and averages
     const totalRevenue = sales.reduce((sum, sale) => sum + sale.amount, 0);
     const averageOrderValue = sales.length > 0 ? totalRevenue / sales.length : 0;
 
-    // Best performing days (top 10)
-    const dailyTotals: Record<string, number> = {};
-    sales.forEach(sale => {
-      dailyTotals[sale.date] = (dailyTotals[sale.date] || 0) + sale.amount;
-    });
-
-    const bestDays = Object.entries(dailyTotals)
+    const bestDays = Object.entries(dailyData)
       .map(([date, amount]) => ({ date, amount }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 10);
+
+    const periodDays = daysBetween(startDate, endDate);
 
     return NextResponse.json({
       typeBreakdown: Object.entries(typeBreakdown).map(([type, amount]) => ({
         type,
         amount,
-        percentage: (amount / totalRevenue) * 100,
+        percentage: totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0,
       })),
       monthlyTrend: monthlyChartData,
       dailyTrend: dailyChartData,
@@ -138,7 +130,7 @@ export async function GET(request: NextRequest) {
         totalRevenue,
         totalSales: sales.length,
         averageOrderValue,
-        averageDailyRevenue: totalRevenue / 365, // Approximate
+        averageDailyRevenue: totalRevenue / periodDays,
       },
     });
   } catch (error: any) {
@@ -149,4 +141,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

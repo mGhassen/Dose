@@ -8,6 +8,8 @@ import DataTablePage from "@/components/data-table-page";
 import { useDashboardPeriod } from "@/components/dashboard-period-provider";
 import {
   useStockMovements,
+  useStockMovementsAnalytics,
+  useStockMovementById,
   useDeleteStockMovement,
   useItems,
   useMetadataEnum,
@@ -45,6 +47,7 @@ import {
   SheetTitle,
 } from "@kit/ui/sheet";
 import { Skeleton } from "@kit/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import {
   Tooltip as UiTooltip,
   TooltipContent,
@@ -495,10 +498,29 @@ export default function StockMovementsContent() {
   const [activeTypes, setActiveTypes] = useState<Set<StockMovementType>>(
     new Set()
   );
+  const [tablePage, setTablePage] = useState(1);
+  const [tablePageSize, setTablePageSize] = useState(20);
   const [openMovementId, setOpenMovementId] = useState<number | null>(() => {
     const raw = urlSearchParams.get("open");
     return raw ? Number(raw) : null;
   });
+  const [analyticsTab, setAnalyticsTab] = useState<string>(
+    urlSearchParams.get("itemId") ? "balance" : "activity"
+  );
+
+  useEffect(() => {
+    if (selectedItemId) setAnalyticsTab((prev) => (prev === "activity" ? "balance" : prev));
+    else setAnalyticsTab((prev) => (prev === "balance" ? "activity" : prev));
+  }, [selectedItemId]);
+
+  useEffect(() => {
+    setTablePage(1);
+  }, [
+    dateRange.startDate,
+    dateRange.endDate,
+    selectedItemId,
+    activeTypes,
+  ]);
 
   useEffect(() => {
     const current = urlSearchParams.get("itemId") ?? "";
@@ -521,37 +543,55 @@ export default function StockMovementsContent() {
     router.replace(`/stock-movements${qs ? `?${qs}` : ""}`, { scroll: false });
   }, [openMovementId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data: movementsResponse, isLoading } = useStockMovements({
-    limit: 1000,
+  const activeTypesCsv = useMemo(
+    () => [...activeTypes].join(","),
+    [activeTypes]
+  );
+  
+  const { data: tableResponse } = useStockMovements({
+    page: tablePage,
+    limit: tablePageSize,
+    itemId: selectedItemId || undefined,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    movementType: activeTypesCsv || undefined,
+  });
+
+  const prevRange = useMemo(() => shiftRangeBack(dateRange), [dateRange]);
+
+  const { data: analytics, isLoading: isLoadingAnalytics } = useStockMovementsAnalytics({
+    itemId: selectedItemId || undefined,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    movementType: activeTypesCsv || undefined,
+  });
+
+  const { data: analyticsAll } = useStockMovementsAnalytics({
     itemId: selectedItemId || undefined,
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
   });
 
-  const prevRange = useMemo(() => shiftRangeBack(dateRange), [dateRange]);
-  const { data: prevMovementsResponse } = useStockMovements({
-    limit: 1000,
+  const { data: analyticsPrev } = useStockMovementsAnalytics({
     itemId: selectedItemId || undefined,
     startDate: prevRange.startDate,
     endDate: prevRange.endDate,
+    movementType: activeTypesCsv || undefined,
   });
 
-  const { data: itemsResponse } = useItems({ limit: 1000 });
+  const isLoading = isLoadingAnalytics;
+
+  const { data: itemsResponse } = useItems({ limit: 1000, excludeCatalogParents: true });
   const items: Item[] = itemsResponse?.data ?? [];
   const itemMap = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const selectedItem = selectedItemId ? itemMap.get(Number(selectedItemId)) : undefined;
 
-  const allMovements: MovementWithIngredient[] =
-    (movementsResponse?.data as MovementWithIngredient[]) || [];
-  const prevMovements: MovementWithIngredient[] =
-    (prevMovementsResponse?.data as MovementWithIngredient[]) || [];
+  const tableMovements: MovementWithIngredient[] =
+    (tableResponse?.data as MovementWithIngredient[]) || [];
 
-  const filteredMovements = useMemo(() => {
-    if (activeTypes.size === 0) return allMovements;
-    return allMovements.filter((m) => activeTypes.has(m.movementType));
-  }, [allMovements, activeTypes]);
-
-  const totalCount = movementsResponse?.pagination?.total ?? allMovements.length;
+  const totalCount = analyticsAll?.totals?.total_count ?? 0;
+  const tableTotalCount = tableResponse?.pagination?.total ?? 0;
+  const tableTotalPages = tableResponse?.pagination?.totalPages ?? 0;
 
   const deleteMutation = useDeleteStockMovement();
   const { data: movementTypeValues = [] } = useMetadataEnum("StockMovementType");
@@ -565,73 +605,45 @@ export default function StockMovementsContent() {
 
   const typeCounts = useMemo(() => {
     const m = new Map<StockMovementType, number>();
-    for (const mov of allMovements) {
-      m.set(mov.movementType, (m.get(mov.movementType) ?? 0) + 1);
+    for (const t of analyticsAll?.by_type ?? []) {
+      m.set(t.type as StockMovementType, t.count);
     }
     return m;
-  }, [allMovements]);
+  }, [analyticsAll]);
 
   const kpi = useMemo(() => {
-    let inCount = 0, outCount = 0, wasteCount = 0, expiredCount = 0;
-    let inQty = 0, outQty = 0, wasteQty = 0, expiredQty = 0, adjQty = 0;
-    for (const m of filteredMovements) {
-      if (m.movementType === StockMovementType.IN) {
-        inCount++;
-        inQty += m.quantity;
-      } else if (m.movementType === StockMovementType.OUT) {
-        outCount++;
-        outQty += m.quantity;
-      } else if (m.movementType === StockMovementType.WASTE) {
-        wasteCount++;
-        wasteQty += m.quantity;
-      } else if (m.movementType === StockMovementType.EXPIRED) {
-        expiredCount++;
-        expiredQty += m.quantity;
-      } else if (m.movementType === StockMovementType.ADJUSTMENT) {
-        adjQty += m.quantity;
-      }
-    }
-    const net = inQty - outQty - wasteQty - expiredQty + adjQty;
+    const t = analytics?.totals;
     return {
-      inCount, outCount, wasteCount, expiredCount,
-      inQty, outQty, wasteQty, expiredQty, adjQty,
-      net,
-      total: filteredMovements.length,
+      inCount: t?.count_in ?? 0,
+      outCount: t?.count_out ?? 0,
+      wasteCount: t?.count_waste ?? 0,
+      expiredCount: t?.count_expired ?? 0,
+      inQty: Number(t?.total_in_qty ?? 0),
+      outQty: Number(t?.total_out_qty ?? 0),
+      wasteQty: Number(t?.total_waste_qty ?? 0),
+      expiredQty: Number(t?.total_expired_qty ?? 0),
+      adjQty: Number(t?.total_adj_qty ?? 0),
+      net: Number(t?.net ?? 0),
+      total: t?.total_count ?? 0,
     };
-  }, [filteredMovements]);
+  }, [analytics]);
 
   const prevKpi = useMemo(() => {
-    let inCount = 0, outCount = 0, wasteCount = 0, expiredCount = 0;
-    let inQty = 0, outQty = 0, wasteQty = 0, expiredQty = 0, adjQty = 0;
-    const scoped =
-      activeTypes.size === 0
-        ? prevMovements
-        : prevMovements.filter((m) => activeTypes.has(m.movementType));
-    for (const m of scoped) {
-      if (m.movementType === StockMovementType.IN) {
-        inCount++;
-        inQty += m.quantity;
-      } else if (m.movementType === StockMovementType.OUT) {
-        outCount++;
-        outQty += m.quantity;
-      } else if (m.movementType === StockMovementType.WASTE) {
-        wasteCount++;
-        wasteQty += m.quantity;
-      } else if (m.movementType === StockMovementType.EXPIRED) {
-        expiredCount++;
-        expiredQty += m.quantity;
-      } else if (m.movementType === StockMovementType.ADJUSTMENT) {
-        adjQty += m.quantity;
-      }
-    }
-    const net = inQty - outQty - wasteQty - expiredQty + adjQty;
+    const t = analyticsPrev?.totals;
     return {
-      inCount, outCount, wasteCount, expiredCount,
-      inQty, outQty, wasteQty, expiredQty, adjQty,
-      net,
-      total: scoped.length,
+      inCount: t?.count_in ?? 0,
+      outCount: t?.count_out ?? 0,
+      wasteCount: t?.count_waste ?? 0,
+      expiredCount: t?.count_expired ?? 0,
+      inQty: Number(t?.total_in_qty ?? 0),
+      outQty: Number(t?.total_out_qty ?? 0),
+      wasteQty: Number(t?.total_waste_qty ?? 0),
+      expiredQty: Number(t?.total_expired_qty ?? 0),
+      adjQty: Number(t?.total_adj_qty ?? 0),
+      net: Number(t?.net ?? 0),
+      total: t?.total_count ?? 0,
     };
-  }, [prevMovements, activeTypes]);
+  }, [analyticsPrev]);
 
   const deltaPct = (now: number, prev: number): number | null => {
     if (!Number.isFinite(now) || !Number.isFinite(prev)) return null;
@@ -646,40 +658,33 @@ export default function StockMovementsContent() {
     const d = new Date(start);
     while (d <= end) {
       days.push(
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-          d.getDate()
+        `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
+          d.getUTCDate()
         ).padStart(2, "0")}`
       );
-      d.setDate(d.getDate() + 1);
+      d.setUTCDate(d.getUTCDate() + 1);
     }
     return days;
   }, [dateRange.startDate, dateRange.endDate]);
 
   const dailyByType = useMemo(() => {
-    const map = new Map<
-      string,
-      { in: number; out: number; waste: number; expired: number; adj: number; count: number; net: number }
-    >();
-    for (const day of dayBuckets) {
-      map.set(day, { in: 0, out: 0, waste: 0, expired: 0, adj: 0, count: 0, net: 0 });
-    }
-    for (const m of filteredMovements) {
-      const key = toLocalDateKey(m.movementDate);
-      const bucket = map.get(key);
-      if (!bucket) continue;
-      bucket.count++;
-      if (m.movementType === StockMovementType.IN) bucket.in += m.quantity;
-      else if (m.movementType === StockMovementType.OUT) bucket.out += m.quantity;
-      else if (m.movementType === StockMovementType.WASTE) bucket.waste += m.quantity;
-      else if (m.movementType === StockMovementType.EXPIRED) bucket.expired += m.quantity;
-      else if (m.movementType === StockMovementType.ADJUSTMENT) bucket.adj += m.quantity;
-      bucket.net += signedDelta(m);
-    }
+    const lookup = new Map(
+      (analytics?.daily ?? []).map((d) => [d.date, d])
+    );
     return dayBuckets.map((day) => {
-      const b = map.get(day)!;
-      return { date: day, ...b };
+      const d = lookup.get(day);
+      return {
+        date: day,
+        in: Number(d?.qty_in ?? 0),
+        out: Number(d?.qty_out ?? 0),
+        waste: Number(d?.qty_waste ?? 0),
+        expired: Number(d?.qty_expired ?? 0),
+        adj: Number(d?.qty_adj ?? 0),
+        count: Number(d?.count ?? 0),
+        net: Number(d?.net ?? 0),
+      };
     });
-  }, [filteredMovements, dayBuckets]);
+  }, [analytics, dayBuckets]);
 
   const sparkSeries = useMemo(() => {
     const total = dailyByType.map((d) => ({ v: d.count }));
@@ -715,61 +720,142 @@ export default function StockMovementsContent() {
     ? balanceChartData[balanceChartData.length - 1].balance
     : 0;
 
-  const multiItemTopSeries = useMemo(() => {
-    if (selectedItemId) return [];
-    const itemCounts = new Map<number, number>();
-    for (const m of filteredMovements) {
-      const id = resolveItemId(m);
-      if (!id) continue;
-      itemCounts.set(id, (itemCounts.get(id) ?? 0) + 1);
-    }
-    const topIds = [...itemCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([id]) => id);
-
-    const perDay = new Map<string, Record<string, number>>();
-    for (const day of dayBuckets) perDay.set(day, { date: day } as any);
-
-    for (const m of filteredMovements) {
-      const id = resolveItemId(m);
-      if (!id || !topIds.includes(id)) continue;
-      const key = toLocalDateKey(m.movementDate);
-      const row = perDay.get(key);
-      if (!row) continue;
-      const name = itemMap.get(id)?.name ?? `Item ${id}`;
-      row[name] = ((row[name] as number) ?? 0) + signedDelta(m);
-    }
-    return {
-      data: [...perDay.values()],
-      keys: topIds.map((id) => itemMap.get(id)?.name ?? `Item ${id}`),
-    } as { data: any[]; keys: string[] };
-  }, [filteredMovements, selectedItemId, itemMap, dayBuckets]);
+  const multiItemTopSeries = useMemo(
+    () => ({ data: [] as any[], keys: [] as string[] }),
+    []
+  );
 
   const typeDistribution = useMemo(() => {
-    const entries: Array<{ name: string; value: number; type: StockMovementType }> = [];
-    for (const t of TYPE_ORDER) {
-      const count = filteredMovements.filter((m) => m.movementType === t).length;
-      if (count > 0) entries.push({ name: TYPE_META[t].label, value: count, type: t });
-    }
-    return entries;
-  }, [filteredMovements]);
+    return TYPE_ORDER.map((t) => {
+      const found = (analytics?.by_type ?? []).find((x) => x.type === t);
+      return {
+        name: TYPE_META[t].label,
+        value: Number(found?.count ?? 0),
+        type: t,
+      };
+    }).filter((e) => e.value > 0);
+  }, [analytics]);
 
-  const chartColors = [
-    "hsl(var(--chart-1))",
-    "hsl(var(--chart-2))",
-    "hsl(var(--chart-3))",
-    "hsl(var(--chart-4))",
-    "hsl(var(--chart-5))",
-  ];
+  const dailyActivity = useMemo(
+    () =>
+      dailyByType.map((d) => ({
+        date: d.date,
+        IN: d.in,
+        OUT: -d.out,
+        WASTE: -d.waste,
+        EXPIRED: -d.expired,
+        ADJ: d.adj,
+      })),
+    [dailyByType]
+  );
+
+  const categoryBreakdown = useMemo(
+    () =>
+      (analytics?.by_category ?? []).slice(0, 12).map((c) => ({
+        name: c.name,
+        in: Number(c.qty_in),
+        out: Number(c.qty_out),
+        net: Number(c.net),
+        count: Number(c.count),
+      })),
+    [analytics]
+  );
+
+  const topItemsBreakdown = useMemo(
+    () =>
+      (analytics?.top_items ?? []).slice(0, 10).map((it) => ({
+        id: it.item_id,
+        name: it.name,
+        unit: it.unit,
+        in: Number(it.qty_in),
+        out: Number(it.qty_out),
+        net: Number(it.net),
+        count: Number(it.count),
+      })),
+    [analytics]
+  );
+
+  const locationBreakdown = useMemo(
+    () =>
+      (analytics?.by_location ?? []).slice(0, 8).map((l) => ({
+        name: l.name,
+        value: Number(l.value),
+      })),
+    [analytics]
+  );
+
+  const heatmapData = useMemo(() => {
+    if (dailyByType.length === 0) return { weeks: [], max: 0 };
+    const max = Math.max(1, ...dailyByType.map((d) => d.count));
+    const weeks: Array<{
+      weekStart: string;
+      cells: Array<{ date: string; count: number; intensity: number; weekday: number } | null>;
+    }> = [];
+    let currentWeek: { weekStart: string; cells: Array<any> } | null = null;
+    for (const d of dailyByType) {
+      const date = new Date(d.date);
+      const wd = (date.getDay() + 6) % 7;
+      if (wd === 0 || !currentWeek) {
+        if (currentWeek) {
+          while (currentWeek.cells.length < 7) currentWeek.cells.push(null);
+          weeks.push(currentWeek);
+        }
+        currentWeek = { weekStart: d.date, cells: [] };
+        while (currentWeek.cells.length < wd) currentWeek.cells.push(null);
+      }
+      currentWeek.cells.push({
+        date: d.date,
+        count: d.count,
+        intensity: d.count / max,
+        weekday: wd,
+      });
+    }
+    if (currentWeek) {
+      while (currentWeek.cells.length < 7) currentWeek.cells.push(null);
+      weeks.push(currentWeek);
+    }
+    return { weeks, max };
+  }, [dailyByType]);
+
+  const weekdayBreakdown = useMemo(() => {
+    const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    return labels.map((label, i) => {
+      const dow = i + 1;
+      const found = (analytics?.weekday ?? []).find((w) => w.dow === dow);
+      return {
+        name: label,
+        count: Number(found?.count ?? 0),
+        qty: Number(found?.qty ?? 0),
+      };
+    });
+  }, [analytics]);
+
+  const referenceBreakdown = useMemo(
+    () =>
+      (analytics?.by_reference ?? []).map((r) => ({
+        name: r.name === "Manual" ? "Manual" : prettyReferenceLabel(r.name),
+        value: Number(r.value),
+      })),
+    [analytics]
+  );
+
+  const COLOR_IN = "#10b981";
+  const COLOR_OUT = "#f43f5e";
+  const COLOR_BALANCE = "#8b5cf6";
+  const COLOR_ADJ = "#f59e0b";
+  const COLOR_TRANS = "#3b82f6";
+
+  const chartColors = [COLOR_IN, COLOR_OUT, COLOR_BALANCE, COLOR_ADJ, COLOR_TRANS];
 
   const pieFillForType = (t: StockMovementType): string => {
-    if (t === StockMovementType.IN) return "hsl(var(--chart-1))";
-    if (t === StockMovementType.OUT) return "hsl(var(--chart-2))";
-    if (t === StockMovementType.ADJUSTMENT) return "hsl(var(--chart-3))";
-    if (t === StockMovementType.TRANSFER) return "hsl(var(--chart-4))";
-    return "hsl(var(--chart-5))";
+    if (t === StockMovementType.IN) return COLOR_IN;
+    if (t === StockMovementType.OUT) return COLOR_OUT;
+    if (t === StockMovementType.ADJUSTMENT) return COLOR_ADJ;
+    if (t === StockMovementType.TRANSFER) return COLOR_TRANS;
+    return "#ef4444";
   };
+
+  const xTickInterval = Math.max(0, Math.floor(dayBuckets.length / 12));
 
   const resetFilters = () => {
     setSelectedItemId("");
@@ -785,9 +871,35 @@ export default function StockMovementsContent() {
     });
   };
 
-  const openMovement = openMovementId
-    ? allMovements.find((m) => m.id === openMovementId)
+  const fromTable = openMovementId
+    ? tableMovements.find((m) => m.id === openMovementId)
     : undefined;
+  const { data: openMovementFetched } = useStockMovementById(
+    openMovementId && !fromTable ? String(openMovementId) : ""
+  );
+  const openMovement = (fromTable ?? openMovementFetched) as
+    | MovementWithIngredient
+    | undefined;
+
+  const detailItemId = openMovement
+    ? resolveItemId(openMovement as MovementWithIngredient)
+    : undefined;
+  const { data: detailAnalytics } = useStockMovementsAnalytics(
+    detailItemId
+      ? {
+          itemId: String(detailItemId),
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+        }
+      : undefined
+  );
+  const detailDailyForItem = useMemo(() => {
+    if (!detailAnalytics?.daily) return [];
+    return detailAnalytics.daily.map((d) => ({
+      date: d.date,
+      net: Number(d.net ?? 0),
+    }));
+  }, [detailAnalytics]);
 
   const handleDelete = async (id: number) => {
     try {
@@ -858,10 +970,10 @@ export default function StockMovementsContent() {
 
   const columns: ColumnDef<StockMovement>[] = useMemo(
     () => [
-      {
-        accessorKey: "itemId",
-        header: "Item",
-        cell: ({ row }) => {
+    {
+      accessorKey: "itemId",
+      header: "Item",
+      cell: ({ row }) => {
           const id = resolveItemId(row.original as MovementWithIngredient);
           const item = id ? itemMap.get(id) : undefined;
           return (
@@ -877,11 +989,11 @@ export default function StockMovementsContent() {
               </div>
             </div>
           );
-        },
       },
-      {
-        accessorKey: "movementType",
-        header: "Type",
+    },
+    {
+      accessorKey: "movementType",
+      header: "Type",
         cell: ({ row }) => {
           const t = row.original.movementType;
           const meta = TYPE_META[t];
@@ -894,12 +1006,12 @@ export default function StockMovementsContent() {
               <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
               <Icon className="h-3 w-3" />
               {movementTypeLabels[t] ?? meta.label}
-            </Badge>
+        </Badge>
           );
         },
-      },
-      {
-        accessorKey: "quantity",
+    },
+    {
+      accessorKey: "quantity",
         header: () => <div className="text-right">Quantity</div>,
         cell: ({ row }) => {
           const m = row.original;
@@ -920,10 +1032,10 @@ export default function StockMovementsContent() {
             </div>
           );
         },
-      },
-      {
-        accessorKey: "location",
-        header: "Location",
+    },
+    {
+      accessorKey: "location",
+      header: "Location",
         cell: ({ row }) =>
           row.original.location ? (
             <div className="flex items-center gap-1.5 text-sm">
@@ -933,10 +1045,10 @@ export default function StockMovementsContent() {
           ) : (
             <span className="text-muted-foreground">—</span>
           ),
-      },
-      {
-        accessorKey: "movementDate",
-        header: "Date",
+    },
+    {
+      accessorKey: "movementDate",
+      header: "Date",
         cell: ({ row }) => (
           <TooltipProvider delayDuration={200}>
             <UiTooltip>
@@ -951,10 +1063,10 @@ export default function StockMovementsContent() {
             </UiTooltip>
           </TooltipProvider>
         ),
-      },
-      {
-        accessorKey: "referenceType",
-        header: "Reference",
+    },
+    {
+      accessorKey: "referenceType",
+      header: "Reference",
         cell: ({ row }) => {
           const refType = row.original.referenceType;
           const refId = row.original.referenceId;
@@ -989,15 +1101,16 @@ export default function StockMovementsContent() {
   );
 
   const hasActiveFilters = selectedItemId !== "" || activeTypes.size > 0;
-  const showInitialEmpty = !isLoading && allMovements.length === 0 && !hasActiveFilters;
+  const showInitialEmpty =
+    !isLoading && (analyticsAll?.totals?.total_count ?? 0) === 0 && !hasActiveFilters;
   const showFilteredEmpty =
-    !isLoading && filteredMovements.length === 0 && hasActiveFilters;
+    !isLoading && (analytics?.totals?.total_count ?? 0) === 0 && hasActiveFilters;
 
   return (
     <div className="space-y-6">
-      <div className="sticky top-14 z-20 -mx-4 border-b bg-background/80 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:-mx-6 md:px-6">
+      <div className="border-b pb-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
+        <div>
             <h1 className="text-2xl font-bold tracking-tight">
               Stock movements
               {selectedItem ? (
@@ -1070,7 +1183,7 @@ export default function StockMovementsContent() {
               icon={ArrowUpDown}
               tintClass="bg-primary/10 text-primary"
               sparkData={sparkSeries.total}
-              sparkColor="hsl(var(--chart-1))"
+              sparkColor={COLOR_BALANCE}
               delta={deltaPct(kpi.total, prevKpi.total)}
             />
             <KpiCard
@@ -1080,7 +1193,7 @@ export default function StockMovementsContent() {
               icon={TrendingUp}
               tintClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
               sparkData={sparkSeries.inSeries}
-              sparkColor="hsl(var(--chart-1))"
+              sparkColor={COLOR_IN}
               delta={deltaPct(kpi.inCount, prevKpi.inCount)}
             />
             <KpiCard
@@ -1090,10 +1203,10 @@ export default function StockMovementsContent() {
               icon={TrendingDown}
               tintClass="bg-sky-500/10 text-sky-600 dark:text-sky-400"
               sparkData={sparkSeries.outSeries}
-              sparkColor="hsl(var(--chart-2))"
+              sparkColor={COLOR_OUT}
               delta={deltaPct(kpi.outCount, prevKpi.outCount)}
             />
-            <Card>
+        <Card>
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Waste / Expired
@@ -1101,7 +1214,7 @@ export default function StockMovementsContent() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400">
                   <Trash2 className="h-4 w-4" />
                 </div>
-              </CardHeader>
+          </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex items-baseline justify-between">
                   <div>
@@ -1125,10 +1238,10 @@ export default function StockMovementsContent() {
                 </div>
                 <Sparkline
                   data={sparkSeries.wasteSeries}
-                  colorVar="hsl(var(--chart-5))"
+                  colorVar="#ef4444"
                 />
-              </CardContent>
-            </Card>
+          </CardContent>
+        </Card>
             <KpiCard
               title="Net variation"
               value={
@@ -1148,7 +1261,7 @@ export default function StockMovementsContent() {
               icon={Scale}
               tintClass="bg-violet-500/10 text-violet-600 dark:text-violet-400"
               sparkData={sparkSeries.netSeries}
-              sparkColor="hsl(var(--chart-3))"
+              sparkColor={COLOR_BALANCE}
               delta={deltaPct(kpi.net, prevKpi.net)}
             />
           </>
@@ -1161,237 +1274,34 @@ export default function StockMovementsContent() {
             <Skeleton className="h-[320px] w-full" />
           </CardContent>
         </Card>
-      ) : selectedItemId && selectedItem ? (
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-              <div>
-                <CardTitle>Stock variation · {selectedItem.name}</CardTitle>
-                <CardDescription>
-                  Running balance + daily IN/OUT across selected period
-                </CardDescription>
-              </div>
-              <div className="flex gap-6 text-sm">
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground">
-                    Start
-                  </div>
-                  <div className="font-semibold tabular-nums">
-                    {formatSignedNumber(startingBalance)} {selectedItem.unit}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground">
-                    End
-                  </div>
-                  <div
-                    className={cn(
-                      "font-semibold tabular-nums",
-                      endingBalance > 0
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : endingBalance < 0
-                        ? "text-rose-600 dark:text-rose-400"
-                        : ""
-                    )}
-                  >
-                    {formatSignedNumber(endingBalance)} {selectedItem.unit}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {balanceChartData.length === 0 ? (
-              <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 text-muted-foreground">
-                <Inbox className="h-8 w-8" />
-                <div>No movements in this period</div>
-                {hasActiveFilters ? (
-                  <Button variant="link" size="sm" onClick={resetFilters}>
-                    Clear filters
-                  </Button>
-                ) : null}
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={360}>
-                <ComposedChart data={balanceChartData}>
-                  <CartesianGrid
-                    strokeDasharray="4 4"
-                    className="stroke-muted"
-                  />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={(v) =>
-                      new Date(v).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                      })
-                    }
-                    tick={{ fontSize: 11 }}
-                  />
-                  <YAxis
-                    yAxisId="left"
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(v) => formatNumber(v)}
-                  />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(v) => formatNumber(v)}
-                  />
-                  <Tooltip
-                    formatter={(value: number, key: string) => [
-                      `${formatSignedNumber(Math.abs(value) === value && key === "out" ? -value : value)} ${selectedItem.unit}`,
-                      key === "in" ? "IN" : key === "out" ? "OUT" : "Balance",
-                    ]}
-                    labelFormatter={(v) => formatDate(v)}
-                    contentStyle={{
-                      background: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <ReferenceLine
-                    yAxisId="left"
-                    y={0}
-                    stroke="hsl(var(--border))"
-                  />
-                  <Bar
-                    yAxisId="left"
-                    dataKey="in"
-                    name="IN"
-                    fill="hsl(var(--chart-1))"
-                    radius={[3, 3, 0, 0]}
-                  />
-                  <Bar
-                    yAxisId="left"
-                    dataKey="out"
-                    name="OUT"
-                    fill="hsl(var(--chart-5))"
-                    radius={[3, 3, 0, 0]}
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="balance"
-                    name="Balance"
-                    stroke="hsl(var(--chart-3))"
-                    strokeWidth={2.5}
-                    dot={false}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Daily net variation · top 5 items</CardTitle>
-              <CardDescription>
-                Stacked daily net change by item (IN − OUT − waste)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {multiItemTopSeries && (multiItemTopSeries as any).data?.length ? (
-                <ResponsiveContainer width="100%" height={320}>
-                  <BarChart data={(multiItemTopSeries as any).data}>
-                    <CartesianGrid
-                      strokeDasharray="4 4"
-                      className="stroke-muted"
-                    />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={(v) =>
-                        new Date(v).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })
-                      }
-                      tick={{ fontSize: 11 }}
-                    />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip
-                      contentStyle={{
-                        background: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                      labelFormatter={(v) => formatDate(v)}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <ReferenceLine y={0} stroke="hsl(var(--border))" />
-                    {(multiItemTopSeries as any).keys.map((k: string, i: number) => (
-                      <Bar
-                        key={k}
-                        dataKey={k}
-                        stackId="a"
-                        fill={chartColors[i % chartColors.length]}
-                        radius={[3, 3, 0, 0]}
-                      />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 text-muted-foreground">
-                  <Inbox className="h-8 w-8" />
-                  <div>No movements in this period</div>
-                  {hasActiveFilters ? (
-                    <Button variant="link" size="sm" onClick={resetFilters}>
-                      Clear filters
-                    </Button>
-                  ) : null}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Distribution</CardTitle>
-              <CardDescription>Movements by type</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {typeDistribution.length ? (
-                <ResponsiveContainer width="100%" height={320}>
-                  <PieChart>
-                    <Pie
-                      data={typeDistribution}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={50}
-                      outerRadius={90}
-                      paddingAngle={2}
-                    >
-                      {typeDistribution.map((entry) => (
-                        <Cell
-                          key={entry.type}
-                          fill={pieFillForType(entry.type)}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        background: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex min-h-[320px] flex-col items-center justify-center text-muted-foreground">
-                  <Inbox className="h-8 w-8" />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <AnalyticsBlock
+          activeTab={analyticsTab}
+          onTabChange={setAnalyticsTab}
+          selectedItem={selectedItem}
+          balanceChartData={balanceChartData}
+          startingBalance={startingBalance}
+          endingBalance={endingBalance}
+          dailyActivity={dailyActivity}
+          multiItemTopSeries={multiItemTopSeries as any}
+          categoryBreakdown={categoryBreakdown}
+          topItemsBreakdown={topItemsBreakdown}
+          locationBreakdown={locationBreakdown}
+          referenceBreakdown={referenceBreakdown}
+          heatmapData={heatmapData}
+          weekdayBreakdown={weekdayBreakdown}
+          typeDistribution={typeDistribution}
+          chartColors={chartColors}
+          pieFillForType={pieFillForType}
+          xTickInterval={xTickInterval}
+          unitLabel={unitLabel}
+          hasActiveFilters={hasActiveFilters}
+          resetFilters={resetFilters}
+          colorIn={COLOR_IN}
+          colorOut={COLOR_OUT}
+          colorBalance={COLOR_BALANCE}
+          colorAdj={COLOR_ADJ}
+        />
       )}
 
       {showInitialEmpty ? (
@@ -1432,7 +1342,7 @@ export default function StockMovementsContent() {
         <DataTablePage
           title=""
           description=""
-          data={filteredMovements}
+          data={tableMovements}
           columns={columns}
           loading={isLoading}
           onRowClick={(movement) => setOpenMovementId(movement.id)}
@@ -1440,6 +1350,17 @@ export default function StockMovementsContent() {
           onBulkDelete={handleBulkDelete}
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
+          pagination={{
+            page: tablePage,
+            pageSize: tablePageSize,
+            totalCount: tableTotalCount,
+            totalPages: tableTotalPages,
+            onPageChange: setTablePage,
+            onPageSizeChange: (newSize) => {
+              setTablePageSize(newSize);
+              setTablePage(1);
+            },
+          }}
           filterColumns={[
             { value: "itemId", label: "Item", type: "select" },
             { value: "movementType", label: "Movement Type", type: "select" },
@@ -1478,7 +1399,7 @@ export default function StockMovementsContent() {
                   return id ? itemMap.get(id) : undefined;
                 })()
               }
-              allMovements={allMovements}
+              dailyForItem={detailDailyForItem}
               selectedItemId={selectedItemId}
               dayBuckets={dayBuckets}
               onDelete={async () => {
@@ -1488,21 +1409,685 @@ export default function StockMovementsContent() {
           ) : null}
         </SheetContent>
       </Sheet>
+      </div>
+  );
+}
+
+type AnalyticsBlockProps = {
+  activeTab: string;
+  onTabChange: (v: string) => void;
+  selectedItem?: Item;
+  balanceChartData: Array<{ date: string; in: number; out: number; balance: number }>;
+  startingBalance: number;
+  endingBalance: number;
+  dailyActivity: Array<{
+    date: string;
+    IN: number;
+    OUT: number;
+    WASTE: number;
+    EXPIRED: number;
+    ADJ: number;
+  }>;
+  multiItemTopSeries: { data: any[]; keys: string[] } | any[];
+  categoryBreakdown: Array<{ name: string; in: number; out: number; net: number; count: number }>;
+  topItemsBreakdown: Array<{
+    id: number;
+    name: string;
+    unit: string;
+    in: number;
+    out: number;
+    net: number;
+    count: number;
+  }>;
+  locationBreakdown: Array<{ name: string; value: number }>;
+  referenceBreakdown: Array<{ name: string; value: number }>;
+  heatmapData: {
+    weeks: Array<{
+      weekStart: string;
+      cells: Array<{ date: string; count: number; intensity: number; weekday: number } | null>;
+    }>;
+    max: number;
+  };
+  weekdayBreakdown: Array<{ name: string; count: number; qty: number }>;
+  typeDistribution: Array<{ name: string; value: number; type: StockMovementType }>;
+  chartColors: string[];
+  pieFillForType: (t: StockMovementType) => string;
+  xTickInterval: number;
+  unitLabel: string;
+  hasActiveFilters: boolean;
+  resetFilters: () => void;
+  colorIn: string;
+  colorOut: string;
+  colorBalance: string;
+  colorAdj: string;
+};
+
+const TOOLTIP_STYLE = {
+  background: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: 8,
+  fontSize: 12,
+} as const;
+
+function EmptyChart({
+  hasActiveFilters,
+  resetFilters,
+  message = "No movements in this period",
+}: {
+  hasActiveFilters: boolean;
+  resetFilters: () => void;
+  message?: string;
+}) {
+  return (
+    <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 text-muted-foreground">
+      <Inbox className="h-8 w-8" />
+      <div>{message}</div>
+      {hasActiveFilters ? (
+        <Button variant="link" size="sm" onClick={resetFilters}>
+          Clear filters
+        </Button>
+      ) : null}
     </div>
+  );
+}
+
+function AnalyticsBlock({
+  activeTab,
+  onTabChange,
+  selectedItem,
+  balanceChartData,
+  startingBalance,
+  endingBalance,
+  dailyActivity,
+  multiItemTopSeries,
+  categoryBreakdown,
+  topItemsBreakdown,
+  locationBreakdown,
+  referenceBreakdown,
+  heatmapData,
+  weekdayBreakdown,
+  typeDistribution,
+  chartColors,
+  pieFillForType,
+  xTickInterval,
+  unitLabel,
+  hasActiveFilters,
+  resetFilters,
+  colorIn,
+  colorOut,
+  colorBalance,
+  colorAdj,
+}: AnalyticsBlockProps) {
+  const xTickFormatter = (v: string) =>
+    new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const totalDailyActivity = dailyActivity.reduce(
+    (acc, d) => acc + d.IN + Math.abs(d.OUT) + Math.abs(d.WASTE) + Math.abs(d.EXPIRED) + Math.abs(d.ADJ),
+    0
+  );
+  return (
+            <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <CardTitle>Stock analytics</CardTitle>
+            <CardDescription>
+              {selectedItem
+                ? `Detailed insights for ${selectedItem.name}`
+                : "Detailed insights across all items"}
+            </CardDescription>
+          </div>
+          {selectedItem && balanceChartData.length > 0 ? (
+            <div className="flex gap-6 text-sm">
+              <div>
+                <div className="text-xs uppercase text-muted-foreground">Start</div>
+                <div className="font-semibold tabular-nums">
+                  {formatSignedNumber(startingBalance)} {selectedItem.unit}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs uppercase text-muted-foreground">End</div>
+                <div
+                  className={cn(
+                    "font-semibold tabular-nums",
+                    endingBalance > 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : endingBalance < 0
+                      ? "text-rose-600 dark:text-rose-400"
+                      : ""
+                  )}
+                >
+                  {formatSignedNumber(endingBalance)} {selectedItem.unit}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+              </CardHeader>
+              <CardContent>
+        <Tabs value={activeTab} onValueChange={onTabChange}>
+          <TabsList className="flex-wrap">
+            <TabsTrigger value="activity">Daily activity</TabsTrigger>
+            <TabsTrigger value="balance" disabled={!selectedItem}>
+              Running balance
+            </TabsTrigger>
+            <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
+            <TabsTrigger value="categories">By category</TabsTrigger>
+            <TabsTrigger value="items" disabled={!!selectedItem}>
+              Top items
+            </TabsTrigger>
+            <TabsTrigger value="types">By type</TabsTrigger>
+            <TabsTrigger value="locations">Locations</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="activity" className="mt-4">
+            {totalDailyActivity === 0 ? (
+              <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
+            ) : (
+              <ResponsiveContainer width="100%" height={360}>
+                <BarChart
+                  data={dailyActivity}
+                  margin={{ top: 12, right: 16, left: 0, bottom: 8 }}
+                  stackOffset="sign"
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                      <XAxis 
+                        dataKey="date" 
+                    tickFormatter={xTickFormatter}
+                    tick={{ fontSize: 11 }}
+                    interval={xTickInterval}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={45} />
+                  <ReferenceLine y={0} stroke="hsl(var(--border))" />
+                      <Tooltip 
+                    contentStyle={TOOLTIP_STYLE}
+                    labelFormatter={(v) => formatDate(v as string)}
+                    formatter={(value: number, name: string) => [
+                      `${formatSignedNumber(value)} ${selectedItem?.unit ?? unitLabel}`,
+                      name,
+                    ]}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
+                  <Bar dataKey="IN" stackId="s" fill={colorIn} maxBarSize={18} />
+                  <Bar dataKey="ADJ" stackId="s" fill={colorAdj} maxBarSize={18} />
+                  <Bar dataKey="OUT" stackId="s" fill={colorOut} maxBarSize={18} />
+                  <Bar dataKey="WASTE" stackId="s" fill="#ef4444" maxBarSize={18} />
+                  <Bar dataKey="EXPIRED" stackId="s" fill="#a16207" maxBarSize={18} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </TabsContent>
+
+          <TabsContent value="balance" className="mt-4">
+            {!selectedItem || balanceChartData.length === 0 ? (
+              <EmptyChart
+                hasActiveFilters={hasActiveFilters}
+                resetFilters={resetFilters}
+                message={
+                  !selectedItem
+                    ? "Pick an item to see its running balance"
+                    : "No movements in this period"
+                }
+              />
+            ) : (
+              <ResponsiveContainer width="100%" height={360}>
+                <ComposedChart
+                  data={balanceChartData}
+                  margin={{ top: 12, right: 16, left: 0, bottom: 8 }}
+                >
+                  <defs>
+                    <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={colorBalance} stopOpacity={0.35} />
+                      <stop offset="100%" stopColor={colorBalance} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={xTickFormatter}
+                    tick={{ fontSize: 11 }}
+                    interval={xTickInterval}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(v) => formatNumber(v)}
+                    tickLine={false}
+                    axisLine={false}
+                    width={45}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(v) => formatNumber(v)}
+                    tickLine={false}
+                    axisLine={false}
+                    width={45}
+                  />
+                  <Tooltip
+                    contentStyle={TOOLTIP_STYLE}
+                    labelFormatter={(v) => formatDate(v as string)}
+                    formatter={(value: number, key: string) => [
+                      `${formatSignedNumber(value)} ${selectedItem.unit}`,
+                      key === "in" ? "IN" : key === "out" ? "OUT" : "Balance",
+                    ]}
+                    cursor={{ fill: "rgba(139, 92, 246, 0.08)" }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} iconType="circle" />
+                  <ReferenceLine yAxisId="right" y={0} stroke="hsl(var(--border))" />
+                  <Area
+                    yAxisId="right"
+                              type="monotone" 
+                    dataKey="balance"
+                    name="Balance"
+                    stroke={colorBalance}
+                    strokeWidth={2.5}
+                    fill="url(#balanceGradient)"
+                    isAnimationActive={false}
+                  />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="in"
+                    name="IN"
+                    fill={colorIn}
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={14}
+                  />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="out"
+                    name="OUT"
+                    fill={colorOut}
+                    radius={[0, 0, 3, 3]}
+                    maxBarSize={14}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
+          </TabsContent>
+
+          <TabsContent value="categories" className="mt-4">
+            {categoryBreakdown.length === 0 ? (
+              <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
+            ) : (
+              <ResponsiveContainer
+                width="100%"
+                height={Math.max(280, categoryBreakdown.length * 36)}
+              >
+                <BarChart
+                  data={categoryBreakdown}
+                  layout="vertical"
+                  margin={{ top: 8, right: 24, left: 16, bottom: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => formatNumber(v)}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 12 }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={140}
+                  />
+                  <Tooltip
+                    contentStyle={TOOLTIP_STYLE}
+                    formatter={(value: number, name: string) => [
+                      `${formatNumber(value)}`,
+                      name === "in" ? "IN" : name === "out" ? "OUT" : name,
+                    ]}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
+                  <Bar dataKey="in" name="IN" stackId="c" fill={colorIn} radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="out" name="OUT" stackId="c" fill={colorOut} radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </TabsContent>
+
+          <TabsContent value="items" className="mt-4">
+            {topItemsBreakdown.length === 0 ? (
+              <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
+            ) : (
+              <div className="space-y-4">
+                <div className="text-xs text-muted-foreground">
+                  Top {topItemsBreakdown.length} items by movement count · IN (right) vs OUT (left)
+                </div>
+                <ResponsiveContainer
+                  width="100%"
+                  height={Math.max(320, topItemsBreakdown.length * 40)}
+                >
+                  <BarChart
+                    data={topItemsBreakdown.map((it) => ({
+                      ...it,
+                      inSigned: it.in,
+                      outSigned: -it.out,
+                    }))}
+                    layout="vertical"
+                    margin={{ top: 8, right: 32, left: 16, bottom: 8 }}
+                    stackOffset="sign"
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      className="stroke-muted"
+                      horizontal={false}
+                    />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => formatNumber(Math.abs(v))}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      tick={{ fontSize: 12 }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={180}
+                    />
+                    <ReferenceLine x={0} stroke="hsl(var(--border))" />
+                    <Tooltip
+                      contentStyle={TOOLTIP_STYLE}
+                      formatter={(value: number, name: string, p: any) => {
+                        const unit = p?.payload?.unit ?? "";
+                        return [
+                          `${formatNumber(Math.abs(value))} ${unit}`,
+                          name === "outSigned" ? "OUT" : "IN",
+                        ];
+                      }}
+                      labelFormatter={(label, payload) => {
+                        const row: any = payload?.[0]?.payload;
+                        if (!row) return label as string;
+                        return `${row.name} · ${formatNumber(row.count)} movements · net ${formatSignedNumber(
+                          row.net
+                        )} ${row.unit}`;
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
+                    <Bar
+                      dataKey="outSigned"
+                      name="OUT"
+                      stackId="t"
+                      fill={colorOut}
+                      radius={[4, 0, 0, 4]}
+                    />
+                    <Bar
+                      dataKey="inSigned"
+                      name="IN"
+                      stackId="t"
+                      fill={colorIn}
+                      radius={[0, 4, 4, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="heatmap" className="mt-4">
+            {heatmapData.weeks.length === 0 || heatmapData.max === 0 ? (
+              <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
+            ) : (
+              <div className="space-y-6">
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Activity calendar
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Max: {heatmapData.max} movements / day
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto pb-2">
+                    <TooltipProvider delayDuration={100}>
+                      <div className="flex gap-1">
+                        <div className="flex flex-col gap-1 pr-2 text-[10px] text-muted-foreground">
+                          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
+                            <div
+                              key={d}
+                              className={cn("h-4 leading-4", i % 2 === 1 ? "opacity-0" : "")}
+                            >
+                              {d}
+                            </div>
+                          ))}
+                        </div>
+                        {heatmapData.weeks.map((w, wi) => (
+                          <div key={wi} className="flex flex-col gap-1">
+                            {w.cells.map((cell, di) => {
+                              if (!cell) {
+                                return (
+                                  <div
+                                    key={di}
+                                    className="h-4 w-4 rounded-sm bg-muted/30"
+                                  />
+                                );
+                              }
+                              const opacity = cell.count === 0 ? 0.08 : 0.15 + 0.85 * cell.intensity;
+                              return (
+                                <UiTooltip key={di}>
+                                  <TooltipTrigger asChild>
+                                    <div
+                                      className="h-4 w-4 cursor-pointer rounded-sm ring-1 ring-inset ring-black/5 transition hover:ring-2 hover:ring-violet-400"
+                                      style={{
+                                        background:
+                                          cell.count === 0
+                                            ? "hsl(var(--muted))"
+                                            : `rgba(139, 92, 246, ${opacity})`,
+                                      }}
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="text-xs">
+                                      <div className="font-medium">{formatDate(cell.date)}</div>
+                                      <div className="text-muted-foreground">
+                                        {cell.count} movement{cell.count === 1 ? "" : "s"}
+                                      </div>
+                                    </div>
+                                  </TooltipContent>
+                                </UiTooltip>
+                          );
+                        })}
+                          </div>
+                        ))}
+                      </div>
+                    </TooltipProvider>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>Less</span>
+                    {[0.1, 0.3, 0.55, 0.8, 1].map((o) => (
+                      <div
+                        key={o}
+                        className="h-3 w-3 rounded-sm"
+                        style={{ background: `rgba(139, 92, 246, ${o})` }}
+                      />
+                    ))}
+                    <span>More</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-3 text-xs uppercase tracking-wide text-muted-foreground">
+                    By day of week
+                  </div>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart
+                      data={weekdayBreakdown}
+                      margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-muted"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                        width={35}
+                      />
+                      <Tooltip
+                        contentStyle={TOOLTIP_STYLE}
+                        formatter={(value: number) => [
+                          `${formatNumber(value)} movements`,
+                          "",
+                        ]}
+                      />
+                      <Bar
+                        dataKey="count"
+                        fill={colorBalance}
+                        radius={[3, 3, 0, 0]}
+                        maxBarSize={28}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                  </div>
+                )}
+          </TabsContent>
+
+          <TabsContent value="types" className="mt-4">
+            {typeDistribution.length === 0 ? (
+              <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                      data={typeDistribution}
+                        dataKey="value"
+                      nameKey="name"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      >
+                      {typeDistribution.map((entry) => (
+                        <Cell key={entry.type} fill={pieFillForType(entry.type)} />
+                        ))}
+                      </Pie>
+                    <Tooltip contentStyle={TOOLTIP_STYLE} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
+                    </PieChart>
+                  </ResponsiveContainer>
+                <div className="space-y-2">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                    By reference source
+                  </div>
+                  {referenceBreakdown.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No data</div>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {referenceBreakdown.map((r, i) => {
+                        const total = referenceBreakdown.reduce((a, b) => a + b.value, 0) || 1;
+                        const pct = Math.round((r.value / total) * 100);
+                        return (
+                          <li key={r.name} className="flex items-center gap-3 text-sm">
+                            <div
+                              className="h-2.5 w-2.5 shrink-0 rounded-full"
+                              style={{ background: chartColors[i % chartColors.length] }}
+                            />
+                            <span className="flex-1 truncate">{r.name}</span>
+                            <span className="tabular-nums text-muted-foreground">
+                              {formatNumber(r.value)}
+                            </span>
+                            <span className="w-10 text-right tabular-nums text-muted-foreground">
+                              {pct}%
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+          </div>
+              </div>
+            )}
+        </TabsContent>
+
+          <TabsContent value="locations" className="mt-4">
+            {locationBreakdown.length === 0 ? (
+              <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={locationBreakdown}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                    >
+                      {locationBreakdown.map((_, i) => (
+                        <Cell key={i} fill={chartColors[i % chartColors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={TOOLTIP_STYLE} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="space-y-2">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Top locations
+                  </div>
+                  <ul className="space-y-1.5">
+                    {locationBreakdown.map((r, i) => {
+                      const total = locationBreakdown.reduce((a, b) => a + b.value, 0) || 1;
+                      const pct = Math.round((r.value / total) * 100);
+                        return (
+                        <li key={r.name} className="flex items-center gap-3 text-sm">
+                          <div
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ background: chartColors[i % chartColors.length] }}
+                          />
+                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="flex-1 truncate">{r.name}</span>
+                          <span className="tabular-nums text-muted-foreground">
+                            {formatNumber(r.value)}
+                          </span>
+                          <span className="w-10 text-right tabular-nums text-muted-foreground">
+                            {pct}%
+                          </span>
+                        </li>
+                        );
+                      })}
+                  </ul>
+                </div>
+                </div>
+              )}
+          </TabsContent>
+        </Tabs>
+            </CardContent>
+          </Card>
   );
 }
 
 function MovementDetail({
   movement,
   item,
-  allMovements,
+  dailyForItem,
   selectedItemId,
   dayBuckets,
   onDelete,
 }: {
   movement: StockMovement;
   item?: Item;
-  allMovements: MovementWithIngredient[];
+  dailyForItem: Array<{ date: string; net: number }>;
   selectedItemId: string;
   dayBuckets: string[];
   onDelete: () => Promise<void>;
@@ -1511,26 +2096,15 @@ function MovementDetail({
   const Icon = meta.icon;
   const signed = signedDelta(movement);
 
-  const itemIdForSpark =
-    resolveItemId(movement as MovementWithIngredient) ?? undefined;
-
   const sparkData = useMemo(() => {
-    const per = new Map<string, number>();
-    for (const d of dayBuckets) per.set(d, 0);
-    for (const m of allMovements) {
-      const id = resolveItemId(m);
-      if (itemIdForSpark && id !== itemIdForSpark) continue;
-      const key = toLocalDateKey(m.movementDate);
-      if (!per.has(key)) continue;
-      per.set(key, (per.get(key) ?? 0) + signedDelta(m));
-    }
+    const per = new Map(dailyForItem.map((d) => [d.date, d.net]));
     let running = 0;
     const movementDay = toLocalDateKey(movement.movementDate);
     return dayBuckets.map((d) => {
       running += per.get(d) ?? 0;
       return { date: d, v: running, marker: d === movementDay ? running : null };
     });
-  }, [allMovements, dayBuckets, itemIdForSpark, movement.movementDate]);
+  }, [dailyForItem, dayBuckets, movement.movementDate]);
 
   const href = referenceHref(movement.referenceType, movement.referenceId);
   const label = movement.referenceType
@@ -1551,7 +2125,7 @@ function MovementDetail({
           <span className="text-xs text-muted-foreground">
             #{movement.id}
           </span>
-        </div>
+                </div>
         <SheetTitle className="text-xl">
           {item?.name ?? "Stock movement"}
         </SheetTitle>
@@ -1585,22 +2159,14 @@ function MovementDetail({
               <AreaChart data={sparkData}>
                 <defs>
                   <linearGradient id="bal-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="0%"
-                      stopColor="hsl(var(--chart-3))"
-                      stopOpacity={0.4}
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="hsl(var(--chart-3))"
-                      stopOpacity={0}
-                    />
+                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <Area
                   type="monotone"
                   dataKey="v"
-                  stroke="hsl(var(--chart-3))"
+                  stroke="#8b5cf6"
                   strokeWidth={1.5}
                   fill="url(#bal-grad)"
                   dot={false}
@@ -1609,15 +2175,15 @@ function MovementDetail({
                 <Line
                   type="monotone"
                   dataKey="marker"
-                  stroke="hsl(var(--primary))"
+                  stroke="#8b5cf6"
                   strokeWidth={0}
-                  dot={{ r: 4, fill: "hsl(var(--primary))" }}
+                  dot={{ r: 4, fill: "#8b5cf6" }}
                   isAnimationActive={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </div>
+      </div>
+    </div>
 
         <dl className="space-y-2 text-sm">
           <div className="flex justify-between gap-4 border-b pb-2">

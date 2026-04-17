@@ -50,6 +50,11 @@ export const pathsConfig: NavigationConfig = {
           translationKey: "salesAnalytics"
         },
         {
+          title: "products-analytics",
+          url: "/analytics/products",
+          translationKey: "productsAnalytics"
+        },
+        {
           title: "expenses-analytics",
           url: "/analytics/expenses",
           translationKey: "expensesAnalytics"

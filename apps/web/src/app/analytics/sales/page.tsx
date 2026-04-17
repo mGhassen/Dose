@@ -30,8 +30,10 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function SalesAnalyticsPage() {
   const { dateRange } = useDashboardPeriod();
-  const selectedYear = dateRange.startDate.slice(0, 4);
-  const salesAnalytics = useSalesAnalytics(selectedYear);
+  const salesAnalytics = useSalesAnalytics({
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+  });
 
   return (
     <AppLayout>
@@ -192,8 +194,8 @@ export default function SalesAnalyticsPage() {
             {salesAnalytics.data?.dailyTrend && salesAnalytics.data.dailyTrend.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Daily Revenue (Current Month)</CardTitle>
-                  <CardDescription>Day-by-day revenue breakdown</CardDescription>
+                  <CardTitle>Daily Revenue</CardTitle>
+                  <CardDescription>Day-by-day revenue breakdown for the selected period</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>

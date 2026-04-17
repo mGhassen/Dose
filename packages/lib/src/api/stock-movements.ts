@@ -18,5 +18,14 @@ export const stockMovementsApi = {
   create: (data: CreateStockMovementData) => apiRequest<StockMovement>('POST', '/api/stock-movements', data),
   update: (id: string, data: UpdateStockMovementData) => apiRequest<StockMovement>('PUT', `/api/stock-movements/${id}`, data),
   delete: (id: string) => apiRequest<void>('DELETE', `/api/stock-movements/${id}`),
+  getAnalytics: (params?: { itemId?: string; movementType?: string; startDate?: string; endDate?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.itemId) searchParams.append('itemId', params.itemId);
+    if (params?.movementType) searchParams.append('movementType', params.movementType);
+    if (params?.startDate) searchParams.append('startDate', params.startDate);
+    if (params?.endDate) searchParams.append('endDate', params.endDate);
+    const query = searchParams.toString();
+    return apiRequest<any>('GET', `/api/stock-movements/analytics${query ? `?${query}` : ''}`);
+  },
 };
 

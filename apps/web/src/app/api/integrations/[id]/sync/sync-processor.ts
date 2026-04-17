@@ -625,6 +625,10 @@ export async function processSyncJob(
         const subtotal = amount - totalTax + totalDiscount;
         const orderDate = (order?.created_at || '').split('T')[0];
         const dateStr = orderDate || today;
+        const saleDateIso =
+          typeof order?.created_at === 'string' && order.created_at.length > 0
+            ? order.created_at
+            : `${dateStr}T12:00:00.000Z`;
 
         const orderTaxes = order?.taxes || [];
         const taxIncluded = orderTaxes.some((t: any) => t?.type === 'INCLUSIVE');
@@ -723,7 +727,7 @@ export async function processSyncJob(
         const { data: saleRow, error: saleErr } = await supabase
           .from('sales')
           .insert({
-            date: dateStr,
+            date: saleDateIso,
             type: 'retail',
             subtotal,
             total_tax: totalTax,

@@ -176,6 +176,13 @@ export function useImportBankFile() {
   });
 }
 
+export function useBackfillSaleItems() {
+  return useMutation({
+    mutationFn: ({ id, offset, limit }: { id: string; offset?: number; limit?: number }) =>
+      integrationsApi.backfillSaleItems(id, { offset, limit }),
+  });
+}
+
 export function useSyncJobs(integrationId: string) {
   return useQuery({
     queryKey: ['integrations', integrationId, 'sync', 'jobs'],

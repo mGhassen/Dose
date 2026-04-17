@@ -65,6 +65,44 @@ export const integrationsApi = {
     formData.set('file', file);
     return apiRequest<{ job_id: number; message?: string }>('POST', `/api/integrations/${id}/import-bank-file`, formData, undefined, { timeout: 120000 });
   },
+  backfillSaleItems: (id: string, params?: { offset?: number; limit?: number }) => {
+    const sp = new URLSearchParams();
+    if (params?.offset != null) sp.set('offset', String(params.offset));
+    if (params?.limit != null) sp.set('limit', String(params.limit));
+    const q = sp.toString();
+    return apiRequest<{
+      status: string;
+      total: number | null;
+      offset: number;
+      limit: number;
+      processed: number;
+      next_offset: number | null;
+      has_more: boolean;
+      results: {
+        sales_scanned: number;
+        lines_updated: number;
+        movements_written: number;
+        missing_payload: number;
+        unmapped_items: number;
+        errors: number;
+      };
+      events: Array<{
+        saleId: number;
+        squareOrderId: string;
+        status: 'missing_payload' | 'unmapped' | 'updated' | 'no_change' | 'error';
+        lines_updated: number;
+        movements_written: number;
+        total_lines: number;
+        message?: string;
+      }>;
+    }>(
+      'POST',
+      `/api/integrations/${id}/sync/backfill-sale-items${q ? `?${q}` : ''}`,
+      undefined,
+      undefined,
+      { timeout: 300000 }
+    );
+  },
   getSyncJobs: (integrationId: string) =>
     apiRequest<SyncJob[]>('GET', `/api/integrations/${integrationId}/sync`),
   getSyncJob: (jobId: number) =>

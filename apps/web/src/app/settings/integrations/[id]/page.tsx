@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useIntegrationById, useSyncIntegration, useSyncJobs, useRetrySyncJob, useDisconnectIntegration, useImportBankFile } from '@kit/hooks';
+import { useIntegrationById, useSyncIntegration, useSyncJobs, useRetrySyncJob, useDisconnectIntegration, useImportBankFile, useBackfillSaleItems } from '@kit/hooks';
 import AppLayout from '@/components/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { Button } from '@kit/ui/button';
@@ -37,6 +37,7 @@ import {
   Activity,
   Upload,
   X,
+  Wrench,
 } from 'lucide-react';
 import { useToast } from '@kit/hooks';
 import { cn } from '@kit/lib/utils';
@@ -201,10 +202,12 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
   const { data: integration, isLoading } = useIntegrationById(id);
   const syncIntegration = useSyncIntegration();
   const importBankFile = useImportBankFile();
+  const backfillSaleItems = useBackfillSaleItems();
   const { data: syncJobs = [] } = useSyncJobs(id);
   const retrySyncJob = useRetrySyncJob();
   const disconnectIntegration = useDisconnectIntegration();
   const { toast } = useToast();
+  const [backfillProgress, setBackfillProgress] = useState<{ processed: number; total: number | null } | null>(null);
 
   const lastJob = Array.isArray(syncJobs) ? syncJobs[0] : null;
 
@@ -248,6 +251,39 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
       }
     } catch (e: any) {
       toast({ title: 'Import failed', description: e?.message || 'Failed to import file', variant: 'destructive' });
+    }
+  };
+
+  const handleBackfill = async () => {
+    try {
+      let offset = 0;
+      const limit = 200;
+      const totals = {
+        sales_scanned: 0,
+        lines_updated: 0,
+        movements_written: 0,
+        missing_payload: 0,
+        unmapped_items: 0,
+        errors: 0,
+      };
+      setBackfillProgress({ processed: 0, total: null });
+      while (true) {
+        const res = await backfillSaleItems.mutateAsync({ id, offset, limit });
+        for (const k of Object.keys(totals) as (keyof typeof totals)[]) {
+          totals[k] += res.results[k] ?? 0;
+        }
+        setBackfillProgress({ processed: offset + res.processed, total: res.total });
+        if (!res.has_more || res.next_offset == null) break;
+        offset = res.next_offset;
+      }
+      toast({
+        title: 'Backfill complete',
+        description: `Scanned ${totals.sales_scanned} sales, patched ${totals.lines_updated} lines, wrote ${totals.movements_written} movements. Unmapped: ${totals.unmapped_items}, errors: ${totals.errors}.`,
+      });
+    } catch (e: any) {
+      toast({ title: 'Backfill failed', description: e?.message || 'Failed', variant: 'destructive' });
+    } finally {
+      setBackfillProgress(null);
     }
   };
 
@@ -398,6 +434,24 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                         >
                           <MapPin className="w-4 h-4 mr-2" />
                           Sync Locations
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={handleBackfill}
+                          disabled={backfillSaleItems.isPending || backfillProgress != null}
+                        >
+                          {backfillProgress ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Backfilling {backfillProgress.processed}
+                              {backfillProgress.total != null ? `/${backfillProgress.total}` : ''}…
+                            </>
+                          ) : (
+                            <>
+                              <Wrench className="w-4 h-4 mr-2" />
+                              Backfill sale stock
+                            </>
+                          )}
                         </DropdownMenuItem>
                       </>
                     ) : null}

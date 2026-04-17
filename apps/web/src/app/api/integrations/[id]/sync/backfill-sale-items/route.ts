@@ -67,12 +67,25 @@ export async function POST(
     }
     const integrationId = integration.id as number;
 
+    const url = new URL(request.url);
+    const limit = Math.max(1, Math.min(500, parseInt(url.searchParams.get('limit') ?? '200', 10)));
+    const offset = Math.max(0, parseInt(url.searchParams.get('offset') ?? '0', 10));
+
+    const { count: total } = await supabase
+      .from('integration_entity_mapping')
+      .select('id', { count: 'exact', head: true })
+      .eq('integration_id', integrationId)
+      .eq('source_type', 'order')
+      .eq('app_entity_type', 'sale');
+
     const { data: mappings, error: mapErr } = await supabase
       .from('integration_entity_mapping')
       .select('source_id, app_entity_id')
       .eq('integration_id', integrationId)
       .eq('source_type', 'order')
-      .eq('app_entity_type', 'sale');
+      .eq('app_entity_type', 'sale')
+      .order('id', { ascending: true })
+      .range(offset, offset + limit - 1);
     if (mapErr) return NextResponse.json({ error: mapErr.message }, { status: 500 });
 
     const results = {
@@ -83,6 +96,23 @@ export async function POST(
       unmapped_items: 0,
       errors: 0,
     };
+
+    type Event = {
+      saleId: number;
+      squareOrderId: string;
+      status: 'missing_payload' | 'unmapped' | 'updated' | 'no_change' | 'error';
+      lines_updated: number;
+      movements_written: number;
+      total_lines: number;
+      message?: string;
+    };
+    const events: Event[] = [];
+    const log = (e: Event) => {
+      events.push(e);
+      console.log(`[backfill-sale-items] int=${integrationId} sale=${e.saleId} order=${e.squareOrderId} status=${e.status} lines_updated=${e.lines_updated} movements_written=${e.movements_written} total_lines=${e.total_lines}${e.message ? ` msg="${e.message}"` : ''}`);
+    };
+
+    console.log(`[backfill-sale-items] START int=${integrationId} offset=${offset} limit=${limit} total=${total ?? '?'} batch_size=${(mappings || []).length}`);
 
     for (const m of mappings || []) {
       results.sales_scanned += 1;
@@ -99,6 +129,7 @@ export async function POST(
         .maybeSingle();
       if (!staged?.payload) {
         results.missing_payload += 1;
+        log({ saleId, squareOrderId, status: 'missing_payload', lines_updated: 0, movements_written: 0, total_lines: 0, message: 'No staged Square payload found' });
         continue;
       }
 
@@ -140,7 +171,10 @@ export async function POST(
         .select('date')
         .eq('id', saleId)
         .maybeSingle();
-      if (!sale) continue;
+      if (!sale) {
+        log({ saleId, squareOrderId, status: 'error', lines_updated: 0, movements_written: 0, total_lines: 0, message: 'Sale row not found' });
+        continue;
+      }
 
       const { data: existingLines } = await supabase
         .from('sale_line_items')
@@ -150,6 +184,8 @@ export async function POST(
       const lines = existingLines || [];
 
       let anyUpdated = false;
+      let linesUpdatedHere = 0;
+      let updateError: string | null = null;
       for (let i = 0; i < lines.length; i++) {
         const l = lines[i];
         const target = resolved[i] ?? null;
@@ -160,10 +196,12 @@ export async function POST(
             .eq('id', l.id);
           if (upErr) {
             results.errors += 1;
+            updateError = upErr.message;
             continue;
           }
           l.item_id = target;
           results.lines_updated += 1;
+          linesUpdatedHere += 1;
           anyUpdated = true;
         }
       }
@@ -171,6 +209,7 @@ export async function POST(
       const hasAnyMappedItem = lines.some((l: any) => l.item_id != null && Number(l.quantity) > 0);
       if (!hasAnyMappedItem) {
         results.unmapped_items += 1;
+        log({ saleId, squareOrderId, status: 'unmapped', lines_updated: linesUpdatedHere, movements_written: 0, total_lines: lines.length, message: updateError ?? 'No mapped item_id after resolution' });
         continue;
       }
 
@@ -185,16 +224,40 @@ export async function POST(
       });
       if (!res.ok) {
         results.errors += 1;
+        log({ saleId, squareOrderId, status: 'error', lines_updated: linesUpdatedHere, movements_written: 0, total_lines: lines.length, message: ('message' in res ? res.message : undefined) || 'replaceSaleStockMovements failed' });
         continue;
       }
-      const movementCount = stockLines.filter((l) => l.itemId != null && l.quantity > 0).length;
+      const movementCount = stockLines.filter(
+        (l: { itemId?: number; quantity: number }) => l.itemId != null && l.quantity > 0
+      ).length;
       results.movements_written += movementCount;
-      if (!anyUpdated) {
-        // movements still rewritten even when no sale_line_items needed patching
-      }
+      log({
+        saleId,
+        squareOrderId,
+        status: anyUpdated ? 'updated' : 'no_change',
+        lines_updated: linesUpdatedHere,
+        movements_written: movementCount,
+        total_lines: lines.length,
+      });
     }
 
-    return NextResponse.json({ status: 'completed', results });
+    const processed = (mappings || []).length;
+    const nextOffset = offset + processed;
+    const hasMore = total != null ? nextOffset < (total as number) : processed === limit;
+
+    console.log(`[backfill-sale-items] DONE int=${integrationId} offset=${offset} processed=${processed} has_more=${hasMore} scanned=${results.sales_scanned} lines_updated=${results.lines_updated} movements=${results.movements_written} unmapped=${results.unmapped_items} missing_payload=${results.missing_payload} errors=${results.errors}`);
+
+    return NextResponse.json({
+      status: 'completed',
+      total,
+      offset,
+      limit,
+      processed,
+      next_offset: hasMore ? nextOffset : null,
+      has_more: hasMore,
+      results,
+      events,
+    });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }
