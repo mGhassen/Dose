@@ -302,7 +302,7 @@ function CreateRecipeForm() {
                               <UnifiedSelector
                                 label="Item"
                                 type="item"
-                                items={itemsResponse?.data?.filter((i) => i.itemTypes?.includes("item")) ?? []}
+                                items={itemsResponse?.data ?? []}
                                 selectedId={row.itemId || undefined}
                                 onSelect={(sel) =>
                                   updateItem(index, "itemId", sel.id === 0 ? 0 : Number(sel.id))
