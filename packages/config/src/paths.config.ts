@@ -39,6 +39,44 @@ export const pathsConfig: NavigationConfig = {
       translationKey: "dashboard"
     },
     {
+      title: "analytics",
+      url: "#",
+      icon: "BarChart3",
+      translationKey: "analytics",
+      items: [
+        {
+          title: "sales-analytics",
+          url: "/analytics/sales",
+          translationKey: "salesAnalytics"
+        },
+        {
+          title: "expenses-analytics",
+          url: "/analytics/expenses",
+          translationKey: "expensesAnalytics"
+        },
+        {
+          title: "personnel-analytics",
+          url: "/analytics/personnel",
+          translationKey: "personnelAnalytics"
+        },
+        {
+          title: "loans-analytics",
+          url: "/analytics/loans",
+          translationKey: "loansAnalytics"
+        },
+        {
+          title: "leasing-analytics",
+          url: "/analytics/leasing",
+          translationKey: "leasingAnalytics"
+        },
+        {
+          title: "investments-analytics",
+          url: "/analytics/investments",
+          translationKey: "investmentsAnalytics"
+        },
+      ]
+    },
+    {
       title: "inputs",
       url: "#",
       icon: "Database",
@@ -95,105 +133,67 @@ export const pathsConfig: NavigationConfig = {
       icon: "Wallet",
       translationKey: "bankTransactions"
     },
-    {
-      title: "financial-results",
-      url: "#",
-      icon: "TrendingUp",
-      translationKey: "financialResults",
-      items: [
-        {
-          title: "investments",
-          url: "/investments",
-          translationKey: "investments"
-        },
-        {
-          title: "profit-loss",
-          url: "/profit-loss",
-          translationKey: "profitLoss"
-        },
-        {
-          title: "cash-flow",
-          url: "/cash-flow",
-          translationKey: "cashFlow"
-        },
-        {
-          title: "balance-sheet",
-          url: "/balance-sheet",
-          translationKey: "balanceSheet"
-        },
-        {
-          title: "working-capital",
-          url: "/working-capital",
-          translationKey: "workingCapital"
-        },
-        {
-          title: "financial-plan",
-          url: "/financial-plan",
-          translationKey: "financialPlan"
-        },
-        {
-          title: "financial-statement",
-          url: "/financial-statement",
-          translationKey: "financialStatement"
-        },
-      ]
-    },
-    {
-      title: "analytics",
-      url: "#",
-      icon: "BarChart3",
-      translationKey: "analytics",
-      items: [
-        {
-          title: "sales-analytics",
-          url: "/analytics/sales",
-          translationKey: "salesAnalytics"
-        },
-        {
-          title: "expenses-analytics",
-          url: "/analytics/expenses",
-          translationKey: "expensesAnalytics"
-        },
-        {
-          title: "personnel-analytics",
-          url: "/analytics/personnel",
-          translationKey: "personnelAnalytics"
-        },
-        {
-          title: "loans-analytics",
-          url: "/analytics/loans",
-          translationKey: "loansAnalytics"
-        },
-        {
-          title: "leasing-analytics",
-          url: "/analytics/leasing",
-          translationKey: "leasingAnalytics"
-        },
-        {
-          title: "investments-analytics",
-          url: "/analytics/investments",
-          translationKey: "investmentsAnalytics"
-        },
-      ]
-    },
-    {
-      title: "budgeting",
-      url: "#",
-      icon: "FileSpreadsheet",
-      translationKey: "budgeting",
-      items: [
-        {
-          title: "budget-projections",
-          url: "/budget-projections",
-          translationKey: "budgetProjections"
-        },
-        {
-          title: "budgets",
-          url: "/budgets",
-          translationKey: "budgets"
-        },
-      ]
-    },
+    // {
+    //   title: "financial-results",
+    //   url: "#",
+    //   icon: "TrendingUp",
+    //   translationKey: "financialResults",
+    //   items: [
+    //     {
+    //       title: "investments",
+    //       url: "/investments",
+    //       translationKey: "investments"
+    //     },
+    //     {
+    //       title: "profit-loss",
+    //       url: "/profit-loss",
+    //       translationKey: "profitLoss"
+    //     },
+    //     {
+    //       title: "cash-flow",
+    //       url: "/cash-flow",
+    //       translationKey: "cashFlow"
+    //     },
+    //     {
+    //       title: "balance-sheet",
+    //       url: "/balance-sheet",
+    //       translationKey: "balanceSheet"
+    //     },
+    //     {
+    //       title: "working-capital",
+    //       url: "/working-capital",
+    //       translationKey: "workingCapital"
+    //     },
+    //     {
+    //       title: "financial-plan",
+    //       url: "/financial-plan",
+    //       translationKey: "financialPlan"
+    //     },
+    //     {
+    //       title: "financial-statement",
+    //       url: "/financial-statement",
+    //       translationKey: "financialStatement"
+    //     },
+    //   ]
+    // },
+    // {
+    //   title: "budgeting",
+    //   url: "#",
+    //   icon: "FileSpreadsheet",
+    //   translationKey: "budgeting",
+    //   items: [
+    //     {
+    //       title: "budget-projections",
+    //       url: "/budget-projections",
+    //       translationKey: "budgetProjections"
+    //     },
+    //     {
+    //       title: "budgets",
+    //       url: "/budgets",
+    //       translationKey: "budgets"
+    //     },
+    //   ]
+    // },
     {
       title: "inventory",
       url: "#",
