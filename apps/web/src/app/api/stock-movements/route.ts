@@ -45,6 +45,8 @@ export async function GET(request: NextRequest) {
     const { page, limit, offset } = getPaginationParams(searchParams);
     const itemId = searchParams.get('itemId') || searchParams.get('ingredientId'); // Support both for backward compat
     const movementType = searchParams.get('movementType');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
 
     const supabase = supabaseServer();
     
@@ -58,6 +60,12 @@ export async function GET(request: NextRequest) {
     }
     if (movementType) {
       query = query.eq('movement_type', movementType);
+    }
+    if (startDate) {
+      query = query.gte('movement_date', startDate);
+    }
+    if (endDate) {
+      query = query.lte('movement_date', `${endDate}T23:59:59.999Z`);
     }
 
     const countQuery = (query as any).select('*', { count: 'exact', head: true });

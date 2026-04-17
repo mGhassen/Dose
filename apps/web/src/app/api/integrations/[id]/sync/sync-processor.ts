@@ -325,11 +325,12 @@ export async function processSyncJob(
     }
 
     for (const [squareItemId, itemObj] of itemsMap) {
-      if (itemObj.is_deleted) continue;
-      const variations = (variationsMap.get(squareItemId) || []).filter((v: any) => !v.is_deleted);
+      const itemArchived = !!itemObj.is_deleted;
+      const variations = variationsMap.get(squareItemId) || [];
       const categoryId = itemObj.item_data?.category_id;
       const categoryName = categoryId ? (categoriesMap.get(categoryId)?.category_data?.name || '') : '';
-      const itemName = itemObj.item_data?.name || 'Unnamed';
+      const rawItemName = itemObj.item_data?.name || 'Unnamed';
+      const itemName = itemArchived ? `[archived] ${rawItemName}` : rawItemName;
       const itemDesc = itemObj.item_data?.description || '';
 
       const taxIds = itemObj.item_data?.tax_ids ?? [];
@@ -354,7 +355,7 @@ export async function processSyncJob(
               category: categoryName || null,
               unit_id: defaultUnitVariableId,
               item_types: ['product'],
-              is_active: true,
+              is_active: !itemArchived,
               is_catalog_parent: false,
             })
             .select('id')
@@ -369,7 +370,7 @@ export async function processSyncJob(
           if (Array.isArray(itemObj.item_data?.variations)) {
             for (const vid of itemObj.item_data.variations as string[]) {
               const vo = allCatalogObjects.find(
-                (o: any) => o?.type === 'ITEM_VARIATION' && o.id === vid && !o.is_deleted
+                (o: any) => o?.type === 'ITEM_VARIATION' && o.id === vid
               );
               const orphanCents = vo?.item_variation_data?.price_money?.amount;
               if (typeof orphanCents === 'number' && orphanCents >= 0) {
@@ -414,7 +415,7 @@ export async function processSyncJob(
               category: categoryName || null,
               unit_id: defaultUnitVariableId,
               item_types: ['product'],
-              is_active: true,
+              is_active: !itemArchived,
               is_catalog_parent: true,
             })
             .select('id')
@@ -475,8 +476,10 @@ export async function processSyncJob(
         const variation = variations[vi];
         const variationId = variation.id;
         const vData = variation.item_variation_data || {};
-        const displayName =
-          variations.length > 1 ? `${itemName} - ${vData.name || variationId}` : itemName;
+        const variationArchived = itemArchived || !!variation.is_deleted;
+        const rawDisplayName =
+          variations.length > 1 ? `${rawItemName} - ${vData.name || variationId}` : rawItemName;
+        const displayName = variationArchived ? `[archived] ${rawDisplayName}` : rawDisplayName;
         const sku = vData.sku || null;
         const priceCents = vData.price_money?.amount;
         const muId = vData.measurement_unit_id as string | undefined;
@@ -539,7 +542,7 @@ export async function processSyncJob(
               sku,
               unit_id: resolvedUnitId,
               item_types: ['product'],
-              is_active: true,
+              is_active: !variationArchived,
               is_catalog_parent: false,
             })
             .select('id')

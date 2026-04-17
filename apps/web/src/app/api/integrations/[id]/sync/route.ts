@@ -106,7 +106,11 @@ async function fetchAndStageSquare(
       const catalogResponse: Response = await fetch(`${SQUARE_API_BASE}/v2/catalog/search`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ object_types: catalogTypes, cursor: catalogCursor || undefined }),
+        body: JSON.stringify({
+          object_types: catalogTypes,
+          include_deleted_objects: true,
+          cursor: catalogCursor || undefined,
+        }),
       });
       if (!catalogResponse.ok) {
         const errorText = await catalogResponse.text();
