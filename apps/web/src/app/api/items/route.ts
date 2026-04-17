@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Item, CreateItemData, PaginatedResponse } from '@kit/types';
+import { normalizeItemKinds } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createItemSchema } from '@/shared/zod-schemas';
 import { getUnitVariableMap } from '../_utils/unit-variables';
@@ -18,7 +19,7 @@ function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item
     unit: unitMap.get(row.unit_id)?.symbol || '',
     unitId: row.unit_id,
     category: row.category,
-    itemType: ['item', 'product', 'item_and_product'].includes(row.item_type) ? row.item_type : 'item',
+    itemTypes: normalizeItemKinds(row.item_types),
     isActive: row.is_active ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -36,7 +37,7 @@ function transformToSnakeCase(data: CreateItemData): any {
     name: data.name,
     description: data.description,
     category: data.category,
-    item_type: data.itemType ?? 'item',
+    item_types: normalizeItemKinds(data.itemTypes ?? ['item']),
     sku: data.sku,
     vendor_id: data.vendorId,
     notes: data.notes,
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
       .select('*');
 
     if (itemType) {
-      itemsQuery = itemsQuery.eq('item_type', itemType);
+      itemsQuery = itemsQuery.contains('item_types', [itemType]);
     }
 
     if (producedOnly) {
@@ -125,7 +126,7 @@ export async function GET(request: NextRequest) {
         description: recipe.description,
         unit: recipe.unit || 'serving',
         category: recipe.category,
-        item_type: 'recipe',
+        item_types: ['item'],
         is_active: recipe.is_active,
         created_at: recipe.created_at,
         updated_at: recipe.updated_at,
@@ -152,8 +153,7 @@ export async function GET(request: NextRequest) {
 
     // Transform to Item type
     const items: Item[] = paginatedData.map((row: any) => {
-      if (row.item_type === 'recipe') {
-        // Transform recipe to Item format
+      if (row.instructions != null) {
         return {
           id: row.id,
           name: row.name,
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
           unit: row.unit || 'serving',
           unitId: row.unit_id,
           category: row.category,
-          itemType: 'recipe' as const,
+          itemTypes: normalizeItemKinds(row.item_types),
           isActive: row.is_active,
           createdAt: row.created_at,
           updatedAt: row.updated_at,

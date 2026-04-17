@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Item, UpdateItemData } from '@kit/types';
+import { normalizeItemKinds } from '@kit/types';
 import { parseRequestBody, updateItemSchema } from '@/shared/zod-schemas';
 import { getUnitVariableMap } from '../../_utils/unit-variables';
 
@@ -14,7 +15,7 @@ function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item
     unit: unitMap.get(row.unit_id)?.symbol || '',
     unitId: row.unit_id,
     category: row.category,
-    itemType: ['item', 'product', 'item_and_product'].includes(row.item_type) ? row.item_type : 'item',
+    itemTypes: normalizeItemKinds(row.item_types),
     isActive: row.is_active ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -40,7 +41,7 @@ function transformToSnakeCase(data: UpdateItemData): any {
   if (data.notes !== undefined) result.notes = data.notes;
   if (data.isActive !== undefined) result.is_active = data.isActive;
   if (data.producedFromRecipeId !== undefined) result.produced_from_recipe_id = data.producedFromRecipeId;
-  if (data.itemType !== undefined) result.item_type = data.itemType;
+  if (data.itemTypes !== undefined) result.item_types = normalizeItemKinds(data.itemTypes);
   return result;
 }
 
@@ -97,7 +98,6 @@ export async function GET(
           unit: recipeData.unit || 'serving',
           unit_id: recipeData.unit_id,
           category: recipeData.category,
-          item_type: 'recipe',
           serving_size: recipeData.serving_size,
           preparation_time: recipeData.preparation_time,
           cooking_time: recipeData.cooking_time,
@@ -120,7 +120,7 @@ export async function GET(
     }
 
     // Transform based on type
-    if (itemData.item_type === 'recipe') {
+    if (itemData.instructions != null) {
       return NextResponse.json({
         id: itemData.id,
         name: itemData.name,
@@ -128,7 +128,7 @@ export async function GET(
         unit: itemData.unit || 'serving',
         unitId: itemData.unit_id,
         category: itemData.category,
-        itemType: 'recipe' as const,
+        itemTypes: ['item'],
         isActive: itemData.is_active,
         createdAt: itemData.created_at,
         updatedAt: itemData.updated_at,

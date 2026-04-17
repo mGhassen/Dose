@@ -2,7 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { itemsApi } from '@kit/lib';
 import type { Item, CreateItemData, UpdateItemData } from '@kit/types';
 
-export function useItems(params?: { page?: number; limit?: number; itemType?: string; includeRecipes?: boolean; producedOnly?: boolean; excludeCatalogParents?: boolean }) {
+export function useItems(params?: {
+  page?: number;
+  limit?: number;
+  itemType?: string;
+  includeRecipes?: boolean;
+  producedOnly?: boolean;
+  excludeCatalogParents?: boolean;
+}) {
   return useQuery({
     queryKey: ['items', params],
     queryFn: async () => {

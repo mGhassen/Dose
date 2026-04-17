@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { SupplierOrder, SupplierOrderItem, UpdateSupplierOrderData } from '@kit/types';
+import { normalizeItemKinds } from '@kit/types';
 import { StockMovementReferenceType } from '@kit/types';
 import { lineTaxAmount } from '@/lib/transaction-tax';
 
@@ -99,7 +100,7 @@ export async function GET(
           unit: item.item.unit,
           unitId: item.item.unit_id,
           category: item.item.category,
-          itemType: item.item.item_type || 'item',
+          itemTypes: normalizeItemKinds(item.item.item_types),
           isActive: item.item.is_active,
           createdAt: item.item.created_at,
           updatedAt: item.item.updated_at,

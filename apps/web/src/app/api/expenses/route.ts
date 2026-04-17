@@ -305,7 +305,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_type), subscription:subscriptions(id, name)').eq('expense_id', expenseRow.id).order('sort_order', { ascending: true });
+      const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_types), subscription:subscriptions(id, name)').eq('expense_id', expenseRow.id).order('sort_order', { ascending: true });
       const lineItems = (lineRows || []).map(transformLineItem);
       return NextResponse.json(transformExpense(expenseRow, lineItems), { status: 201 });
     }
@@ -341,7 +341,7 @@ export async function POST(request: NextRequest) {
       console.error('Error creating entry for expense:', entryError);
     }
 
-    const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_type), subscription:subscriptions(id, name)').eq('expense_id', data.id).order('sort_order', { ascending: true });
+    const { data: lineRows } = await supabase.from('expense_line_items').select('*, item:items(id, name, category, unit, unit_id, item_types), subscription:subscriptions(id, name)').eq('expense_id', data.id).order('sort_order', { ascending: true });
     const lineItems = (lineRows || []).map(transformLineItem);
     return NextResponse.json(transformExpense(data, lineItems), { status: 201 });
   } catch (error: any) {

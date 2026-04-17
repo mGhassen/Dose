@@ -70,7 +70,7 @@ export default function InventoryDashboardContent() {
   }, [orders]);
 
   // Calculate summary stats
-  const totalItems = items.filter(i => i.itemType === 'item').length;
+  const totalItems = items.filter((i) => i.itemTypes?.includes("item")).length;
   const activeRecipes = recipes.filter(r => r.isActive).length;
   const totalSuppliers = suppliers.length;
   const activeSuppliers = suppliers.filter(s => s.isActive).length;
@@ -81,7 +81,7 @@ export default function InventoryDashboardContent() {
   // Get item names for display
   const itemMap = useMemo(() => {
     const map = new Map<number, string>();
-    items.filter(i => i.itemType === 'item').forEach(item => map.set(item.id, item.name));
+    items.filter((i) => i.itemTypes?.includes("item")).forEach((item) => map.set(item.id, item.name));
     return map;
   }, [items]);
 

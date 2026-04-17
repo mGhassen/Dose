@@ -209,6 +209,7 @@ const saleLineItemSchema = z.object({
   unitPrice: z.number(),
   unitCost: z.number().optional(),
   taxRatePercent: z.number().optional(),
+  parentLineIndex: z.number().int().min(0).optional(),
 });
 
 export const createSaleTransactionSchema = z.object({
@@ -295,7 +296,11 @@ export const createItemSchema = z
     notes: z.string().optional(),
     defaultTaxRatePercent: z.number().optional(),
     isActive: z.boolean().optional(),
-    itemType: z.enum(["item", "product", "item_and_product"]).optional(),
+    itemTypes: z
+      .array(z.enum(["item", "product", "modifier"]))
+      .min(1)
+      .refine((a) => new Set(a).size === a.length, { message: "Duplicate kinds" })
+      .optional(),
   });
 export type CreateItemInput = z.infer<typeof createItemSchema>;
 

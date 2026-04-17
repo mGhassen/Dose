@@ -100,7 +100,7 @@ export async function produceRecipe(
         unit: recipeData.unit || 'serving',
         unit_id: recipeData.unit_id,
         produced_from_recipe_id: Number(recipeId),
-        item_type: 'product',
+        item_types: ['product'],
         is_active: true,
       })
       .select()
@@ -135,7 +135,7 @@ export async function produceRecipe(
             unit: recipeData.unit || 'serving',
             unit_id: recipeData.unit_id,
             produced_from_recipe_id: Number(recipeId),
-            item_type: 'product',
+            item_types: ['product'],
             is_active: true,
           })
           .select()

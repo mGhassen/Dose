@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Recipe, RecipeWithItems, UpdateRecipeData, RecipeItem } from '@kit/types';
+import { normalizeItemKinds } from '@kit/types';
 import { getItemSellingPriceAsOf } from '@/lib/items/price-resolve';
 
 function transformRecipe(row: any): Recipe {
@@ -13,7 +14,6 @@ function transformRecipe(row: any): Recipe {
     unit: row.unit,
     unitId: row.unit_id,
     category: row.category,
-    itemType: 'recipe' as const,
     servingSize: row.serving_size,
     preparationTime: row.preparation_time,
     cookingTime: row.cooking_time,
@@ -65,7 +65,7 @@ function transformItem(row: any): any {
     unit: row.unit,
     unitId: row.unit_id,
     category: row.category,
-    itemType: row.item_type || 'item',
+    itemTypes: normalizeItemKinds(row.item_types),
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -137,7 +137,7 @@ export async function GET(
           unit: ri.item.unit,
           unitId: ri.item.unit_id,
           category: ri.item.category,
-          itemType: ri.item.item_type || 'item',
+          itemTypes: normalizeItemKinds(ri.item.item_types),
           isActive: ri.item.is_active,
           createdAt: ri.item.created_at,
           updatedAt: ri.item.updated_at,

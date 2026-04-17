@@ -118,6 +118,7 @@ export interface SquareOrderLineItemModifier {
   name?: string;
   base_price_money?: SquareMoney;
   total_price_money?: SquareMoney;
+  total_tax_money?: SquareMoney;
 }
 
 export interface SquareOrderLineItemAppliedTax {

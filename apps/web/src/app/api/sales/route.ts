@@ -36,6 +36,7 @@ function transformLineItem(row: any): SaleLineItem {
   return {
     id: row.id,
     saleId: row.sale_id,
+    parentSaleLineId: row.parent_sale_line_id ?? undefined,
     itemId: row.item_id ?? undefined,
     quantity: parseFloat(row.quantity),
     unitId: row.unit_id ?? undefined,
@@ -151,7 +152,17 @@ export async function POST(request: NextRequest) {
 
     const supabase = supabaseServer();
       const dateStr = body.date.split('T')[0] || body.date;
-      const lines: Array<{ itemId?: number; quantity: number; unitId?: number; unitPrice: number; unitCost?: number; lineTotal: number; taxRatePercent: number; taxAmount: number }> = [];
+      const lines: Array<{
+        itemId?: number;
+        quantity: number;
+        unitId?: number;
+        unitPrice: number;
+        unitCost?: number;
+        lineTotal: number;
+        taxRatePercent: number;
+        taxAmount: number;
+        parentLineIndex?: number;
+      }> = [];
       for (let i = 0; i < body.lineItems.length; i++) {
         const line = body.lineItems[i];
         let unitPrice = line.unitPrice;
@@ -231,6 +242,7 @@ export async function POST(request: NextRequest) {
           lineTotal,
           taxRatePercent: lineTaxRate,
           taxAmount,
+          parentLineIndex: line.parentLineIndex,
         });
       }
       const subtotal = Math.round(lines.reduce((s, l) => s + l.lineTotal, 0) * 100) / 100;
@@ -259,20 +271,31 @@ export async function POST(request: NextRequest) {
         .single();
       if (saleError) throw saleError;
 
+      const insertedLineIds: number[] = [];
       for (let i = 0; i < lines.length; i++) {
         const l = lines[i];
-        await supabase.from('sale_line_items').insert({
-          sale_id: saleRow.id,
-          item_id: l.itemId ?? null,
-          quantity: l.quantity,
-          unit_id: l.unitId ?? null,
-          unit_price: l.unitPrice,
-          unit_cost: l.unitCost ?? null,
-          tax_rate_percent: l.taxRatePercent,
-          tax_amount: l.taxAmount,
-          line_total: l.lineTotal,
-          sort_order: i,
-        });
+        const pIdx = l.parentLineIndex;
+        const parentSaleLineId =
+          pIdx != null && pIdx >= 0 && pIdx < insertedLineIds.length ? insertedLineIds[pIdx] ?? null : null;
+        const { data: insRow, error: insErr } = await supabase
+          .from('sale_line_items')
+          .insert({
+            sale_id: saleRow.id,
+            item_id: l.itemId ?? null,
+            quantity: l.quantity,
+            unit_id: l.unitId ?? null,
+            unit_price: l.unitPrice,
+            unit_cost: l.unitCost ?? null,
+            tax_rate_percent: l.taxRatePercent,
+            tax_amount: l.taxAmount,
+            line_total: l.lineTotal,
+            parent_sale_line_id: parentSaleLineId,
+            sort_order: i,
+          })
+          .select('id')
+          .single();
+        if (insErr) throw insErr;
+        insertedLineIds[i] = insRow.id as number;
       }
 
       await supabase.from('entries').insert({

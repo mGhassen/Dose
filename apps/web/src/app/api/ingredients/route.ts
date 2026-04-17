@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Ingredient, CreateIngredientData, PaginatedResponse } from '@kit/types';
+import { normalizeItemKinds } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createIngredientSchema } from '@/shared/zod-schemas';
 
@@ -13,7 +14,7 @@ function transformIngredient(row: any): Ingredient {
     description: row.description,
     unit: row.unit,
     category: row.category,
-    itemType: row.item_type ?? 'item',
+    itemTypes: normalizeItemKinds(row.item_types),
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

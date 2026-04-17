@@ -14,7 +14,18 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateItem, useInventorySuppliers, useUnits } from "@kit/hooks";
-import type { ItemType } from "@kit/types";
+import type { ItemKind } from "@kit/types";
+
+function toggleItemKind(current: ItemKind[], k: ItemKind): ItemKind[] {
+  const next = current.includes(k) ? current.filter((x) => x !== k) : [...current, k];
+  return next.length ? next : [k];
+}
+
+const ITEM_KIND_OPTIONS: { id: ItemKind; label: string }[] = [
+  { id: "item", label: "Item" },
+  { id: "product", label: "Product" },
+  { id: "modifier", label: "Modifier" },
+];
 import { toast } from "sonner";
 
 export default function CreateItemPage() {
@@ -23,11 +34,6 @@ export default function CreateItemPage() {
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
-  const itemTypeItems: { id: ItemType; name: string }[] = [
-    { id: "item", name: "Item" },
-    { id: "product", name: "Product" },
-    { id: "item_and_product", name: "Item and product" },
-  ];
   const [addVendorOpen, setAddVendorOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -38,7 +44,7 @@ export default function CreateItemPage() {
     vendorId: "",
     notes: "",
     isActive: true,
-    itemType: "item" as ItemType,
+    itemTypes: ["item"] as ItemKind[],
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,7 +65,7 @@ export default function CreateItemPage() {
         vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
         notes: formData.notes || undefined,
         isActive: formData.isActive,
-        itemType: formData.itemType as 'item' | 'product' | 'item_and_product',
+        itemTypes: formData.itemTypes,
       });
       toast.success("Item created successfully");
       router.push('/items');
@@ -122,16 +128,24 @@ export default function CreateItemPage() {
                   />
                 </div>
 
-                {/* Item type */}
-                <div className="space-y-2">
-                  <UnifiedSelector
-                    label="Item type"
-                    type="type"
-                    items={itemTypeItems}
-                    selectedId={formData.itemType}
-                    onSelect={(item) => handleInputChange('itemType', item.id as ItemType)}
-                    placeholder="Select type"
-                  />
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Types</Label>
+                  <div className="flex flex-wrap gap-4">
+                    {ITEM_KIND_OPTIONS.map(({ id, label }) => (
+                      <label key={id} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={formData.itemTypes.includes(id)}
+                          onCheckedChange={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              itemTypes: toggleItemKind(prev.itemTypes, id),
+                            }))
+                          }
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Unit */}

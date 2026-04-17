@@ -41,7 +41,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatDateTime } from "@kit/lib/date-format";
-import type { SalesType } from "@kit/types";
+import type { SalesType, SaleLineItem, SaleLineItemInput } from "@kit/types";
 import { lineTaxAmount, to2Decimals, netUnitPriceFromInclusive, unitPriceExclToIncl } from "@/lib/transaction-tax";
 import { taxRulesApi } from "@kit/lib";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
@@ -94,6 +94,8 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
     setIsEditing(initialEditMode);
   }, [initialEditMode]);
   const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
+  const { data: modifierItemsResponse } = useItems({ limit: 500, itemType: "modifier" });
+  const modifierItems = modifierItemsResponse?.data ?? [];
   const { data: unitsData } = useUnits();
   const updateSale = useUpdateSale();
   const deleteMutation = useDeleteSale();
@@ -123,6 +125,16 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
     taxRulesApi.resolve({ context: 'sale', salesType: formData.type, date: formData.date }).then((r) => setDefaultTaxRate(r.rate)).catch(() => setDefaultTaxRate(0));
   }, [formData.type, formData.date]);
 
+  type ModifierLine = {
+    itemId: string;
+    unitPrice: string;
+    unitCost: string;
+    taxRatePercent: string;
+    taxInclusive: boolean;
+    taxVariableName?: string;
+    taxConditionType?: string;
+    taxConditionValue?: string;
+  };
   type LineItem = {
     itemId: string;
     quantity: string;
@@ -134,6 +146,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
     taxVariableName?: string;
     taxConditionType?: string;
     taxConditionValue?: string;
+    modifiers: ModifierLine[];
   };
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const lineItemsRef = useRef(lineItems);
@@ -190,14 +203,24 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
     let sub = 0;
     let tax = 0;
+    const addLineTax = (q: number, p: number, lineRate: number, inclusive: boolean) => {
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, inclusive);
+      sub += lineTotalNet;
+      tax += taxAmount;
+    };
     for (const line of lineItems) {
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
       const inclusive = line.taxInclusive && lineRate > 0;
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, inclusive);
-      sub += lineTotalNet;
-      tax += taxAmount;
+      addLineTax(q, p, lineRate, inclusive);
+      for (const m of line.modifiers) {
+        const mq = q;
+        const mp = parseFloat(m.unitPrice) || 0;
+        const mRate = m.taxRatePercent !== "" ? parseFloat(m.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
+        const mIncl = m.taxInclusive && mRate > 0;
+        addLineTax(mq, mp, mRate, mIncl);
+      }
     }
     sub = to2Decimals(sub);
     tax = to2Decimals(tax);
@@ -243,7 +266,66 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
   }, [sale?.id, sale?.type, sale?.date, sale?.lineItems?.length]);
 
   const addLine = () => {
-    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
+    setLineItems((prev) => [
+      ...prev,
+      {
+        itemId: "",
+        quantity: "1",
+        unitId: null,
+        unitPrice: "",
+        unitCost: "",
+        taxRatePercent: "",
+        taxInclusive: false,
+        modifiers: [],
+      },
+    ]);
+  };
+
+  const addModifier = (lineIndex: number) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      const line = next[lineIndex];
+      if (!line) return prev;
+      next[lineIndex] = {
+        ...line,
+        modifiers: [
+          ...line.modifiers,
+          {
+            itemId: "",
+            unitPrice: "",
+            unitCost: "",
+            taxRatePercent: "",
+            taxInclusive: false,
+          },
+        ],
+      };
+      return next;
+    });
+  };
+
+  const removeModifier = (lineIndex: number, modIndex: number) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      const line = next[lineIndex];
+      if (!line) return prev;
+      next[lineIndex] = {
+        ...line,
+        modifiers: line.modifiers.filter((_, i) => i !== modIndex),
+      };
+      return next;
+    });
+  };
+
+  const updateModifier = (lineIndex: number, modIndex: number, field: keyof ModifierLine, value: string | boolean) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      const line = next[lineIndex];
+      if (!line) return prev;
+      const mods = [...line.modifiers];
+      mods[modIndex] = { ...mods[modIndex], [field]: value };
+      next[lineIndex] = { ...line, modifiers: mods };
+      return next;
+    });
   };
   const salesTypeLabelMap = useMemo(
     () => Object.fromEntries(salesTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])),
@@ -275,6 +357,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
         line.taxVariableName = undefined;
         line.taxConditionType = undefined;
         line.taxConditionValue = undefined;
+        line.modifiers = [];
       } else {
         const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; unit_price?: number; unitPrice?: number; defaultTaxRatePercent?: number } | undefined;
         line.quantity = "1";
@@ -334,6 +417,59 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
     }
   };
 
+  const handleModifierItemSelect = (lineIndex: number, modIndex: number, itemId: string) => {
+    updateModifier(lineIndex, modIndex, "itemId", itemId);
+    if (!itemId) {
+      updateModifier(lineIndex, modIndex, "unitPrice", "");
+      updateModifier(lineIndex, modIndex, "taxRatePercent", "");
+      updateModifier(lineIndex, modIndex, "taxInclusive", false);
+      return;
+    }
+    const dateStr = formData.date || new Date().toISOString().slice(0, 10);
+    const apply = (data: { unitPrice?: number | null; taxIncluded?: boolean }, r: { rate: number; taxInclusive?: boolean; variableName?: string; conditionType?: string | null; conditionValue?: string | null }) => {
+      if (data?.unitPrice == null) return;
+      const rate = r.rate;
+      const apiIncl = data.taxIncluded ?? false;
+      const excl = apiIncl && rate > 0 ? netUnitPriceFromInclusive(data.unitPrice!, rate) : data.unitPrice!;
+      setLineItems((prev) => {
+        const next = [...prev];
+        const line = next[lineIndex];
+        if (!line?.modifiers[modIndex] || line.modifiers[modIndex].itemId !== itemId) return prev;
+        const mods = [...line.modifiers];
+        mods[modIndex] = {
+          ...mods[modIndex],
+          unitPrice: String(to2Decimals(excl)),
+          taxRatePercent: r.rate.toString(),
+          taxVariableName: r.variableName,
+          taxConditionType: r.conditionType ?? undefined,
+          taxConditionValue: r.conditionValue ?? undefined,
+          taxInclusive: r.taxInclusive ?? false,
+        };
+        next[lineIndex] = { ...line, modifiers: mods };
+        return next;
+      });
+    };
+    if (formData.type && formData.date) {
+      Promise.all([
+        fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`).then((r) => r.json()) as Promise<{ unitPrice?: number | null; taxIncluded?: boolean }>,
+        taxRulesApi.resolve({ context: "sale", salesType: formData.type, itemId: parseInt(itemId, 10), date: formData.date }),
+      ])
+        .then(([data, r]) => apply(data, r))
+        .catch(() => {});
+    } else {
+      fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`)
+        .then((r) => r.json())
+        .then((data: { unitPrice?: number | null; taxIncluded?: boolean }) => {
+          if (data?.unitPrice == null) return;
+          const rate = defaultTaxRate;
+          const apiIncl = data.taxIncluded ?? false;
+          const excl = apiIncl && rate > 0 ? netUnitPriceFromInclusive(data.unitPrice, rate) : data.unitPrice;
+          updateModifier(lineIndex, modIndex, "unitPrice", String(to2Decimals(excl)));
+        })
+        .catch(() => {});
+    }
+  };
+
   const hasAnyItem = lineItems.some((l) => l.itemId !== "");
 
   useEffect(() => {
@@ -348,10 +484,44 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
         discountValue: sale.totalDiscount != null && sale.totalDiscount > 0 ? sale.totalDiscount.toString() : "",
       });
       if (sale.lineItems?.length) {
+        const sorted = [...sale.lineItems].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+        const childrenByParent = new Map<number, SaleLineItem[]>();
+        const roots: SaleLineItem[] = [];
+        for (const l of sorted) {
+          if (l.parentSaleLineId) {
+            const arr = childrenByParent.get(l.parentSaleLineId) ?? [];
+            arr.push(l);
+            childrenByParent.set(l.parentSaleLineId, arr);
+          } else {
+            roots.push(l);
+          }
+        }
         setLineItems(
-          sale.lineItems.map((l) => {
+          roots.map((l) => {
             const up = l.unitPrice;
-            const unitPriceStr = up != null && Number.isFinite(up) ? String(up) : (l.quantity && l.lineTotal != null ? String(to2Decimals(l.lineTotal / l.quantity)) : "");
+            const unitPriceStr =
+              up != null && Number.isFinite(up)
+                ? String(up)
+                : l.quantity && l.lineTotal != null
+                  ? String(to2Decimals(l.lineTotal / l.quantity))
+                  : "";
+            const childLines = childrenByParent.get(l.id) ?? [];
+            const modifiers: ModifierLine[] = childLines.map((m) => {
+              const mup = m.unitPrice;
+              const mUnitPriceStr =
+                mup != null && Number.isFinite(mup)
+                  ? String(mup)
+                  : m.quantity && m.lineTotal != null
+                    ? String(to2Decimals(m.lineTotal / m.quantity))
+                    : "";
+              return {
+                itemId: m.itemId?.toString() ?? "",
+                unitPrice: mUnitPriceStr,
+                unitCost: m.unitCost != null ? String(m.unitCost) : "",
+                taxRatePercent: m.taxRatePercent != null ? String(m.taxRatePercent) : "",
+                taxInclusive: (m as { taxInclusive?: boolean }).taxInclusive ?? false,
+              };
+            });
             return {
               itemId: l.itemId?.toString() ?? "",
               quantity: String(l.quantity),
@@ -360,11 +530,23 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
               unitCost: l.unitCost != null ? String(l.unitCost) : "",
               taxRatePercent: l.taxRatePercent != null ? String(l.taxRatePercent) : "",
               taxInclusive: (l as { taxInclusive?: boolean }).taxInclusive ?? false,
+              modifiers,
             };
           })
         );
       } else {
-        setLineItems([{ itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
+        setLineItems([
+          {
+            itemId: "",
+            quantity: "1",
+            unitId: null,
+            unitPrice: "",
+            unitCost: "",
+            taxRatePercent: "",
+            taxInclusive: false,
+            modifiers: [],
+          },
+        ]);
       }
     }
   }, [sale]);
@@ -373,21 +555,46 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
     e.preventDefault();
     try {
       const dateTimeIso = new Date(`${formData.date}T${formData.time}`).toISOString();
-      const payloadLines = lineItems.map((line) => {
-        const price = parseFloat(line.unitPrice) || 0;
-        const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
-        return {
-          itemId: line.itemId ? parseInt(line.itemId) : undefined,
-          quantity: parseFloat(line.quantity) || 0,
+      const payloadLines: SaleLineItemInput[] = [];
+      for (let i = 0; i < lineItems.length; i++) {
+        const line = lineItems[i];
+        const qty = parseFloat(line.quantity);
+        const price = parseFloat(line.unitPrice);
+        if (isNaN(qty) || qty <= 0 || isNaN(price) || price < 0) {
+          toast.error(`Line ${i + 1}: quantity (positive) and unit price are required`);
+          return;
+        }
+        for (const m of line.modifiers) {
+          if (!m.itemId?.trim()) continue;
+          const mp = parseFloat(m.unitPrice);
+          if (isNaN(mp) || mp < 0) {
+            toast.error(`Line ${i + 1}: modifier needs a valid unit price`);
+            return;
+          }
+        }
+        const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : defaultTaxRate;
+        const parentIdx = payloadLines.length;
+        payloadLines.push({
+          itemId: line.itemId ? parseInt(line.itemId, 10) : undefined,
+          quantity: qty,
           unitId: line.unitId ?? undefined,
           unitPrice: price,
           unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
-          taxRatePercent: line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : undefined,
-        };
-      });
-      if (payloadLines.some((l) => l.quantity <= 0 || l.unitPrice < 0)) {
-        toast.error("Each line needs positive quantity and non-negative unit price");
-        return;
+          taxRatePercent: line.taxRatePercent !== "" ? lineRate : undefined,
+        });
+        for (const m of line.modifiers) {
+          if (!m.itemId?.trim()) continue;
+          const mp = parseFloat(m.unitPrice);
+          const mRate = m.taxRatePercent !== "" ? parseFloat(m.taxRatePercent) : defaultTaxRate;
+          payloadLines.push({
+            itemId: parseInt(m.itemId, 10),
+            quantity: qty,
+            unitPrice: mp,
+            unitCost: m.unitCost ? parseFloat(m.unitCost) : undefined,
+            taxRatePercent: m.taxRatePercent !== "" ? mRate : undefined,
+            parentLineIndex: parentIdx,
+          });
+        }
       }
       await updateSale.mutateAsync({
         id: saleId,
@@ -400,7 +607,7 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
             formData.discountValue && parseFloat(formData.discountValue) > 0
               ? { type: formData.discountType as "amount" | "percent", value: parseFloat(formData.discountValue) }
               : undefined,
-        } as any,
+        },
       });
       toast.success("Sale updated successfully");
       router.push(`/sales/${saleId}`);
@@ -519,7 +726,8 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
               </div>
               <div className="space-y-3 border rounded-md p-3 bg-muted/30">
                 {lineItems.map((line, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                  <div key={index} className="space-y-2">
+                  <div className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-3 flex flex-col gap-1.5">
                       {line.itemId && (
                         <Link
@@ -664,6 +872,48 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                         </div>
                       </>
                     )}
+                  </div>
+                  {line.itemId ? (
+                    <div className="ml-1 pl-3 border-l border-border space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-muted-foreground">Modifiers</span>
+                        <Button type="button" variant="secondary" size="sm" onClick={() => addModifier(index)}>
+                          <Plus className="h-3 w-3 mr-1" /> Add modifier
+                        </Button>
+                      </div>
+                      {line.modifiers.map((mod, mi) => (
+                        <div key={mi} className="grid grid-cols-12 gap-2 items-end">
+                          <div className="col-span-6">
+                            <UnifiedSelector
+                              type="item"
+                              items={modifierItems}
+                              selectedId={mod.itemId ? parseInt(mod.itemId, 10) : undefined}
+                              onSelect={(item) => handleModifierItemSelect(index, mi, item.id === 0 ? "" : String(item.id))}
+                              placeholder="Modifier item"
+                              getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}`}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="col-span-4">
+                            <Label className="text-xs text-muted-foreground">Price (excl. tax)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="text-sm tabular-nums"
+                              value={mod.unitPrice}
+                              onChange={(e) => updateModifier(index, mi, "unitPrice", e.target.value)}
+                            />
+                          </div>
+                          <div className="col-span-2 flex h-10 items-end justify-end">
+                            <Button type="button" variant="ghost" size="icon" onClick={() => removeModifier(index, mi)}>
+                              <Trash2 className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   </div>
                 ))}
               </div>
@@ -837,12 +1087,13 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                   </thead>
                   <tbody>
                     {(sale.lineItems && sale.lineItems.length > 0
-                      ? sale.lineItems
-                      : [{ id: 0, quantity: 1, unitPrice: sale.amount, lineTotal: sale.amount }]
+                      ? [...sale.lineItems].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                      : [{ id: 0, quantity: 1, unitPrice: sale.amount, lineTotal: sale.amount, sortOrder: 0 }]
                     ).map(
                       (
                         line: {
                           id: number;
+                          parentSaleLineId?: number;
                           itemId?: number;
                           item?: { id?: number; name?: string };
                           quantity: number;
@@ -850,8 +1101,10 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                           lineTotal: number;
                           taxRatePercent?: number;
                           taxAmount?: number;
+                          sortOrder?: number;
                         }
                       ) => {
+                        const isModifierLine = line.parentSaleLineId != null;
                         const resolved = resolvedLineTax[line.id];
                         const rate = (line.taxRatePercent ?? resolved?.rate ?? 0);
                         const inclusive = (resolved?.taxInclusive ?? false) && rate > 0;
@@ -874,8 +1127,15 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                         const hasItemLink = !!(itemId && line.item);
 
                         return (
-                          <tr key={line.id} className="border-b last:border-0">
+                          <tr key={line.id} className={`border-b last:border-0 ${isModifierLine ? "bg-muted/15" : ""}`}>
                             <td className="p-2">
+                              <span className="inline-flex items-center gap-1.5">
+                                {isModifierLine ? (
+                                  <span className="text-muted-foreground shrink-0" aria-hidden>
+                                    ↳
+                                  </span>
+                                ) : null}
+                                <span className="min-w-0">
                               {hasItemLink ? (
                                 <Link
                                   href={`/items/${itemId}`}
@@ -887,6 +1147,8 @@ export function SaleDetailContent({ saleId, initialEditMode = false, onClose, on
                               ) : (
                                 itemLabel
                               )}
+                                </span>
+                              </span>
                             </td>
                             <td className="p-2 text-right tabular-nums">{line.quantity}</td>
                             <td className="p-2 text-right tabular-nums">

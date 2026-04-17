@@ -241,7 +241,7 @@ export default function CreateRecipePage() {
                             <UnifiedSelector
                               label="Item"
                               type="item"
-                              items={itemsResponse?.data?.filter(i => i.itemType === 'item') ?? []}
+                              items={itemsResponse?.data?.filter((i) => i.itemTypes?.includes("item")) ?? []}
                               selectedId={item.itemId || undefined}
                               onSelect={(sel) => updateItem(index, 'itemId', sel.id === 0 ? 0 : Number(sel.id))}
                               placeholder="Select item"

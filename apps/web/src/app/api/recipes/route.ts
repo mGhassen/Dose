@@ -13,7 +13,6 @@ function transformRecipe(row: any): Recipe {
     unit: row.unit,
     unitId: row.unit_id,
     category: row.category,
-    itemType: 'recipe' as const,
     servingSize: row.serving_size,
     preparationTime: row.preparation_time,
     cookingTime: row.cooking_time,

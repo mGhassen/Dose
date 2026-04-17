@@ -21,7 +21,7 @@ export default function ExpiryDatesContent() {
   
   const itemMap = useMemo(() => {
     if (!itemsResponse?.data) return new Map<number, string>();
-    return new Map(itemsResponse.data.filter(i => i.itemType === 'item').map(i => [i.id, i.name]));
+    return new Map(itemsResponse.data.filter((i) => i.itemTypes?.includes("item")).map((i) => [i.id, i.name]));
   }, [itemsResponse?.data]);
   
   const filteredExpiryDates = useMemo(() => {

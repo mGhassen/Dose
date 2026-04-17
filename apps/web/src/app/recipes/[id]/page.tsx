@@ -477,7 +477,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                               <UnifiedSelector
                                 label="Item"
                                 type="item"
-                                items={itemsResponse?.data?.filter(i => i.itemType === 'item') ?? []}
+                                items={itemsResponse?.data?.filter((i) => i.itemTypes?.includes("item")) ?? []}
                                 selectedId={item.itemId || undefined}
                                 onSelect={(sel) => updateItem(index, 'itemId', sel.id === 0 ? 0 : Number(sel.id))}
                                 placeholder="Select item"
@@ -958,7 +958,7 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
             <UnifiedSelector
               label="Item"
               type="item"
-              items={allItems.filter(i => i.itemType === 'item')}
+              items={allItems.filter((i) => i.itemTypes?.includes("item"))}
               selectedId={linkItemId ?? undefined}
               onSelect={(sel) => setLinkItemId(sel.id === 0 ? null : Number(sel.id))}
               placeholder="Select item"

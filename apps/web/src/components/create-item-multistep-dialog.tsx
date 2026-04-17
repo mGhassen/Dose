@@ -13,7 +13,18 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { useCreateItem, useInventorySuppliers, useUnits } from "@kit/hooks";
-import type { Item, ItemType } from "@kit/types";
+import type { Item, ItemKind } from "@kit/types";
+
+function toggleItemKind(current: ItemKind[], k: ItemKind): ItemKind[] {
+  const next = current.includes(k) ? current.filter((x) => x !== k) : [...current, k];
+  return next.length ? next : [k];
+}
+
+const ITEM_KIND_OPTIONS: { id: ItemKind; label: string }[] = [
+  { id: "item", label: "Item" },
+  { id: "product", label: "Product" },
+  { id: "modifier", label: "Modifier" },
+];
 import { toast } from "sonner";
 import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
@@ -23,7 +34,8 @@ import { Save, X } from "lucide-react";
 export function CreateItemMultiStepDialog(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  defaultItemType?: Exclude<ItemType, "recipe">;
+  /** Defaults to `['item']` */
+  defaultItemTypes?: ItemKind[];
   onCreated?: (item: Item) => void;
 }) {
   const createItem = useCreateItem();
@@ -35,12 +47,6 @@ export function CreateItemMultiStepDialog(props: {
     [unitsData]
   );
 
-  const itemTypeItems: { id: ItemType; name: string }[] = [
-    { id: "item", name: "Item" },
-    { id: "product", name: "Product" },
-    { id: "item_and_product", name: "Item and product" },
-  ];
-
   const [addVendorOpen, setAddVendorOpen] = useState(false);
   const [formData, setFormData] = useState<{
     name: string;
@@ -51,7 +57,7 @@ export function CreateItemMultiStepDialog(props: {
     vendorId: string;
     notes: string;
     isActive: boolean;
-    itemType: ItemType;
+    itemTypes: ItemKind[];
   }>(() => ({
     name: "",
     description: "",
@@ -61,7 +67,7 @@ export function CreateItemMultiStepDialog(props: {
     vendorId: "",
     notes: "",
     isActive: true,
-    itemType: props.defaultItemType ?? "item",
+    itemTypes: props.defaultItemTypes?.length ? props.defaultItemTypes : ["item"],
   }));
 
   const reset = () => {
@@ -75,7 +81,7 @@ export function CreateItemMultiStepDialog(props: {
       vendorId: "",
       notes: "",
       isActive: true,
-      itemType: props.defaultItemType ?? "item",
+      itemTypes: props.defaultItemTypes?.length ? props.defaultItemTypes : ["item"],
     });
   };
 
@@ -108,7 +114,7 @@ export function CreateItemMultiStepDialog(props: {
         vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
         notes: formData.notes || undefined,
         isActive: formData.isActive,
-        itemType: formData.itemType as "item" | "product" | "item_and_product",
+        itemTypes: formData.itemTypes,
       })) as Item;
       toast.success("Item created successfully");
       props.onCreated?.(created);
@@ -159,15 +165,24 @@ export function CreateItemMultiStepDialog(props: {
               />
             </div>
 
-            <div className="space-y-2">
-              <UnifiedSelector
-                label="Item type"
-                type="type"
-                items={itemTypeItems}
-                selectedId={formData.itemType}
-                onSelect={(item) => handleInputChange("itemType", item.id as ItemType)}
-                placeholder="Select type"
-              />
+            <div className="space-y-2 md:col-span-2">
+              <Label>Types</Label>
+              <div className="flex flex-wrap gap-4">
+                {ITEM_KIND_OPTIONS.map(({ id, label }) => (
+                  <label key={id} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={formData.itemTypes.includes(id)}
+                      onCheckedChange={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          itemTypes: toggleItemKind(prev.itemTypes, id),
+                        }))
+                      }
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">

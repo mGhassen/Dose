@@ -34,6 +34,8 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
   const createSale = useCreateSale();
   const { data: itemsResponse } = useItems({ limit: 1000, producedOnly: true });
   const items = itemsResponse?.data ?? [];
+  const { data: modifierItemsResponse } = useItems({ limit: 500, itemType: "modifier" });
+  const modifierItems = modifierItemsResponse?.data ?? [];
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
   const { data: salesTypeValues = [] } = useMetadataEnum("SalesType");
@@ -58,6 +60,16 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     taxRulesApi.resolve({ context: 'sale', salesType: formData.type, date: formData.date }).then((r) => setDefaultTaxRate(r.rate)).catch(() => setDefaultTaxRate(0));
   }, [formData.type, formData.date]);
 
+  type ModifierLine = {
+    itemId: string;
+    unitPrice: string;
+    unitCost: string;
+    taxRatePercent: string;
+    taxInclusive: boolean;
+    taxVariableName?: string;
+    taxConditionType?: string;
+    taxConditionValue?: string;
+  };
   type LineItem = {
     itemId: string;
     quantity: string;
@@ -69,9 +81,19 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     taxVariableName?: string;
     taxConditionType?: string;
     taxConditionValue?: string;
+    modifiers: ModifierLine[];
   };
   const [lineItems, setLineItems] = useState<LineItem[]>([
-    { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false },
+    {
+      itemId: "",
+      quantity: "1",
+      unitId: null,
+      unitPrice: "",
+      unitCost: "",
+      taxRatePercent: "",
+      taxInclusive: false,
+      modifiers: [],
+    },
   ]);
   const lineItemsRef = useRef(lineItems);
   lineItemsRef.current = lineItems;
@@ -80,14 +102,24 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
   const { subtotal, totalTax, discountAmount, total } = useMemo(() => {
     let sub = 0;
     let tax = 0;
+    const addLineTax = (q: number, p: number, lineRate: number, inclusive: boolean) => {
+      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, inclusive);
+      sub += lineTotalNet;
+      tax += taxAmount;
+    };
     for (const line of lineItems) {
       const q = parseFloat(line.quantity) || 0;
       const p = parseFloat(line.unitPrice) || 0;
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
       const inclusive = line.taxInclusive && lineRate > 0;
-      const { lineTotalNet, taxAmount } = lineTaxAmount(q, p, lineRate, inclusive);
-      sub += lineTotalNet;
-      tax += taxAmount;
+      addLineTax(q, p, lineRate, inclusive);
+      for (const m of line.modifiers) {
+        const mq = q;
+        const mp = parseFloat(m.unitPrice) || 0;
+        const mRate = m.taxRatePercent !== "" ? parseFloat(m.taxRatePercent) : (formData.type ? defaultTaxRate : 0);
+        const mIncl = m.taxInclusive && mRate > 0;
+        addLineTax(mq, mp, mRate, mIncl);
+      }
     }
     sub = to2Decimals(sub);
     tax = to2Decimals(tax);
@@ -102,7 +134,67 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
   }, [lineItems, defaultTaxRate, formData.type, formData.discountType, formData.discountValue]);
 
   const addLine = () => {
-    setLineItems((prev) => [...prev, { itemId: "", quantity: "1", unitId: null, unitPrice: "", unitCost: "", taxRatePercent: "", taxInclusive: false }]);
+    setLineItems((prev) => [
+      ...prev,
+      {
+        itemId: "",
+        quantity: "1",
+        unitId: null,
+        unitPrice: "",
+        unitCost: "",
+        taxRatePercent: "",
+        taxInclusive: false,
+        modifiers: [],
+      },
+    ]);
+  };
+
+  const addModifier = (lineIndex: number) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      const line = next[lineIndex];
+      if (!line) return prev;
+      next[lineIndex] = {
+        ...line,
+        modifiers: [
+          ...line.modifiers,
+          {
+            itemId: "",
+            unitPrice: "",
+            unitCost: "",
+            taxRatePercent: "",
+            taxInclusive: false,
+          },
+        ],
+      };
+      return next;
+    });
+  };
+
+  const removeModifier = (lineIndex: number, modIndex: number) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      const line = next[lineIndex];
+      if (!line) return prev;
+      next[lineIndex] = {
+        ...line,
+        modifiers: line.modifiers.filter((_, i) => i !== modIndex),
+      };
+      return next;
+    });
+  };
+
+  const updateModifier = (lineIndex: number, modIndex: number, field: keyof ModifierLine, value: string | boolean) => {
+    setLineItems((prev) => {
+      const next = [...prev];
+      const line = next[lineIndex];
+      if (!line) return prev;
+      const mods = [...line.modifiers];
+      const cur = { ...mods[modIndex], [field]: value };
+      mods[modIndex] = cur;
+      next[lineIndex] = { ...line, modifiers: mods };
+      return next;
+    });
   };
 
   const salesTypeLabelMap = useMemo(
@@ -186,6 +278,7 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
         line.taxVariableName = undefined;
         line.taxConditionType = undefined;
         line.taxConditionValue = undefined;
+        line.modifiers = [];
       } else {
         const item = items.find((i: { id: number }) => i.id === parseInt(itemId, 10)) as { unitId?: number; unit_price?: number; unitPrice?: number; defaultTaxRatePercent?: number } | undefined;
         line.quantity = "1";
@@ -245,6 +338,59 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
     }
   };
 
+  const handleModifierItemSelect = (lineIndex: number, modIndex: number, itemId: string) => {
+    updateModifier(lineIndex, modIndex, "itemId", itemId);
+    if (!itemId) {
+      updateModifier(lineIndex, modIndex, "unitPrice", "");
+      updateModifier(lineIndex, modIndex, "taxRatePercent", "");
+      updateModifier(lineIndex, modIndex, "taxInclusive", false);
+      return;
+    }
+    const dateStr = formData.date || new Date().toISOString().slice(0, 10);
+    const apply = (data: { unitPrice?: number | null; taxIncluded?: boolean }, r: { rate: number; taxInclusive?: boolean; variableName?: string; conditionType?: string | null; conditionValue?: string | null }) => {
+      if (data?.unitPrice == null) return;
+      const rate = r.rate;
+      const apiIncl = data.taxIncluded ?? false;
+      const excl = apiIncl && rate > 0 ? netUnitPriceFromInclusive(data.unitPrice!, rate) : data.unitPrice!;
+      setLineItems((prev) => {
+        const next = [...prev];
+        const line = next[lineIndex];
+        if (!line?.modifiers[modIndex] || line.modifiers[modIndex].itemId !== itemId) return prev;
+        const mods = [...line.modifiers];
+        mods[modIndex] = {
+          ...mods[modIndex],
+          unitPrice: String(to2Decimals(excl)),
+          taxRatePercent: r.rate.toString(),
+          taxVariableName: r.variableName,
+          taxConditionType: r.conditionType ?? undefined,
+          taxConditionValue: r.conditionValue ?? undefined,
+          taxInclusive: r.taxInclusive ?? false,
+        };
+        next[lineIndex] = { ...line, modifiers: mods };
+        return next;
+      });
+    };
+    if (formData.type && formData.date) {
+      Promise.all([
+        fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`).then((r) => r.json()) as Promise<{ unitPrice?: number | null; taxIncluded?: boolean }>,
+        taxRulesApi.resolve({ context: "sale", salesType: formData.type, itemId: parseInt(itemId, 10), date: formData.date }),
+      ])
+        .then(([data, r]) => apply(data, r))
+        .catch(() => {});
+    } else {
+      fetch(`/api/items/${itemId}/resolved-price?date=${dateStr}`)
+        .then((r) => r.json())
+        .then((data: { unitPrice?: number | null; taxIncluded?: boolean }) => {
+          if (data?.unitPrice == null) return;
+          const rate = defaultTaxRate;
+          const apiIncl = data.taxIncluded ?? false;
+          const excl = apiIncl && rate > 0 ? netUnitPriceFromInclusive(data.unitPrice, rate) : data.unitPrice;
+          updateModifier(lineIndex, modIndex, "unitPrice", String(to2Decimals(excl)));
+        })
+        .catch(() => {});
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.date || !formData.type) {
@@ -260,15 +406,37 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
         toast.error(`Line ${i + 1}: quantity (positive) and unit price are required`);
         return;
       }
+      for (const m of line.modifiers) {
+        if (!m.itemId?.trim()) continue;
+        const mp = parseFloat(m.unitPrice);
+        if (isNaN(mp) || mp < 0) {
+          toast.error(`Line ${i + 1}: modifier needs a valid unit price`);
+          return;
+        }
+      }
       const lineRate = line.taxRatePercent !== "" ? parseFloat(line.taxRatePercent) : defaultTaxRate;
+      const parentIdx = payloadLines.length;
       payloadLines.push({
-        itemId: line.itemId ? parseInt(line.itemId) : undefined,
+        itemId: line.itemId ? parseInt(line.itemId, 10) : undefined,
         quantity: qty,
         unitId: line.unitId ?? undefined,
         unitPrice: price,
         unitCost: line.unitCost ? parseFloat(line.unitCost) : undefined,
         taxRatePercent: line.taxRatePercent !== "" ? lineRate : undefined,
       });
+      for (const m of line.modifiers) {
+        if (!m.itemId?.trim()) continue;
+        const mp = parseFloat(m.unitPrice);
+        const mRate = m.taxRatePercent !== "" ? parseFloat(m.taxRatePercent) : defaultTaxRate;
+        payloadLines.push({
+          itemId: parseInt(m.itemId, 10),
+          quantity: qty,
+          unitPrice: mp,
+          unitCost: m.unitCost ? parseFloat(m.unitCost) : undefined,
+          taxRatePercent: m.taxRatePercent !== "" ? mRate : undefined,
+          parentLineIndex: parentIdx,
+        });
+      }
     }
     const dateTimeIso = new Date(`${formData.date}T${formData.time}`).toISOString();
     const payload = {
@@ -346,7 +514,8 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
             </div>
             <div className="space-y-3 border rounded-md p-3 bg-muted/30">
               {lineItems.map((line, index) => (
-                <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                <div key={index} className="space-y-2">
+                <div className="grid grid-cols-12 gap-2 items-end">
                   <div className="col-span-3 flex flex-col gap-1.5">
                     {line.itemId && (
                       <Link
@@ -493,6 +662,49 @@ export function SaleCreateContent({ onClose, onCreated }: SaleCreateContentProps
                         </div>
                     </>
                   )}
+                </div>
+                {line.itemId ? (
+                  <div className="ml-1 pl-3 border-l border-border space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-muted-foreground">Modifiers</span>
+                      <Button type="button" variant="secondary" size="sm" onClick={() => addModifier(index)}>
+                        <Plus className="h-3 w-3 mr-1" /> Add modifier
+                      </Button>
+                    </div>
+                    {line.modifiers.map((mod, mi) => (
+                      <div key={mi} className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-6">
+                          <UnifiedSelector
+                            label=""
+                            type="item"
+                            items={modifierItems}
+                            selectedId={mod.itemId ? parseInt(mod.itemId, 10) : undefined}
+                            onSelect={(item) => handleModifierItemSelect(index, mi, item.id === 0 ? "" : String(item.id))}
+                            placeholder="Modifier item"
+                            getDisplayName={(i) => `${(i as { name?: string }).name ?? i.id}`}
+                            className="h-10"
+                          />
+                        </div>
+                        <div className="col-span-4">
+                          <Label className="text-xs text-muted-foreground">Price (excl. tax)</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="text-sm tabular-nums"
+                            value={mod.unitPrice}
+                            onChange={(e) => updateModifier(index, mi, "unitPrice", e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-2 flex h-10 items-end justify-end">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeModifier(index, mi)}>
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 </div>
               ))}
             </div>

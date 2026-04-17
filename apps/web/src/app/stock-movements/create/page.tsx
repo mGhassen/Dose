@@ -100,7 +100,7 @@ export default function CreateStockMovementPage() {
                     label="Item"
                     required
                     type="item"
-                    items={items.filter(i => i.isActive && i.itemType === 'item').map((item) => ({
+                    items={items.filter((i) => i.isActive && i.itemTypes?.includes("item")).map((item) => ({
                       ...item,
                       id: item.id,
                       name: `${item.name} (${item.unit})`,

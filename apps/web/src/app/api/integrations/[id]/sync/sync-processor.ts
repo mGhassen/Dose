@@ -13,6 +13,10 @@ import {
   getDefaultUnitVariableId,
   resolveSquareMeasurementUnitId,
 } from './square-measurement-unit';
+import {
+  ensureCatalogTaxVariableMapping,
+  upsertItemTaxesFromSquareTaxIds,
+} from './square-tax';
 import { upsertSellingPrice } from '@/lib/items/price-history-upsert';
 import { getItemCostAsOf } from '@/lib/items/price-resolve';
 
@@ -154,6 +158,7 @@ export async function processSyncJob(
     const variationsMap = new Map<string, any[]>();
     const categoriesMap = new Map<string, any>();
     const taxInclusionByTaxId = new Map<string, 'ADDITIVE' | 'INCLUSIVE'>();
+    const taxObjectsMap = new Map<string, any>();
     const measurementUnitMap = new Map<string, any>();
     for (const obj of allCatalogObjects) {
       if (obj?.type === 'ITEM') {
@@ -168,10 +173,19 @@ export async function processSyncJob(
       } else if (obj?.type === 'CATEGORY') {
         categoriesMap.set(obj.id, obj);
       } else if (obj?.type === 'TAX') {
+        if (obj.id) taxObjectsMap.set(obj.id, obj);
         const inc = obj.tax_data?.inclusion_type;
         if (inc === 'ADDITIVE' || inc === 'INCLUSIVE') taxInclusionByTaxId.set(obj.id, inc);
       } else if (obj?.type === 'MEASUREMENT_UNIT' && obj.id) {
         measurementUnitMap.set(obj.id, obj);
+      }
+    }
+
+    for (const [tid, tObj] of taxObjectsMap) {
+      try {
+        await ensureCatalogTaxVariableMapping(supabase, integrationId, tid, tObj, today);
+      } catch (e: any) {
+        await recordImportError(supabase, jobId, 'catalog_tax', tid, e?.message || String(e));
       }
     }
 
@@ -207,30 +221,98 @@ export async function processSyncJob(
       if (obj?.type !== 'MODIFIER' || obj.is_deleted) continue;
       const sqModId = obj.id;
       try {
-        const existingMod = await getMappedAppEntityId(supabase, integrationId, 'catalog_modifier', sqModId);
-        if (existingMod != null) continue;
         const listSqId = obj.modifier_data?.modifier_list_id;
-        if (!listSqId) continue;
+        if (!listSqId) {
+          await recordImportError(supabase, jobId, 'catalog_modifier', sqModId, 'missing modifier_list_id');
+          continue;
+        }
         const listDbId = await getMappedAppEntityId(supabase, integrationId, 'catalog_modifier_list', listSqId);
         if (listDbId == null) continue;
         const priceCents = obj.modifier_data?.price_money?.amount;
-        const { data: modRow, error: modErr } = await supabase
-          .from('modifiers')
-          .insert({
-            modifier_list_id: listDbId,
-            square_modifier_id: sqModId,
-            name: obj.modifier_data?.name ?? null,
-            price_amount_cents: typeof priceCents === 'number' ? priceCents : null,
-            sort_order: obj.modifier_data?.ordinal ?? 0,
-            raw_payload: obj,
-          })
-          .select('id')
-          .single();
-        if (modErr) {
-          await recordImportError(supabase, jobId, 'catalog_modifier', sqModId, modErr.message);
-          continue;
+        const modName = (obj.modifier_data?.name as string | undefined) || 'Modifier';
+
+        const existingModRowId = await getMappedAppEntityId(supabase, integrationId, 'catalog_modifier', sqModId);
+        let invItemId: number | null = null;
+
+        if (existingModRowId != null) {
+          const { data: existingRow } = await supabase
+            .from('modifiers')
+            .select('id, item_id, name')
+            .eq('id', existingModRowId)
+            .maybeSingle();
+          if (!existingRow) continue;
+          invItemId = existingRow.item_id;
+          if (invItemId == null) {
+            const label = (existingRow.name as string | null) || modName;
+            const { data: newItem, error: insItemErr } = await supabase
+              .from('items')
+              .insert({
+                name: label,
+                description: null,
+                category: null,
+                unit_id: defaultUnitVariableId,
+                item_types: ['modifier'],
+                is_active: true,
+                is_catalog_parent: false,
+              })
+              .select('id')
+              .single();
+            if (insItemErr) {
+              await recordImportError(supabase, jobId, 'catalog_modifier', sqModId, insItemErr.message);
+              continue;
+            }
+            invItemId = newItem.id as number;
+            await supabase.from('modifiers').update({ item_id: invItemId }).eq('id', existingRow.id);
+            stats.items_imported += 1;
+          }
+        } else {
+          const { data: newItem, error: insItemErr } = await supabase
+            .from('items')
+            .insert({
+              name: modName,
+              description: null,
+              category: null,
+              unit_id: defaultUnitVariableId,
+              item_types: ['modifier'],
+              is_active: true,
+              is_catalog_parent: false,
+            })
+            .select('id')
+            .single();
+          if (insItemErr) {
+            await recordImportError(supabase, jobId, 'catalog_modifier', sqModId, insItemErr.message);
+            continue;
+          }
+          invItemId = newItem.id as number;
+          const { data: modRow, error: modErr } = await supabase
+            .from('modifiers')
+            .insert({
+              modifier_list_id: listDbId,
+              square_modifier_id: sqModId,
+              name: obj.modifier_data?.name ?? null,
+              price_amount_cents: typeof priceCents === 'number' ? priceCents : null,
+              sort_order: obj.modifier_data?.ordinal ?? 0,
+              item_id: invItemId,
+              raw_payload: obj,
+            })
+            .select('id')
+            .single();
+          if (modErr) {
+            await recordImportError(supabase, jobId, 'catalog_modifier', sqModId, modErr.message);
+            continue;
+          }
+          await insertMapping(supabase, integrationId, 'catalog_modifier', sqModId, 'modifier', modRow.id);
+          stats.items_imported += 1;
         }
-        await insertMapping(supabase, integrationId, 'catalog_modifier', sqModId, 'modifier', modRow.id);
+
+        const existingItemMap = await getMappedAppEntityId(supabase, integrationId, 'catalog_modifier_item', sqModId);
+        if (existingItemMap == null && invItemId != null) {
+          await insertMapping(supabase, integrationId, 'catalog_modifier_item', sqModId, 'item', invItemId);
+        }
+
+        if (invItemId != null && typeof priceCents === 'number' && priceCents >= 0) {
+          await upsertSellingPrice(supabase, invItemId, today, centsToDecimal(priceCents), undefined);
+        }
       } catch (e: any) {
         await recordImportError(supabase, jobId, 'catalog_modifier', sqModId, e?.message || String(e));
       }
@@ -265,7 +347,7 @@ export async function processSyncJob(
               description: itemDesc,
               category: categoryName || null,
               unit_id: defaultUnitVariableId,
-              item_type: 'product',
+              item_types: ['product'],
               is_active: true,
               is_catalog_parent: false,
             })
@@ -278,6 +360,31 @@ export async function processSyncJob(
           }
           await insertMapping(supabase, integrationId, 'catalog_item', squareItemId, 'item', newItem.id);
           stats.items_imported += 1;
+          if (Array.isArray(itemObj.item_data?.variations)) {
+            for (const vid of itemObj.item_data.variations as string[]) {
+              const vo = allCatalogObjects.find(
+                (o: any) => o?.type === 'ITEM_VARIATION' && o.id === vid && !o.is_deleted
+              );
+              const orphanCents = vo?.item_variation_data?.price_money?.amount;
+              if (typeof orphanCents === 'number' && orphanCents >= 0) {
+                await upsertSellingPrice(
+                  supabase,
+                  newItem.id as number,
+                  today,
+                  centsToDecimal(orphanCents),
+                  taxIncludedForItem
+                );
+                break;
+              }
+            }
+          }
+          await upsertItemTaxesFromSquareTaxIds(
+            supabase,
+            integrationId,
+            newItem.id as number,
+            taxIds,
+            taxInclusionByTaxId
+          );
         } catch (e: any) {
           await recordImportError(supabase, jobId, 'catalog_item', squareItemId, e?.message || String(e));
           stats.items_failed += 1;
@@ -300,7 +407,7 @@ export async function processSyncJob(
               description: itemDesc || null,
               category: categoryName || null,
               unit_id: defaultUnitVariableId,
-              item_type: 'product',
+              item_types: ['product'],
               is_active: true,
               is_catalog_parent: true,
             })
@@ -371,24 +478,41 @@ export async function processSyncJob(
 
         try {
           const existingChild = await getMappedAppEntityId(supabase, integrationId, 'catalog_variation', variationId);
-          if (existingChild != null && parentItemId != null) {
-            const { data: ivRow } = await supabase
-              .from('item_variations')
-              .select('id')
-              .eq('variant_item_id', existingChild)
-              .maybeSingle();
-            if (!ivRow) {
-              await supabase.from('item_variations').insert({
-                parent_item_id: parentItemId,
-                variant_item_id: existingChild,
-                square_variation_id: variationId,
-                sort_order: vData.ordinal ?? vi,
-                name_snapshot: vData.name || null,
-              });
+          if (existingChild != null) {
+            if (parentItemId != null) {
+              const { data: ivRow } = await supabase
+                .from('item_variations')
+                .select('id')
+                .eq('variant_item_id', existingChild)
+                .maybeSingle();
+              if (!ivRow) {
+                await supabase.from('item_variations').insert({
+                  parent_item_id: parentItemId,
+                  variant_item_id: existingChild,
+                  square_variation_id: variationId,
+                  sort_order: vData.ordinal ?? vi,
+                  name_snapshot: vData.name || null,
+                });
+              }
             }
+            if (typeof priceCents === 'number' && priceCents >= 0) {
+              await upsertSellingPrice(
+                supabase,
+                existingChild,
+                today,
+                centsToDecimal(priceCents),
+                taxIncludedForItem
+              );
+            }
+            await upsertItemTaxesFromSquareTaxIds(
+              supabase,
+              integrationId,
+              existingChild,
+              taxIds,
+              taxInclusionByTaxId
+            );
             continue;
           }
-          if (existingChild != null) continue;
 
           const resolvedUnitId = muId
             ? await resolveSquareMeasurementUnitId(
@@ -408,7 +532,7 @@ export async function processSyncJob(
               category: categoryName || null,
               sku,
               unit_id: resolvedUnitId,
-              item_type: 'product',
+              item_types: ['product'],
               is_active: true,
               is_catalog_parent: false,
             })
@@ -424,6 +548,13 @@ export async function processSyncJob(
           }
           await insertMapping(supabase, integrationId, 'catalog_variation', variationId, 'item', newItem.id);
           stats.items_imported += 1;
+          await upsertItemTaxesFromSquareTaxIds(
+            supabase,
+            integrationId,
+            newItem.id as number,
+            taxIds,
+            taxInclusionByTaxId
+          );
 
           if (parentItemId != null) {
             await supabase.from('item_variations').insert({
@@ -499,6 +630,7 @@ export async function processSyncJob(
           taxRatePercent: number;
           taxIncluded: boolean | null;
           name?: string;
+          parentLineIndex?: number;
         }> = [];
         for (const line of lineItems) {
           const qty = parseFloat(line.quantity) || 0;
@@ -534,6 +666,42 @@ export async function processSyncJob(
             taxIncluded: taxIncluded ? true : false,
             name: line.name,
           });
+          const baseIdx = lineRows.length - 1;
+          const mods = Array.isArray(line.modifiers) ? line.modifiers : [];
+          for (const mod of mods) {
+            const modCatId = mod?.catalog_object_id;
+            let modItemId: number | null = null;
+            if (modCatId) {
+              modItemId = await getMappedAppEntityId(supabase, integrationId, 'catalog_modifier_item', modCatId);
+            }
+            const modTotalCents =
+              mod?.total_price_money?.amount ??
+              (typeof mod?.base_price_money?.amount === 'number' ? Math.round(mod.base_price_money.amount * qty) : 0);
+            const modLineTotal = centsToDecimal(modTotalCents);
+            const modUnitPrice = qty > 0 ? modLineTotal / qty : modLineTotal;
+            const modTaxCents = mod?.total_tax_money?.amount ?? 0;
+            const modTaxAmount = centsToDecimal(modTaxCents);
+            const modBaseForRate = Math.max(modLineTotal - modTaxAmount, 0);
+            const modTaxPct =
+              modBaseForRate > 0 && modTaxAmount > 0 ? (modTaxAmount / modBaseForRate) * 100 : 0;
+            let modUnitCost: number | null = null;
+            if (modItemId != null) {
+              const cost = await getItemCostAsOf(supabase, modItemId, dateStr);
+              if (cost.unitCost != null) modUnitCost = cost.unitCost;
+            }
+            lineRows.push({
+              itemId: modItemId,
+              quantity: qty,
+              unitPrice: modUnitPrice,
+              unitCost: modUnitCost,
+              lineTotal: modLineTotal,
+              taxAmount: modTaxAmount,
+              taxRatePercent: modTaxPct,
+              taxIncluded: taxIncluded ? true : false,
+              name: mod?.name,
+              parentLineIndex: baseIdx,
+            });
+          }
         }
 
         const firstLine = lineRows[0];
@@ -561,20 +729,32 @@ export async function processSyncJob(
         }
         const saleId = saleRow.id;
 
+        const insertedSaleLineIds: number[] = [];
         let sortOrder = 0;
-        for (const l of lineRows) {
-          await supabase.from('sale_line_items').insert({
-            sale_id: saleId,
-            item_id: l.itemId,
-            quantity: l.quantity,
-            unit_price: l.unitPrice,
-            unit_cost: l.unitCost,
-            line_total: l.lineTotal,
-            tax_rate_percent: l.taxRatePercent,
-            tax_amount: l.taxAmount,
-            tax_included: l.taxIncluded,
-            sort_order: sortOrder++,
-          });
+        for (let li = 0; li < lineRows.length; li++) {
+          const l = lineRows[li];
+          const parentIdx = l.parentLineIndex;
+          const parentSaleLineId =
+            parentIdx != null && parentIdx >= 0 ? insertedSaleLineIds[parentIdx] ?? null : null;
+          const { data: insLine, error: lineInsErr } = await supabase
+            .from('sale_line_items')
+            .insert({
+              sale_id: saleId,
+              item_id: l.itemId,
+              quantity: l.quantity,
+              unit_price: l.unitPrice,
+              unit_cost: l.unitCost,
+              line_total: l.lineTotal,
+              tax_rate_percent: l.taxRatePercent,
+              tax_amount: l.taxAmount,
+              tax_included: l.taxIncluded,
+              parent_sale_line_id: parentSaleLineId,
+              sort_order: sortOrder++,
+            })
+            .select('id')
+            .single();
+          if (lineInsErr) throw lineInsErr;
+          insertedSaleLineIds[li] = insLine.id as number;
         }
 
         await supabase.from('entries').insert({

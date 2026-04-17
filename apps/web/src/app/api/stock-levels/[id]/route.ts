@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { StockLevel, UpdateStockLevelData } from '@kit/types';
+import { normalizeItemKinds } from '@kit/types';
 import { getUnitVariableMap } from '../../_utils/unit-variables';
 
 function transformStockLevel(row: any, unitMap: Map<number, { symbol: string }>): StockLevel {
@@ -24,7 +25,7 @@ function transformStockLevel(row: any, unitMap: Map<number, { symbol: string }>)
       description: row.item.description,
       unit: unitMap.get(row.item.unit_id)?.symbol || '',
       category: row.item.category,
-      itemType: row.item.item_type || 'item',
+      itemTypes: normalizeItemKinds(row.item.item_types),
       isActive: row.item.is_active,
       createdAt: row.item.created_at,
       updatedAt: row.item.updated_at,

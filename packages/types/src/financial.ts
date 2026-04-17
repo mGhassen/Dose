@@ -144,7 +144,7 @@ export interface UpdateVendorData extends Partial<CreateVendorData> {}
 // ============================================================================
 // ITEMS (Articles/Produits) - See unified Item interface below
 // ============================================================================
-// Note: Item interface is defined later in the file with itemType support
+// Note: Item interface is defined later (itemTypes: ItemKind[]).
 // This section is kept for reference but the actual types are below
 
 // ============================================================================
@@ -595,6 +595,8 @@ export interface ExpenseTaxRate {
 export interface SaleLineItem {
   id: number;
   saleId: number;
+  /** Present when this line is a modifier charge for another line. */
+  parentSaleLineId?: number;
   itemId?: number;
   quantity: number;
   unitId?: number;
@@ -652,6 +654,8 @@ export interface SaleLineItemInput {
   unitPrice: number;
   unitCost?: number;
   taxRatePercent?: number;
+  /** Index in the same request’s lineItems array of the base line (no parent). */
+  parentLineIndex?: number;
 }
 
 export interface TransactionDiscount {
@@ -991,10 +995,30 @@ export interface FinancialKPIs {
 // ============================================================================
 
 // ============================================================================
-// ITEMS (replaces ingredients - can be regular items or recipes)
+// ITEMS (replaces ingredients — stock/SKU rows)
 // ============================================================================
+//
+// Roles are stored in DB as `items.item_types` (text[]): ItemKind values can be combined
+// (e.g. ingredient + sellable product). Recipe definitions live in `recipes`; produced output
+// links via `items.produced_from_recipe_id`. Square modifier definitions use `modifiers` with
+// optional `modifiers.item_id` pointing at an inventory row for COGS when the add-on is stocked.
 
-export type ItemType = 'item' | 'product' | 'item_and_product' | 'recipe';
+/** Logical roles for an inventory row; combine when a SKU is e.g. both ingredient and sellable. */
+export type ItemKind = 'item' | 'product' | 'modifier';
+
+/** @deprecated Use ItemKind */
+export type ItemType = ItemKind;
+
+export function normalizeItemKinds(raw: unknown): ItemKind[] {
+  const allowed = new Set<ItemKind>(['item', 'product', 'modifier']);
+  if (!Array.isArray(raw) || raw.length === 0) return ['item'];
+  const out = raw.filter((x): x is ItemKind => typeof x === 'string' && allowed.has(x as ItemKind));
+  return out.length ? [...new Set(out)] : ['item'];
+}
+
+export function itemHasKind(item: { itemTypes?: ItemKind[] } | null | undefined, k: ItemKind): boolean {
+  return item?.itemTypes?.includes(k) ?? false;
+}
 
 export interface Item {
   id: number;
@@ -1003,11 +1027,10 @@ export interface Item {
   unit: string;
   unitId?: number;
   category?: string;
-  itemType: ItemType;
+  itemTypes: ItemKind[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  // Item-specific fields (only when itemType === 'item')
   sku?: string;
   unitPrice?: number;
   unitCost?: number;
@@ -1015,10 +1038,9 @@ export interface Item {
   notes?: string;
   producedFromRecipeId?: number;
   defaultTaxRatePercent?: number;
-  type?: string; // Variable type (same as in variables), e.g. unit, other
+  type?: string;
   /** Square catalog: parent row for a product with variations (not a sellable SKU). */
   isCatalogParent?: boolean;
-  // Recipe-specific fields (only when itemType === 'recipe')
   servingSize?: number;
   preparationTime?: number;
   cookingTime?: number;
@@ -1038,7 +1060,7 @@ export interface CreateItemData {
   notes?: string;
   defaultTaxRatePercent?: number;
   isActive?: boolean;
-  itemType?: 'item' | 'product' | 'item_and_product';
+  itemTypes?: ItemKind[];
   type?: string;
 }
 
@@ -1052,16 +1074,27 @@ export type CreateIngredientData = CreateItemData;
 export type UpdateIngredientData = UpdateItemData;
 
 // ============================================================================
-// RECIPES (now a type of Item)
+// RECIPES (recipes table — separate from items.item_types)
 // ============================================================================
 
-// Recipe is now just an Item with itemType='recipe'
-export type Recipe = Item & {
-  itemType: 'recipe';
+export interface Recipe {
+  id: number;
+  name: string;
+  description?: string;
+  unit: string;
+  unitId?: number;
+  category?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  servingSize?: number;
+  preparationTime?: number;
+  cookingTime?: number;
+  instructions?: string;
+  notes?: string;
   producedItemId?: number | null;
-  /** Linked output items (from recipe_produced_items). Use this for produce-dialog logic. */
   producedItems?: Item[];
-};
+}
 
 export interface RecipeItem {
   id: number;

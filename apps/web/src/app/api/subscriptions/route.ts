@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
         description: body.description ?? null,
         category: body.category,
         unit: 'unit',
-        item_type: 'item',
+        item_types: ['item'],
         is_active: true,
       })
       .select('id')

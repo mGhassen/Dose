@@ -5,8 +5,16 @@ import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useItems, useDeleteItem, useInventorySuppliers } from "@kit/hooks";
-import type { Item } from "@kit/types";
+import type { Item, ItemKind } from "@kit/types";
+
+const KIND_LABEL: Record<ItemKind, string> = {
+  item: "Item",
+  product: "Product",
+  modifier: "Modifier",
+};
 import { Badge } from "@kit/ui/badge";
+import { Label } from "@kit/ui/label";
+import { Switch } from "@kit/ui/switch";
 import { StatusPin } from "@/components/status-pin";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate } from "@kit/lib/date-format";
@@ -14,9 +22,11 @@ import { toast } from "sonner";
 
 export default function ItemsContent() {
   const router = useRouter();
-  
-  const { data: itemsResponse, isLoading } = useItems({ 
-    limit: 1000 // Fetch all for filtering, then paginate client-side
+  const [showCatalogGroups, setShowCatalogGroups] = useState(false);
+
+  const { data: itemsResponse, isLoading } = useItems({
+    limit: 1000,
+    excludeCatalogParents: !showCatalogGroups,
   });
   
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
@@ -41,18 +51,12 @@ export default function ItemsContent() {
           <div className="font-medium">
             {row.original.name}
           </div>
-          {row.original.itemType === 'recipe' && (
+          {"instructions" in row.original && (row.original as { instructions?: string }).instructions != null && (
             <Badge variant="secondary" className="text-xs">Recipe</Badge>
           )}
-          {row.original.itemType === 'product' && (
-            <Badge variant="secondary" className="text-xs">Product</Badge>
-          )}
-          {row.original.itemType === 'item' && (
-            <Badge variant="secondary" className="text-xs">Item</Badge>
-          )}
-          {row.original.itemType === 'item_and_product' && (
-            <Badge variant="secondary" className="text-xs">Item & product</Badge>
-          )}
+          {row.original.itemTypes?.map((k) => (
+            <Badge key={k} variant="secondary" className="text-xs">{KIND_LABEL[k]}</Badge>
+          ))}
           {row.original.isCatalogParent && (
             <Badge variant="outline" className="text-xs">Catalog group</Badge>
           )}
@@ -78,7 +82,7 @@ export default function ItemsContent() {
       accessorKey: "unitPrice",
       header: "Selling price",
       cell: ({ row }) => {
-        if (row.original.itemType === 'recipe') {
+        if ("instructions" in row.original && (row.original as { instructions?: string }).instructions != null) {
           return row.original.servingSize ? `${row.original.servingSize} servings` : <span className="text-muted-foreground">—</span>;
         }
         return row.original.unitPrice != null ? formatCurrency(row.original.unitPrice) : <span className="text-muted-foreground">—</span>;
@@ -176,12 +180,22 @@ export default function ItemsContent() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex-shrink-0 flex items-center justify-between pb-4">
+      <div className="flex-shrink-0 flex flex-col gap-4 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Items</h1>
           <p className="text-muted-foreground mt-2">
             Manage your inventory items and products
           </p>
+        </div>
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 shrink-0">
+          <Switch
+            id="show-catalog-groups"
+            checked={showCatalogGroups}
+            onCheckedChange={setShowCatalogGroups}
+          />
+          <Label htmlFor="show-catalog-groups" className="text-sm font-normal cursor-pointer">
+            Show catalog groups
+          </Label>
         </div>
       </div>
 
@@ -201,7 +215,7 @@ export default function ItemsContent() {
           filterColumns={[
             { value: "name", label: "Name" },
             { value: "sku", label: "SKU" },
-            { value: "itemType", label: "Type", type: "select", options: [{ value: "item", label: "Item" }, { value: "product", label: "Product" }, { value: "item_and_product", label: "Item and product" }, { value: "recipe", label: "Recipe" }] },
+            { value: "itemTypes", label: "Type", type: "select", options: [{ value: "item", label: "Item" }, { value: "product", label: "Product" }, { value: "modifier", label: "Modifier" }] },
             { value: "category", label: "Category", type: "select" },
             { value: "unit", label: "Unit", type: "select" },
             { value: "unitPrice", label: "Selling price" },
@@ -212,7 +226,7 @@ export default function ItemsContent() {
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
             { value: "sku", label: "SKU", type: "character varying" },
-            { value: "itemType", label: "Type", type: "character varying" },
+            { value: "itemTypes", label: "Type", type: "character varying" },
             { value: "category", label: "Category", type: "character varying" },
             { value: "unit", label: "Unit", type: "character varying" },
             { value: "unitPrice", label: "Selling price", type: "numeric" },

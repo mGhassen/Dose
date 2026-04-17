@@ -22,7 +22,7 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { StockMovementType } from "@kit/types";
-import { Save, X, Trash2, MoreVertical, Edit2, Package, TrendingUp, TrendingDown, Plus, DollarSign } from "lucide-react";
+import { Save, X, Trash2, MoreVertical, Edit2, Package, TrendingUp, TrendingDown, Plus, DollarSign, ChevronRight } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import { Separator } from "@kit/ui/separator";
 import {
@@ -42,7 +42,18 @@ import {
 import AppLayout from "@/components/app-layout";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum, useVariablesByType } from "@kit/hooks";
-import type { ItemType } from "@kit/types";
+import type { ItemKind } from "@kit/types";
+
+function toggleItemKind(current: ItemKind[], k: ItemKind): ItemKind[] {
+  const next = current.includes(k) ? current.filter((x) => x !== k) : [...current, k];
+  return next.length ? next : [k];
+}
+
+const ITEM_KIND_OPTIONS: { id: ItemKind; label: string }[] = [
+  { id: "item", label: "Item" },
+  { id: "product", label: "Product" },
+  { id: "modifier", label: "Modifier" },
+];
 import { toast } from "sonner";
 import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
@@ -72,6 +83,40 @@ interface SupplierOrderPriceRow {
   unit: string;
   orderDate: string | null;
   orderNumber: string | null;
+}
+
+interface ItemCatalogPayload {
+  parentItem: { id: number; name: string; isCatalogParent: boolean } | null;
+  variantMeta: { nameSnapshot: string | null; squareVariationId: string | null } | null;
+  modifierListsSourceItemId?: number;
+  variations: {
+    id: number;
+    variantItemId: number;
+    name: string;
+    sku: string | null;
+    sortOrder: number | null;
+    nameSnapshot: string | null;
+    squareVariationId: string | null;
+  }[];
+  modifierLists: {
+    linkSortOrder: number | null;
+    minSelected: number | null;
+    maxSelected: number | null;
+    enabled: boolean;
+    id: number;
+    name: string | null;
+    selectionType: string | null;
+    squareModifierListId: string | null;
+    modifiers: {
+      id: number;
+      name: string | null;
+      priceAmountCents: number | null;
+      sortOrder: number;
+      squareModifierId: string | null;
+      supplyItemId: number | null;
+      supplyItemName: string | null;
+    }[];
+  }[];
 }
 
 function HistoryEntryTable({
@@ -1057,15 +1102,10 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     vendorId: "",
     notes: "",
     isActive: true,
-    itemType: "item" as ItemType,
+    itemTypes: ["item"] as ItemKind[],
   });
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
-  const itemTypeItems: { id: ItemType; name: string }[] = [
-    { id: "item", name: "Item" },
-    { id: "product", name: "Product" },
-    { id: "item_and_product", name: "Item and product" },
-  ];
 
   const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null; taxIncluded?: boolean; costTaxIncluded?: boolean } | null>(null);
   const [sellHistory, setSellHistory] = useState<PriceHistoryEntry[]>([]);
@@ -1074,6 +1114,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
   const [itemTaxesList, setItemTaxesList] = useState<{ id: number; variableId: number; conditionType: string; conditionValues?: string[]; calculationType?: string; priority: number; variableName?: string; variableValue?: number }[]>([]);
   const [itemTaxesLoading, setItemTaxesLoading] = useState(false);
+  const [catalogInfo, setCatalogInfo] = useState<ItemCatalogPayload | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const { data: transactionTaxVars = [] } = useVariablesByType("transaction_tax");
   const { data: taxVars = [] } = useVariablesByType("tax");
   const taxVariableOptions = [...(transactionTaxVars as { id: number; name: string; value: number }[]), ...(taxVars as { id: number; name: string; value: number }[])];
@@ -1131,6 +1173,16 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   }, [resolvedParams?.id, fetchItemTaxes]);
 
   useEffect(() => {
+    if (!resolvedParams?.id) return;
+    setCatalogLoading(true);
+    fetch(`/api/items/${resolvedParams.id}/catalog`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setCatalogInfo(d))
+      .catch(() => setCatalogInfo(null))
+      .finally(() => setCatalogLoading(false));
+  }, [resolvedParams?.id]);
+
+  useEffect(() => {
     if (item) {
       setFormData({
         name: item.name,
@@ -1141,7 +1193,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         vendorId: item.vendorId?.toString() || "",
         notes: item.notes || "",
         isActive: item.isActive,
-        itemType: (item.itemType === "recipe" ? "item" : item.itemType) as ItemType,
+        itemTypes: item.itemTypes?.length ? item.itemTypes : (["item"] as ItemKind[]),
       });
     }
   }, [item]);
@@ -1168,7 +1220,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
           notes: formData.notes || undefined,
           isActive: formData.isActive,
-          itemType: formData.itemType === 'recipe' ? undefined : formData.itemType,
+          itemTypes: formData.itemTypes,
         },
       });
       toast.success("Item updated successfully");
@@ -1232,17 +1284,20 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               <h1 className="text-2xl font-bold">
                 {isEditing ? "Edit Item" : item.name}
               </h1>
-              {item.itemType === "recipe" && (
+              {"instructions" in item && (item as { instructions?: string }).instructions != null && (
                 <Badge variant="secondary" className="text-xs">Recipe</Badge>
               )}
-              {item.itemType === "product" && (
+              {item.itemTypes?.includes("product") && (
                 <Badge variant="secondary" className="text-xs">Product</Badge>
               )}
-              {item.itemType === "item" && (
+              {item.itemTypes?.includes("item") && (
                 <Badge variant="secondary" className="text-xs">Item</Badge>
               )}
-              {item.itemType === "item_and_product" && (
-                <Badge variant="secondary" className="text-xs">Item & product</Badge>
+              {item.itemTypes?.includes("modifier") && (
+                <Badge variant="secondary" className="text-xs">Modifier</Badge>
+              )}
+              {item.isCatalogParent && (
+                <Badge variant="outline" className="text-xs">Catalog group</Badge>
               )}
             </div>
             <p className="text-muted-foreground">
@@ -1316,16 +1371,25 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     />
                   </div>
 
-                  {/* Item type */}
-                  <div className="space-y-2">
-                    <UnifiedSelector
-                      label="Item type"
-                      type="type"
-                      items={itemTypeItems}
-                      selectedId={formData.itemType}
-                      onSelect={(item) => handleInputChange('itemType', item.id as ItemType)}
-                      placeholder="Select type"
-                    />
+                  {/* Types (multi) */}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Types</Label>
+                    <div className="flex flex-wrap gap-4">
+                      {ITEM_KIND_OPTIONS.map(({ id, label }) => (
+                        <label key={id} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={formData.itemTypes.includes(id)}
+                            onCheckedChange={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                itemTypes: toggleItemKind(prev.itemTypes, id),
+                              }))
+                            }
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Unit */}
@@ -1504,6 +1568,156 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   </CardContent>
                 </Card>
               </div>
+
+              {(item.isCatalogParent ||
+                catalogInfo?.parentItem ||
+                (catalogInfo?.variations?.length ?? 0) > 0 ||
+                (catalogInfo?.modifierLists?.length ?? 0) > 0) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Catalog (Square)</CardTitle>
+                    <CardDescription>
+                      Variants, modifier lists, and parent links from the integrated catalog.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {catalogLoading ? (
+                      <div className="flex justify-center py-6">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                      </div>
+                    ) : (
+                      <>
+                        {catalogInfo?.parentItem && (
+                          <div>
+                            <p className="text-sm font-medium mb-2">Parent catalog group</p>
+                            <Link
+                              href={`/items/${catalogInfo.parentItem.id}`}
+                              className="text-primary hover:underline inline-flex items-center gap-1"
+                            >
+                              {catalogInfo.parentItem.name}
+                              <ChevronRight className="h-4 w-4" />
+                            </Link>
+                            {catalogInfo.variantMeta?.nameSnapshot && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Variation: {catalogInfo.variantMeta.nameSnapshot}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {item.isCatalogParent && (catalogInfo?.variations?.length ?? 0) > 0 && (
+                          <div>
+                            <p className="text-sm font-medium mb-2">Variants (sellable SKUs)</p>
+                            <p className="text-xs text-muted-foreground mb-2">
+                              Selling price and history apply to each variant, not this group row.
+                            </p>
+                            <div className="rounded-md border overflow-hidden">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="border-b bg-muted/50">
+                                    <th className="text-left p-2 font-medium">Name</th>
+                                    <th className="text-left p-2 font-medium">SKU</th>
+                                    <th className="text-right p-2 font-medium w-[100px]">Open</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {catalogInfo!.variations.map((v) => (
+                                    <tr key={v.id} className="border-b last:border-0">
+                                      <td className="p-2">{v.name}</td>
+                                      <td className="p-2 font-mono text-muted-foreground">{v.sku || "—"}</td>
+                                      <td className="p-2 text-right">
+                                        <Link href={`/items/${v.variantItemId}`}>
+                                          <Button variant="ghost" size="sm" className="h-8">
+                                            View
+                                          </Button>
+                                        </Link>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {(catalogInfo?.modifierLists?.length ?? 0) > 0 && (
+                          <div className="space-y-4">
+                            <div>
+                              <p className="text-sm font-medium">Modifier lists</p>
+                              {catalogInfo?.modifierListsSourceItemId != null &&
+                                catalogInfo.modifierListsSourceItemId !== item.id && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    From parent catalog group (item #{catalogInfo.modifierListsSourceItemId})
+                                  </p>
+                                )}
+                            </div>
+                            {catalogInfo!.modifierLists.map((list) => (
+                              <div key={list.id} className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                                <div className="flex flex-wrap items-center gap-2 justify-between">
+                                  <span className="font-medium">{list.name || `List #${list.id}`}</span>
+                                  <div className="flex gap-1 flex-wrap">
+                                    {list.selectionType && (
+                                      <Badge variant="secondary" className="text-xs font-normal">
+                                        {list.selectionType}
+                                      </Badge>
+                                    )}
+                                    {!list.enabled && (
+                                      <Badge variant="outline" className="text-xs">
+                                        Disabled
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                {(list.minSelected != null || list.maxSelected != null) && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Select {list.minSelected ?? 0}–{list.maxSelected ?? "∞"}
+                                  </p>
+                                )}
+                                <ul className="text-sm space-y-1.5 pl-0 list-none">
+                                  {list.modifiers.map((m) => (
+                                    <li
+                                      key={m.id}
+                                      className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/50 last:border-0 pb-1.5 last:pb-0"
+                                    >
+                                      <span>
+                                        {m.name || "—"}
+                                        {m.supplyItemId != null && (
+                                          <span className="text-muted-foreground text-xs ml-2">
+                                            →{" "}
+                                            <Link
+                                              href={`/items/${m.supplyItemId}`}
+                                              className="text-primary hover:underline"
+                                            >
+                                              {m.supplyItemName || "item"}
+                                            </Link>
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span className="text-muted-foreground tabular-nums text-xs">
+                                        {m.priceAmountCents != null
+                                          ? formatCurrency(m.priceAmountCents / 100)
+                                          : "—"}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {item.isCatalogParent &&
+                          (catalogInfo?.variations?.length ?? 0) === 0 &&
+                          (catalogInfo?.modifierLists?.length ?? 0) === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                              No linked variants or modifier lists in the catalog for this group yet.
+                            </p>
+                          )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               <Tabs defaultValue="movements" className="w-full">
                 <TabsList className="grid w-full max-w-2xl grid-cols-4">
@@ -1867,6 +2081,11 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Selling price (today)</CardTitle>
+                    {item.isCatalogParent && (
+                      <p className="text-xs text-muted-foreground font-normal pt-1">
+                        Use each variant&apos;s page for sell price and history.
+                      </p>
+                    )}
                   </CardHeader>
                   <CardContent className="space-y-1">
                     {(() => {
