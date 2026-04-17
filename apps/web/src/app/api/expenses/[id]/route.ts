@@ -7,6 +7,7 @@ import { parseRequestBody, updateExpenseSchema, type PaymentSliceInput } from '@
 import { toPositiveItemId } from '@/lib/merge-selector-items';
 import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
 import { hydrateExpenseLineItemItems } from '@/lib/expenses/hydrate-expense-line-item-items';
+import { replaceExpenseStockMovements } from '@/lib/expenses/replace-expense-stock-movements';
 
 function transformLineItem(row: any): ExpenseLineItem {
   const subscription = row.subscription;
@@ -79,6 +80,7 @@ async function updateExpenseAsTransaction(
     expenseDate: string;
     description?: string;
     supplierId?: number;
+    supplierOrderId?: number | null;
     lineItems: Array<{
       itemId?: number;
       subscriptionId?: number;
@@ -152,20 +154,35 @@ async function updateExpenseAsTransaction(
   }
   const amount = Math.round((subtotal + totalTax - discountAmount) * 100) / 100;
 
+  if (body.supplierOrderId != null) {
+    const { data: conflict } = await supabase
+      .from('expenses')
+      .select('id')
+      .eq('supplier_order_id', body.supplierOrderId)
+      .neq('id', id)
+      .maybeSingle();
+    if (conflict) throw new Error('Supplier order already linked to another expense');
+  }
+
+  const expensePatch: Record<string, unknown> = {
+    name: body.name,
+    category: body.category,
+    expense_date: body.expenseDate,
+    description: body.description ?? null,
+    supplier_id: body.supplierId ?? null,
+    amount,
+    subtotal,
+    total_tax: totalTax,
+    total_discount: discountAmount,
+    updated_at: new Date().toISOString(),
+  };
+  if (body.supplierOrderId !== undefined) {
+    expensePatch.supplier_order_id = body.supplierOrderId;
+  }
+
   const { data: expenseRow, error: updateError } = await supabase
     .from('expenses')
-    .update({
-      name: body.name,
-      category: body.category,
-      expense_date: body.expenseDate,
-      description: body.description ?? null,
-      supplier_id: body.supplierId ?? null,
-      amount,
-      subtotal,
-      total_tax: totalTax,
-      total_discount: discountAmount,
-      updated_at: new Date().toISOString(),
-    })
+    .update(expensePatch)
     .eq('id', id)
     .select()
     .single();
@@ -201,6 +218,14 @@ async function updateExpenseAsTransaction(
     const { error: payErr } = await replacePaymentsForEntry(supabase, entryRow.id, body.paymentSlices);
     if (payErr) throw new Error(payErr);
   }
+
+  const stockRes = await replaceExpenseStockMovements(supabase, {
+    expenseId: Number(id),
+    supplierOrderId: expenseRow.supplier_order_id ?? null,
+    lines,
+    movementDate: body.expenseDate,
+  });
+  if (!stockRes.ok) throw new Error(stockRes.message);
 
   const { data: lineRows } = await supabase
     .from('expense_line_items')
@@ -267,6 +292,7 @@ export async function PUT(
         expenseDate: body.expenseDate!,
         description: body.description,
         supplierId: body.supplierId,
+        supplierOrderId: body.supplierOrderId,
         lineItems: body.lineItems,
         discount: body.discount,
         paymentSlices: body.paymentSlices,

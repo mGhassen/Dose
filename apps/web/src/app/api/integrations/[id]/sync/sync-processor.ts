@@ -19,6 +19,8 @@ import {
 } from './square-tax';
 import { upsertSellingPrice } from '@/lib/items/price-history-upsert';
 import { getItemCostAsOf } from '@/lib/items/price-resolve';
+import type { SupabaseClient as DbSupabaseClient } from '@supabase/supabase-js';
+import { replaceSaleStockMovements } from '@/lib/sales/replace-sale-stock-movements';
 
 type SupabaseClient = { from: (table: string) => any };
 
@@ -755,6 +757,24 @@ export async function processSyncJob(
             .single();
           if (lineInsErr) throw lineInsErr;
           insertedSaleLineIds[li] = insLine.id as number;
+        }
+
+        const stockLines = lineRows.map((l) => ({
+          itemId: l.itemId ?? undefined,
+          quantity: l.quantity,
+        }));
+        const stockRes = await replaceSaleStockMovements(supabase as unknown as DbSupabaseClient, {
+          saleId,
+          movementDate: dateStr,
+          lines: stockLines,
+        });
+        if (!stockRes.ok) {
+          await supabase.from('stock_movements').delete().eq('reference_type', 'sale').eq('reference_id', saleId);
+          await supabase.from('sale_line_items').delete().eq('sale_id', saleId);
+          await supabase.from('sales').delete().eq('id', saleId);
+          await recordImportError(supabase, jobId, 'order', orderId, stockRes.message);
+          stats.orders_failed += 1;
+          continue;
         }
 
         await supabase.from('entries').insert({

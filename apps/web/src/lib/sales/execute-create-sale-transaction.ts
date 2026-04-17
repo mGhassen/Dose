@@ -1,14 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Sale, SaleLineItem } from "@kit/types";
-import { StockMovementType, StockMovementReferenceType } from "@kit/types";
-import { getItemStock } from "@/lib/stock/get-item-stock";
-import { produceRecipe } from "@/lib/stock/produce-recipe";
 import { getItemSellingPriceAsOf, getItemCostAsOf } from "@/lib/items/price-resolve";
 import { upsertSellingPrice, upsertCost } from "@/lib/items/price-history-upsert";
 import { getTaxRateAndRuleForSaleLineWithItemTaxes, getTaxRateAndRuleForExpenseLineWithItemTaxes } from "@/lib/item-taxes-resolve";
 import { lineTaxAmount, netUnitPriceFromInclusive, unitPriceExclToIncl } from "@/lib/transaction-tax";
 import type { CreateSaleTransactionInput, PaymentSliceInput } from "@/shared/zod-schemas";
 import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from "@/lib/ledger/replace-entry-payments";
+import { replaceSaleStockMovements } from "@/lib/sales/replace-sale-stock-movements";
 
 function transformSale(row: Record<string, unknown>): Sale {
   const subtotal = row.subtotal != null ? parseFloat(String(row.subtotal)) : 0;
@@ -266,65 +264,20 @@ export async function executeCreateSaleTransaction(
     }
   }
 
-  for (const l of lines) {
-    if (!l.itemId || l.quantity <= 0) continue;
-    const [itemResult, recipeResult] = await Promise.all([
-      supabase.from("items").select("id, unit, produced_from_recipe_id").eq("id", l.itemId).single(),
-      supabase.from("recipes").select("id, unit").eq("id", l.itemId).single(),
-    ]);
-    if (itemResult.data) {
-      const targetItemId = itemResult.data.id;
-      const unit = itemResult.data.unit || "unit";
-      const { error: outError } = await supabase.from("stock_movements").insert({
-        item_id: targetItemId,
-        movement_type: StockMovementType.OUT,
-        quantity: l.quantity,
-        unit,
-        reference_type: StockMovementReferenceType.SALE,
-        reference_id: saleRow.id,
-        movement_date: body.date,
-        notes: `Sale #${saleRow.id}`,
-      });
-      if (outError) console.error("Stock movement error:", outError);
-    } else if (recipeResult.data) {
-      const { data: producedItem } = await supabase
-        .from("items")
-        .select("id, unit")
-        .eq("produced_from_recipe_id", l.itemId)
-        .single();
-      let producedItemId: number;
-      let producedItemUnit: string;
-      if (!producedItem) {
-        const result = await produceRecipe(supabase, String(l.itemId), {
-          quantity: l.quantity,
-          location: null,
-          notes: `Sale #${saleRow.id}`,
-        });
-        producedItemId = result.producedItemId;
-        producedItemUnit = recipeResult.data.unit || "unit";
-      } else {
-        producedItemId = producedItem.id;
-        producedItemUnit = producedItem.unit || "unit";
-        const stock = await getItemStock(supabase, producedItem.id, null);
-        if (stock < l.quantity) {
-          await produceRecipe(supabase, String(l.itemId), {
-            quantity: l.quantity - stock,
-            location: null,
-            notes: `Sale #${saleRow.id}`,
-          });
-        }
-      }
-      await supabase.from("stock_movements").insert({
-        item_id: producedItemId,
-        movement_type: StockMovementType.OUT,
-        quantity: l.quantity,
-        unit: producedItemUnit,
-        reference_type: StockMovementReferenceType.SALE,
-        reference_id: saleRow.id,
-        movement_date: body.date,
-        notes: `Sale #${saleRow.id}`,
-      });
+  const stockRes = await replaceSaleStockMovements(supabase, {
+    saleId: saleRow.id,
+    movementDate: body.date,
+    lines,
+  });
+  if (!stockRes.ok) {
+    await supabase.from("stock_movements").delete().eq("reference_type", "sale").eq("reference_id", saleRow.id);
+    await supabase.from("sale_line_items").delete().eq("sale_id", saleRow.id);
+    if (saleEntry?.id) {
+      await supabase.from("payments").delete().eq("entry_id", saleEntry.id);
+      await supabase.from("entries").delete().eq("id", saleEntry.id);
     }
+    await supabase.from("sales").delete().eq("id", saleRow.id);
+    throw new Error(stockRes.message);
   }
 
   const { data: lineItemsData } = await supabase

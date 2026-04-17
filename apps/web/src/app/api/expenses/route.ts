@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Expense, CreateExpenseData, PaginatedResponse, ExpenseLineItem } from '@kit/types';
-import { StockMovementType, StockMovementReferenceType } from '@kit/types';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { z } from "zod";
 import {
@@ -18,6 +18,31 @@ import {
 import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
 import { toPositiveItemId } from '@/lib/merge-selector-items';
 import { hydrateExpenseLineItemItems } from '@/lib/expenses/hydrate-expense-line-item-items';
+import { replaceExpenseStockMovements } from '@/lib/expenses/replace-expense-stock-movements';
+
+async function rollbackCreatedExpenseTransaction(
+  supabase: SupabaseClient,
+  expenseId: number,
+  entryId?: number | null
+) {
+  await supabase.from('stock_movements').delete().eq('reference_type', 'expense').eq('reference_id', expenseId);
+  if (entryId != null) {
+    await supabase.from('payments').delete().eq('entry_id', entryId);
+    await supabase.from('entries').delete().eq('id', entryId);
+  } else {
+    const { data: ents } = await supabase
+      .from('entries')
+      .select('id')
+      .eq('entry_type', 'expense')
+      .eq('reference_id', expenseId);
+    for (const e of ents || []) {
+      await supabase.from('payments').delete().eq('entry_id', e.id);
+      await supabase.from('entries').delete().eq('id', e.id);
+    }
+  }
+  await supabase.from('expense_line_items').delete().eq('expense_id', expenseId);
+  await supabase.from('expenses').delete().eq('id', expenseId);
+}
 
 function transformLineItem(row: any): ExpenseLineItem {
   const subscription = row.subscription;
@@ -250,6 +275,20 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Payment slices must sum to expense total' }, { status: 400 });
       }
 
+      if (txBody.supplierOrderId != null) {
+        const { data: existingLink } = await supabase
+          .from('expenses')
+          .select('id')
+          .eq('supplier_order_id', txBody.supplierOrderId)
+          .maybeSingle();
+        if (existingLink) {
+          return NextResponse.json(
+            { error: 'Supplier order already linked to an expense' },
+            { status: 409 }
+          );
+        }
+      }
+
       const { data: expenseRow, error: insertError } = await supabase
         .from('expenses')
         .insert({
@@ -259,6 +298,7 @@ export async function POST(request: NextRequest) {
           expense_date: txBody.expenseDate,
           description: txBody.description ?? null,
           supplier_id: txBody.supplierId ?? null,
+          supplier_order_id: txBody.supplierOrderId ?? null,
           start_date: txBody.expenseDate,
           amount,
           subtotal,
@@ -303,8 +343,10 @@ export async function POST(request: NextRequest) {
         })
         .select('id')
         .single();
+      let createdEntryId: number | undefined;
       if (entryError) console.error('Error creating entry for expense:', entryError);
       else if (entryInserted?.id) {
+        createdEntryId = entryInserted.id;
         const toPersist: PaymentSliceInput[] =
           slices != null && slices.length > 0
             ? slices
@@ -312,27 +354,23 @@ export async function POST(request: NextRequest) {
         const { error: payErr } = await replacePaymentsForEntry(supabase, entryInserted.id, toPersist);
         if (payErr) {
           console.error('Error creating payments for expense entry:', payErr);
+          await rollbackCreatedExpenseTransaction(supabase, expenseRow.id, createdEntryId);
           return NextResponse.json({ error: 'Failed to persist payments', details: payErr }, { status: 500 });
         }
       }
 
-      const itemIds = [...new Set(lines.filter((l) => l.itemId != null && l.quantity > 0).map((l) => l.itemId!))];
-      if (itemIds.length > 0) {
-        for (const l of lines) {
-          if (!l.itemId || l.quantity <= 0) continue;
-          const unit = 'unit';
-          const { error: outError } = await supabase.from('stock_movements').insert({
-            item_id: l.itemId,
-            movement_type: StockMovementType.OUT,
-            quantity: l.quantity,
-            unit,
-            reference_type: StockMovementReferenceType.EXPENSE,
-            reference_id: expenseRow.id,
-            movement_date: txBody.expenseDate,
-            notes: `Expense #${expenseRow.id}`,
-          });
-          if (outError) console.error('Stock movement error:', outError);
-        }
+      const stockRes = await replaceExpenseStockMovements(supabase, {
+        expenseId: expenseRow.id,
+        supplierOrderId: expenseRow.supplier_order_id ?? null,
+        lines,
+        movementDate: txBody.expenseDate,
+      });
+      if (!stockRes.ok) {
+        await rollbackCreatedExpenseTransaction(supabase, expenseRow.id, createdEntryId);
+        return NextResponse.json(
+          { error: 'Failed to record stock', details: stockRes.message },
+          { status: 500 }
+        );
       }
 
       const { data: lineRows } = await supabase

@@ -9,6 +9,7 @@ import { getTaxRateAndRuleForSaleLineWithItemTaxes, getTaxRateAndRuleForExpenseL
 import { lineTaxAmount, netUnitPriceFromInclusive, unitPriceExclToIncl } from '@/lib/transaction-tax';
 import { parseRequestBody, updateSaleTransactionSchema } from '@/shared/zod-schemas';
 import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
+import { replaceSaleStockMovements } from '@/lib/sales/replace-sale-stock-movements';
 
 function transformSale(row: any): Sale {
   const subtotal = row.subtotal != null ? parseFloat(row.subtotal) : 0;
@@ -314,6 +315,18 @@ export async function PUT(
       if (payErr) {
         return NextResponse.json({ error: 'Failed to persist payments', details: payErr }, { status: 500 });
       }
+    }
+
+    const stockRes = await replaceSaleStockMovements(supabase, {
+      saleId: Number(id),
+      movementDate: body.date,
+      lines,
+    });
+    if (!stockRes.ok) {
+      return NextResponse.json(
+        { error: 'Failed to record stock', details: stockRes.message },
+        { status: 500 }
+      );
     }
 
     const { data: lineItemsData } = await supabase.from('sale_line_items').select('*').eq('sale_id', id).order('sort_order');

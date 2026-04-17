@@ -197,6 +197,8 @@ export const createExpenseTransactionSchema = z.object({
   expenseDate: z.string().min(1, "Expense date is required"),
   description: z.string().optional(),
   supplierId: z.number().optional(),
+  /** When set, stock is updated only via supplier-order receive, not from this expense. */
+  supplierOrderId: z.number().int().positive().optional(),
   lineItems: z.array(expenseLineItemSchema).min(1, "At least one line item is required"),
   discount: transactionDiscountSchema.optional(),
   paymentSlices: z.array(paymentSliceSchema).min(1).optional(),
@@ -256,6 +258,7 @@ export const updateExpenseSchema = z.object({
   description: z.string().optional(),
   vendor: z.string().optional(),
   supplierId: z.number().optional(),
+  supplierOrderId: z.union([z.number().int().positive(), z.null()]).optional(),
   lineItems: z.array(expenseLineItemSchema).optional(),
   discount: transactionDiscountSchema.optional(),
   paymentSlices: z.array(paymentSliceSchema).min(1).optional(),
