@@ -24,7 +24,14 @@ function transformStockLevel(row: any, unitMap: Map<number, { symbol: string }>)
       name: row.item.name,
       description: row.item.description,
       unit: unitMap.get(row.item.unit_id)?.symbol || '',
-      category: row.item.category,
+      categoryId: row.item.category_id ?? null,
+      category: row.item.category
+        ? {
+            id: row.item.category.id,
+            name: row.item.category.name,
+            label: row.item.category.label,
+          }
+        : null,
       itemTypes: normalizeItemKinds(row.item.item_types),
       isActive: row.item.is_active,
       createdAt: row.item.created_at,
@@ -56,7 +63,7 @@ export async function GET(
     
     const { data, error } = await supabase
       .from('stock_levels')
-      .select('*, item:items(*)')
+      .select('*, item:items(*, category:item_categories(id, name, label))')
       .eq('id', id)
       .single();
 
@@ -99,7 +106,7 @@ export async function PUT(
         last_updated: new Date().toISOString(),
       })
       .eq('id', id)
-      .select('*, item:items(*)')
+      .select('*, item:items(*, category:item_categories(id, name, label))')
       .single();
 
     if (error) throw error;

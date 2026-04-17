@@ -42,7 +42,7 @@ export async function replaceSaleStockMovements(
     const [itemResult, recipeResult] = await Promise.all([
       supabase
         .from("items")
-        .select("id, unit_id, produced_from_recipe_id")
+        .select("id, unit_id, produced_from_recipe_id, affects_stock")
         .eq("id", l.itemId)
         .maybeSingle(),
       supabase.from("recipes").select("id, unit_id").eq("id", l.itemId).maybeSingle(),
@@ -57,6 +57,7 @@ export async function replaceSaleStockMovements(
     }
 
     if (itemResult.data) {
+      if (itemResult.data.affects_stock === false) continue;
       const { error: outError } = await supabase.from("stock_movements").insert({
         item_id: itemResult.data.id,
         movement_type: StockMovementType.OUT,

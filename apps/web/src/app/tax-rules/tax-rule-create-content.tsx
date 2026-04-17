@@ -37,7 +37,7 @@ export function TaxRuleCreateContent({ onClose, onCreated }: TaxRuleCreateConten
   const items: Item[] = useMemo(() => itemsResponse?.data ?? [], [itemsResponse]);
   const categories = useMemo(
     () =>
-      [...new Set(items.map((i) => i.category).filter((c): c is string => !!c))].sort(
+      [...new Set(items.map((i) => i.category?.name).filter((c): c is string => !!c))].sort(
         (a, b) => a.localeCompare(b)
       ),
     [items]
@@ -246,7 +246,7 @@ export function TaxRuleCreateContent({ onClose, onCreated }: TaxRuleCreateConten
                         />
                         <span className="truncate">
                           {item.name}
-                          {item.category && <span className="text-muted-foreground"> ({item.category})</span>}
+                          {item.category && <span className="text-muted-foreground"> ({item.category.label ?? item.category.name})</span>}
                         </span>
                       </label>
                     ))}

@@ -70,7 +70,10 @@ function transformItem(row: any): any {
     description: row.description,
     unit: row.unit,
     unitId: row.unit_id,
-    category: row.category,
+    categoryId: row.category_id ?? null,
+    category: row.category
+      ? { id: row.category.id, name: row.category.name, label: row.category.label }
+      : null,
     itemTypes: normalizeItemKinds(row.item_types),
     isActive: row.is_active,
     createdAt: row.created_at,
@@ -109,7 +112,7 @@ export async function GET(
       .from('recipe_items')
       .select(`
         *,
-        item:items(*)
+        item:items(*, category:item_categories(id, name, label))
       `)
       .eq('recipe_id', id);
 
@@ -124,7 +127,7 @@ export async function GET(
     if (producedItemIds.length > 0) {
       const { data: itemsRows } = await supabase
         .from('items')
-        .select('*')
+        .select('*, category:item_categories(id, name, label)')
         .in('id', producedItemIds);
       producedItemsData = itemsRows || [];
     }
@@ -142,7 +145,10 @@ export async function GET(
           description: ri.item.description,
           unit: ri.item.unit,
           unitId: ri.item.unit_id,
-          category: ri.item.category,
+          categoryId: ri.item.category_id ?? null,
+          category: ri.item.category
+            ? { id: ri.item.category.id, name: ri.item.category.name, label: ri.item.category.label }
+            : null,
           itemTypes: normalizeItemKinds(ri.item.item_types),
           isActive: ri.item.is_active,
           createdAt: ri.item.created_at,

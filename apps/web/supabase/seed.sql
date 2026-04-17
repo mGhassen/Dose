@@ -479,20 +479,13 @@ CROSS JOIN (VALUES
 WHERE e.name = 'UnitDimension'
 ON CONFLICT (enum_id, name) DO NOTHING;
 
-INSERT INTO metadata_enums (name, label, description, is_active) VALUES
-('ItemCategory', 'Item Category', 'Category for items', true)
-ON CONFLICT (name) DO NOTHING;
-INSERT INTO metadata_enum_values (enum_id, name, label, description, display_order, is_active)
-SELECT e.id, v.name, v.label, v.description, v.display_order, true
-FROM metadata_enums e
-CROSS JOIN (VALUES
-  ('food', 'Food', 'Food items', 1),
-  ('beverage', 'Beverage', 'Beverages', 2),
-  ('supplies', 'Supplies', 'Supplies', 3),
-  ('other', 'Other', 'Other category', 4)
-) AS v(name, label, description, display_order)
-WHERE e.name = 'ItemCategory'
-ON CONFLICT (enum_id, name) DO NOTHING;
+-- Item categories (dedicated table; replaces former ItemCategory metadata enum)
+INSERT INTO item_categories (name, label, description, display_order, is_active) VALUES
+  ('food', 'Food', 'Food items', 1, true),
+  ('beverage', 'Beverage', 'Beverages', 2, true),
+  ('supplies', 'Supplies', 'Supplies', 3, true),
+  ('other', 'Other', 'Other category', 4, true)
+ON CONFLICT ((LOWER(name))) DO NOTHING;
 
 INSERT INTO metadata_enums (name, label, description, is_active) VALUES
 ('SupplierPaymentTerms', 'Supplier Payment Terms', 'Payment terms for suppliers', true)

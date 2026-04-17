@@ -169,17 +169,25 @@ export async function PUT(
         let resolvedPriceFromHistory: number | null = null;
         let resolvedTaxIncludedFromHistory: boolean | null = null;
         if (line.itemId && dateStr) {
-          const { data: itemRow } = await supabase.from('items').select('id, category, created_at').eq('id', line.itemId).single();
+          const { data: itemRow } = await supabase
+            .from('items')
+            .select('id, created_at, category:item_categories(name)')
+            .eq('id', line.itemId)
+            .single();
           if (itemRow) {
-            priceLookupItemId = itemRow.id;
-            itemCategory = itemRow.category ?? null;
-            itemCreatedAt = itemRow.created_at ?? null;
+            priceLookupItemId = (itemRow as any).id;
+            itemCategory = ((itemRow as any).category?.name) ?? null;
+            itemCreatedAt = (itemRow as any).created_at ?? null;
           } else {
-            const { data: produced } = await supabase.from('items').select('id, category, created_at').eq('produced_from_recipe_id', line.itemId).single();
+            const { data: produced } = await supabase
+              .from('items')
+              .select('id, created_at, category:item_categories(name)')
+              .eq('produced_from_recipe_id', line.itemId)
+              .single();
             if (produced) {
-              priceLookupItemId = produced.id;
-              itemCategory = produced.category ?? null;
-              itemCreatedAt = produced.created_at ?? null;
+              priceLookupItemId = (produced as any).id;
+              itemCategory = ((produced as any).category?.name) ?? null;
+              itemCreatedAt = (produced as any).created_at ?? null;
             }
           }
           if (priceLookupItemId) {

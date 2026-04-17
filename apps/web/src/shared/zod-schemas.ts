@@ -359,7 +359,7 @@ export const createItemSchema = z
     name: z.string().min(1, "Name is required"),
     description: z.string().optional(),
     unitId: z.number().optional(),
-    category: z.string().optional(),
+    categoryId: z.number().nullable().optional(),
     sku: z.string().optional(),
     unitPrice: z.number().optional(),
     unitCost: z.number().optional(),
@@ -367,6 +367,7 @@ export const createItemSchema = z
     notes: z.string().optional(),
     defaultTaxRatePercent: z.number().optional(),
     isActive: z.boolean().optional(),
+    affectsStock: z.boolean().optional(),
     itemTypes: z
       .array(z.enum(["item", "product", "modifier"]))
       .min(1)
@@ -385,7 +386,7 @@ export const createIngredientSchema = z
     name: z.string().min(1, "Name is required"),
     unitId: z.number().optional(),
     description: z.string().optional(),
-    category: z.string().optional(),
+    categoryId: z.number().nullable().optional(),
     sku: z.string().optional(),
     unitPrice: z.number().optional(),
     unitCost: z.number().optional(),
@@ -958,6 +959,24 @@ export const createMetadataEnumSchema = z.object({
   isActive: z.boolean().optional(),
 });
 export type CreateMetadataEnumInput = z.infer<typeof createMetadataEnumSchema>;
+
+export const createItemCategorySchema = z.object({
+  name: z.string().min(1).optional(),
+  label: z.string().min(1),
+  description: z.string().optional(),
+  displayOrder: z.number().optional(),
+  isActive: z.boolean().optional(),
+});
+export type CreateItemCategoryInput = z.infer<typeof createItemCategorySchema>;
+
+export const updateItemCategorySchema = z.object({
+  name: z.string().min(1).optional(),
+  label: z.string().min(1).optional(),
+  description: z.string().optional(),
+  displayOrder: z.number().optional(),
+  isActive: z.boolean().optional(),
+});
+export type UpdateItemCategoryInput = z.infer<typeof updateItemCategorySchema>;
 export const updateMetadataEnumSchema = z.object({
   name: z.string().min(1).optional(),
   label: z.string().min(1).optional(),

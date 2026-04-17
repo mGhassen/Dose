@@ -66,7 +66,7 @@ function CreateRecipeForm() {
       producedItemId: producedItemRow.id,
       name: prev.name.trim() ? prev.name : producedItemRow.name,
       description: prev.description.trim() ? prev.description : producedItemRow.description ?? "",
-      category: prev.category.trim() ? prev.category : producedItemRow.category ?? "",
+      category: prev.category.trim() ? prev.category : producedItemRow.category?.label ?? producedItemRow.category?.name ?? "",
       unit: prev.unit.trim() ? prev.unit : producedItemRow.unit ?? "",
       unitId: prev.unitId ?? producedItemRow.unitId ?? null,
     }));

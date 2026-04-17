@@ -13,6 +13,7 @@ import { Save, X, Trash2, Package, ChefHat, MoreVertical, Edit2 } from "lucide-r
 import Link from "next/link";
 import AppLayout from "@/components/app-layout";
 import { useIngredientById, useUpdateIngredient, useDeleteIngredient, useStockLevels } from "@kit/hooks";
+import { ItemCategorySelector } from "@/components/item-category-selector";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
 import {
@@ -40,11 +41,17 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
   const updateIngredient = useUpdateIngredient();
   const deleteMutation = useDeleteIngredient();
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+    unit: string;
+    categoryId: number | null;
+    isActive: boolean;
+  }>({
     name: "",
     description: "",
     unit: "",
-    category: "",
+    categoryId: null,
     isActive: true,
   });
 
@@ -58,7 +65,7 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
         name: ingredient.name,
         description: ingredient.description || "",
         unit: ingredient.unit,
-        category: ingredient.category || "",
+        categoryId: ingredient.categoryId ?? null,
         isActive: ingredient.isActive,
       });
     }
@@ -97,7 +104,7 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
           name: formData.name,
           description: formData.description || undefined,
           unit: formData.unit,
-          category: formData.category || undefined,
+          categoryId: formData.categoryId ?? null,
           isActive: formData.isActive,
         },
       });
@@ -220,11 +227,11 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Input
+                    <ItemCategorySelector
                       id="category"
-                      value={formData.category}
-                      onChange={(e) => handleInputChange('category', e.target.value)}
+                      label="Category"
+                      selectedId={formData.categoryId}
+                      onSelect={(cat) => handleInputChange('categoryId', cat?.id ?? null)}
                     />
                   </div>
 
@@ -281,7 +288,7 @@ export default function IngredientDetailPage({ params }: IngredientDetailPagePro
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Category</label>
-                    <p className="text-base mt-1">{ingredient.category || "—"}</p>
+                    <p className="text-base mt-1">{ingredient.category?.label ?? ingredient.category?.name ?? "—"}</p>
                   </div>
                   {ingredient.description && (
                     <div className="md:col-span-2">

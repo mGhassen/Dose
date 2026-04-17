@@ -16,9 +16,10 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { AddVendorDialog } from "@/components/add-vendor-dialog";
-import { CategorySelector } from "@/components/category-selector";
+import { ItemCategorySelector } from "@/components/item-category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
+import { Switch } from "@kit/ui/switch";
 import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { StockMovementType } from "@kit/types";
@@ -115,6 +116,7 @@ interface ItemCatalogPayload {
       squareModifierId: string | null;
       supplyItemId: number | null;
       supplyItemName: string | null;
+      supplyItemAffectsStock: boolean;
     }[];
   }[];
 }
@@ -1100,12 +1102,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    category: "",
+    categoryId: null as number | null,
     sku: "",
     unitId: null as number | null,
     vendorId: "",
     notes: "",
     isActive: true,
+    affectsStock: true,
     itemTypes: ["item"] as ItemKind[],
   });
   const { data: unitsData } = useUnits();
@@ -1186,17 +1189,61 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       .finally(() => setCatalogLoading(false));
   }, [resolvedParams?.id]);
 
+  const toggleModifierAffectsStock = useCallback(
+    async (supplyItemId: number, next: boolean) => {
+      setCatalogInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              modifierLists: prev.modifierLists.map((list) => ({
+                ...list,
+                modifiers: list.modifiers.map((m) =>
+                  m.supplyItemId === supplyItemId ? { ...m, supplyItemAffectsStock: next } : m,
+                ),
+              })),
+            }
+          : prev,
+      );
+      try {
+        const res = await fetch(`/api/items/${supplyItemId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ affectsStock: next }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        toast.success(next ? "Modifier now affects stock" : "Modifier no longer affects stock");
+      } catch (err: any) {
+        setCatalogInfo((prev) =>
+          prev
+            ? {
+                ...prev,
+                modifierLists: prev.modifierLists.map((list) => ({
+                  ...list,
+                  modifiers: list.modifiers.map((m) =>
+                    m.supplyItemId === supplyItemId ? { ...m, supplyItemAffectsStock: !next } : m,
+                  ),
+                })),
+              }
+            : prev,
+        );
+        toast.error(err?.message || "Failed to update modifier");
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (item) {
       setFormData({
         name: item.name,
         description: item.description || "",
-        category: item.category || "",
+        categoryId: item.categoryId ?? item.category?.id ?? null,
         sku: item.sku || "",
         unitId: item.unitId ?? null,
         vendorId: item.vendorId?.toString() || "",
         notes: item.notes || "",
         isActive: item.isActive,
+        affectsStock: item.affectsStock ?? true,
         itemTypes: item.itemTypes?.length ? item.itemTypes : (["item"] as ItemKind[]),
       });
     }
@@ -1218,12 +1265,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         data: {
           name: formData.name,
           description: formData.description || undefined,
-          category: formData.category || undefined,
+          categoryId: formData.categoryId,
           sku: formData.sku || undefined,
           unitId: formData.unitId ?? undefined,
           vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
           notes: formData.notes || undefined,
           isActive: formData.isActive,
+          affectsStock: formData.affectsStock,
           itemTypes: formData.itemTypes,
         },
       });
@@ -1300,6 +1348,9 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               {item.itemTypes?.includes("modifier") && (
                 <Badge variant="secondary" className="text-xs">Modifier</Badge>
               )}
+              {item.affectsStock === false && (
+                <Badge variant="outline" className="text-xs">No stock</Badge>
+              )}
               {item.isCatalogParent && (
                 <Badge variant="outline" className="text-xs">Catalog group</Badge>
               )}
@@ -1364,13 +1415,11 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     />
                   </div>
 
-                  {/* Category */}
                   <div className="space-y-2">
-                    <CategorySelector
-                      enumName="ItemCategory"
+                    <ItemCategorySelector
                       label="Category"
-                      selectedId={formData.category || undefined}
-                      onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
+                      selectedId={formData.categoryId}
+                      onSelect={(cat) => handleInputChange('categoryId', cat?.id ?? null)}
                       placeholder="Select category"
                     />
                   </div>
@@ -1435,6 +1484,18 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       onCheckedChange={(checked) => handleInputChange('isActive', checked)}
                     />
                     <Label htmlFor="isActive" className="cursor-pointer">Active</Label>
+                  </div>
+
+                  {/* Affects Stock */}
+                  <div className="space-y-2 flex items-center space-x-2 pt-6">
+                    <Checkbox
+                      id="affectsStock"
+                      checked={formData.affectsStock}
+                      onCheckedChange={(checked) => handleInputChange('affectsStock', checked)}
+                    />
+                    <Label htmlFor="affectsStock" className="cursor-pointer">
+                      Affects stock (deduct on sale)
+                    </Label>
                   </div>
                 </div>
 
@@ -1671,7 +1732,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                                   {list.modifiers.map((m) => (
                                     <li
                                       key={m.id}
-                                      className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/50 last:border-0 pb-1.5 last:pb-0"
+                                      className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 last:border-0 pb-1.5 last:pb-0"
                                     >
                                       <span>
                                         {m.name || "—"}
@@ -1687,11 +1748,24 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                                           </span>
                                         )}
                                       </span>
-                                      <span className="text-muted-foreground tabular-nums text-xs">
-                                        {m.priceAmountCents != null
-                                          ? formatCurrency(m.priceAmountCents / 100)
-                                          : "—"}
-                                      </span>
+                                      <div className="flex items-center gap-3">
+                                        {m.supplyItemId != null && (
+                                          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                                            <Switch
+                                              checked={m.supplyItemAffectsStock}
+                                              onCheckedChange={(checked) =>
+                                                toggleModifierAffectsStock(m.supplyItemId!, checked)
+                                              }
+                                            />
+                                            <span>Affects stock</span>
+                                          </label>
+                                        )}
+                                        <span className="text-muted-foreground tabular-nums text-xs">
+                                          {m.priceAmountCents != null
+                                            ? formatCurrency(m.priceAmountCents / 100)
+                                            : "—"}
+                                        </span>
+                                      </div>
                                     </li>
                                   ))}
                                 </ul>
@@ -2015,7 +2089,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       <Separator />
                       <div>
                         <label className="text-xs font-medium text-muted-foreground">Category</label>
-                        <p className="text-sm mt-1">{item.category}</p>
+                        <p className="text-sm mt-1">{item.category.label ?? item.category.name}</p>
                       </div>
                     </>
                   )}

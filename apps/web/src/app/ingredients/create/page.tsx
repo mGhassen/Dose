@@ -9,6 +9,7 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { UnifiedSelector } from "@/components/unified-selector";
+import { ItemCategorySelector } from "@/components/item-category-selector";
 import { Save, X, Info } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateIngredient, useUnits } from "@kit/hooks";
@@ -20,32 +21,22 @@ import {
   TooltipTrigger,
 } from "@kit/ui/tooltip";
 
-const COMMON_CATEGORIES = [
-  'Coffee',
-  'Tea',
-  'Dairy',
-  'Dairy Alternatives',
-  'Syrups',
-  'Sweeteners',
-  'Toppings',
-  'Spices',
-  'Pastries',
-  'Food',
-  'Packaging',
-  'Beverages',
-  'Cleaning',
-];
-
 export default function CreateIngredientPage() {
   const router = useRouter();
   const createIngredient = useCreateIngredient();
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+    unitId: number | null;
+    categoryId: number | null;
+    isActive: boolean;
+  }>({
     name: "",
     description: "",
-    unitId: null as number | null,
-    category: "",
+    unitId: null,
+    categoryId: null,
     isActive: true,
   });
 
@@ -62,7 +53,7 @@ export default function CreateIngredientPage() {
         name: formData.name,
         description: formData.description || undefined,
         unit: unitSymbol ?? '',
-        category: formData.category || undefined,
+        categoryId: formData.categoryId ?? null,
         isActive: formData.isActive,
       });
       toast.success("Ingredient created successfully");
@@ -129,32 +120,12 @@ export default function CreateIngredientPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="category">Category</Label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Helps organize and filter ingredients</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                  <UnifiedSelector
-                    label=""
-                    type="category"
-                    items={COMMON_CATEGORIES.map((c) => ({ id: c, name: c }))}
-                    selectedId={formData.category || undefined}
-                    onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
+                  <ItemCategorySelector
+                    id="category"
+                    label="Category"
+                    selectedId={formData.categoryId}
+                    onSelect={(cat) => handleInputChange('categoryId', cat?.id ?? null)}
                     placeholder="Select category"
-                  />
-                  <Input
-                    value={formData.category}
-                    onChange={(e) => handleInputChange('category', e.target.value)}
-                    placeholder="Or type custom category"
-                    className="mt-2"
                   />
                 </div>
 

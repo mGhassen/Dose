@@ -7,6 +7,19 @@ import { normalizeItemKinds } from '@kit/types';
 import { parseRequestBody, updateItemSchema } from '@/shared/zod-schemas';
 import { getUnitVariableMap } from '../../_utils/unit-variables';
 
+function mapCategoryRow(row: any): Item['category'] {
+  const c = row?.category;
+  if (!c) return null;
+  return {
+    id: c.id,
+    name: c.name,
+    label: c.label,
+    description: c.description ?? null,
+    displayOrder: c.display_order ?? 0,
+    isActive: c.is_active ?? true,
+  };
+}
+
 function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item {
   return {
     id: row.id,
@@ -14,7 +27,8 @@ function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item
     description: row.description,
     unit: unitMap.get(row.unit_id)?.symbol || '',
     unitId: row.unit_id,
-    category: row.category,
+    categoryId: row.category_id ?? null,
+    category: mapCategoryRow(row),
     itemTypes: normalizeItemKinds(row.item_types),
     isActive: row.is_active ?? true,
     createdAt: row.created_at,
@@ -24,26 +38,30 @@ function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item
     vendorId: row.vendor_id,
     notes: row.notes,
     producedFromRecipeId: row.produced_from_recipe_id,
+    affectsStock: row.affects_stock ?? true,
     isCatalogParent: row.is_catalog_parent ?? false,
   };
 }
 
 function transformToSnakeCase(data: UpdateItemData): any {
-  // Items should only have item fields, recipes are updated via recipes API
   const result: any = {};
-  
+
   if (data.name !== undefined) result.name = data.name;
   if (data.description !== undefined) result.description = data.description;
   if (data.unitId !== undefined) result.unit_id = data.unitId;
-  if (data.category !== undefined) result.category = data.category;
+  if (data.categoryId !== undefined) result.category_id = data.categoryId;
   if (data.sku !== undefined) result.sku = data.sku;
   if (data.vendorId !== undefined) result.vendor_id = data.vendorId;
   if (data.notes !== undefined) result.notes = data.notes;
   if (data.isActive !== undefined) result.is_active = data.isActive;
   if (data.producedFromRecipeId !== undefined) result.produced_from_recipe_id = data.producedFromRecipeId;
   if (data.itemTypes !== undefined) result.item_types = normalizeItemKinds(data.itemTypes);
+  if (data.affectsStock !== undefined) result.affects_stock = data.affectsStock;
   return result;
 }
+
+const ITEM_SELECT_WITH_CATEGORY =
+  '*, category:item_categories(id, name, label, description, display_order, is_active)';
 
 export async function GET(
   request: NextRequest,
@@ -53,27 +71,22 @@ export async function GET(
     const { id } = await params;
     const supabase = supabaseServer();
     
-    // Try to find in items table first
     let { data: itemData, error: itemError } = await supabase
       .from('items')
-      .select('*')
+      .select(ITEM_SELECT_WITH_CATEGORY)
       .eq('id', id)
       .single();
 
-    // If not found in items, check if it's a recipe ID and if there's a produced item
     if (itemError && itemError.code === 'PGRST116') {
-      // First check if there's a produced item for this recipe ID
       const { data: producedItemData } = await supabase
         .from('items')
-        .select('*')
+        .select(ITEM_SELECT_WITH_CATEGORY)
         .eq('produced_from_recipe_id', id)
         .single();
-      
+
       if (producedItemData) {
-        // Return the produced item instead
         itemData = producedItemData;
       } else {
-        // Check if it's a recipe (for backward compatibility)
         const { data: recipeData, error: recipeError } = await supabase
           .from('recipes')
           .select('*')
@@ -90,14 +103,16 @@ export async function GET(
           throw recipeError;
         }
 
-        // Transform recipe to item format (for API response, not stored)
         itemData = {
           id: recipeData.id,
           name: recipeData.name,
           description: recipeData.description,
           unit: recipeData.unit || 'serving',
           unit_id: recipeData.unit_id,
-          category: recipeData.category,
+          category_id: null,
+          category: recipeData.category
+            ? { id: -1, name: recipeData.category, label: recipeData.category }
+            : null,
           serving_size: recipeData.serving_size,
           preparation_time: recipeData.preparation_time,
           cooking_time: recipeData.cooking_time,
@@ -127,7 +142,8 @@ export async function GET(
         description: itemData.description,
         unit: itemData.unit || 'serving',
         unitId: itemData.unit_id,
-        category: itemData.category,
+        categoryId: itemData.category_id ?? null,
+        category: mapCategoryRow(itemData),
         itemTypes: ['item'],
         isActive: itemData.is_active,
         createdAt: itemData.created_at,
@@ -167,7 +183,7 @@ export async function PUT(
       .from('items')
       .update(transformToSnakeCase(body))
       .eq('id', id)
-      .select('*')
+      .select(ITEM_SELECT_WITH_CATEGORY)
       .single();
 
     if (itemError) throw itemError;

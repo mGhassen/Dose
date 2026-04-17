@@ -37,7 +37,10 @@ export default function ItemsContent() {
   
   const filteredItems = useMemo(() => {
     if (!itemsResponse?.data) return [];
-    return itemsResponse.data;
+    return itemsResponse.data.map((it) => ({
+      ...it,
+      categoryLabel: it.category?.label ?? it.category?.name ?? '',
+    }));
   }, [itemsResponse?.data]);
   const deleteMutation = useDeleteItem();
 
@@ -69,9 +72,13 @@ export default function ItemsContent() {
       cell: ({ row }) => row.original.sku || <span className="text-muted-foreground">—</span>,
     },
     {
-      accessorKey: "category",
+      accessorKey: "categoryLabel",
       header: "Category",
-      cell: ({ row }) => row.original.category || <span className="text-muted-foreground">—</span>,
+      cell: ({ row }) => {
+        const c = row.original.category;
+        const display = c?.label ?? c?.name;
+        return display || <span className="text-muted-foreground">—</span>;
+      },
     },
     {
       accessorKey: "unit",
@@ -138,7 +145,7 @@ export default function ItemsContent() {
       ...itemsToCopy.map(item => [
         item.name,
         item.sku || '',
-        item.category || '',
+        item.category?.label ?? item.category?.name ?? '',
         item.unit || '',
         item.unitPrice || '',
         item.vendorId ? supplierMap.get(item.vendorId) || '' : '',
@@ -146,7 +153,7 @@ export default function ItemsContent() {
         item.isActive ? 'Active' : 'Inactive',
       ].join(','))
     ].join('\n');
-    
+
     navigator.clipboard.writeText(csv);
     toast.success(`${itemsToCopy.length} item(s) copied to clipboard`);
   };
@@ -159,7 +166,7 @@ export default function ItemsContent() {
       ...itemsToExport.map(item => [
         item.name,
         item.sku || '',
-        item.category || '',
+        item.category?.label ?? item.category?.name ?? '',
         item.unit || '',
         item.unitPrice || '',
         item.vendorId ? supplierMap.get(item.vendorId) || '' : '',
@@ -216,7 +223,7 @@ export default function ItemsContent() {
             { value: "name", label: "Name" },
             { value: "sku", label: "SKU" },
             { value: "itemTypes", label: "Type", type: "select", options: [{ value: "item", label: "Item" }, { value: "product", label: "Product" }, { value: "modifier", label: "Modifier" }] },
-            { value: "category", label: "Category", type: "select" },
+            { value: "categoryLabel", label: "Category", type: "select" },
             { value: "unit", label: "Unit", type: "select" },
             { value: "unitPrice", label: "Selling price" },
             { value: "vendorId", label: "Vendor", type: "select" },
@@ -227,14 +234,14 @@ export default function ItemsContent() {
             { value: "name", label: "Name", type: "character varying" },
             { value: "sku", label: "SKU", type: "character varying" },
             { value: "itemTypes", label: "Type", type: "character varying" },
-            { value: "category", label: "Category", type: "character varying" },
+            { value: "categoryLabel", label: "Category", type: "character varying" },
             { value: "unit", label: "Unit", type: "character varying" },
             { value: "unitPrice", label: "Selling price", type: "numeric" },
             { value: "vendorId", label: "Vendor", type: "numeric" },
             { value: "createdAt", label: "Created", type: "timestamp" },
           ]}
           localStoragePrefix="items"
-          searchFields={["name", "sku", "category", "description"]}
+          searchFields={["name", "sku", "categoryLabel", "description"]}
         />
       </div>
     </div>

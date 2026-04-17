@@ -17,9 +17,13 @@ export async function GET(request: NextRequest) {
       let itemCategory: string | null = null;
       let itemCreatedAt: string | null = null;
       if (itemId) {
-        const { data: item } = await supabase.from('items').select('category, created_at').eq('id', itemId).maybeSingle();
-        itemCategory = item?.category ?? null;
-        itemCreatedAt = item?.created_at ?? null;
+        const { data: item } = await supabase
+          .from('items')
+          .select('created_at, category:item_categories(name)')
+          .eq('id', itemId)
+          .maybeSingle();
+        itemCategory = ((item as { category?: { name?: string } | null } | null)?.category?.name) ?? null;
+        itemCreatedAt = (item as { created_at?: string } | null)?.created_at ?? null;
       }
       const result = await getTaxRateAndRuleForSaleLineWithItemTaxes(supabase, itemId, itemCategory, salesType, dateStr, itemCreatedAt);
       return NextResponse.json({
@@ -37,9 +41,14 @@ export async function GET(request: NextRequest) {
       let itemCategory: string | null = searchParams.get('itemCategory') || null;
       let itemCreatedAt: string | null = null;
       if (itemId) {
-        const { data: item } = await supabase.from('items').select('category, created_at').eq('id', itemId).maybeSingle();
-        if (itemCategory == null && item) itemCategory = (item as { category?: string }).category ?? null;
-        itemCreatedAt = (item as { created_at?: string } | undefined)?.created_at ?? null;
+        const { data: item } = await supabase
+          .from('items')
+          .select('created_at, category:item_categories(name)')
+          .eq('id', itemId)
+          .maybeSingle();
+        const joinedName = ((item as { category?: { name?: string } | null } | null)?.category?.name) ?? null;
+        if (itemCategory == null) itemCategory = joinedName;
+        itemCreatedAt = (item as { created_at?: string } | null)?.created_at ?? null;
       }
       const result = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, itemId, itemCategory, dateStr, itemCreatedAt);
       return NextResponse.json({

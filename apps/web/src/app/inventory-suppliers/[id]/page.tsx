@@ -839,7 +839,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                           <div className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                             <div className="flex items-center justify-between">
                               <div className="font-medium">{item.name}</div>
-                              <Badge variant="outline">{item.category || 'No category'}</Badge>
+                              <Badge variant="outline">{item.category?.label ?? item.category?.name ?? 'No category'}</Badge>
                             </div>
                           </div>
                         </Link>

@@ -36,6 +36,7 @@ export * from './client/useDashboard';
 export * from './client/useBudgetProjections';
 export * from './client/useBudgets';
 export * from './client/useMetadataEnums';
+export * from './client/useItemCategories';
 export * from './client/useUnits';
 export * from './client/useActualPayments';
 export * from './client/useEntries';

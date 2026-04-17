@@ -1036,13 +1036,35 @@ export function itemHasKind(item: { itemTypes?: ItemKind[] } | null | undefined,
   return item?.itemTypes?.includes(k) ?? false;
 }
 
+export interface ItemCategory {
+  id: number;
+  name: string;
+  label: string;
+  description?: string | null;
+  displayOrder?: number;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateItemCategoryData {
+  name?: string;
+  label: string;
+  description?: string;
+  displayOrder?: number;
+  isActive?: boolean;
+}
+
+export interface UpdateItemCategoryData extends Partial<CreateItemCategoryData> {}
+
 export interface Item {
   id: number;
   name: string;
   description?: string;
   unit: string;
   unitId?: number;
-  category?: string;
+  categoryId?: number | null;
+  category?: ItemCategory | null;
   itemTypes: ItemKind[];
   isActive: boolean;
   createdAt: string;
@@ -1055,6 +1077,8 @@ export interface Item {
   producedFromRecipeId?: number;
   defaultTaxRatePercent?: number;
   type?: string;
+  /** When false, sales for this item do not create stock movements. */
+  affectsStock?: boolean;
   /** Square catalog: parent row for a product with variations (not a sellable SKU). */
   isCatalogParent?: boolean;
   servingSize?: number;
@@ -1068,7 +1092,7 @@ export interface CreateItemData {
   description?: string;
   unit?: string;
   unitId?: number;
-  category?: string;
+  categoryId?: number | null;
   sku?: string;
   unitPrice?: number;
   unitCost?: number;
@@ -1077,6 +1101,7 @@ export interface CreateItemData {
   defaultTaxRatePercent?: number;
   isActive?: boolean;
   itemTypes?: ItemKind[];
+  affectsStock?: boolean;
   type?: string;
 }
 

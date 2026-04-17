@@ -107,8 +107,13 @@ async function updateExpenseAsTransaction(
     if (line.subscriptionId) {
       const { data: sub } = await supabase.from('subscriptions').select('item_id, category').eq('id', line.subscriptionId).maybeSingle();
       if (sub?.item_id != null) {
-        const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', sub.item_id).maybeSingle();
-        const taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, sub.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+        const { data: itemRow } = await supabase
+          .from('items')
+          .select('created_at, category:item_categories(name)')
+          .eq('id', sub.item_id)
+          .maybeSingle();
+        const itemCategoryName = ((itemRow as any)?.category?.name) ?? null;
+        const taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, sub.item_id, itemCategoryName, dateStr, (itemRow as any)?.created_at ?? null);
         taxRate = taxRule.rate ?? 0;
         taxInclusive = line.taxInclusive ?? taxRule.taxInclusive ?? false;
       } else {
@@ -117,8 +122,13 @@ async function updateExpenseAsTransaction(
         taxInclusive = line.taxInclusive ?? taxRule.taxInclusive ?? false;
       }
     } else if (line.itemId) {
-      const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', line.itemId).maybeSingle();
-      const taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, line.itemId, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+      const { data: itemRow } = await supabase
+        .from('items')
+        .select('created_at, category:item_categories(name)')
+        .eq('id', line.itemId)
+        .maybeSingle();
+      const itemCategoryName = ((itemRow as any)?.category?.name) ?? null;
+      const taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, line.itemId, itemCategoryName, dateStr, (itemRow as any)?.created_at ?? null);
       taxRate = taxRule.rate ?? 0;
       taxInclusive = line.taxInclusive ?? taxRule.taxInclusive ?? false;
     } else {

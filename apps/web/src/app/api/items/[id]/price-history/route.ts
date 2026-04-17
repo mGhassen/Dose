@@ -41,10 +41,10 @@ export async function GET(
     let itemCreatedAt: string | null = null;
     const { data: item } = await supabase
       .from('items')
-      .select('category, created_at')
+      .select('created_at, category:item_categories(name)')
       .eq('id', itemId)
       .maybeSingle();
-    itemCategory = (item as { category?: string } | null)?.category ?? null;
+    itemCategory = ((item as { category?: { name?: string } | null } | null)?.category?.name) ?? null;
     itemCreatedAt = (item as { created_at?: string } | null)?.created_at ?? null;
 
     const rows = (data || []) as unknown as Record<string, unknown>[];

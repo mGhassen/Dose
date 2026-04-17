@@ -13,7 +13,10 @@ function transformIngredient(row: any): Ingredient {
     name: row.name,
     description: row.description,
     unit: row.unit,
-    category: row.category,
+    categoryId: row.category_id ?? null,
+    category: row.category
+      ? { id: row.category.id, name: row.category.name, label: row.category.label }
+      : null,
     itemTypes: normalizeItemKinds(row.item_types),
     isActive: row.is_active,
     createdAt: row.created_at,
@@ -26,7 +29,7 @@ function transformToSnakeCase(data: CreateIngredientData): any {
     name: data.name,
     description: data.description,
     unit: data.unit,
-    category: data.category,
+    category_id: data.categoryId ?? null,
     is_active: data.isActive ?? true,
   };
 }

@@ -26,7 +26,7 @@ const ITEM_KIND_OPTIONS: { id: ItemKind; label: string }[] = [
   { id: "modifier", label: "Modifier" },
 ];
 import { toast } from "sonner";
-import { CategorySelector } from "@/components/category-selector";
+import { ItemCategorySelector } from "@/components/item-category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { AddVendorDialog } from "@/components/add-vendor-dialog";
 import { Save, X } from "lucide-react";
@@ -51,7 +51,7 @@ export function CreateItemMultiStepDialog(props: {
   const [formData, setFormData] = useState<{
     name: string;
     description: string;
-    category: string;
+    categoryId: number | null;
     sku: string;
     unitId: number | null;
     vendorId: string;
@@ -61,7 +61,7 @@ export function CreateItemMultiStepDialog(props: {
   }>(() => ({
     name: "",
     description: "",
-    category: "",
+    categoryId: null,
     sku: "",
     unitId: null,
     vendorId: "",
@@ -75,7 +75,7 @@ export function CreateItemMultiStepDialog(props: {
     setFormData({
       name: "",
       description: "",
-      category: "",
+      categoryId: null,
       sku: "",
       unitId: null,
       vendorId: "",
@@ -108,7 +108,7 @@ export function CreateItemMultiStepDialog(props: {
       const created = (await createItem.mutateAsync({
         name: formData.name,
         description: formData.description || undefined,
-        category: formData.category || undefined,
+        categoryId: formData.categoryId,
         sku: formData.sku || undefined,
         unitId: formData.unitId ?? undefined,
         vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
@@ -156,11 +156,10 @@ export function CreateItemMultiStepDialog(props: {
             </div>
 
             <div className="space-y-2">
-              <CategorySelector
-                enumName="ItemCategory"
+              <ItemCategorySelector
                 label="Category"
-                selectedId={formData.category || undefined}
-                onSelect={(item) => handleInputChange("category", item.id === 0 ? "" : String(item.id))}
+                selectedId={formData.categoryId}
+                onSelect={(cat) => handleInputChange("categoryId", cat?.id ?? null)}
                 placeholder="Select category"
               />
             </div>

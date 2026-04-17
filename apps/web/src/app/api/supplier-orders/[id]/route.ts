@@ -83,7 +83,7 @@ export async function GET(
       .from('supplier_order_items')
       .select(`
         *,
-        item:items(*)
+        item:items(*, category:item_categories(id, name, label))
       `)
       .eq('order_id', id);
 
@@ -99,7 +99,10 @@ export async function GET(
           description: item.item.description,
           unit: item.item.unit,
           unitId: item.item.unit_id,
-          category: item.item.category,
+          categoryId: item.item.category_id ?? null,
+          category: item.item.category
+            ? { id: item.item.category.id, name: item.item.category.name, label: item.item.category.label }
+            : null,
           itemTypes: normalizeItemKinds(item.item.item_types),
           isActive: item.item.is_active,
           createdAt: item.item.created_at,

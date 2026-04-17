@@ -200,7 +200,7 @@ export function SupplierOrderEditor(props: {
             context: "expense",
             date: state.orderDate,
             itemId: it.itemId,
-            itemCategory: item?.category ?? undefined,
+            itemCategory: item?.category?.name ?? undefined,
           })
           .then((r) => ({ idx, r }))
           .catch(() => null);
@@ -621,7 +621,7 @@ export function SupplierOrderEditor(props: {
                                       context: "expense",
                                       date: state.orderDate || undefined,
                                       itemId: it.itemId || undefined,
-                                      itemCategory: allItems.find((x: any) => x.id === it.itemId)?.category ?? undefined,
+                                      itemCategory: allItems.find((x: any) => x.id === it.itemId)?.category?.name ?? undefined,
                                     })
                                     .then((r) => {
                                       updateItem(idx, {

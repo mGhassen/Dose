@@ -107,6 +107,7 @@ export async function GET(
         squareModifierId: string | null;
         supplyItemId: number | null;
         supplyItemName: string | null;
+        supplyItemAffectsStock: boolean;
       }[];
     }[] = [];
 
@@ -129,10 +130,16 @@ export async function GET(
       const modifiers = [];
       for (const m of mods || []) {
         let supplyItemName: string | null = null;
+        let supplyItemAffectsStock: boolean = true;
         const mid = m.item_id as number | null;
         if (mid) {
-          const { data: inv } = await supabase.from('items').select('name').eq('id', mid).maybeSingle();
+          const { data: inv } = await supabase
+            .from('items')
+            .select('name, affects_stock')
+            .eq('id', mid)
+            .maybeSingle();
           supplyItemName = (inv?.name as string) ?? null;
+          supplyItemAffectsStock = (inv as { affects_stock?: boolean } | null)?.affects_stock ?? true;
         }
         modifiers.push({
           id: m.id as number,
@@ -142,6 +149,7 @@ export async function GET(
           squareModifierId: (m.square_modifier_id as string) ?? null,
           supplyItemId: mid,
           supplyItemName,
+          supplyItemAffectsStock,
         });
       }
 

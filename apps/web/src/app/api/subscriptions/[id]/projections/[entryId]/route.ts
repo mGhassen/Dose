@@ -177,8 +177,13 @@ export async function PUT(
               const { to2Decimals, splitInclusiveTotal } = await import('@/lib/transaction-tax');
               let taxRule: { rate: number; taxInclusive?: boolean };
               if (subscriptionData.item_id != null) {
-                const { data: itemRow } = await supabase.from('items').select('category, created_at').eq('id', subscriptionData.item_id).maybeSingle();
-                taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, subscriptionData.item_id, itemRow?.category ?? null, dateStr, itemRow?.created_at ?? null);
+                const { data: itemRow } = await supabase
+                  .from('items')
+                  .select('created_at, category:item_categories(name)')
+                  .eq('id', subscriptionData.item_id)
+                  .maybeSingle();
+                const itemCategoryName = ((itemRow as any)?.category?.name) ?? null;
+                taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, subscriptionData.item_id, itemCategoryName, dateStr, (itemRow as any)?.created_at ?? null);
               } else {
                 taxRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, null, subscriptionData.category ?? null, dateStr);
               }

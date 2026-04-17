@@ -101,6 +101,104 @@ function getCatalogObjectsFromRows(
   return out;
 }
 
+function slugifyCategory(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 100);
+}
+
+/**
+ * Load all Square CATEGORY staging rows for the job (not just current chunk),
+ * so item.category_id resolution works even when category and item land in
+ * different chunks.
+ */
+async function loadAllCategoryObjectsForJob(
+  supabase: SupabaseClient,
+  jobId: number
+): Promise<any[]> {
+  const out: any[] = [];
+  const pageSize = 1000;
+  let offset = 0;
+  for (;;) {
+    const { data, error } = await supabase
+      .from('sync_square_data')
+      .select('payload')
+      .eq('job_id', jobId)
+      .eq('data_type', 'catalog_object')
+      .eq('payload->>type', 'CATEGORY')
+      .order('id', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) break;
+    const rows = (data || []) as { payload: any }[];
+    for (const r of rows) if (r?.payload) out.push(r.payload);
+    if (rows.length < pageSize) break;
+    offset += pageSize;
+  }
+  return out;
+}
+
+/**
+ * Upsert a Square category into item_categories and return the local id.
+ * Creates/updates mapping row (source_type='catalog_category') for stable re-sync.
+ */
+async function upsertItemCategoryFromSquare(
+  supabase: SupabaseClient,
+  integrationId: number,
+  squareCategoryObj: any
+): Promise<number | null> {
+  const sqId = squareCategoryObj?.id;
+  const label = (squareCategoryObj?.category_data?.name ?? '').trim();
+  if (!sqId || !label) return null;
+
+  const existingLocalId = await getMappedAppEntityId(
+    supabase,
+    integrationId,
+    'catalog_category',
+    sqId
+  );
+
+  if (existingLocalId != null) {
+    await supabase
+      .from('item_categories')
+      .update({ label, is_active: !squareCategoryObj.is_deleted, updated_at: new Date().toISOString() })
+      .eq('id', existingLocalId);
+    return existingLocalId;
+  }
+
+  const slug = slugifyCategory(label);
+  const { data: found } = await supabase
+    .from('item_categories')
+    .select('id, label')
+    .ilike('name', slug)
+    .maybeSingle();
+  let localId: number | null = (found?.id as number | undefined) ?? null;
+
+  if (localId == null) {
+    const { data: inserted, error: insertErr } = await supabase
+      .from('item_categories')
+      .insert({ name: slug, label, is_active: !squareCategoryObj.is_deleted })
+      .select('id')
+      .single();
+    if (insertErr || !inserted) return null;
+    localId = inserted.id as number;
+  } else if (found && found.label !== label) {
+    await supabase
+      .from('item_categories')
+      .update({ label, updated_at: new Date().toISOString() })
+      .eq('id', localId);
+  }
+
+  try {
+    await insertMapping(supabase, integrationId, 'catalog_category', sqId, 'item_category', localId);
+  } catch {
+    // mapping may already exist (race); ignore
+  }
+  return localId;
+}
+
 export async function processSyncJob(
   supabase: SupabaseClient,
   job: { id: number; integration_id: number; sync_type: string },
@@ -187,6 +285,26 @@ export async function processSyncJob(
       }
     }
 
+    // Fill categoriesMap from the full job staging set so cross-chunk items can
+    // still resolve their Square category → local item_categories id.
+    if (itemsMap.size > 0) {
+      const allCats = await loadAllCategoryObjectsForJob(supabase, jobId);
+      for (const cat of allCats) {
+        if (cat?.id && !categoriesMap.has(cat.id)) categoriesMap.set(cat.id, cat);
+      }
+    }
+
+    // Upsert every Square category into item_categories and build Square-id → local-id map.
+    const localCategoryIdBySquareId = new Map<string, number>();
+    for (const [sqCatId, catObj] of categoriesMap) {
+      try {
+        const localId = await upsertItemCategoryFromSquare(supabase, integrationId, catObj);
+        if (localId != null) localCategoryIdBySquareId.set(sqCatId, localId);
+      } catch (e: any) {
+        await recordImportError(supabase, jobId, 'catalog_category', sqCatId, e?.message || String(e));
+      }
+    }
+
     for (const [tid, tObj] of taxObjectsMap) {
       try {
         await ensureCatalogTaxVariableMapping(supabase, integrationId, tid, tObj, today);
@@ -255,7 +373,7 @@ export async function processSyncJob(
               .insert({
                 name: label,
                 description: null,
-                category: null,
+                category_id: null,
                 unit_id: defaultUnitVariableId,
                 item_types: ['modifier'],
                 is_active: true,
@@ -277,7 +395,7 @@ export async function processSyncJob(
             .insert({
               name: modName,
               description: null,
-              category: null,
+              category_id: null,
               unit_id: defaultUnitVariableId,
               item_types: ['modifier'],
               is_active: true,
@@ -327,8 +445,20 @@ export async function processSyncJob(
     for (const [squareItemId, itemObj] of itemsMap) {
       const itemArchived = !!itemObj.is_deleted;
       const variations = variationsMap.get(squareItemId) || [];
-      const categoryId = itemObj.item_data?.category_id;
-      const categoryName = categoryId ? (categoriesMap.get(categoryId)?.category_data?.name || '') : '';
+      const sqCategoryId = itemObj.item_data?.category_id as string | undefined;
+      let categoryLocalId: number | null = sqCategoryId
+        ? localCategoryIdBySquareId.get(sqCategoryId) ?? null
+        : null;
+      // Fallback: category may have been staged in a previous job but not re-sent this run.
+      if (categoryLocalId == null && sqCategoryId) {
+        categoryLocalId = await getMappedAppEntityId(
+          supabase,
+          integrationId,
+          'catalog_category',
+          sqCategoryId
+        );
+        if (categoryLocalId != null) localCategoryIdBySquareId.set(sqCategoryId, categoryLocalId);
+      }
       const rawItemName = itemObj.item_data?.name || 'Unnamed';
       const itemName = itemArchived ? `[archived] ${rawItemName}` : rawItemName;
       const itemDesc = itemObj.item_data?.description || '';
@@ -346,13 +476,23 @@ export async function processSyncJob(
       if (variations.length === 0) {
         try {
           const existing = await getMappedAppEntityId(supabase, integrationId, 'catalog_item', squareItemId);
-          if (existing != null) continue;
+          if (existing != null) {
+            await supabase
+              .from('items')
+              .update({
+                category_id: categoryLocalId ?? null,
+                is_active: !itemArchived,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existing);
+            continue;
+          }
           const { data: newItem, error: insertErr } = await supabase
             .from('items')
             .insert({
               name: itemName,
               description: itemDesc,
-              category: categoryName || null,
+              category_id: categoryLocalId ?? null,
               unit_id: defaultUnitVariableId,
               item_types: ['product'],
               is_active: !itemArchived,
@@ -405,6 +545,16 @@ export async function processSyncJob(
         'catalog_item_parent',
         squareItemId
       );
+      if (parentItemId != null) {
+        await supabase
+          .from('items')
+          .update({
+            category_id: categoryLocalId ?? null,
+            is_active: !itemArchived,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', parentItemId);
+      }
       if (parentItemId == null) {
         try {
           const { data: parentRow, error: parentErr } = await supabase
@@ -412,7 +562,7 @@ export async function processSyncJob(
             .insert({
               name: itemName,
               description: itemDesc || null,
-              category: categoryName || null,
+              category_id: categoryLocalId ?? null,
               unit_id: defaultUnitVariableId,
               item_types: ['product'],
               is_active: !itemArchived,
@@ -488,6 +638,14 @@ export async function processSyncJob(
         try {
           const existingChild = await getMappedAppEntityId(supabase, integrationId, 'catalog_variation', variationId);
           if (existingChild != null) {
+            await supabase
+              .from('items')
+              .update({
+                category_id: categoryLocalId ?? null,
+                is_active: !variationArchived,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existingChild);
             if (parentItemId != null) {
               const { data: ivRow } = await supabase
                 .from('item_variations')
@@ -538,7 +696,7 @@ export async function processSyncJob(
             .insert({
               name: displayName,
               description: itemDesc || null,
-              category: categoryName || null,
+              category_id: categoryLocalId ?? null,
               sku,
               unit_id: resolvedUnitId,
               item_types: ['product'],

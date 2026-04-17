@@ -1,5 +1,5 @@
 /** Embed shape from expense_line_items / sale_line_items joins (Supabase may return object or single-element array). */
-type EmbeddedItem = { id?: number; name?: string; unit?: string; unitId?: number; category?: string } | null;
+type EmbeddedItem = { id?: number; name?: string; unit?: string; unitId?: number } | null;
 
 export type LineWithOptionalItemEmbed = {
   itemId?: number | string | null;

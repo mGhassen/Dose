@@ -8,7 +8,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { AddVendorDialog } from "@/components/add-vendor-dialog";
-import { CategorySelector } from "@/components/category-selector";
+import { ItemCategorySelector } from "@/components/item-category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
@@ -38,7 +38,7 @@ export default function CreateItemPage() {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    category: "",
+    categoryId: null as number | null,
     sku: "",
     unitId: null as number | null,
     vendorId: "",
@@ -59,7 +59,7 @@ export default function CreateItemPage() {
       await createItem.mutateAsync({
         name: formData.name,
         description: formData.description || undefined,
-        category: formData.category || undefined,
+        categoryId: formData.categoryId,
         sku: formData.sku || undefined,
         unitId: formData.unitId ?? undefined,
         vendorId: formData.vendorId ? parseInt(formData.vendorId) : undefined,
@@ -117,13 +117,11 @@ export default function CreateItemPage() {
                   />
                 </div>
 
-                {/* Category */}
                 <div className="space-y-2">
-                  <CategorySelector
-                    enumName="ItemCategory"
+                  <ItemCategorySelector
                     label="Category"
-                    selectedId={formData.category || undefined}
-                    onSelect={(item) => handleInputChange('category', item.id === 0 ? '' : String(item.id))}
+                    selectedId={formData.categoryId}
+                    onSelect={(cat) => handleInputChange('categoryId', cat?.id ?? null)}
                     placeholder="Select category"
                   />
                 </div>

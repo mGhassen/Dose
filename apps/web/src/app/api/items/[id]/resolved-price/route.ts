@@ -25,10 +25,10 @@ export async function GET(
     const [selling, cost, itemRow] = await Promise.all([
       getItemSellingPriceAsOf(supabase, itemId, dateStr),
       getItemCostAsOf(supabase, itemId, dateStr),
-      supabase.from('items').select('category, created_at').eq('id', itemId).maybeSingle(),
+      supabase.from('items').select('created_at, category:item_categories(name)').eq('id', itemId).maybeSingle(),
     ]);
 
-    const itemCategory = (itemRow.data as { category?: string } | null)?.category ?? null;
+    const itemCategory = ((itemRow.data as { category?: { name?: string } | null } | null)?.category?.name) ?? null;
     const itemCreatedAt = (itemRow.data as { created_at?: string } | null)?.created_at ?? null;
 
     const [saleRule, expenseRule] = await Promise.all([

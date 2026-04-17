@@ -153,13 +153,16 @@ export async function GET(request: NextRequest) {
       const ids = [...itemIds];
       for (let i = 0; i < ids.length; i += 200) {
         const batch = ids.slice(i, i + 200);
-        const { data, error } = await supabase.from('items').select('id, name, category, item_types, is_active').in('id', batch);
+        const { data, error } = await supabase
+          .from('items')
+          .select('id, name, item_types, is_active, category:item_categories(name)')
+          .in('id', batch);
         if (error) throw error;
         for (const row of data || []) {
           itemsById.set(row.id as number, {
             id: row.id as number,
             name: (row.name as string) ?? '',
-            category: (row.category as string | null) ?? null,
+            category: ((row as any).category?.name as string | null) ?? null,
             item_types: (row.item_types as string[] | null) ?? null,
             is_active: row.is_active as boolean | null,
           });
@@ -514,7 +517,7 @@ export async function GET(request: NextRequest) {
 
     const { data: catalogItems, error: catErr } = await supabase
       .from('items')
-      .select('id, name, category, item_types, is_active')
+      .select('id, name, item_types, is_active, category:item_categories(name)')
       .eq('is_active', true);
     if (catErr) throw catErr;
 
@@ -533,11 +536,12 @@ export async function GET(request: NextRequest) {
       const agg = lastSaleAndLife.get(id);
       const last = agg?.last ?? null;
       const lifetimeUnits = agg?.lifetime ?? 0;
+      const catName = (((row as any).category?.name as string | null) ?? '').trim() || 'Uncategorized';
       if (last == null) {
         deadStock.push({
           itemId: id,
           name: (row.name as string) ?? '',
-          category: (row.category as string)?.trim() || 'Uncategorized',
+          category: catName,
           daysSinceLastSale: null,
           lifetimeUnits: Math.round(lifetimeUnits * 1000) / 1000,
         });
@@ -549,7 +553,7 @@ export async function GET(request: NextRequest) {
         deadStock.push({
           itemId: id,
           name: (row.name as string) ?? '',
-          category: (row.category as string)?.trim() || 'Uncategorized',
+          category: catName,
           daysSinceLastSale: daysSince,
           lifetimeUnits: Math.round(lifetimeUnits * 1000) / 1000,
         });

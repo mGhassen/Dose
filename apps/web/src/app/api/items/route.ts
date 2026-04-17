@@ -11,6 +11,19 @@ import { parseRequestBody, createItemSchema } from '@/shared/zod-schemas';
 import { getUnitVariableMap } from '../_utils/unit-variables';
 import { applyTaxRulesToItem } from '@/lib/item-taxes-resolve';
 
+function mapCategoryRow(row: any): Item['category'] {
+  const c = row?.category;
+  if (!c) return null;
+  return {
+    id: c.id,
+    name: c.name,
+    label: c.label,
+    description: c.description ?? null,
+    displayOrder: c.display_order ?? 0,
+    isActive: c.is_active ?? true,
+  };
+}
+
 function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item {
   return {
     id: row.id,
@@ -18,7 +31,8 @@ function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item
     description: row.description,
     unit: unitMap.get(row.unit_id)?.symbol || '',
     unitId: row.unit_id,
-    category: row.category,
+    categoryId: row.category_id ?? null,
+    category: mapCategoryRow(row),
     itemTypes: normalizeItemKinds(row.item_types),
     isActive: row.is_active ?? true,
     createdAt: row.created_at,
@@ -28,6 +42,7 @@ function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item
     vendorId: row.vendor_id,
     notes: row.notes,
     producedFromRecipeId: row.produced_from_recipe_id,
+    affectsStock: row.affects_stock ?? true,
     isCatalogParent: row.is_catalog_parent ?? false,
   };
 }
@@ -36,16 +51,20 @@ function transformToSnakeCase(data: CreateItemData): any {
   const result: any = {
     name: data.name,
     description: data.description,
-    category: data.category,
     item_types: normalizeItemKinds(data.itemTypes ?? ['item']),
     sku: data.sku,
     vendor_id: data.vendorId,
     notes: data.notes,
     is_active: data.isActive ?? true,
   };
+  if (data.categoryId !== undefined) result.category_id = data.categoryId;
   if (data.unitId != null) result.unit_id = data.unitId;
+  if (data.affectsStock !== undefined) result.affects_stock = data.affectsStock;
   return result;
 }
+
+const ITEM_SELECT_WITH_CATEGORY =
+  '*, category:item_categories(id, name, label, description, display_order, is_active)';
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,7 +79,7 @@ export async function GET(request: NextRequest) {
 
     let itemsQuery = supabase
       .from('items')
-      .select('*');
+      .select(ITEM_SELECT_WITH_CATEGORY);
 
     if (itemType) {
       itemsQuery = itemsQuery.contains('item_types', [itemType]);
@@ -104,28 +123,28 @@ export async function GET(request: NextRequest) {
           .map((item: any) => item.produced_from_recipe_id)
       );
 
-      // Fetch all active recipes
       const { data: allRecipesData, error: recipesError } = await supabase
         .from('recipes')
         .select('*')
         .eq('is_active', true);
-      
+
       if (recipesError) throw recipesError;
-      
-      // Filter out recipes that have produced items (in JavaScript)
+
       const recipesData = (allRecipesData || []).filter(
         (recipe: any) => !producedRecipeIds.has(recipe.id)
       );
 
-      if (recipesError) throw recipesError;
-
-      // Transform recipes to items format (for API response only)
+      // Recipes keep legacy text `category` column; expose as label-only shape
+      // so the UI can render uniformly with items (which now have a joined object).
       const recipesAsItems = (recipesData || []).map((recipe: any) => ({
         id: recipe.id,
         name: recipe.name,
         description: recipe.description,
         unit: recipe.unit || 'serving',
-        category: recipe.category,
+        category_id: null,
+        category: recipe.category
+          ? { id: -1, name: recipe.category, label: recipe.category, display_order: 0, is_active: true }
+          : null,
         item_types: ['item'],
         is_active: recipe.is_active,
         created_at: recipe.created_at,
@@ -160,7 +179,8 @@ export async function GET(request: NextRequest) {
           description: row.description,
           unit: row.unit || 'serving',
           unitId: row.unit_id,
-          category: row.category,
+          categoryId: row.category_id ?? null,
+          category: mapCategoryRow(row),
           itemTypes: normalizeItemKinds(row.item_types),
           isActive: row.is_active,
           createdAt: row.created_at,
@@ -204,17 +224,18 @@ export async function POST(request: NextRequest) {
     const { data: itemData, error } = await supabase
       .from('items')
       .insert(transformToSnakeCase(body))
-      .select('*')
+      .select(ITEM_SELECT_WITH_CATEGORY)
       .single();
 
     if (error) throw error;
 
-    // Auto-assign taxes from global tax rules for newly created items.
-    // This uses the same mechanism as "Apply tax rules to this item".
-    // Best-effort: item creation shouldn't fail if tax application has issues.
     if (itemData?.id != null) {
       try {
-        await applyTaxRulesToItem(supabase as any, itemData.id, itemData.category ?? null);
+        await applyTaxRulesToItem(
+          supabase as any,
+          itemData.id,
+          (itemData as any).category?.name ?? null
+        );
       } catch (taxErr) {
         console.error('Error auto-applying tax rules to item:', taxErr);
       }

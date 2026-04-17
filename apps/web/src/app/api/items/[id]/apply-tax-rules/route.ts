@@ -13,8 +13,12 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid item id' }, { status: 400 });
     }
     const supabase = supabaseServer();
-    const { data: item } = await supabase.from('items').select('category').eq('id', itemId).maybeSingle();
-    const itemCategory = (item as { category?: string } | null)?.category ?? null;
+    const { data: item } = await supabase
+      .from('items')
+      .select('category:item_categories(name)')
+      .eq('id', itemId)
+      .maybeSingle();
+    const itemCategory = ((item as { category?: { name?: string } | null } | null)?.category?.name) ?? null;
     const { applied, errors } = await applyTaxRulesToItem(supabase, itemId, itemCategory);
     return NextResponse.json({ applied, errors });
   } catch (err: any) {
