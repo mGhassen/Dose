@@ -12,9 +12,9 @@ UPDATE public.items SET item_types = CASE COALESCE(item_type, 'item')
   ELSE ARRAY['item']::TEXT[]
 END;
 
-ALTER TABLE public.items DROP COLUMN IF EXISTS item_type;
-
 DROP INDEX IF EXISTS idx_items_item_type;
+
+ALTER TABLE public.items DROP COLUMN IF EXISTS item_type;
 
 ALTER TABLE public.items ADD CONSTRAINT items_item_types_allowed CHECK (
   item_types <@ ARRAY['item', 'product', 'recipe', 'modifier']::TEXT[]
