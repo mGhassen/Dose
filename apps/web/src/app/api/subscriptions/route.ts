@@ -118,7 +118,6 @@ export async function POST(request: NextRequest) {
       .insert({
         name: body.name,
         description: body.description ?? null,
-        category: body.category,
         unit: 'unit',
         item_types: ['item'],
         is_active: true,

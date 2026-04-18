@@ -528,7 +528,7 @@ export default function DataTable({
             <div className="flex items-center gap-1.5">
               <span className="text-muted-foreground">per page</span>
               <Select value={String(currentPageSize)} onValueChange={(value) => { setCurrentPageSize(parseInt(value, 10)); setCurrentPage(1); }}>
-                <SelectTrigger className="h-7 w-14 text-xs border-border/60">
+                <SelectTrigger className="h-7 w-20 text-xs border-border/60">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

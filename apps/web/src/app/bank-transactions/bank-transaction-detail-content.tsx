@@ -14,6 +14,8 @@ import {
   useInventorySuppliers,
   useSupplierOrders,
   useItems,
+  useBalanceAccounts,
+  useAllocateBankToBalance,
 } from "@kit/hooks";
 import { formatDate } from "@kit/lib/date-format";
 import { Button } from "@kit/ui/button";
@@ -149,7 +151,7 @@ export function BankTransactionDetailContent({
           </p>
           <p>
             {tx.reconciled_entity_type
-              ? `${tx.reconciled_entity_type} #${tx.reconciled_entity_id}`
+              ? `${formatReconciledEntityType(tx.reconciled_entity_type)} #${tx.reconciled_entity_id}`
               : "—"}
           </p>
         </div>
@@ -163,14 +165,15 @@ export function BankTransactionDetailContent({
           defaultValue="reconcile"
           className="flex min-h-0 flex-1 flex-col gap-2"
         >
-          <TabsList className="grid w-full shrink-0 grid-cols-3">
-            <TabsTrigger value="reconcile">Reconcile existing</TabsTrigger>
+          <TabsList className="grid w-full shrink-0 grid-cols-4">
+            <TabsTrigger value="reconcile">Reconcile</TabsTrigger>
             <TabsTrigger value="create-expense" disabled={!isDebit}>
-              Debit (out)
+              Debit
             </TabsTrigger>
             <TabsTrigger value="create-sale" disabled={!isCredit}>
-              Credit (in)
+              Credit
             </TabsTrigger>
+            <TabsTrigger value="balance">Balance</TabsTrigger>
           </TabsList>
           <TabsContent value="reconcile" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
             <ReconciliationBlock tx={tx} />
@@ -190,6 +193,9 @@ export function BankTransactionDetailContent({
             ) : (
               <p className="text-sm text-muted-foreground">Credit actions are only for positive amounts (money in).</p>
             )}
+          </TabsContent>
+          <TabsContent value="balance" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
+            <BalanceAllocationBlock tx={tx} />
           </TabsContent>
         </Tabs>
       )}
@@ -1323,6 +1329,137 @@ function CreateSaleFromTransactionForm({
       >
         {createMutation.isPending ? "Saving…" : "Create sale & reconcile"}
       </Button>
+    </div>
+  );
+}
+
+function formatReconciledEntityType(type: string): string {
+  switch (type) {
+    case "balance_movement":
+      return "balance";
+    case "entry":
+      return "entry";
+    default:
+      return type;
+  }
+}
+
+function BalanceAllocationBlock({
+  tx,
+}: {
+  tx: NonNullable<ReturnType<typeof useBankTransaction>["data"]>;
+}) {
+  const { data: accounts, isLoading } = useBalanceAccounts();
+  const allocate = useAllocateBankToBalance();
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [label, setLabel] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const list = (accounts ?? []).filter((a) => !a.archived_at);
+
+  const handleAllocate = () => {
+    if (!selectedId) return;
+    allocate.mutate(
+      {
+        bankTxId: tx.id,
+        data: {
+          balance_account_id: selectedId,
+          label: label.trim() || null,
+          notes: notes.trim() || null,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Allocated to balance account");
+          setSelectedId(null);
+          setLabel("");
+          setNotes("");
+        },
+        onError: (err: unknown) => {
+          const msg = err instanceof Error ? err.message : "Failed to allocate";
+          toast.error(msg);
+        },
+      }
+    );
+  };
+
+  return (
+    <div className="rounded-lg border bg-background p-4 space-y-3">
+      <div>
+        <p className="text-xs font-medium text-muted-foreground uppercase">
+          Allocate to balance account
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Capital, partner account, cash, or other. The transaction&apos;s amount and date are used
+          as-is.
+        </p>
+      </div>
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading balance accounts…</p>
+      ) : list.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No balance accounts yet. Create one from Settings → Balance.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          <div className="rounded-md border max-h-56 overflow-auto">
+            {list.map((a) => {
+              const selected = selectedId === a.id;
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setSelectedId(a.id)}
+                  className={`w-full text-left px-3 py-2 text-sm border-b last:border-b-0 hover:bg-muted/50 ${
+                    selected ? "bg-accent" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{a.name}</p>
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {a.kind.replace("_", " ")}
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {(a.balance ?? 0).toFixed(2)} {a.currency}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="bal-alloc-label" className="text-xs">
+              Label (override)
+            </Label>
+            <Input
+              id="bal-alloc-label"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Defaults to bank transaction label"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="bal-alloc-notes" className="text-xs">
+              Notes
+            </Label>
+            <Input
+              id="bal-alloc-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+          <Button
+            size="sm"
+            onClick={handleAllocate}
+            disabled={allocate.isPending || !selectedId}
+          >
+            {allocate.isPending ? "Allocating…" : "Allocate"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

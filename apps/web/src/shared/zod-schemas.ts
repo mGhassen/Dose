@@ -1086,3 +1086,47 @@ export const updateUserSchema = z.object({
   roleId: z.number().optional(),
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+
+export const balanceAccountKindSchema = z.enum(['capital', 'partner_account', 'cash', 'other']);
+
+export const createBalanceAccountSchema = z.object({
+  name: z.string().min(1),
+  kind: balanceAccountKindSchema,
+  currency: z.string().min(1).max(10).optional(),
+  notes: z.string().nullable().optional(),
+});
+export type CreateBalanceAccountInput = z.infer<typeof createBalanceAccountSchema>;
+
+export const updateBalanceAccountSchema = z.object({
+  name: z.string().min(1).optional(),
+  kind: balanceAccountKindSchema.optional(),
+  currency: z.string().min(1).max(10).optional(),
+  notes: z.string().nullable().optional(),
+  archived_at: z.string().nullable().optional(),
+});
+export type UpdateBalanceAccountInput = z.infer<typeof updateBalanceAccountSchema>;
+
+export const createBalanceMovementSchema = z.object({
+  occurred_on: z.string().min(1),
+  amount: z.number(),
+  label: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  bank_transaction_id: z.number().int().nullable().optional(),
+});
+export type CreateBalanceMovementInput = z.infer<typeof createBalanceMovementSchema>;
+
+export const updateBalanceMovementSchema = z.object({
+  occurred_on: z.string().min(1).optional(),
+  amount: z.number().optional(),
+  label: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  bank_transaction_id: z.number().int().nullable().optional(),
+});
+export type UpdateBalanceMovementInput = z.infer<typeof updateBalanceMovementSchema>;
+
+export const allocateBankToBalanceSchema = z.object({
+  balance_account_id: z.number().int().positive(),
+  label: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+export type AllocateBankToBalanceInput = z.infer<typeof allocateBankToBalanceSchema>;

@@ -268,6 +268,11 @@ export const pathsConfig: NavigationConfig = {
           url: "/settings/integrations",
           translationKey: "integrations"
         },
+        {
+          title: "balance",
+          url: "/settings/balance",
+          translationKey: "balance"
+        },
       ]
     },
   ],

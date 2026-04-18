@@ -1502,3 +1502,69 @@ export interface ItemWithRecipe extends Item {
   recipe?: Recipe;
 }
 
+// ============================================================================
+// BALANCE ACCOUNTS
+// ============================================================================
+
+export type BalanceAccountKind = 'capital' | 'partner_account' | 'cash' | 'other';
+
+export interface BalanceAccount {
+  id: number;
+  account_id: string;
+  name: string;
+  kind: BalanceAccountKind;
+  currency: string;
+  notes: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Sum of all movements. Populated by list/get endpoints. */
+  balance?: number;
+  /** Number of movements. Populated by list/get endpoints. */
+  movements_count?: number;
+}
+
+export interface BalanceMovement {
+  id: number;
+  account_id: string;
+  balance_account_id: number;
+  occurred_on: string;
+  amount: number;
+  label: string | null;
+  notes: string | null;
+  bank_transaction_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateBalanceAccountData {
+  name: string;
+  kind: BalanceAccountKind;
+  currency?: string;
+  notes?: string | null;
+}
+
+export interface UpdateBalanceAccountData {
+  name?: string;
+  kind?: BalanceAccountKind;
+  currency?: string;
+  notes?: string | null;
+  archived_at?: string | null;
+}
+
+export interface CreateBalanceMovementData {
+  occurred_on: string;
+  amount: number;
+  label?: string | null;
+  notes?: string | null;
+  bank_transaction_id?: number | null;
+}
+
+export interface UpdateBalanceMovementData {
+  occurred_on?: string;
+  amount?: number;
+  label?: string | null;
+  notes?: string | null;
+  bank_transaction_id?: number | null;
+}
+

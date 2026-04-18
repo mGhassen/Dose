@@ -222,6 +222,7 @@
     "settings": "Settings",
         "metadataEnums": "Metadata Enums",
         "integrations": "Integrations",
+        "balance": "Balance",
         "units": "Units",
         "taxes": "Taxes",
         "taxRates": "Tax rates",

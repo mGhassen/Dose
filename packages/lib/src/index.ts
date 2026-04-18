@@ -61,6 +61,7 @@ export * from './api/expiry-dates';
 export * from './api/metadata-enums';
 export * from './api/item-categories';
 export * from './api/item-groups';
+export * from './api/balance-accounts';
 
 // Export units API
 export * from './api/units';
