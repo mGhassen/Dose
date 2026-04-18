@@ -30,7 +30,7 @@ CREATE TRIGGER update_recipe_modifier_quantities_updated_at
 
 ALTER TABLE public.recipe_modifier_quantities ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can manage recipe_modifier_quantities for own integrations"
+CREATE POLICY "Manage recipe_modifier_quantities for own integrations"
   ON public.recipe_modifier_quantities FOR ALL
   USING (
     modifier_id IN (

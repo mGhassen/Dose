@@ -27,7 +27,7 @@ CREATE TRIGGER update_recipe_modifier_list_quantities_updated_at
 
 ALTER TABLE public.recipe_modifier_list_quantities ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can manage recipe_modifier_list_quantities for own integrations"
+CREATE POLICY "Manage recipe_modifier_list_quantities for own integrations"
   ON public.recipe_modifier_list_quantities FOR ALL
   USING (
     modifier_list_id IN (
