@@ -8,7 +8,7 @@ ADD COLUMN IF NOT EXISTS supplier_type VARCHAR(50)[] DEFAULT ARRAY['supplier']::
 -- Add check constraint to ensure valid types
 ALTER TABLE suppliers 
 ADD CONSTRAINT check_supplier_type 
-CHECK (supplier_type <@ ARRAY['supplier', 'vendor']::VARCHAR(50)[]);
+CHECK (supplier_type <@ ARRAY['supplier', 'vendor', 'lender', 'customer', 'bank', 'lessor']::VARCHAR(50)[]);
 
 -- Create index for type filtering
 CREATE INDEX IF NOT EXISTS idx_suppliers_type ON suppliers USING GIN(supplier_type);
