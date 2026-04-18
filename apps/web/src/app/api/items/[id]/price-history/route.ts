@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import { parseRequestBody, createItemPriceHistorySchema } from '@/shared/zod-schemas';
 import { getTaxRateAndRuleForSaleLineWithItemTaxes, getTaxRateAndRuleForExpenseLineWithItemTaxes } from '@/lib/item-taxes-resolve';
+import { getGroupMemberIds } from '@/lib/items/group-members';
 
 type HistoryType = 'sell' | 'cost';
 
@@ -28,10 +29,12 @@ export async function GET(
     const valueCol = type === 'sell' ? 'unit_price' : 'unit_cost';
     const taxIncludedCol = ', tax_included';
 
+    const memberIds = await getGroupMemberIds(supabase, itemId);
+
     const { data, error } = await supabase
       .from(table)
-      .select('id, effective_date, ' + valueCol + taxIncludedCol)
-      .eq('item_id', itemId)
+      .select('id, item_id, effective_date, ' + valueCol + taxIncludedCol)
+      .in('item_id', memberIds)
       .order('effective_date', { ascending: false })
       .order('id', { ascending: false });
 
@@ -52,10 +55,11 @@ export async function GET(
       rows.map(async (row) => {
         const entry = {
           id: row.id,
+          itemId: row.item_id,
           effectiveDate: row.effective_date,
           value: row[valueCol] != null ? parseFloat(String(row[valueCol])) : null,
           taxIncluded: row.tax_included != null ? !!row.tax_included : undefined,
-        } as { id: number; effectiveDate: string; value: number | null; taxIncluded?: boolean; resolvedTax?: Record<string, { rate: number; taxInclusive: boolean }> };
+        } as { id: number; itemId: number; effectiveDate: string; value: number | null; taxIncluded?: boolean; resolvedTax?: Record<string, { rate: number; taxInclusive: boolean }> };
 
         if (type === 'sell') {
           const dateStr = String(row.effective_date ?? '').slice(0, 10);

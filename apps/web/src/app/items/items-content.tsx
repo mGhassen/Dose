@@ -6,6 +6,8 @@ import { ColumnDef } from "@tanstack/react-table";
 import DataTablePage from "@/components/data-table-page";
 import { useItems, useDeleteItem, useInventorySuppliers } from "@kit/hooks";
 import type { Item, ItemKind } from "@kit/types";
+import MergeItemsDialog from "@/app/items/_components/merge-items-dialog";
+import { Link as LinkIcon } from "lucide-react";
 
 const KIND_LABEL: Record<ItemKind, string> = {
   item: "Item",
@@ -23,6 +25,8 @@ import { toast } from "sonner";
 export default function ItemsContent() {
   const router = useRouter();
   const [showCatalogGroups, setShowCatalogGroups] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeItems, setMergeItems] = useState<Item[]>([]);
 
   const { data: itemsResponse, isLoading } = useItems({
     limit: 1000,
@@ -62,6 +66,27 @@ export default function ItemsContent() {
           ))}
           {row.original.isCatalogParent && (
             <Badge variant="outline" className="text-xs">Catalog group</Badge>
+          )}
+          {row.original.groupId && row.original.isCanonical && (
+            <Badge variant="outline" className="text-xs gap-1">
+              <LinkIcon className="h-3 w-3" />
+              Group · {row.original.groupName}
+            </Badge>
+          )}
+          {row.original.groupId && !row.original.isCanonical && (
+            <Badge
+              variant="outline"
+              className="text-xs gap-1 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (row.original.canonicalItemId) {
+                  router.push(`/items/${row.original.canonicalItemId}`);
+                }
+              }}
+            >
+              <LinkIcon className="h-3 w-3" />
+              merged → {row.original.canonicalItemName}
+            </Badge>
           )}
         </div>
       ),
@@ -115,7 +140,7 @@ export default function ItemsContent() {
       header: "Created",
       cell: ({ row }) => formatDate(row.original.createdAt),
     },
-  ], [supplierMap]);
+  ], [supplierMap, router]);
 
   const handleDelete = async (id: number) => {
     try {
@@ -214,11 +239,18 @@ export default function ItemsContent() {
           data={filteredItems}
           columns={columns}
           loading={isLoading}
-          onRowClick={(item) => router.push(`/items/${item.id}`)}
+          onRowClick={(item) => {
+            const target = !item.isCanonical && item.canonicalItemId ? item.canonicalItemId : item.id;
+            router.push(`/items/${target}`);
+          }}
           onDelete={handleDelete}
           onBulkDelete={handleBulkDelete}
           onBulkCopy={handleBulkCopy}
           onBulkExport={handleBulkExport}
+          onBulkMerge={(selected) => {
+            setMergeItems(selected as Item[]);
+            setMergeOpen(true);
+          }}
           filterColumns={[
             { value: "name", label: "Name" },
             { value: "sku", label: "SKU" },
@@ -244,6 +276,12 @@ export default function ItemsContent() {
           searchFields={["name", "sku", "categoryLabel", "description"]}
         />
       </div>
+
+      <MergeItemsDialog
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        items={mergeItems}
+      />
     </div>
   );
 }

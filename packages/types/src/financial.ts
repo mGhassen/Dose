@@ -1085,6 +1085,33 @@ export interface Item {
   preparationTime?: number;
   cookingTime?: number;
   instructions?: string;
+  groupId?: number | null;
+  groupName?: string | null;
+  isCanonical?: boolean;
+  canonicalItemId?: number | null;
+  canonicalItemName?: string | null;
+}
+
+export interface ItemGroup {
+  id: number;
+  name: string;
+  canonicalItemId: number;
+  members: Item[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateItemGroupData {
+  name: string;
+  canonicalItemId: number;
+  memberItemIds: number[];
+}
+
+export interface UpdateItemGroupData {
+  name?: string;
+  canonicalItemId?: number;
+  addMemberIds?: number[];
+  removeMemberIds?: number[];
 }
 
 export interface CreateItemData {

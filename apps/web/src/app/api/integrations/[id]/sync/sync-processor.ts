@@ -8,7 +8,13 @@
  * - Tax inclusion: order.taxes[].type === 'INCLUSIVE' → sale_line_items.tax_included true; else ADDITIVE/unknown → false/null.
  */
 
-import { getMappedAppEntityId, insertMapping, centsToDecimal } from './square-import';
+import {
+  getMappedAppEntityId,
+  getMappedAppEntityIdsBatch,
+  insertMapping,
+  centsToDecimal,
+  makeMappingKey,
+} from './square-import';
 import {
   getDefaultUnitVariableId,
   resolveSquareMeasurementUnitId,
@@ -18,9 +24,14 @@ import {
   upsertItemTaxesFromSquareTaxIds,
 } from './square-tax';
 import { upsertSellingPrice } from '@/lib/items/price-history-upsert';
-import { getItemCostAsOf } from '@/lib/items/price-resolve';
+import { getItemCostsAsOfBatch } from '@/lib/items/price-resolve';
 import type { SupabaseClient as DbSupabaseClient } from '@supabase/supabase-js';
-import { replaceSaleStockMovements } from '@/lib/sales/replace-sale-stock-movements';
+import {
+  replaceSaleStockMovements,
+  type PreloadedItem,
+  type PreloadedRecipe,
+} from '@/lib/sales/replace-sale-stock-movements';
+import type { MissingCatalogHint } from './recover-missing-catalog';
 
 type SupabaseClient = { from: (table: string) => any };
 
@@ -39,7 +50,7 @@ async function recordImportError(
   });
 }
 
-async function getNextStepSequence(supabase: SupabaseClient, jobId: number): Promise<number> {
+export async function getNextStepSequence(supabase: SupabaseClient, jobId: number): Promise<number> {
   const { data: rows } = await supabase
     .from('sync_job_steps')
     .select('sequence')
@@ -50,7 +61,7 @@ async function getNextStepSequence(supabase: SupabaseClient, jobId: number): Pro
   return max + 1;
 }
 
-async function insertStep(
+export async function insertStep(
   supabase: SupabaseClient,
   jobId: number,
   sequence: number,
@@ -67,7 +78,7 @@ async function insertStep(
   });
 }
 
-async function completeStep(
+export async function completeStep(
   supabase: SupabaseClient,
   jobId: number,
   sequence: number,
@@ -84,6 +95,8 @@ export type ChunkContext = {
   chunkIndex: number;
   totalChunks: number;
   accumulatedStats: Record<string, number>;
+  missingCatalogHints?: Map<string, MissingCatalogHint>;
+  affectedSales?: Map<number, { squareOrderId: string; dateStr: string }>;
 };
 
 function getCatalogObjectsFromRows(
@@ -445,7 +458,12 @@ export async function processSyncJob(
     for (const [squareItemId, itemObj] of itemsMap) {
       const itemArchived = !!itemObj.is_deleted;
       const variations = variationsMap.get(squareItemId) || [];
-      const sqCategoryId = itemObj.item_data?.category_id as string | undefined;
+      const itemData = itemObj.item_data ?? {};
+      const categoriesArr = Array.isArray(itemData.categories) ? itemData.categories : [];
+      const sqCategoryId =
+        (itemData.reporting_category?.id as string | undefined) ??
+        (categoriesArr[0]?.id as string | undefined) ??
+        (itemData.category_id as string | undefined);
       let categoryLocalId: number | null = sqCategoryId
         ? localCategoryIdBySquareId.get(sqCategoryId) ?? null
         : null;
@@ -765,12 +783,109 @@ export async function processSyncJob(
       ordersStepSeq = stepSeq;
       await insertStep(supabase, jobId, stepSeq, 'Process orders', 'running', {});
     }
-    const touchedSales: { saleId: number; date: string }[] = [];
+    // ---- Preload per-chunk lookups to avoid N+1 round trips ----
+    const orderSourceIds: string[] = [];
+    const variationCatalogIds: string[] = [];
+    const modifierCatalogIds: string[] = [];
+    for (const row of orderRows) {
+      const order = row.payload;
+      const oid = order?.id || row.source_id;
+      if (oid) orderSourceIds.push(String(oid));
+      const lineItems = order?.line_items || [];
+      for (const line of lineItems) {
+        if (line?.catalog_object_id) variationCatalogIds.push(String(line.catalog_object_id));
+        const mods = Array.isArray(line?.modifiers) ? line.modifiers : [];
+        for (const mod of mods) {
+          if (mod?.catalog_object_id) modifierCatalogIds.push(String(mod.catalog_object_id));
+        }
+      }
+    }
+
+    const [orderMap, variationMap, modifierMap] = await Promise.all([
+      getMappedAppEntityIdsBatch(supabase, integrationId, ['order'], orderSourceIds),
+      getMappedAppEntityIdsBatch(
+        supabase,
+        integrationId,
+        ['catalog_variation', 'catalog_item'],
+        variationCatalogIds
+      ),
+      getMappedAppEntityIdsBatch(
+        supabase,
+        integrationId,
+        ['catalog_modifier_item'],
+        modifierCatalogIds
+      ),
+    ]);
+
+    const resolveVariationItemId = (sqId: string): number | null => {
+      return (
+        variationMap.get(makeMappingKey('catalog_variation', sqId)) ??
+        variationMap.get(makeMappingKey('catalog_item', sqId)) ??
+        null
+      );
+    };
+    const resolveModifierItemId = (sqId: string): number | null => {
+      return modifierMap.get(makeMappingKey('catalog_modifier_item', sqId)) ?? null;
+    };
+
+    const costPairs: { itemId: number; dateStr: string }[] = [];
+    const referencedItemIds = new Set<number>();
+    for (const row of orderRows) {
+      const order = row.payload;
+      const orderDate = (order?.created_at || '').split('T')[0];
+      const dateStr = orderDate || today;
+      const lineItems = order?.line_items || [];
+      for (const line of lineItems) {
+        const itemId = line?.catalog_object_id ? resolveVariationItemId(line.catalog_object_id) : null;
+        if (itemId != null) {
+          referencedItemIds.add(itemId);
+          costPairs.push({ itemId, dateStr });
+        }
+        const mods = Array.isArray(line?.modifiers) ? line.modifiers : [];
+        for (const mod of mods) {
+          const modItemId = mod?.catalog_object_id ? resolveModifierItemId(mod.catalog_object_id) : null;
+          if (modItemId != null) {
+            referencedItemIds.add(modItemId);
+            costPairs.push({ itemId: modItemId, dateStr });
+          }
+        }
+      }
+    }
+
+    const [costMap, itemsRows, recipesRows] = await Promise.all([
+      getItemCostsAsOfBatch(supabase, costPairs),
+      referencedItemIds.size > 0
+        ? supabase
+            .from('items')
+            .select('id, unit_id, produced_from_recipe_id, affects_stock')
+            .in('id', Array.from(referencedItemIds))
+        : Promise.resolve({ data: [] as PreloadedItem[] }),
+      referencedItemIds.size > 0
+        ? supabase
+            .from('recipes')
+            .select('id, unit_id')
+            .in('id', Array.from(referencedItemIds))
+        : Promise.resolve({ data: [] as PreloadedRecipe[] }),
+    ]);
+
+    const itemsById = new Map<number, PreloadedItem>();
+    for (const it of (itemsRows?.data ?? []) as PreloadedItem[]) {
+      itemsById.set(it.id, it);
+    }
+    const recipesById = new Map<number, PreloadedRecipe>();
+    for (const r of (recipesRows?.data ?? []) as PreloadedRecipe[]) {
+      recipesById.set(r.id, r);
+    }
+    const resolveCost = (itemId: number, dateStr: string): number | null => {
+      const entry = costMap.get(`${itemId}:${dateStr}`);
+      return entry?.unitCost ?? null;
+    };
+
     for (const row of orderRows) {
       const order = row.payload;
       const orderId = order?.id || row.source_id;
       try {
-        const existingSaleId = await getMappedAppEntityId(supabase, integrationId, 'order', orderId);
+        const existingSaleId = orderMap.get(makeMappingKey('order', String(orderId))) ?? null;
         if (existingSaleId != null) continue;
 
         const netAmounts = order?.net_amounts || {};
@@ -803,14 +918,17 @@ export async function processSyncJob(
           taxIncluded: boolean | null;
           name?: string;
           parentLineIndex?: number;
+          catalogObjectId?: string;
         }> = [];
+        const catalogRefs: string[] = [];
+        const missingCatalogRefs: string[] = [];
         for (const line of lineItems) {
           const qty = parseFloat(line.quantity) || 0;
-          const catalogObjectId = line.catalog_object_id;
-          let itemId: number | null = null;
+          const catalogObjectId = line.catalog_object_id as string | undefined;
+          const itemId = catalogObjectId ? resolveVariationItemId(catalogObjectId) : null;
           if (catalogObjectId) {
-            itemId = await getMappedAppEntityId(supabase, integrationId, 'catalog_variation', catalogObjectId);
-            if (itemId == null) itemId = await getMappedAppEntityId(supabase, integrationId, 'catalog_item', catalogObjectId);
+            catalogRefs.push(catalogObjectId);
+            if (itemId == null) missingCatalogRefs.push(catalogObjectId);
           }
           const baseCents = line.base_price_money?.amount ?? 0;
           const lineTotalCents = line.total_money?.amount ?? (baseCents ? Math.round(baseCents * qty) : 0);
@@ -822,11 +940,7 @@ export async function processSyncJob(
           const taxAmount = centsToDecimal(taxCentsRaw);
           const baseForRate = Math.max(lineTotal - taxAmount, 0);
           const taxPct = baseForRate > 0 && taxAmount > 0 ? (taxAmount / baseForRate) * 100 : 0;
-          let unitCost: number | null = null;
-          if (itemId != null) {
-            const cost = await getItemCostAsOf(supabase, itemId, dateStr);
-            if (cost.unitCost != null) unitCost = cost.unitCost;
-          }
+          const unitCost = itemId != null ? resolveCost(itemId, dateStr) : null;
           lineRows.push({
             itemId,
             quantity: qty,
@@ -837,14 +951,16 @@ export async function processSyncJob(
             taxRatePercent: taxPct,
             taxIncluded: taxIncluded ? true : false,
             name: line.name,
+            catalogObjectId,
           });
           const baseIdx = lineRows.length - 1;
           const mods = Array.isArray(line.modifiers) ? line.modifiers : [];
           for (const mod of mods) {
-            const modCatId = mod?.catalog_object_id;
-            let modItemId: number | null = null;
+            const modCatId = mod?.catalog_object_id as string | undefined;
+            const modItemId = modCatId ? resolveModifierItemId(modCatId) : null;
             if (modCatId) {
-              modItemId = await getMappedAppEntityId(supabase, integrationId, 'catalog_modifier_item', modCatId);
+              catalogRefs.push(modCatId);
+              if (modItemId == null) missingCatalogRefs.push(modCatId);
             }
             const modTotalCents =
               mod?.total_price_money?.amount ??
@@ -856,11 +972,7 @@ export async function processSyncJob(
             const modBaseForRate = Math.max(modLineTotal - modTaxAmount, 0);
             const modTaxPct =
               modBaseForRate > 0 && modTaxAmount > 0 ? (modTaxAmount / modBaseForRate) * 100 : 0;
-            let modUnitCost: number | null = null;
-            if (modItemId != null) {
-              const cost = await getItemCostAsOf(supabase, modItemId, dateStr);
-              if (cost.unitCost != null) modUnitCost = cost.unitCost;
-            }
+            const modUnitCost = modItemId != null ? resolveCost(modItemId, dateStr) : null;
             lineRows.push({
               itemId: modItemId,
               quantity: qty,
@@ -872,12 +984,28 @@ export async function processSyncJob(
               taxIncluded: taxIncluded ? true : false,
               name: mod?.name,
               parentLineIndex: baseIdx,
+              catalogObjectId: modCatId,
             });
           }
         }
 
+        if (chunkContext?.missingCatalogHints && missingCatalogRefs.length > 0) {
+          for (const l of lineRows) {
+            if (l.catalogObjectId && l.itemId == null) {
+              if (!chunkContext.missingCatalogHints.has(l.catalogObjectId)) {
+                const isModifier = l.parentLineIndex != null;
+                chunkContext.missingCatalogHints.set(l.catalogObjectId, {
+                  sourceType: isModifier ? 'catalog_modifier_item' : 'catalog_variation',
+                  name: (l.name || '').toString(),
+                  unitPrice: l.unitPrice,
+                  taxIncluded: !!l.taxIncluded,
+                });
+              }
+            }
+          }
+        }
+
         const firstLine = lineRows[0];
-        const sumQty = lineRows.reduce((s, l) => s + l.quantity, 0) || 1;
         const description = order?.reference_id
           ? `Square #${order.reference_id}`
           : (firstLine?.name ? firstLine.name : null);
@@ -901,16 +1029,49 @@ export async function processSyncJob(
         }
         const saleId = saleRow.id;
 
-        const insertedSaleLineIds: number[] = [];
-        let sortOrder = 0;
+        // Two-pass bulk insert: parents first (for their ids), then children.
+        const insertedSaleLineIds: number[] = new Array(lineRows.length);
+        const parentIndices: number[] = [];
+        const parentPayloads: any[] = [];
         for (let li = 0; li < lineRows.length; li++) {
           const l = lineRows[li];
-          const parentIdx = l.parentLineIndex;
-          const parentSaleLineId =
-            parentIdx != null && parentIdx >= 0 ? insertedSaleLineIds[parentIdx] ?? null : null;
-          const { data: insLine, error: lineInsErr } = await supabase
+          if (l.parentLineIndex == null) {
+            parentIndices.push(li);
+            parentPayloads.push({
+              sale_id: saleId,
+              item_id: l.itemId,
+              quantity: l.quantity,
+              unit_price: l.unitPrice,
+              unit_cost: l.unitCost,
+              line_total: l.lineTotal,
+              tax_rate_percent: l.taxRatePercent,
+              tax_amount: l.taxAmount,
+              tax_included: l.taxIncluded,
+              parent_sale_line_id: null,
+              sort_order: li,
+            });
+          }
+        }
+        if (parentPayloads.length > 0) {
+          const { data: insertedParents, error: parentsErr } = await supabase
             .from('sale_line_items')
-            .insert({
+            .insert(parentPayloads)
+            .select('id');
+          if (parentsErr) throw parentsErr;
+          const parentRows = (insertedParents ?? []) as { id: number }[];
+          for (let k = 0; k < parentIndices.length; k++) {
+            insertedSaleLineIds[parentIndices[k]] = parentRows[k]?.id as number;
+          }
+        }
+
+        const childPayloads: any[] = [];
+        const childOrigIndices: number[] = [];
+        for (let li = 0; li < lineRows.length; li++) {
+          const l = lineRows[li];
+          if (l.parentLineIndex != null) {
+            const parentSaleLineId = insertedSaleLineIds[l.parentLineIndex] ?? null;
+            childOrigIndices.push(li);
+            childPayloads.push({
               sale_id: saleId,
               item_id: l.itemId,
               quantity: l.quantity,
@@ -921,22 +1082,32 @@ export async function processSyncJob(
               tax_amount: l.taxAmount,
               tax_included: l.taxIncluded,
               parent_sale_line_id: parentSaleLineId,
-              sort_order: sortOrder++,
-            })
-            .select('id')
-            .single();
-          if (lineInsErr) throw lineInsErr;
-          insertedSaleLineIds[li] = insLine.id as number;
+              sort_order: li,
+            });
+          }
+        }
+        if (childPayloads.length > 0) {
+          const { data: insertedChildren, error: childrenErr } = await supabase
+            .from('sale_line_items')
+            .insert(childPayloads)
+            .select('id');
+          if (childrenErr) throw childrenErr;
+          const childRows = (insertedChildren ?? []) as { id: number }[];
+          for (let k = 0; k < childOrigIndices.length; k++) {
+            insertedSaleLineIds[childOrigIndices[k]] = childRows[k]?.id as number;
+          }
         }
 
         const stockLines = lineRows.map((l) => ({
           itemId: l.itemId ?? undefined,
           quantity: l.quantity,
         }));
+        const hasAnyMappedItem = stockLines.some((l) => l.itemId != null && l.quantity > 0);
         const stockRes = await replaceSaleStockMovements(supabase as unknown as DbSupabaseClient, {
           saleId,
           movementDate: dateStr,
           lines: stockLines,
+          preload: { itemsById, recipesById },
         });
         if (!stockRes.ok) {
           await supabase.from('stock_movements').delete().eq('reference_type', 'sale').eq('reference_id', saleId);
@@ -959,57 +1130,28 @@ export async function processSyncJob(
 
         await insertMapping(supabase, integrationId, 'order', orderId, 'sale', saleId);
         stats.orders_imported += 1;
-        touchedSales.push({ saleId, date: dateStr });
-      } catch (e: any) {
-        await recordImportError(supabase, jobId, 'order', orderId, e?.message || String(e));
-        stats.orders_failed += 1;
-      }
-    }
-
-    if (touchedSales.length > 0) {
-      const reconcileSeq = await getNextStepSequence(supabase, jobId);
-      await insertStep(supabase, jobId, reconcileSeq, 'Reconcile sale stock movements', 'running', {
-        sales: touchedSales.length,
-      });
-      for (const { saleId, date } of touchedSales) {
-        const { data: linesFresh } = await supabase
-          .from('sale_line_items')
-          .select('item_id, quantity')
-          .eq('sale_id', saleId);
-        const lines: { itemId?: number; quantity: number }[] = (linesFresh || []).map(
-          (r: { item_id: number | null; quantity: number | string }) => ({
-            itemId: r.item_id ?? undefined,
-            quantity: Number(r.quantity) || 0,
-          })
-        );
-        const hasAnyMappedItem = lines.some((l) => l.itemId != null && l.quantity > 0);
-        if (!hasAnyMappedItem) {
+        if (missingCatalogRefs.length > 0 && chunkContext?.affectedSales) {
+          chunkContext.affectedSales.set(saleId, { squareOrderId: orderId, dateStr });
+        }
+        if (hasAnyMappedItem || catalogRefs.length === 0) {
+          stats.stock_reconciled += 1;
+        } else {
+          const uniqueMissing = Array.from(new Set(missingCatalogRefs));
+          const preview = uniqueMissing.slice(0, 5).join(', ');
+          const suffix = uniqueMissing.length > 5 ? `, +${uniqueMissing.length - 5} more` : '';
           await recordImportError(
             supabase,
             jobId,
             'sale_stock',
             String(saleId),
-            'No mapped line items (catalog mapping missing) — no stock movements created'
+            `Catalog mapping missing for ${uniqueMissing.length} catalog_object_id(s) [${preview}${suffix}] — no stock movements created`
           );
           stats.stock_reconcile_failed += 1;
-          continue;
         }
-        const res = await replaceSaleStockMovements(supabase as unknown as DbSupabaseClient, {
-          saleId,
-          movementDate: date,
-          lines,
-        });
-        if (!res.ok) {
-          await recordImportError(supabase, jobId, 'sale_stock', String(saleId), res.message);
-          stats.stock_reconcile_failed += 1;
-          continue;
-        }
-        stats.stock_reconciled += 1;
+      } catch (e: any) {
+        await recordImportError(supabase, jobId, 'order', orderId, e?.message || String(e));
+        stats.orders_failed += 1;
       }
-      await completeStep(supabase, jobId, reconcileSeq, {
-        stock_reconciled: stats.stock_reconciled,
-        stock_reconcile_failed: stats.stock_reconcile_failed,
-      });
     }
 
     await completeStep(supabase, jobId, ordersStepSeq, {

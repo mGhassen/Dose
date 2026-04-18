@@ -19,6 +19,7 @@ import {
   Edit,
   Trash2,
   Eye,
+  Merge,
   ArrowUpDown,
   Search,
   ArrowDownUp,
@@ -171,6 +172,7 @@ interface DataTablePageProps<T> {
   onBulkDelete?: (ids: number[]) => Promise<void>;
   onBulkCopy?: (data: T[], type: 'selected' | 'all') => void;
   onBulkExport?: (data: T[], type: 'selected' | 'all') => void;
+  onBulkMerge?: (items: T[]) => void;
   filterColumns?: FilterColumnConfig[];
   sortColumns?: Array<{ value: string; label: string; type: string }>;
   localStoragePrefix: string;
@@ -212,6 +214,7 @@ export default function DataTablePage<T>({
   onBulkDelete,
   onBulkCopy,
   onBulkExport,
+  onBulkMerge,
   filterColumns = [],
   sortColumns = [],
   localStoragePrefix,
@@ -397,6 +400,15 @@ export default function DataTablePage<T>({
       : filteredData;
     
     onBulkExport(dataToExport, type);
+  };
+
+  const handleBulkMerge = () => {
+    if (!onBulkMerge || selectedRows.size < 2) return;
+    const selected = filteredData.filter((item) => {
+      const itemId = (item as any).id;
+      return itemId !== undefined && selectedRows.has(itemId);
+    });
+    onBulkMerge(selected);
   };
 
   useEffect(() => {
@@ -749,6 +761,17 @@ export default function DataTablePage<T>({
                     >
                       <Trash2 className="w-4 h-4 mr-1" />
                       {tDataTable('bulkActions.deleteRows', { count: selectedRows.size })}
+                    </Button>
+                  )}
+                  {onBulkMerge && selectedRows.size >= 2 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-border hover:bg-muted/50"
+                      onClick={handleBulkMerge}
+                    >
+                      <Merge className="w-4 h-4 mr-1" />
+                      Merge {selectedRows.size}
                     </Button>
                   )}
                   {onBulkCopy && (
@@ -1331,7 +1354,7 @@ export default function DataTablePage<T>({
               .filter((col): col is ColumnDef<T> => col !== undefined && visibleColumns.has(col.id || (col as any).accessorKey || ''))} 
             data={Array.isArray(filteredData) ? filteredData : []} 
             loading={loading}
-            selectable={selectable !== undefined ? selectable : !!(onBulkDelete || onBulkCopy || onBulkExport)}
+            selectable={selectable !== undefined ? selectable : !!(onBulkDelete || onBulkCopy || onBulkExport || onBulkMerge)}
             sortable={false}
             pagination={!pagination}
             pageSize={pagination ? pagination.pageSize : undefined}

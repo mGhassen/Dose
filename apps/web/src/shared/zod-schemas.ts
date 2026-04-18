@@ -83,6 +83,7 @@ export const PAYMENT_METHOD_NAMES = ["cash", "card", "bank_transfer"] as const;
 export const SALARY_FREQUENCY_NAMES = ["yearly", "monthly", "weekly"] as const;
 export const BUDGET_PERIOD_NAMES = ["monthly", "quarterly", "yearly"] as const;
 export const SYNC_TYPE_NAMES = ["orders", "payments", "catalog", "locations", "transactions", "full"] as const;
+export const SYNC_PERIOD_MODE_NAMES = ["last_sync", "custom", "all"] as const;
 export const UNIT_DIMENSION_NAMES = ["mass", "volume", "count", "other"] as const;
 export const ITEM_CATEGORY_NAMES = ["food", "beverage", "supplies", "other"] as const;
 export const SUPPLIER_PAYMENT_TERMS_NAMES = ["net_30", "net_15", "cod", "due_on_receipt", "net_60"] as const;
@@ -380,6 +381,33 @@ export const updateItemSchema = createItemSchema.partial().extend({
   producedFromRecipeId: z.number().nullable().optional(),
 });
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;
+
+export const createItemGroupSchema = z.object({
+  name: z.string().min(1, "Group name is required"),
+  canonicalItemId: z.number().int().positive(),
+  memberItemIds: z
+    .array(z.number().int().positive())
+    .min(2, "At least 2 items are required to create a group")
+    .refine((a) => new Set(a).size === a.length, { message: "Duplicate item ids" }),
+});
+export type CreateItemGroupInput = z.infer<typeof createItemGroupSchema>;
+
+export const updateItemGroupSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    canonicalItemId: z.number().int().positive().optional(),
+    addMemberIds: z.array(z.number().int().positive()).optional(),
+    removeMemberIds: z.array(z.number().int().positive()).optional(),
+  })
+  .refine(
+    (v) =>
+      v.name !== undefined ||
+      v.canonicalItemId !== undefined ||
+      (v.addMemberIds && v.addMemberIds.length > 0) ||
+      (v.removeMemberIds && v.removeMemberIds.length > 0),
+    { message: "Nothing to update" }
+  );
+export type UpdateItemGroupInput = z.infer<typeof updateItemGroupSchema>;
 
 export const createIngredientSchema = z
   .object({
@@ -944,8 +972,12 @@ export const manualConnectSchema = z.object({
   location_id: z.string().optional(),
 });
 const syncTypeEnum = z.enum(SYNC_TYPE_NAMES);
+const syncPeriodModeEnum = z.enum(SYNC_PERIOD_MODE_NAMES);
 export const syncBodySchema = z.object({
   sync_type: syncTypeEnum.optional(),
+  period_mode: syncPeriodModeEnum.optional(),
+  start_at: z.string().datetime().optional(),
+  end_at: z.string().datetime().optional(),
 });
 export const importCsvSchema = z.object({
   import_type: z.string().min(1),

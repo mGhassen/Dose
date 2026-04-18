@@ -53,11 +53,36 @@ async function getIntegrationAndVerifyAccess(
   return { integration, error: null };
 }
 
+type FullSyncPeriod = {
+  mode: 'last_sync' | 'custom' | 'all';
+  startAt?: string;
+  endAt?: string;
+};
+
+function resolveFullSyncRange(
+  integration: any,
+  period: FullSyncPeriod | undefined
+): { start: Date; end: Date } {
+  const now = new Date();
+  const defaultEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const LOOKBACK_YEARS = 7;
+  const mode = period?.mode ?? 'all';
+
+  if (mode === 'custom' && period?.startAt && period?.endAt) {
+    return { start: new Date(period.startAt), end: new Date(period.endAt) };
+  }
+  if (mode === 'last_sync' && integration.last_sync_at) {
+    return { start: new Date(integration.last_sync_at), end: defaultEnd };
+  }
+  return { start: new Date(now.getFullYear() - LOOKBACK_YEARS, 0, 1), end: defaultEnd };
+}
+
 async function fetchAndStageSquare(
   supabase: any,
   integration: any,
   jobId: number,
-  syncType: string
+  syncType: string,
+  period?: FullSyncPeriod
 ): Promise<{ error?: string; stats?: Record<string, number> }> {
   const accessToken = integration.access_token;
   const integrationId = integration.id as number;
@@ -161,13 +186,21 @@ async function fetchAndStageSquare(
 
   if ((syncType === 'orders' || syncType === 'full') && locationIds.length > 0) {
     const now = new Date();
-    const useIncremental = syncType === 'orders' && integration.last_sync_at != null;
-    const lastSync = useIncremental
-      ? new Date(new Date(integration.last_sync_at).getTime() - 5 * 60 * 1000)
-      : null;
-    const ORDER_LOOKBACK_YEARS = 7;
-    const startDate = lastSync ?? new Date(now.getFullYear() - ORDER_LOOKBACK_YEARS, 0, 1);
-    const orderEndDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    let startDate: Date;
+    let orderEndDate: Date;
+    if (syncType === 'full') {
+      const range = resolveFullSyncRange(integration, period);
+      startDate = range.start;
+      orderEndDate = range.end;
+    } else {
+      const useIncremental = integration.last_sync_at != null;
+      const lastSync = useIncremental
+        ? new Date(new Date(integration.last_sync_at).getTime() - 5 * 60 * 1000)
+        : null;
+      const ORDER_LOOKBACK_YEARS = 7;
+      startDate = lastSync ?? new Date(now.getFullYear() - ORDER_LOOKBACK_YEARS, 0, 1);
+      orderEndDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    }
     const ranges = getMonthlyDateRanges(startDate, orderEndDate);
     let ordersStepAdded = false;
 
@@ -210,20 +243,25 @@ async function fetchAndStageSquare(
         const ordersData = await ordersResponse.json();
         const orders = ordersData.orders || [];
         ordersCursor = ordersData.cursor || null;
-        for (const order of orders) {
-          const row = { job_id: jobId, data_type: 'order', source_id: order.id || '', payload: order };
+        if (orders.length > 0) {
+          const rows = orders.map((order: any) => ({
+            job_id: jobId,
+            data_type: 'order',
+            source_id: order.id || '',
+            payload: order,
+          }));
           const { error: upsertErr } = await supabase
             .from('sync_square_data')
-            .upsert(row, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
+            .upsert(rows, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
           if (upsertErr) {
             if (upsertErr.message?.includes('no unique or exclusion constraint')) {
-              const { error: insertErr } = await supabase.from('sync_square_data').insert(row);
+              const { error: insertErr } = await supabase.from('sync_square_data').insert(rows);
               if (insertErr) return { error: `Failed to stage order: ${insertErr.message}` };
             } else {
               return { error: `Failed to stage order: ${upsertErr.message}` };
             }
           }
-          stats.orders_fetched += 1;
+          stats.orders_fetched += orders.length;
         }
         if (orders.length > 0) {
           ordersPageInMonth += 1;
@@ -237,10 +275,18 @@ async function fetchAndStageSquare(
 
   if (syncType === 'payments' || syncType === 'full') {
     const now = new Date();
-    const paymentsStart = integration.last_sync_at != null
-      ? new Date(integration.last_sync_at)
-      : new Date(now.getFullYear() - 7, 0, 1);
-    const paymentsEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    let paymentsStart: Date;
+    let paymentsEnd: Date;
+    if (syncType === 'full') {
+      const range = resolveFullSyncRange(integration, period);
+      paymentsStart = range.start;
+      paymentsEnd = range.end;
+    } else {
+      paymentsStart = integration.last_sync_at != null
+        ? new Date(integration.last_sync_at)
+        : new Date(now.getFullYear() - 7, 0, 1);
+      paymentsEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    }
     const paymentRanges = getMonthlyDateRanges(paymentsStart, paymentsEnd);
     let paymentsStepAdded = false;
 
@@ -268,20 +314,25 @@ async function fetchAndStageSquare(
         const payData = await payResponse.json();
         const payments = payData.payments || [];
         paymentsCursor = payData.cursor || null;
-        for (const payment of payments) {
-          const row = { job_id: jobId, data_type: 'payment', source_id: payment.id || '', payload: payment };
+        if (payments.length > 0) {
+          const rows = payments.map((payment: any) => ({
+            job_id: jobId,
+            data_type: 'payment',
+            source_id: payment.id || '',
+            payload: payment,
+          }));
           const { error: upsertErr } = await supabase
             .from('sync_square_data')
-            .upsert(row, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
+            .upsert(rows, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
           if (upsertErr) {
             if (upsertErr.message?.includes('no unique or exclusion constraint')) {
-              const { error: insertErr } = await supabase.from('sync_square_data').insert(row);
+              const { error: insertErr } = await supabase.from('sync_square_data').insert(rows);
               if (insertErr) return { error: `Failed to stage payment: ${insertErr.message}` };
             } else {
               return { error: `Failed to stage payment: ${upsertErr.message}` };
             }
           }
-          stats.payments_fetched += 1;
+          stats.payments_fetched += payments.length;
         }
         if (payments.length > 0) {
           paymentsPageInMonth += 1;
@@ -384,6 +435,27 @@ export async function POST(
     );
     if (!parsed.success) return parsed.response;
     const syncType = parsed.data.sync_type || 'full';
+    const period: FullSyncPeriod | undefined = parsed.data.period_mode
+      ? {
+          mode: parsed.data.period_mode,
+          startAt: parsed.data.start_at,
+          endAt: parsed.data.end_at,
+        }
+      : undefined;
+    if (period?.mode === 'custom') {
+      if (!period.startAt || !period.endAt) {
+        return NextResponse.json(
+          { error: 'start_at and end_at are required for custom period' },
+          { status: 400 }
+        );
+      }
+      if (new Date(period.startAt) > new Date(period.endAt)) {
+        return NextResponse.json(
+          { error: 'start_at must be before or equal to end_at' },
+          { status: 400 }
+        );
+      }
+    }
 
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -445,7 +517,7 @@ export async function POST(
 
     const result = isPennylane
       ? await fetchAndStagePennylane(supabase, integration, jobId, effectiveSyncType)
-      : await fetchAndStageSquare(supabase, integration, jobId, syncType);
+      : await fetchAndStageSquare(supabase, integration, jobId, syncType, period);
 
     if (result.error) {
       await supabase

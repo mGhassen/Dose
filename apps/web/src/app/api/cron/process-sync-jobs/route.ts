@@ -3,8 +3,19 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
-import { processSyncJob } from '@/app/api/integrations/[id]/sync/sync-processor';
+import {
+  processSyncJob,
+  insertStep,
+  completeStep,
+  getNextStepSequence,
+} from '@/app/api/integrations/[id]/sync/sync-processor';
 import { processPennylaneSyncJob } from '@/app/api/integrations/[id]/sync/pennylane-processor';
+import {
+  recoverMissingCatalog,
+  backfillAffectedSales,
+  type MissingCatalogHint,
+} from '@/app/api/integrations/[id]/sync/recover-missing-catalog';
+import { getDefaultUnitVariableId } from '@/app/api/integrations/[id]/sync/square-measurement-unit';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 /** PostgREST/Supabase cap at 1000 rows per query; use that so pagination matches reality. */
@@ -176,6 +187,9 @@ async function runProcessor(specificJobId?: number) {
       stock_reconcile_failed: 0,
     };
 
+    const missingCatalogHints = new Map<string, MissingCatalogHint>();
+    const affectedSales = new Map<number, { squareOrderId: string; dateStr: string }>();
+
     try {
       let chunkIndex = 0;
       while (true) {
@@ -194,6 +208,8 @@ async function runProcessor(specificJobId?: number) {
           chunkIndex,
           totalChunks,
           accumulatedStats: { ...accumulatedStats },
+          missingCatalogHints,
+          affectedSales,
         };
         const result = await processSyncJob(supabase, job, integration, rows, chunkContext);
         accumulatedStats.items_imported += result.stats.items_imported;
@@ -211,6 +227,65 @@ async function runProcessor(specificJobId?: number) {
           .update({ processed_at: new Date().toISOString() })
           .in('id', ids);
         chunkIndex += 1;
+      }
+
+      if (missingCatalogHints.size > 0) {
+        const defaultUnitVariableId = await getDefaultUnitVariableId(supabase as any);
+
+        const recoverSeq = await getNextStepSequence(supabase as any, job.id);
+        await insertStep(
+          supabase as any,
+          job.id,
+          recoverSeq,
+          `Recover missing catalog items (batch-retrieve)`,
+          'running',
+          { missing: missingCatalogHints.size }
+        );
+        const recoverRes = await recoverMissingCatalog(
+          supabase as any,
+          integration,
+          missingCatalogHints,
+          defaultUnitVariableId
+        );
+        await completeStep(supabase as any, job.id, recoverSeq, {
+          missing: missingCatalogHints.size,
+          recovered: recoverRes.recovered,
+          synthesized: recoverRes.synthesized,
+          errors: recoverRes.errors,
+        });
+        (accumulatedStats as any).catalog_recovered =
+          ((accumulatedStats as any).catalog_recovered ?? 0) + recoverRes.recovered;
+        (accumulatedStats as any).catalog_synthesized =
+          ((accumulatedStats as any).catalog_synthesized ?? 0) + recoverRes.synthesized;
+
+        if (affectedSales.size > 0) {
+          const backfillSeq = await getNextStepSequence(supabase as any, job.id);
+          await insertStep(
+            supabase as any,
+            job.id,
+            backfillSeq,
+            `Backfill sale line items + stock movements`,
+            'running',
+            { affected_sales: affectedSales.size }
+          );
+          const backfillRes = await backfillAffectedSales(
+            supabase as any,
+            job.integration_id,
+            job.id,
+            affectedSales
+          );
+          await completeStep(supabase as any, job.id, backfillSeq, {
+            affected_sales: affectedSales.size,
+            sales_backfilled: backfillRes.sales_backfilled,
+            stock_rewritten: backfillRes.stock_rewritten,
+            errors: backfillRes.errors,
+          });
+          accumulatedStats.stock_reconciled += backfillRes.sales_backfilled;
+          accumulatedStats.stock_reconcile_failed = Math.max(
+            0,
+            accumulatedStats.stock_reconcile_failed - backfillRes.sales_backfilled
+          );
+        }
       }
 
       const hasFailures =

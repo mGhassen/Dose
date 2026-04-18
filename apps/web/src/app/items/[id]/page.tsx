@@ -42,6 +42,7 @@ import {
 } from 'recharts';
 import AppLayout from "@/components/app-layout";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import MergedItemsCard from "@/app/items/[id]/_components/merged-items-card";
 import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum, useVariablesByType, useRecipes, useUpdateRecipe } from "@kit/hooks";
 import type { ItemKind } from "@kit/types";
 
@@ -1354,6 +1355,16 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               {item.isCatalogParent && (
                 <Badge variant="outline" className="text-xs">Catalog group</Badge>
               )}
+              {item.groupId && item.isCanonical && (
+                <Badge variant="outline" className="text-xs">
+                  Group · {item.groupName}
+                </Badge>
+              )}
+              {item.groupId && !item.isCanonical && (
+                <Badge variant="outline" className="text-xs">
+                  merged → {item.canonicalItemName}
+                </Badge>
+              )}
             </div>
             <p className="text-muted-foreground">
               {isEditing ? "Update item information" : "Item details and information"}
@@ -1384,6 +1395,31 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
             </DropdownMenu>
           )}
         </div>
+
+        {!isEditing && item.groupId && !item.isCanonical && item.canonicalItemId && (
+          <Card className="border-amber-500/40 bg-amber-500/5">
+            <CardContent className="flex items-center justify-between gap-4 py-4">
+              <div className="text-sm">
+                This item is merged into{" "}
+                <Link
+                  href={`/items/${item.canonicalItemId}`}
+                  className="font-semibold underline"
+                >
+                  {item.canonicalItemName}
+                </Link>
+                . Combined analytics live on the canonical page. This item keeps its own Square
+                sync, price history and stock movements.
+              </div>
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/items/${item.canonicalItemId}`}>Open canonical</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isEditing && item.groupId && item.isCanonical && (
+          <MergedItemsCard groupId={item.groupId} />
+        )}
 
         {isEditing ? (
           <Card>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import { getGroupMemberIds } from '@/lib/items/group-members';
 
 export async function GET(
   request: NextRequest,
@@ -12,6 +13,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid item id' }, { status: 400 });
     }
     const supabase = supabaseServer();
+    const memberIds = await getGroupMemberIds(supabase, itemId);
 
     const { data: rows, error } = await supabase
       .from('supplier_order_items')
@@ -23,7 +25,7 @@ export async function GET(
         created_at,
         supplier_orders(order_date, order_number)
       `)
-      .eq('item_id', itemId)
+      .in('item_id', memberIds)
       .order('created_at', { ascending: false })
       .limit(20);
 

@@ -24,7 +24,12 @@ function mapCategoryRow(row: any): Item['category'] {
   };
 }
 
-function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item {
+function transformItem(
+  row: any,
+  unitMap: Map<number, { symbol: string }>,
+  groupMap?: Map<number, { id: number; name: string; canonical_item_id: number; canonical_name?: string }>
+): Item {
+  const group = row.group_id ? groupMap?.get(row.group_id) : undefined;
   return {
     id: row.id,
     name: row.name,
@@ -44,6 +49,11 @@ function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item
     producedFromRecipeId: row.produced_from_recipe_id,
     affectsStock: row.affects_stock ?? true,
     isCatalogParent: row.is_catalog_parent ?? false,
+    groupId: row.group_id ?? null,
+    groupName: group?.name ?? null,
+    isCanonical: group ? group.canonical_item_id === row.id : false,
+    canonicalItemId: group?.canonical_item_id ?? null,
+    canonicalItemName: group?.canonical_name ?? null,
   };
 }
 
@@ -65,6 +75,34 @@ function transformToSnakeCase(data: CreateItemData): any {
 
 const ITEM_SELECT_WITH_CATEGORY =
   '*, category:item_categories(id, name, label, description, display_order, is_active)';
+
+async function buildGroupMap(
+  supabase: ReturnType<typeof supabaseServer>,
+  groupIds: (number | null | undefined)[]
+): Promise<Map<number, { id: number; name: string; canonical_item_id: number; canonical_name?: string }>> {
+  const uniqueIds = [...new Set(groupIds.filter((g): g is number => g != null))];
+  const map = new Map<number, { id: number; name: string; canonical_item_id: number; canonical_name?: string }>();
+  if (uniqueIds.length === 0) return map;
+  const { data: groups, error } = await supabase
+    .from('item_groups')
+    .select('id, name, canonical_item_id')
+    .in('id', uniqueIds);
+  if (error) throw error;
+  const canonicalIds = (groups || []).map((g: any) => g.canonical_item_id);
+  const { data: canonicals } = canonicalIds.length
+    ? await supabase.from('items').select('id, name').in('id', canonicalIds)
+    : { data: [] as any[] };
+  const nameById = new Map<number, string>((canonicals || []).map((c: any) => [c.id, c.name]));
+  for (const g of groups || []) {
+    map.set(g.id, {
+      id: g.id,
+      name: g.name,
+      canonical_item_id: g.canonical_item_id,
+      canonical_name: nameById.get(g.canonical_item_id),
+    });
+  }
+  return map;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -113,6 +151,10 @@ export async function GET(request: NextRequest) {
     const unitMap = await getUnitVariableMap(
       supabase as any,
       (itemsData || []).map((r: any) => r.unit_id)
+    );
+    const groupMap = await buildGroupMap(
+      supabase,
+      (itemsData || []).map((r: any) => r.group_id)
     );
 
     if (includeRecipes && !producedOnly) {
@@ -192,8 +234,7 @@ export async function GET(request: NextRequest) {
           notes: row.notes,
         };
       } else {
-        // Transform regular item
-        return transformItem(row, unitMap);
+        return transformItem(row, unitMap, groupMap);
       }
     });
     
@@ -242,7 +283,8 @@ export async function POST(request: NextRequest) {
     }
 
     const unitMap = await getUnitVariableMap(supabase as any, [itemData?.unit_id]);
-    return NextResponse.json(transformItem(itemData, unitMap), { status: 201 });
+    const groupMap = await buildGroupMap(supabase, [itemData?.group_id]);
+    return NextResponse.json(transformItem(itemData, unitMap, groupMap), { status: 201 });
   } catch (error: any) {
     console.error('Error creating item:', error);
     return NextResponse.json(

@@ -54,9 +54,16 @@ export async function GET(request: NextRequest) {
       ? movementType.split(',').map((t) => t.trim()).filter(Boolean)
       : [];
 
+    let itemIds: number[] | null = null;
+    if (itemId) {
+      const { getGroupMemberIds } = await import('@/lib/items/group-members');
+      itemIds = await getGroupMemberIds(supabase, Number(itemId));
+    }
+
     const applyFilters = <T extends { eq: any; in: any; gte: any; lte: any }>(q: T): T => {
       let out: any = q;
-      if (itemId) out = out.eq('item_id', itemId);
+      if (itemIds && itemIds.length > 1) out = out.in('item_id', itemIds);
+      else if (itemIds && itemIds.length === 1) out = out.eq('item_id', itemIds[0]);
       if (types.length === 1) out = out.eq('movement_type', types[0]);
       else if (types.length > 1) out = out.in('movement_type', types);
       if (startDate) out = out.gte('movement_date', startDate);

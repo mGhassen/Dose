@@ -20,7 +20,42 @@ function mapCategoryRow(row: any): Item['category'] {
   };
 }
 
-function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item {
+type GroupInfo = {
+  id: number;
+  name: string;
+  canonical_item_id: number;
+  canonical_name?: string;
+};
+
+async function fetchGroupInfo(
+  supabase: ReturnType<typeof supabaseServer>,
+  groupId: number | null | undefined
+): Promise<GroupInfo | null> {
+  if (!groupId) return null;
+  const { data: group } = await supabase
+    .from('item_groups')
+    .select('id, name, canonical_item_id')
+    .eq('id', groupId)
+    .maybeSingle();
+  if (!group) return null;
+  const { data: canonical } = await supabase
+    .from('items')
+    .select('name')
+    .eq('id', group.canonical_item_id)
+    .maybeSingle();
+  return {
+    id: group.id,
+    name: group.name,
+    canonical_item_id: group.canonical_item_id,
+    canonical_name: canonical?.name,
+  };
+}
+
+function transformItem(
+  row: any,
+  unitMap: Map<number, { symbol: string }>,
+  group: GroupInfo | null
+): Item {
   return {
     id: row.id,
     name: row.name,
@@ -40,6 +75,11 @@ function transformItem(row: any, unitMap: Map<number, { symbol: string }>): Item
     producedFromRecipeId: row.produced_from_recipe_id,
     affectsStock: row.affects_stock ?? true,
     isCatalogParent: row.is_catalog_parent ?? false,
+    groupId: row.group_id ?? null,
+    groupName: group?.name ?? null,
+    isCanonical: group ? group.canonical_item_id === row.id : false,
+    canonicalItemId: group?.canonical_item_id ?? null,
+    canonicalItemName: group?.canonical_name ?? null,
   };
 }
 
@@ -156,7 +196,8 @@ export async function GET(
       });
     } else {
       const unitMap = await getUnitVariableMap(supabase as any, [itemData?.unit_id]);
-      return NextResponse.json(transformItem(itemData, unitMap));
+      const group = await fetchGroupInfo(supabase, itemData?.group_id);
+      return NextResponse.json(transformItem(itemData, unitMap, group));
     }
   } catch (error: any) {
     console.error('Error fetching item:', error);
@@ -189,7 +230,8 @@ export async function PUT(
     if (itemError) throw itemError;
 
     const unitMap = await getUnitVariableMap(supabase as any, [itemData?.unit_id]);
-    return NextResponse.json(transformItem(itemData, unitMap));
+    const group = await fetchGroupInfo(supabase, itemData?.group_id);
+    return NextResponse.json(transformItem(itemData, unitMap, group));
   } catch (error: any) {
     console.error('Error updating item:', error);
     return NextResponse.json(

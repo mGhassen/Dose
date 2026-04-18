@@ -45,6 +45,7 @@ import { formatDateTime } from '@kit/lib/date-format';
 import SquareDataView from '../square-data-view';
 import { Alert, AlertDescription } from '@kit/ui/alert';
 import { ConfirmationDialog } from '@/components/confirmation-dialog';
+import { SyncPeriodDialog, type SyncPeriodSelection } from './sync-period-dialog';
 
 function getStatusBadge(status: string) {
   switch (status) {
@@ -198,6 +199,7 @@ export default function IntegrationDetailPage({ params }: { params: Promise<{ id
 function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string; activeTab: string; setActiveTab: (tab: string) => void }) {
   const router = useRouter();
   const [isDisconnectDialogOpen, setIsDisconnectDialogOpen] = useState(false);
+  const [isSyncPeriodOpen, setIsSyncPeriodOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const { data: integration, isLoading } = useIntegrationById(id);
   const syncIntegration = useSyncIntegration();
@@ -211,9 +213,12 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
 
   const lastJob = Array.isArray(syncJobs) ? syncJobs[0] : null;
 
-  const handleSync = async (syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'transactions' | 'full' = 'full') => {
+  const handleSync = async (
+    syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'transactions' | 'full' = 'full',
+    period?: SyncPeriodSelection
+  ) => {
     try {
-      const res = await syncIntegration.mutateAsync({ id, syncType });
+      const res = await syncIntegration.mutateAsync({ id, syncType, period });
       const jobId = res?.job_id;
       if (jobId != null) {
         window.location.href = `/settings/integrations/syncs/${jobId}`;
@@ -392,7 +397,10 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                     ) : integration.integration_type === 'square' ? (
                       <>
                         <DropdownMenuItem
-                          onClick={() => handleSync('full')}
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            setIsSyncPeriodOpen(true);
+                          }}
                           disabled={syncIntegration.isPending}
                         >
                           {syncIntegration.isPending ? (
@@ -666,6 +674,18 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
           isPending={disconnectIntegration.isPending}
           variant="destructive"
         />
+        {integration.integration_type === 'square' && (
+          <SyncPeriodDialog
+            open={isSyncPeriodOpen}
+            onOpenChange={setIsSyncPeriodOpen}
+            lastSyncAt={integration.last_sync_at}
+            isPending={syncIntegration.isPending}
+            onConfirm={async (selection) => {
+              setIsSyncPeriodOpen(false);
+              await handleSync('full', selection);
+            }}
+          />
+        )}
       </div>
     </AppLayout>
   );

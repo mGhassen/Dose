@@ -52,11 +52,20 @@ export const integrationsApi = {
     apiRequest<Integration>('POST', '/api/integrations/manual-connect', data),
 
   // Sync operations (async: returns job_id, processor runs in background)
-  sync: (id: string, syncType?: 'orders' | 'payments' | 'catalog' | 'locations' | 'transactions' | 'full') =>
+  sync: (
+    id: string,
+    syncType?: 'orders' | 'payments' | 'catalog' | 'locations' | 'transactions' | 'full',
+    period?: { mode: 'last_sync' | 'custom' | 'all'; startAt?: string; endAt?: string }
+  ) =>
     apiRequest<SyncStartResponse>(
       'POST',
       `/api/integrations/${id}/sync`,
-      { sync_type: syncType || 'full' },
+      {
+        sync_type: syncType || 'full',
+        period_mode: period?.mode,
+        start_at: period?.startAt,
+        end_at: period?.endAt,
+      },
       undefined,
       { timeout: 120000 }
     ),
