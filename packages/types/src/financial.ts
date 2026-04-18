@@ -221,6 +221,7 @@ export interface CreateExpenseData {
   description?: string;
   vendor?: string;
   supplierId?: number;
+  supplierOrderId?: number | null;
   expenseDate: string;
 }
 

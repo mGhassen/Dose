@@ -147,3 +147,18 @@ export function useDeleteExpense() {
   });
 }
 
+export function useCreateSupplierOrderFromExpense() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (expenseId: string) => expensesApi.createSupplierOrder(expenseId),
+    onSuccess: (_, expenseId) => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses', expenseId] });
+      queryClient.invalidateQueries({ queryKey: ['supplier-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-levels'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+    },
+  });
+}
+

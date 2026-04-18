@@ -256,6 +256,7 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
                           field.onChange(d ? dateToYYYYMMDD(d) : "")
                         }
                         placeholder="Pick a date"
+                        toYear={new Date().getFullYear() + 20}
                       />
                     )}
                   />

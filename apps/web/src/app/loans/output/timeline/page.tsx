@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent } from "@kit/ui/card";
 import { Input } from "@kit/ui/input";
-import { Calendar, Download, Eye, MoreVertical, ChevronDown, LayoutList, CalendarDays } from "lucide-react";
+import { ArrowLeft, Calendar, Download, Eye, MoreVertical, ChevronDown, LayoutList, CalendarDays } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useAllLoanSchedules, useLoans, useEntries } from "@kit/hooks";
 import { useQueryClient } from "@tanstack/react-query";
@@ -154,11 +154,17 @@ export default function LoanPaymentsTimelinePage() {
     <AppLayout>
       <div className="p-6 max-w-7xl mx-auto space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Loan Payments Timeline</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Payment schedule and actual repayments
-            </p>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => router.push("/loans/output")}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Loan Payments Timeline</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Payment schedule and actual repayments
+              </p>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Popover>

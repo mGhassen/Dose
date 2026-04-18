@@ -96,6 +96,9 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
   );
 
   const { data: variables } = useVariables();
+  const { data: personnelTypeValues = [] } = useMetadataEnum("PersonnelType");
+  const { data: salaryFrequencyValues = [] } = useMetadataEnum("SalaryFrequency");
+  const { data: positionValues = [] } = useMetadataEnum("PersonnelPosition");
   const variablesList = Array.isArray(variables) ? variables : [];
   const employeeSocialTaxVariable = useMemo(() =>
     variablesList.find((v: any) => v.name === 'Employee Social Tax Rate'),
@@ -317,9 +320,6 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     );
   }
 
-  const { data: personnelTypeValues = [] } = useMetadataEnum("PersonnelType");
-  const { data: salaryFrequencyValues = [] } = useMetadataEnum("SalaryFrequency");
-  const { data: positionValues = [] } = useMetadataEnum("PersonnelPosition");
   const personnelTypeItems = personnelTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const salaryFrequencyItems = salaryFrequencyValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
   const positionItems = positionValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));

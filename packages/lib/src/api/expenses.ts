@@ -6,6 +6,7 @@ import type {
   ExpenseProjection,
   AnnualExpenseBudget,
   ExpenseProjectionSummary,
+  SupplierOrder,
   PaginatedResponse,
   PaginationParams
 } from '@kit/types';
@@ -47,5 +48,7 @@ export const expensesApi = {
   getProjectionSummary: (year: string) => apiRequest<ExpenseProjectionSummary>('GET', `/api/expenses/projection-summary?year=${year}`),
   getMonthlyProjections: (startMonth: string, endMonth: string) => 
     apiRequest<ExpenseProjection[]>('GET', `/api/expenses/projections?start=${startMonth}&end=${endMonth}`),
+  createSupplierOrder: (id: string) =>
+    apiRequest<SupplierOrder>('POST', `/api/expenses/${id}/create-supplier-order`),
 };
 

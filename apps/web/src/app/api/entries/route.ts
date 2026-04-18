@@ -193,7 +193,6 @@ export async function GET(request: NextRequest) {
       countQuery = countQuery.lte('entry_date', toDate);
     }
 
-    // Apply pagination
     query = query.range(offset, offset + limit - 1);
 
     // Execute queries

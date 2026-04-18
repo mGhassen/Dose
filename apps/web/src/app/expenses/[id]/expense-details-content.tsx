@@ -31,6 +31,10 @@ import {
   Package,
   ChevronRight,
   Plus,
+  Link2,
+  Link2Off,
+  ShoppingCart,
+  ExternalLink,
 } from "lucide-react";
 import { DatePicker } from "@kit/ui/date-picker";
 import { AddVendorDialog } from "@/components/add-vendor-dialog";
@@ -49,6 +53,9 @@ import {
   usePayments,
   useCreatePayment,
   useDeletePayment,
+  useSupplierOrders,
+  useSupplierOrderById,
+  useCreateSupplierOrderFromExpense,
 } from "@kit/hooks";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -115,6 +122,10 @@ export function ExpenseDetailContent({
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   const [paymentDialogDate, setPaymentDialogDate] = useState<Date>(() => new Date());
+  const [linkOrderDialogOpen, setLinkOrderDialogOpen] = useState(false);
+  const [pickedOrderId, setPickedOrderId] = useState<number | undefined>(undefined);
+  const [isUnlinkDialogOpen, setIsUnlinkDialogOpen] = useState(false);
+  const [isCreateOrderDialogOpen, setIsCreateOrderDialogOpen] = useState(false);
   const { data: expense, isLoading, isError, error } = useExpenseById(expenseId);
   const { data: paymentsPage, isLoading: paymentsLoading } = usePayments({
     entryType: "expense",
@@ -136,6 +147,24 @@ export function ExpenseDetailContent({
     supplierType: "vendor",
   });
   const suppliers = suppliersResponse?.data || [];
+  const { data: linkedOrder } = useSupplierOrderById(
+    expense?.supplierOrderId != null ? String(expense.supplierOrderId) : ""
+  );
+  const { data: availableOrdersResponse } = useSupplierOrders({
+    limit: 200,
+    supplierId:
+      expense?.supplierId != null ? String(expense.supplierId) : undefined,
+  });
+  const availableOrders = availableOrdersResponse?.data ?? [];
+  const availableOrderItems = useMemo(
+    () =>
+      availableOrders.map((o) => ({
+        id: o.id,
+        name: `Order #${o.orderNumber || o.id} · ${o.orderDate ?? "—"} · ${o.status ?? "—"}`,
+      })),
+    [availableOrders]
+  );
+  const createOrderFromExpense = useCreateSupplierOrderFromExpense();
   const { data: itemsResponse } = useItems({ limit: 2500 });
   const itemsBase = itemsResponse?.data ?? [];
   const selectorItems = useMemo(
@@ -450,6 +479,50 @@ export function ExpenseDetailContent({
     }
   };
 
+  const handleLinkSupplierOrder = async () => {
+    if (pickedOrderId == null) {
+      toast.error("Pick a supplier order");
+      return;
+    }
+    try {
+      await updateExpense.mutateAsync({
+        id: expenseId,
+        data: { supplierOrderId: pickedOrderId } as any,
+      });
+      toast.success("Supplier order linked");
+      setLinkOrderDialogOpen(false);
+      setPickedOrderId(undefined);
+    } catch (err: unknown) {
+      toast.error((err as { message?: string })?.message || "Failed to link supplier order");
+    }
+  };
+
+  const handleUnlinkSupplierOrder = async () => {
+    try {
+      await updateExpense.mutateAsync({
+        id: expenseId,
+        data: { supplierOrderId: null } as any,
+      });
+      toast.success("Supplier order unlinked");
+      setIsUnlinkDialogOpen(false);
+    } catch (err: unknown) {
+      toast.error((err as { message?: string })?.message || "Failed to unlink supplier order");
+    }
+  };
+
+  const handleCreateSupplierOrder = async () => {
+    try {
+      const order = await createOrderFromExpense.mutateAsync(expenseId);
+      toast.success("Supplier order created");
+      setIsCreateOrderDialogOpen(false);
+      router.push(`/supplier-orders/${order.id}`);
+    } catch (err: unknown) {
+      toast.error(
+        (err as { message?: string })?.message || "Failed to create supplier order"
+      );
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-full flex-col">
@@ -751,6 +824,22 @@ export function ExpenseDetailContent({
       ? subscriptions.find((s: { id: number }) => s.id === expense.subscriptionId)?.name
       : null;
   const effectiveTaxRateView = defaultTaxRate;
+  const hasLinkedOrder = expense.supplierOrderId != null;
+  const hasUsableLinesForOrder =
+    (expense.lineItems || []).some(
+      (li) =>
+        (li.itemId != null || (li as { item_id?: number }).item_id != null) &&
+        li.subscriptionId == null &&
+        (li.quantity ?? 0) > 0
+    );
+  const canCreateOrder = !hasLinkedOrder && expense.supplierId != null && hasUsableLinesForOrder;
+  const createOrderBlockedReason = hasLinkedOrder
+    ? "Already linked to a supplier order"
+    : expense.supplierId == null
+      ? "Pick a vendor first"
+      : !hasUsableLinesForOrder
+        ? "Expense has no line items with items"
+        : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -780,6 +869,54 @@ export function ExpenseDetailContent({
                   <Plus className="mr-2 h-4 w-4" />
                   Add payment
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {hasLinkedOrder ? (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => router.push(`/supplier-orders/${expense.supplierOrderId}`)}
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      View supplier order
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setIsUnlinkDialogOpen(true)}
+                      disabled={updateExpense.isPending}
+                    >
+                      <Link2Off className="mr-2 h-4 w-4" />
+                      Unlink supplier order
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (expense.supplierId == null) {
+                          toast.error("Pick a vendor first");
+                          return;
+                        }
+                        setPickedOrderId(undefined);
+                        setLinkOrderDialogOpen(true);
+                      }}
+                      disabled={expense.supplierId == null}
+                    >
+                      <Link2 className="mr-2 h-4 w-4" />
+                      Link to supplier order…
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (!canCreateOrder) {
+                          toast.error(createOrderBlockedReason ?? "Cannot create supplier order");
+                          return;
+                        }
+                        setIsCreateOrderDialogOpen(true);
+                      }}
+                      disabled={!canCreateOrder}
+                    >
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      Create supplier order from this expense
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => setIsDeleteDialogOpen(true)}
@@ -976,6 +1113,22 @@ export function ExpenseDetailContent({
                 expense.vendor || <span className="text-muted-foreground">—</span>
               )}
             </DetailRow>
+            <Separator />
+            <DetailRow icon={ShoppingCart} label="Supplier order">
+              {expense.supplierOrderId ? (
+                <Link
+                  href={`/supplier-orders/${expense.supplierOrderId}`}
+                  className="group inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  {linkedOrder
+                    ? `Order #${linkedOrder.orderNumber || linkedOrder.id} · ${linkedOrder.orderDate ?? "—"} · ${linkedOrder.status ?? "—"}`
+                    : `Order #${expense.supplierOrderId}`}
+                  <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                </Link>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </DetailRow>
             {expense.description && (
               <>
                 <Separator />
@@ -1126,6 +1279,80 @@ export function ExpenseDetailContent({
         cancelText="Cancel"
         isPending={deletePayment.isPending}
         variant="destructive"
+      />
+
+      <Dialog open={linkOrderDialogOpen} onOpenChange={setLinkOrderDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link to supplier order</DialogTitle>
+            <DialogDescription>
+              Pick an existing supplier order from this vendor. Stock movements will re-anchor to the order.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Supplier order</Label>
+              <UnifiedSelector
+                mode="single"
+                type="item"
+                items={availableOrderItems}
+                selectedId={pickedOrderId}
+                onSelect={(item) => {
+                  const oid = typeof item.id === "string" ? parseInt(item.id, 10) : item.id;
+                  setPickedOrderId(Number.isNaN(oid) || oid === 0 ? undefined : (oid as number));
+                }}
+                placeholder="Select supplier order…"
+                searchPlaceholder="Search orders…"
+              />
+              {availableOrderItems.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No orders for this vendor. Try creating one from this expense instead.
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setLinkOrderDialogOpen(false);
+                setPickedOrderId(undefined);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={pickedOrderId == null || updateExpense.isPending}
+              onClick={handleLinkSupplierOrder}
+            >
+              {updateExpense.isPending ? "Linking…" : "Link"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmationDialog
+        open={isUnlinkDialogOpen}
+        onOpenChange={setIsUnlinkDialogOpen}
+        onConfirm={handleUnlinkSupplierOrder}
+        title="Unlink supplier order"
+        description="Stock movements will move back under this expense. The supplier order itself is not deleted."
+        confirmText="Unlink"
+        cancelText="Cancel"
+        isPending={updateExpense.isPending}
+      />
+
+      <ConfirmationDialog
+        open={isCreateOrderDialogOpen}
+        onOpenChange={setIsCreateOrderDialogOpen}
+        onConfirm={handleCreateSupplierOrder}
+        title="Create supplier order"
+        description="A delivered supplier order will be created from this expense's line items. Stock movements will re-anchor to the new order."
+        confirmText="Create"
+        cancelText="Cancel"
+        isPending={createOrderFromExpense.isPending}
       />
     </div>
   );

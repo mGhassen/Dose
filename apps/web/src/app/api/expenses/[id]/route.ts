@@ -67,6 +67,7 @@ function transformToSnakeCase(data: UpdateExpenseData): any {
   if (data.description !== undefined) result.description = data.description;
   if (data.vendor !== undefined) result.vendor = data.vendor;
   if (data.supplierId !== undefined) result.supplier_id = data.supplierId || null;
+  if (data.supplierOrderId !== undefined) result.supplier_order_id = data.supplierOrderId ?? null;
   result.updated_at = new Date().toISOString();
   return result;
 }
@@ -311,6 +312,22 @@ export async function PUT(
     }
 
     const supabase = supabaseServer();
+
+    if (body.supplierOrderId != null) {
+      const { data: conflict } = await supabase
+        .from('expenses')
+        .select('id')
+        .eq('supplier_order_id', body.supplierOrderId)
+        .neq('id', id)
+        .maybeSingle();
+      if (conflict) {
+        return NextResponse.json(
+          { error: 'Supplier order already linked to another expense' },
+          { status: 400 }
+        );
+      }
+    }
+
     const { data, error } = await supabase
       .from('expenses')
       .update(transformToSnakeCase(body as UpdateExpenseData))
@@ -330,6 +347,21 @@ export async function PUT(
       .select('*, subscription:subscriptions(id, name)')
       .eq('expense_id', id)
       .order('sort_order', { ascending: true });
+
+    if (body.supplierOrderId !== undefined) {
+      const stockRes = await replaceExpenseStockMovements(supabase, {
+        expenseId: Number(id),
+        supplierOrderId: data.supplier_order_id ?? null,
+        lines: (lineRows || []).map((r: any) => ({
+          itemId: r.item_id ?? undefined,
+          subscriptionId: r.subscription_id ?? undefined,
+          quantity: parseFloat(r.quantity) || 0,
+        })),
+        movementDate: data.expense_date,
+      });
+      if (!stockRes.ok) throw new Error(stockRes.message);
+    }
+
     const lineItems = await hydrateExpenseLineItemItems(supabase, (lineRows || []).map(transformLineItem));
     return NextResponse.json(transformExpense(data, lineItems));
   } catch (error: any) {

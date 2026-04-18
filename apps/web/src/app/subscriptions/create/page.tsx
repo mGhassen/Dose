@@ -200,6 +200,7 @@ export default function CreateSubscriptionPage() {
                           field.onChange(d ? dateToYYYYMMDD(d) : "")
                         }
                         placeholder="Pick a date"
+                        toYear={new Date().getFullYear() + 20}
                       />
                     )}
                   />
