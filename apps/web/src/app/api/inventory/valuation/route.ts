@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       .from('stock_levels')
       .select(`
         *,
-        item:items(id, name, unit)
+        item:items(id, name)
       `)
       .gt('quantity', 0);
 

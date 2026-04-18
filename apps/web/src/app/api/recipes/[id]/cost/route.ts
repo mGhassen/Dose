@@ -87,7 +87,7 @@ export async function GET(
         id, modifier_id, quantity, unit_id, enabled, sort_order,
         modifier:modifiers(
           id, name, price_amount_cents, sort_order, item_id, modifier_list_id,
-          item:items(id, name, unit, unit_id),
+          item:items(id, name, unit_id),
           modifier_list:modifier_lists(id, name, selection_type)
         )
       `
@@ -107,7 +107,7 @@ export async function GET(
         sort_order: number | null;
         item_id: number | null;
         modifier_list_id: number;
-        item: { id: number; name: string; unit: string | null; unit_id: number | null } | null;
+        item: { id: number; name: string; unit_id: number | null } | null;
         modifier_list: { id: number; name: string | null; selection_type: string | null } | null;
       } | null;
     };

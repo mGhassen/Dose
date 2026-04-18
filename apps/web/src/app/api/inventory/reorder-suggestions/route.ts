@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       .from('stock_levels')
       .select(`
         *,
-        item:items(id, name, unit)
+        item:items(id, name)
       `)
       .not('minimum_stock_level', 'is', null)
       .order('quantity', { ascending: true });

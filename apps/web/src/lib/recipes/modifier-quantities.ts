@@ -15,7 +15,7 @@ type ModifierRow = {
   item?: {
     id: number;
     name: string;
-    unit: string | null;
+    unit_id: number | null;
     affects_stock: boolean | null;
   } | null;
   modifier_list?: {
@@ -63,7 +63,7 @@ export function transformRecipeModifierQuantity(row: RecipeModifierRow): RecipeM
           priceAmountCents: mod.price_amount_cents,
           supplyItemId: mod.item_id,
           supplyItemName: mod.item?.name ?? null,
-          supplyItemUnit: mod.item?.unit ?? null,
+          supplyItemUnit: null,
           supplyItemAffectsStock: mod.item?.affects_stock ?? undefined,
           modifierList: {
             id: mod.modifier_list?.id ?? mod.modifier_list_id,
@@ -217,7 +217,7 @@ export async function fetchRecipeModifierQuantities(
       unit:variables(id, payload),
       modifier:modifiers(
         id, name, price_amount_cents, sort_order, item_id, modifier_list_id,
-        item:items(id, name, unit, affects_stock),
+        item:items(id, name, unit_id, affects_stock),
         modifier_list:modifier_lists(id, name, selection_type)
       )
     `
