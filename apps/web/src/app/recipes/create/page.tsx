@@ -114,14 +114,14 @@ function CreateRecipeForm() {
         modifierQuantities:
           modifierRows.length > 0
             ? modifierRows
-                .filter((r) => r.enabled && r.quantity > 0)
+                .filter((r) => r.quantity > 0)
                 .map((r) => ({
                   modifierId: r.modifierId,
                   quantity: r.quantity,
                   unit: r.unit,
                   unitId: r.unitId,
                   notes: r.notes,
-                  enabled: r.enabled,
+                  enabled: true,
                 }))
             : undefined,
       });

@@ -54,11 +54,11 @@ export async function POST(
       );
     }
 
-    const alloc = result.result.inserted[0];
+    const saleId = result.result.lineResults[0]?.primaryEntityId ?? null;
     return NextResponse.json(
       {
         bankTransaction: result.result.bankTransaction,
-        saleId: alloc?.entity_id ?? null,
+        saleId,
       },
       { status: 201 }
     );

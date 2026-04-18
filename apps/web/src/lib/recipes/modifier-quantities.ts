@@ -76,6 +76,32 @@ export function transformRecipeModifierQuantity(row: RecipeModifierRow): RecipeM
 }
 
 /**
+ * Modifier ids that appear on modifier lists linked to these catalog items.
+ */
+export async function allowedModifierIdsForProducedItemIds(
+  supabase: SupabaseClient,
+  producedItemIds: number[]
+): Promise<Set<number>> {
+  const ids = [...new Set(producedItemIds.filter((id) => typeof id === 'number' && id > 0))];
+  if (ids.length === 0) return new Set();
+
+  const { data: modListLinks } = await supabase
+    .from('item_modifier_list_links')
+    .select('modifier_list_id')
+    .in('item_id', ids);
+  const listIds = Array.from(
+    new Set((modListLinks || []).map((r: { modifier_list_id: number }) => r.modifier_list_id))
+  );
+  if (listIds.length === 0) return new Set();
+
+  const { data: mods } = await supabase
+    .from('modifiers')
+    .select('id')
+    .in('modifier_list_id', listIds);
+  return new Set((mods || []).map((m: { id: number }) => m.id));
+}
+
+/**
  * Returns the distinct set of modifier ids attached to any modifier_list that is
  * linked to one of the recipe's produced items. Quantities may only target modifiers
  * in this set.
@@ -99,32 +125,22 @@ export async function allowedModifierIdsForRecipe(
     if (recipe?.produced_item_id) producedItemIds.push(recipe.produced_item_id);
   }
 
-  if (producedItemIds.length === 0) return new Set();
-
-  const { data: modListLinks } = await supabase
-    .from('item_modifier_list_links')
-    .select('modifier_list_id')
-    .in('item_id', producedItemIds);
-  const listIds = Array.from(
-    new Set((modListLinks || []).map((r: { modifier_list_id: number }) => r.modifier_list_id))
-  );
-  if (listIds.length === 0) return new Set();
-
-  const { data: mods } = await supabase
-    .from('modifiers')
-    .select('id')
-    .in('modifier_list_id', listIds);
-  return new Set((mods || []).map((m: { id: number }) => m.id));
+  return allowedModifierIdsForProducedItemIds(supabase, producedItemIds);
 }
 
 /**
  * Validates that every provided modifierId is in the recipe's allowed set.
  * Caller must have synced produced_items BEFORE calling this.
+ *
+ * `alsoAllowForProducedItemIds` — server-only: union allowed modifiers for these item ids
+ * (same ids you just linked). Covers multi-output recipes where reading `recipe_produced_items`
+ * back is incomplete and matches POST create with `producedIdsFromCreateBody`.
  */
 export async function validateModifierQuantities(
   supabase: SupabaseClient,
   recipeId: number,
-  quantities: RecipeModifierQuantityInput[]
+  quantities: RecipeModifierQuantityInput[],
+  options?: { alsoAllowForProducedItemIds?: number[] }
 ): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
   if (quantities.length === 0) return { ok: true };
 
@@ -140,7 +156,14 @@ export async function validateModifierQuantities(
     seen.add(q.modifierId);
   }
 
-  const allowed = await allowedModifierIdsForRecipe(supabase, recipeId);
+  let allowed = await allowedModifierIdsForRecipe(supabase, recipeId);
+  const extraIds = options?.alsoAllowForProducedItemIds?.filter(
+    (id) => typeof id === 'number' && id > 0
+  );
+  if (extraIds?.length) {
+    const fromExplicitItems = await allowedModifierIdsForProducedItemIds(supabase, extraIds);
+    allowed = new Set([...allowed, ...fromExplicitItems]);
+  }
   for (const q of quantities) {
     if (!allowed.has(q.modifierId)) {
       return {

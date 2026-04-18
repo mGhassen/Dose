@@ -21,18 +21,34 @@ const ALLOCATABLE_INPUT_ENTRY_TYPES = new Set(['sale']);
 type Line = BankTransactionSplitInput['lines'][number];
 
 type CreatedRef = {
-  table: 'payments' | 'balance_movements' | 'expenses' | 'sales' | 'supplier_orders';
+  table: 'payments' | 'balance_movements' | 'expenses' | 'sales' | 'supplier_orders' | 'entries';
   id: number;
   extra?: { saleId?: number };
 };
 
 export type SplitError = { status: number; message: string; details?: string };
 
+export type LineResult = {
+  kind: Line['kind'];
+  /** Allocation row id that was inserted for this line. */
+  allocationId: number;
+  /**
+   * The user-facing primary entity id for this line:
+   * - link_expense / new_expense -> expense id
+   * - link_sale / new_sale -> sale id
+   * - payment -> payment id
+   * - balance_movement -> balance_movement id
+   */
+  primaryEntityId?: number;
+};
+
 export type SplitResult = {
   bankTransaction: Record<string, unknown>;
   allocations: AllocationSummary['allocations'];
   /** The subset of allocations that were created by this call. */
   inserted: AllocationSummary['allocations'];
+  /** Per-line results in input order. */
+  lineResults: LineResult[];
 };
 
 export async function executeBankTransactionSplit(
@@ -79,12 +95,12 @@ export async function executeBankTransactionSplit(
   }
 
   const created: CreatedRef[] = [];
-  const insertedIds: number[] = [];
+  const lineResults: LineResult[] = [];
 
   try {
     for (const line of input.lines) {
-      const alloc = await processLine(supabase, bankTx, line, created);
-      insertedIds.push(alloc.id);
+      const lineResult = await processLine(supabase, bankTx, line, created);
+      lineResults.push(lineResult);
     }
   } catch (e: unknown) {
     await rollback(supabase, created);
@@ -93,13 +109,15 @@ export async function executeBankTransactionSplit(
     return { ok: false, error: { status, message } };
   }
 
+  const insertedIds = new Set(lineResults.map((r) => r.allocationId));
   const summary = await loadBankTxAllocations(supabase, bankTxId, bankAmount);
   return {
     ok: true,
     result: {
       bankTransaction: withAllocationsSummary(bankTx, summary),
       allocations: summary.allocations,
-      inserted: summary.allocations.filter((a) => insertedIds.includes(a.id)),
+      inserted: summary.allocations.filter((a) => insertedIds.has(a.id)),
+      lineResults,
     },
   };
 }
@@ -159,6 +177,56 @@ async function insertAllocation(
   return data as { id: number };
 }
 
+/**
+ * Insert a payments row against the given entry, enforcing that total paid does not
+ * exceed entry.amount. Pushes a rollback ref for the created payment row.
+ */
+async function bookPaymentForEntry(
+  supabase: SupabaseClient,
+  entry: { id: number; amount: number | string },
+  absAmount: number,
+  paymentDate: string,
+  notes: string | null,
+  created: CreatedRef[]
+): Promise<number> {
+  const entryAmount = parseFloat(String(entry.amount));
+  const { data: existingPay } = await supabase
+    .from('payments')
+    .select('amount')
+    .eq('entry_id', entry.id);
+  const paid = (existingPay ?? []).reduce(
+    (s, p) => s + parseFloat(String((p as { amount: string | number }).amount)),
+    0
+  );
+  if (paid + absAmount > entryAmount + 0.02) {
+    throw Object.assign(
+      new Error(
+        `Payment exceeds remaining balance on entry (entry ${entryAmount.toFixed(2)}, already paid ${paid.toFixed(2)})`
+      ),
+      { status: 400 }
+    );
+  }
+
+  const dateStr = paymentDate.split('T')[0] || paymentDate;
+  const { data: paymentRow, error: payInsErr } = await supabase
+    .from('payments')
+    .insert({
+      entry_id: entry.id,
+      payment_date: dateStr,
+      amount: absAmount,
+      is_paid: true,
+      paid_date: dateStr,
+      notes,
+    })
+    .select('id')
+    .single();
+  if (payInsErr || !paymentRow) {
+    throw Object.assign(new Error(`Failed to create payment: ${payInsErr?.message}`), { status: 500 });
+  }
+  created.push({ table: 'payments', id: paymentRow.id });
+  return paymentRow.id as number;
+}
+
 async function processLine(
   supabase: SupabaseClient,
   bankTx: {
@@ -170,8 +238,9 @@ async function processLine(
   },
   line: Line,
   created: CreatedRef[]
-) {
+): Promise<LineResult> {
   const bankTxIdNum = Number(bankTx.id);
+  const txDate = (bankTx.execution_date || '').split('T')[0] || bankTx.execution_date;
 
   switch (line.kind) {
     case 'balance_movement': {
@@ -205,7 +274,7 @@ async function processLine(
       }
       created.push({ table: 'balance_movements', id: movement.id });
 
-      return insertAllocation(
+      const alloc = await insertAllocation(
         supabase,
         bankTx,
         'balance_movement',
@@ -214,6 +283,7 @@ async function processLine(
         line.label ?? null,
         line.notes ?? null
       );
+      return { kind: 'balance_movement', allocationId: alloc.id, primaryEntityId: movement.id };
     }
 
     case 'payment': {
@@ -240,50 +310,31 @@ async function processLine(
         );
       }
 
-      const entryAmount = parseFloat(String(entry.amount));
-      const { data: existingPay } = await supabase.from('payments').select('amount').eq('entry_id', entry.id);
-      const paid = (existingPay ?? []).reduce(
-        (s, p) => s + parseFloat(String((p as { amount: string | number }).amount)),
-        0
+      const paymentId = await bookPaymentForEntry(
+        supabase,
+        entry,
+        Math.abs(line.amount),
+        line.paymentDate,
+        line.notes ?? null,
+        created
       );
-      const paymentAmount = Math.abs(line.amount);
-      if (paid + paymentAmount > entryAmount + 0.02) {
-        throw Object.assign(
-          new Error(
-            `Payment exceeds remaining balance on entry (entry ${entryAmount.toFixed(2)}, already paid ${paid.toFixed(2)})`
-          ),
-          { status: 400 }
-        );
+      if (line.paymentMethod) {
+        await supabase
+          .from('payments')
+          .update({ payment_method: line.paymentMethod })
+          .eq('id', paymentId);
       }
 
-      const dateStr = line.paymentDate.split('T')[0] || line.paymentDate;
-      const { data: paymentRow, error: payInsErr } = await supabase
-        .from('payments')
-        .insert({
-          entry_id: entry.id,
-          payment_date: dateStr,
-          amount: paymentAmount,
-          is_paid: true,
-          paid_date: dateStr,
-          payment_method: line.paymentMethod ?? null,
-          notes: line.notes ?? null,
-        })
-        .select('id')
-        .single();
-      if (payInsErr || !paymentRow) {
-        throw Object.assign(new Error(`Failed to create payment: ${payInsErr?.message}`), { status: 500 });
-      }
-      created.push({ table: 'payments', id: paymentRow.id });
-
-      return insertAllocation(
+      const alloc = await insertAllocation(
         supabase,
         bankTx,
         'payment',
-        paymentRow.id,
+        paymentId,
         line.amount,
         null,
         line.notes ?? null
       );
+      return { kind: 'payment', allocationId: alloc.id, primaryEntityId: paymentId };
     }
 
     case 'link_expense': {
@@ -293,7 +344,36 @@ async function processLine(
         .eq('id', line.expenseId)
         .maybeSingle();
       if (expErr || !exp) throw Object.assign(new Error('Expense not found'), { status: 404 });
-      return insertAllocation(supabase, bankTx, 'expense', exp.id, line.amount, null, line.notes ?? null);
+
+      const { data: entry, error: entErr } = await supabase
+        .from('entries')
+        .select('id, amount')
+        .eq('reference_id', exp.id)
+        .eq('entry_type', 'expense')
+        .maybeSingle();
+      if (entErr || !entry) {
+        throw Object.assign(new Error('Ledger entry for this expense not found'), { status: 404 });
+      }
+
+      const paymentId = await bookPaymentForEntry(
+        supabase,
+        entry,
+        Math.abs(line.amount),
+        txDate,
+        line.notes ?? null,
+        created
+      );
+
+      const alloc = await insertAllocation(
+        supabase,
+        bankTx,
+        'payment',
+        paymentId,
+        line.amount,
+        `expense #${exp.id}`,
+        line.notes ?? null
+      );
+      return { kind: 'link_expense', allocationId: alloc.id, primaryEntityId: exp.id };
     }
 
     case 'link_sale': {
@@ -303,7 +383,36 @@ async function processLine(
         .eq('id', line.saleId)
         .maybeSingle();
       if (saleErr || !sale) throw Object.assign(new Error('Sale not found'), { status: 404 });
-      return insertAllocation(supabase, bankTx, 'sale', sale.id, line.amount, null, line.notes ?? null);
+
+      const { data: entry, error: entErr } = await supabase
+        .from('entries')
+        .select('id, amount')
+        .eq('reference_id', sale.id)
+        .eq('entry_type', 'sale')
+        .maybeSingle();
+      if (entErr || !entry) {
+        throw Object.assign(new Error('Ledger entry for this sale not found'), { status: 404 });
+      }
+
+      const paymentId = await bookPaymentForEntry(
+        supabase,
+        entry,
+        Math.abs(line.amount),
+        txDate,
+        line.notes ?? null,
+        created
+      );
+
+      const alloc = await insertAllocation(
+        supabase,
+        bankTx,
+        'payment',
+        paymentId,
+        line.amount,
+        `sale #${sale.id}`,
+        line.notes ?? null
+      );
+      return { kind: 'link_sale', allocationId: alloc.id, primaryEntityId: sale.id };
     }
 
     case 'new_expense': {
@@ -376,21 +485,47 @@ async function processLine(
       }
       created.push({ table: 'expenses', id: expenseRow.id });
 
-      await supabase.from('entries').insert({
-        direction: 'output',
-        entry_type: 'expense',
-        name: b.name,
-        amount: b.amount,
-        description: b.description,
-        category: b.category,
-        vendor: b.vendor,
-        supplier_id: resolvedSupplierId,
-        entry_date: b.expenseDate,
-        reference_id: expenseRow.id,
-        is_active: true,
-      });
+      const { data: entryRow, error: entryErr } = await supabase
+        .from('entries')
+        .insert({
+          direction: 'output',
+          entry_type: 'expense',
+          name: b.name,
+          amount: b.amount,
+          description: b.description,
+          category: b.category,
+          vendor: b.vendor,
+          supplier_id: resolvedSupplierId,
+          entry_date: b.expenseDate,
+          reference_id: expenseRow.id,
+          is_active: true,
+        })
+        .select('id, amount')
+        .single();
+      if (entryErr || !entryRow) {
+        throw Object.assign(new Error(`Failed to create ledger entry: ${entryErr?.message}`), { status: 500 });
+      }
+      created.push({ table: 'entries', id: entryRow.id });
 
-      return insertAllocation(supabase, bankTx, 'expense', expenseRow.id, line.amount, null, null);
+      const paymentId = await bookPaymentForEntry(
+        supabase,
+        entryRow,
+        Math.abs(line.amount),
+        txDate,
+        null,
+        created
+      );
+
+      const alloc = await insertAllocation(
+        supabase,
+        bankTx,
+        'payment',
+        paymentId,
+        line.amount,
+        `expense #${expenseRow.id}`,
+        null
+      );
+      return { kind: 'new_expense', allocationId: alloc.id, primaryEntityId: expenseRow.id };
     }
 
     case 'new_sale': {
@@ -407,7 +542,36 @@ async function processLine(
         { buildPaymentSlices: () => [] }
       );
       created.push({ table: 'sales', id: sale.id, extra: { saleId: sale.id } });
-      return insertAllocation(supabase, bankTx, 'sale', sale.id, line.amount, null, null);
+
+      const { data: saleEntry, error: saleEntryErr } = await supabase
+        .from('entries')
+        .select('id, amount')
+        .eq('reference_id', sale.id)
+        .eq('entry_type', 'sale')
+        .maybeSingle();
+      if (saleEntryErr || !saleEntry) {
+        throw Object.assign(new Error('Ledger entry for new sale not found'), { status: 500 });
+      }
+
+      const paymentId = await bookPaymentForEntry(
+        supabase,
+        saleEntry,
+        Math.abs(line.amount),
+        txDate,
+        null,
+        created
+      );
+
+      const alloc = await insertAllocation(
+        supabase,
+        bankTx,
+        'payment',
+        paymentId,
+        line.amount,
+        `sale #${sale.id}`,
+        null
+      );
+      return { kind: 'new_sale', allocationId: alloc.id, primaryEntityId: sale.id };
     }
   }
 }

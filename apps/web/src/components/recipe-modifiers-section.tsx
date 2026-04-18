@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Button } from "@kit/ui/button";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
-import { Switch } from "@kit/ui/switch";
 import { Badge } from "@kit/ui/badge";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { useItemModifierLists, useUnits } from "@kit/hooks";
@@ -91,6 +90,8 @@ export function RecipeModifiersSection({ producedItemId, rows, onChange }: Props
         <ListCard
           key={list.id}
           list={list}
+          rows={rows}
+          onChangeRows={onChange}
           rowByModifierId={rowByModifierId}
           units={units}
           onUpsert={upsertRow}
@@ -106,20 +107,24 @@ type UnitItem = ReturnType<typeof useUnits>["data"] extends (infer U)[] | undefi
 
 function ListCard({
   list,
+  rows,
+  onChangeRows,
   rowByModifierId,
   units,
   onUpsert,
   onRemove,
 }: {
   list: ModifierListItem;
+  rows: RecipeModifierRowInput[];
+  onChangeRows: (rows: RecipeModifierRowInput[]) => void;
   rowByModifierId: Map<number, RecipeModifierRowInput>;
   units: UnitItem[];
   onUpsert: (modifierId: number, patch: Partial<RecipeModifierRowInput>) => void;
   onRemove: (modifierId: number) => void;
 }) {
   const pricedOptions = list.modifiers.filter((m) => m.supplyItemId != null);
-  const enabledCount = list.modifiers.reduce(
-    (n, m) => n + (rowByModifierId.get(m.id)?.enabled ? 1 : 0),
+  const qtyPositiveCount = list.modifiers.reduce(
+    (n, m) => n + (m.supplyItemId != null && (rowByModifierId.get(m.id)?.quantity ?? 0) > 0 ? 1 : 0),
     0
   );
 
@@ -131,15 +136,30 @@ function ListCard({
     if (!Number.isFinite(qty) || qty < 0) return;
     const unit = bulkUnitId ? units.find((u: { id: number }) => u.id === bulkUnitId) : undefined;
     const unitSymbol = unit ? ((unit as { symbol?: string }).symbol ?? undefined) : undefined;
+    const next = [...rows];
+    const upsertInNext = (modifierId: number, patch: Partial<RecipeModifierRowInput>) => {
+      const i = next.findIndex((r) => r.modifierId === modifierId);
+      if (i >= 0) {
+        next[i] = { ...next[i], ...patch };
+      } else {
+        next.push({
+          modifierId,
+          quantity: 0,
+          enabled: true,
+          ...patch,
+        });
+      }
+    };
     for (const m of list.modifiers) {
       if (m.supplyItemId == null) continue;
-      onUpsert(m.id, {
+      upsertInNext(m.id, {
         quantity: qty,
         unitId: bulkUnitId,
         unit: unitSymbol,
         enabled: true,
       });
     }
+    onChangeRows(next);
   };
 
   return (
@@ -163,7 +183,7 @@ function ListCard({
           <p className="text-xs text-muted-foreground">
             {list.modifiers.length} option{list.modifiers.length === 1 ? "" : "s"}
             {pricedOptions.length > 0 && ` · ${pricedOptions.length} linked to stock`}
-            {enabledCount > 0 && ` · ${enabledCount} included`}
+            {qtyPositiveCount > 0 && ` · ${qtyPositiveCount} with quantity`}
           </p>
         </div>
       </div>
@@ -208,24 +228,13 @@ function ListCard({
       <div className="divide-y rounded-md border">
         {list.modifiers.map((m) => {
           const row = rowByModifierId.get(m.id);
-          const enabled = row?.enabled ?? false;
           const noStock = m.supplyItemId == null;
 
           return (
             <div
               key={m.id}
-              className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-[auto_1fr_140px_140px]"
+              className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-[1fr_140px_140px]"
             >
-              <div className="flex items-center gap-2 self-center">
-                <Switch
-                  checked={enabled}
-                  disabled={noStock}
-                  onCheckedChange={(checked) => {
-                    if (checked) onUpsert(m.id, { enabled: true });
-                    else if (row) onRemove(m.id);
-                  }}
-                />
-              </div>
               <div className="space-y-1 self-center">
                 <p className="text-sm font-medium leading-tight">
                   {m.name || `Modifier #${m.id}`}
@@ -252,11 +261,22 @@ function ListCard({
                   type="number"
                   step="0.01"
                   min={0}
-                  disabled={!enabled || noStock}
+                  disabled={noStock}
                   value={row?.quantity ? row.quantity : ""}
-                  onChange={(e) =>
-                    onUpsert(m.id, { quantity: parseFloat(e.target.value) || 0 })
-                  }
+                  onChange={(e) => {
+                    const raw = e.target.value.trim();
+                    if (raw === "") {
+                      if (row) onRemove(m.id);
+                      return;
+                    }
+                    const v = parseFloat(raw);
+                    if (!Number.isFinite(v) || v < 0) return;
+                    if (v === 0) {
+                      if (row) onRemove(m.id);
+                      return;
+                    }
+                    onUpsert(m.id, { quantity: v, enabled: true });
+                  }}
                   placeholder="Qty"
                 />
               </div>
@@ -275,11 +295,13 @@ function ListCard({
                     onUpsert(m.id, {
                       unitId: u?.id,
                       unit: (u as { symbol?: string } | undefined)?.symbol ?? undefined,
+                      enabled: true,
                     });
                   }}
                   placeholder="Unit"
                   manageLink={{ href: "/variables", text: "Variables" }}
                   getDisplayName={(x) => (x as { symbol?: string }).symbol ?? x.name ?? String(x.id)}
+                  disabled={noStock}
                 />
               </div>
             </div>

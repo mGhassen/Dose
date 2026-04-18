@@ -64,14 +64,14 @@ export async function POST(
       order_date: string;
     };
 
-    const alloc = result.result.inserted[0];
+    const expenseId = result.result.lineResults[0]?.primaryEntityId;
     let expenseRow: ExpenseRow | null = null;
     let supplierOrderRow: SupplierOrderRow | null = null;
-    if (alloc) {
+    if (expenseId != null) {
       const { data: ex } = await supabase
         .from('expenses')
         .select('id, name, category, amount, expense_date, supplier_id, supplier_order_id')
-        .eq('id', alloc.entity_id)
+        .eq('id', expenseId)
         .maybeSingle();
       expenseRow = (ex as ExpenseRow | null) ?? null;
       if (expenseRow && expenseRow.supplier_order_id != null) {

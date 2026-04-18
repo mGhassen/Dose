@@ -176,14 +176,14 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           isActive: formData.isActive,
           items: items.length > 0 ? items.map(i => ({ itemId: i.itemId, quantity: i.quantity, unit: i.unit, unitId: i.unitId, notes: i.notes })) : undefined,
           modifierQuantities: modifierRows
-            .filter((r) => r.enabled && r.quantity > 0)
+            .filter((r) => r.quantity > 0)
             .map((r) => ({
             modifierId: r.modifierId,
             quantity: r.quantity,
             unit: r.unit,
             unitId: r.unitId,
             notes: r.notes,
-            enabled: r.enabled,
+            enabled: true,
           })),
         },
       });
@@ -569,8 +569,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                       </div>
                       <RecipeModifiersSection
                         producedItemId={
-                          (recipe as { producedItemId?: number | null })?.producedItemId ??
                           (recipe.producedItems && recipe.producedItems[0]?.id) ??
+                          (recipe as { producedItemId?: number | null })?.producedItemId ??
                           null
                         }
                         rows={modifierRows}

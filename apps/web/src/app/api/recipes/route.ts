@@ -185,10 +185,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.modifierQuantities && body.modifierQuantities.length > 0) {
+      if (producedIds.length === 0) {
+        await supabase.from('recipes').delete().eq('id', recipeData.id);
+        return NextResponse.json(
+          { error: 'Choose a produced item before saving modifier quantities' },
+          { status: 400 }
+        );
+      }
       const valid = await validateModifierQuantities(
         supabase,
         Number(recipeData.id),
-        body.modifierQuantities
+        body.modifierQuantities,
+        { alsoAllowForProducedItemIds: producedIds }
       );
       if (!valid.ok) {
         await supabase.from('recipes').delete().eq('id', recipeData.id);

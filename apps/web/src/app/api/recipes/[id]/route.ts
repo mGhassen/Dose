@@ -294,10 +294,15 @@ export async function PUT(
     }
 
     if (body.modifierQuantities !== undefined) {
+      const alsoAllowForProducedItemIds =
+        body.producedItemIds !== undefined
+          ? [...new Set(body.producedItemIds.filter((n): n is number => typeof n === 'number'))]
+          : undefined;
       const valid = await validateModifierQuantities(
         supabase,
         Number(id),
-        body.modifierQuantities
+        body.modifierQuantities,
+        alsoAllowForProducedItemIds?.length ? { alsoAllowForProducedItemIds } : undefined
       );
       if (!valid.ok) {
         return NextResponse.json({ error: valid.message }, { status: valid.status });
