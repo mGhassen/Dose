@@ -235,21 +235,6 @@ export const bankTransactionAllocatePaymentBodySchema = z.object({
 });
 export type BankTransactionAllocatePaymentBody = z.infer<typeof bankTransactionAllocatePaymentBodySchema>;
 
-export const bankTransactionAllocateReceiptsBulkBodySchema = z.object({
-  allocations: z
-    .array(
-      z.object({
-        entryId: z.number().int().positive(),
-        amount: z.number().positive("Amount must be positive"),
-        notes: z.string().optional(),
-      })
-    )
-    .min(1, "At least one allocation is required"),
-  paymentDate: z.string().min(1, "Payment date is required"),
-  paymentMethod: paymentMethodEnum.optional(),
-});
-export type BankTransactionAllocateReceiptsBulkBody = z.infer<typeof bankTransactionAllocateReceiptsBulkBodySchema>;
-
 export const updateExpenseSchema = z.object({
   name: z.string().min(1).optional(),
   category: expenseCategoryEnum.optional(),
@@ -1122,7 +1107,6 @@ export const createBalanceMovementSchema = z.object({
   amount: z.number(),
   label: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  bank_transaction_id: z.number().int().nullable().optional(),
 });
 export type CreateBalanceMovementInput = z.infer<typeof createBalanceMovementSchema>;
 
@@ -1131,13 +1115,67 @@ export const updateBalanceMovementSchema = z.object({
   amount: z.number().optional(),
   label: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  bank_transaction_id: z.number().int().nullable().optional(),
 });
 export type UpdateBalanceMovementInput = z.infer<typeof updateBalanceMovementSchema>;
 
 export const allocateBankToBalanceSchema = z.object({
   balance_account_id: z.number().int().positive(),
+  amount: z.number().optional(),
   label: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 export type AllocateBankToBalanceInput = z.infer<typeof allocateBankToBalanceSchema>;
+
+const bankTxSplitLineBase = {
+  amount: z.number().refine((v) => v !== 0, 'Amount cannot be zero'),
+  notes: z.string().nullable().optional(),
+};
+
+export const bankTransactionSplitSchema = z.object({
+  lines: z
+    .array(
+      z.discriminatedUnion('kind', [
+        z.object({
+          kind: z.literal('balance_movement'),
+          ...bankTxSplitLineBase,
+          balanceAccountId: z.number().int().positive(),
+          label: z.string().nullable().optional(),
+        }),
+        z.object({
+          kind: z.literal('payment'),
+          ...bankTxSplitLineBase,
+          entryId: z.number().int().positive(),
+          paymentDate: z.string().min(1),
+          paymentMethod: paymentMethodEnum.optional(),
+        }),
+        z.object({
+          kind: z.literal('link_expense'),
+          ...bankTxSplitLineBase,
+          expenseId: z.number().int().positive(),
+        }),
+        z.object({
+          kind: z.literal('link_sale'),
+          ...bankTxSplitLineBase,
+          saleId: z.number().int().positive(),
+        }),
+        z.object({
+          kind: z.literal('new_expense'),
+          ...bankTxSplitLineBase,
+          expense: bankTransactionCreateExpenseBodySchema,
+        }),
+        z.object({
+          kind: z.literal('new_sale'),
+          ...bankTxSplitLineBase,
+          sale: z.object({
+            date: z.string().min(1),
+            type: salesTypeEnum,
+            lineItems: z.array(saleLineItemSchema).min(1),
+            discount: transactionDiscountSchema.optional(),
+            description: z.string().optional(),
+          }),
+        }),
+      ])
+    )
+    .min(1, 'At least one line is required'),
+});
+export type BankTransactionSplitInput = z.infer<typeof bankTransactionSplitSchema>;

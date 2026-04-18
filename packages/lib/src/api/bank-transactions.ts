@@ -1,5 +1,10 @@
 import { apiRequest } from './api';
-import type { PaginatedResponse, PaginationParams } from '@kit/types';
+import type {
+  BankTransactionAllocation,
+  BankTransactionAllocationEntityType,
+  PaginatedResponse,
+  PaginationParams,
+} from '@kit/types';
 
 export interface BankTransaction {
   id: number;
@@ -16,10 +21,13 @@ export interface BankTransaction {
   counterparty_id: string | null;
   balance_after: number | null;
   state: string | null;
-  reconciled_entity_type: string | null;
-  reconciled_entity_id: number | null;
-  /** Sum of `payments.amount` linked via `bank_transaction_id` (split allocations). */
-  allocated_payments_total?: number;
+  /** Populated by detail/list endpoints that join the allocations table. */
+  allocations?: BankTransactionAllocation[];
+  allocated_total?: number;
+  remaining?: number;
+  fully_reconciled?: boolean;
+  /** Distinct entity_types present in allocations (list endpoint summary). */
+  allocation_kinds?: BankTransactionAllocationEntityType[];
   created_at: string;
   updated_at: string;
 }
@@ -87,27 +95,58 @@ export interface BankTransactionAllocatePaymentResponse {
     entryId: number;
     amount: number;
     paymentDate: string;
-    bankTransactionId?: number;
   };
   bankTransaction: BankTransaction;
+  allocation: BankTransactionAllocation;
 }
 
-export interface BankTransactionAllocateReceiptsBulkPayload {
-  allocations: Array<{ entryId: number; amount: number; notes?: string }>;
-  paymentDate: string;
-  paymentMethod?: 'cash' | 'card' | 'bank_transfer';
+/** Individual line in a /split batch request. */
+export type BankTransactionSplitLine =
+  | {
+      kind: 'balance_movement';
+      amount: number;
+      balanceAccountId: number;
+      label?: string | null;
+      notes?: string | null;
+    }
+  | {
+      kind: 'payment';
+      amount: number;
+      entryId: number;
+      paymentDate: string;
+      paymentMethod?: 'cash' | 'card' | 'bank_transfer';
+      notes?: string | null;
+    }
+  | {
+      kind: 'link_expense';
+      amount: number;
+      expenseId: number;
+      notes?: string | null;
+    }
+  | {
+      kind: 'link_sale';
+      amount: number;
+      saleId: number;
+      notes?: string | null;
+    }
+  | {
+      kind: 'new_expense';
+      amount: number;
+      expense: BankTransactionCreateExpensePayload;
+    }
+  | {
+      kind: 'new_sale';
+      amount: number;
+      sale: BankTransactionCreateSalePayload;
+    };
+
+export interface BankTransactionSplitPayload {
+  lines: BankTransactionSplitLine[];
 }
 
-export interface BankTransactionAllocateReceiptsBulkResponse {
-  payments: Array<{
-    id: number;
-    entryId: number;
-    amount: number;
-    paymentDate: string;
-    bankTransactionId?: number;
-  }>;
+export interface BankTransactionSplitResponse {
   bankTransaction: BankTransaction;
-  fullyAllocated: boolean;
+  allocations: BankTransactionAllocation[];
 }
 
 export const bankTransactionsApi = {
@@ -115,11 +154,11 @@ export const bankTransactionsApi = {
     integration_id?: string;
     from_date?: string;
     to_date?: string;
-    reconciled?: 'true' | 'false';
+    reconciled?: 'any' | 'fully' | 'partial' | 'none';
     q?: string;
     min_amount?: string;
     max_amount?: string;
-    reconciled_entity_type?: string;
+    has_entity_type?: BankTransactionAllocationEntityType;
     sort_by?: 'execution_date' | 'amount' | 'label' | 'counterparty_name';
     sort_order?: 'asc' | 'desc';
   }) => {
@@ -133,18 +172,17 @@ export const bankTransactionsApi = {
     if (params?.q) searchParams.append('q', params.q);
     if (params?.min_amount) searchParams.append('min_amount', params.min_amount);
     if (params?.max_amount) searchParams.append('max_amount', params.max_amount);
-    if (params?.reconciled_entity_type) searchParams.append('reconciled_entity_type', params.reconciled_entity_type);
+    if (params?.has_entity_type) searchParams.append('has_entity_type', params.has_entity_type);
     if (params?.sort_by) searchParams.append('sort_by', params.sort_by);
     if (params?.sort_order) searchParams.append('sort_order', params.sort_order);
     const query = searchParams.toString();
     return apiRequest<PaginatedResponse<BankTransaction>>('GET', `/api/bank-transactions${query ? `?${query}` : ''}`);
   },
   getById: (id: string) => apiRequest<BankTransaction>('GET', `/api/bank-transactions/${id}`),
-  reconcile: (id: string, reconciled_entity_type: string | null, reconciled_entity_id: number | null) =>
-    apiRequest<BankTransaction>('PATCH', `/api/bank-transactions/${id}`, {
-      reconciled_entity_type,
-      reconciled_entity_id,
-    }),
+  split: (id: string, body: BankTransactionSplitPayload) =>
+    apiRequest<BankTransactionSplitResponse>('POST', `/api/bank-transactions/${id}/split`, body),
+  deleteAllocation: (id: string, allocationId: number) =>
+    apiRequest<BankTransaction>('DELETE', `/api/bank-transactions/${id}/allocations/${allocationId}`),
   createExpenseFromTransaction: (id: string, body: BankTransactionCreateExpensePayload) =>
     apiRequest<BankTransactionCreateExpenseResponse>('POST', `/api/bank-transactions/${id}/create-expense`, body),
   createSaleFromTransaction: (id: string, body: BankTransactionCreateSalePayload) =>
@@ -154,7 +192,4 @@ export const bankTransactionsApi = {
   /** Credit: record payment on a sale input entry; same body as allocate-payment. */
   allocateReceiptFromTransaction: (id: string, body: BankTransactionAllocatePaymentPayload) =>
     apiRequest<BankTransactionAllocatePaymentResponse>('POST', `/api/bank-transactions/${id}/allocate-receipt`, body),
-  /** Credit: record several sale receipts in one all-or-nothing call. */
-  allocateReceiptsBulkFromTransaction: (id: string, body: BankTransactionAllocateReceiptsBulkPayload) =>
-    apiRequest<BankTransactionAllocateReceiptsBulkResponse>('POST', `/api/bank-transactions/${id}/allocate-receipt`, body),
 };

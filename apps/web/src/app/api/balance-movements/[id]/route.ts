@@ -43,7 +43,16 @@ export async function GET(
       .maybeSingle();
     if (error) throw error;
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return NextResponse.json(data);
+    const { data: alloc } = await supabase
+      .from('bank_transaction_allocations')
+      .select('bank_transaction_id')
+      .eq('entity_type', 'balance_movement')
+      .eq('entity_id', id)
+      .maybeSingle();
+    return NextResponse.json({
+      ...data,
+      bank_transaction_id: alloc ? (alloc as { bank_transaction_id: number }).bank_transaction_id : null,
+    });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Failed to fetch balance movement';
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -69,7 +78,6 @@ export async function PATCH(
     if (body.amount !== undefined) update.amount = body.amount;
     if (body.label !== undefined) update.label = body.label;
     if (body.notes !== undefined) update.notes = body.notes;
-    if (body.bank_transaction_id !== undefined) update.bank_transaction_id = body.bank_transaction_id;
     if (Object.keys(update).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
     }
@@ -83,6 +91,22 @@ export async function PATCH(
       .maybeSingle();
     if (error) throw error;
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    if (body.amount !== undefined) {
+      await supabase
+        .from('bank_transaction_allocations')
+        .update({ amount: body.amount })
+        .eq('entity_type', 'balance_movement')
+        .eq('entity_id', id);
+    }
+    if (body.label !== undefined) {
+      await supabase
+        .from('bank_transaction_allocations')
+        .update({ label: body.label })
+        .eq('entity_type', 'balance_movement')
+        .eq('entity_id', id);
+    }
+
     return NextResponse.json(data);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Failed to update balance movement';
@@ -109,23 +133,11 @@ export async function DELETE(
 
     const { data: existing } = await supabase
       .from('balance_movements')
-      .select('id, bank_transaction_id')
+      .select('id')
       .eq('id', id)
       .eq('account_id', accountId)
       .maybeSingle();
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-    if (existing.bank_transaction_id != null) {
-      await supabase
-        .from('bank_transactions')
-        .update({
-          reconciled_entity_type: null,
-          reconciled_entity_id: null,
-        })
-        .eq('id', existing.bank_transaction_id)
-        .eq('reconciled_entity_type', 'balance_movement')
-        .eq('reconciled_entity_id', Number(id));
-    }
 
     const { error } = await supabase
       .from('balance_movements')

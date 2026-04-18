@@ -1,11 +1,22 @@
-// Payment by ID API Route
-
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Payment, UpdatePaymentData } from '../route';
 import { parseRequestBody, updatePaymentSchema } from '@/shared/zod-schemas';
 
-function transformPayment(row: any): Payment {
+async function getPaymentBankTxId(
+  supabase: ReturnType<typeof supabaseServer>,
+  paymentId: number
+): Promise<number | null> {
+  const { data } = await supabase
+    .from('bank_transaction_allocations')
+    .select('bank_transaction_id')
+    .eq('entity_type', 'payment')
+    .eq('entity_id', paymentId)
+    .maybeSingle();
+  return data ? Number((data as { bank_transaction_id: number }).bank_transaction_id) : null;
+}
+
+function transformPayment(row: any, bankTransactionId?: number | null): Payment {
   return {
     id: row.id,
     entryId: row.entry_id,
@@ -15,7 +26,7 @@ function transformPayment(row: any): Payment {
     paidDate: row.paid_date,
     paymentMethod: row.payment_method,
     notes: row.notes,
-    bankTransactionId: row.bank_transaction_id != null ? Number(row.bank_transaction_id) : undefined,
+    bankTransactionId: bankTransactionId != null ? Number(bankTransactionId) : undefined,
     paymentGroupId: row.payment_group_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -31,34 +42,24 @@ function transformToSnakeCase(data: UpdatePaymentData): any {
   if (data.paidDate !== undefined) result.paid_date = data.paidDate;
   if (data.paymentMethod !== undefined) result.payment_method = data.paymentMethod;
   if (data.notes !== undefined) result.notes = data.notes;
-  if (data.bankTransactionId !== undefined) result.bank_transaction_id = data.bankTransactionId;
   if (data.paymentGroupId !== undefined) result.payment_group_id = data.paymentGroupId;
   return result;
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-
     const supabase = supabaseServer();
-    const { data, error } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('id', id)
-      .single();
-
+    const { data, error } = await supabase.from('payments').select('*').eq('id', id).single();
     if (error) throw error;
     if (!data) {
-      return NextResponse.json(
-        { error: 'Payment not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
     }
-
-    return NextResponse.json(transformPayment(data));
+    const bankTxId = await getPaymentBankTxId(supabase, Number(id));
+    return NextResponse.json(transformPayment(data, bankTxId));
   } catch (error: any) {
     console.error('Error fetching payment:', error);
     return NextResponse.json(
@@ -82,46 +83,17 @@ export async function PUT(
 
     const { data: existing, error: exErr } = await supabase
       .from('payments')
-      .select('id, amount, bank_transaction_id')
+      .select('id, amount')
       .eq('id', id)
       .single();
     if (exErr || !existing) {
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
     }
 
+    const currentBankTxId = await getPaymentBankTxId(supabase, Number(id));
     const nextBankId =
-      body.bankTransactionId !== undefined
-        ? body.bankTransactionId
-        : existing.bank_transaction_id != null
-          ? Number(existing.bank_transaction_id)
-          : null;
-    const nextAmount =
-      body.amount !== undefined ? body.amount : parseFloat(String(existing.amount));
-
-    if (nextBankId != null) {
-      const { data: bt } = await supabase.from('bank_transactions').select('amount').eq('id', nextBankId).single();
-      if (!bt) {
-        return NextResponse.json({ error: 'Bank transaction not found' }, { status: 404 });
-      }
-      const { data: slices } = await supabase
-        .from('payments')
-        .select('id, amount')
-        .eq('bank_transaction_id', nextBankId);
-      let sumExisting = 0;
-      for (const r of slices || []) {
-        if (Number(r.id) === Number(id)) continue;
-        sumExisting += parseFloat(String(r.amount));
-      }
-      const cap = Math.abs(parseFloat(String(bt.amount)));
-      if (sumExisting + nextAmount > cap + 0.005) {
-        return NextResponse.json(
-          {
-            error: `Allocations for this bank line exceed its amount (cap ${cap.toFixed(2)}, other slices ${sumExisting.toFixed(2)})`,
-          },
-          { status: 400 }
-        );
-      }
-    }
+      body.bankTransactionId !== undefined ? body.bankTransactionId : currentBankTxId;
+    const nextAmount = body.amount !== undefined ? body.amount : parseFloat(String(existing.amount));
 
     const { data, error } = await supabase
       .from('payments')
@@ -129,16 +101,50 @@ export async function PUT(
       .eq('id', id)
       .select()
       .single();
-
     if (error) throw error;
     if (!data) {
-      return NextResponse.json(
-        { error: 'Payment not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
     }
 
-    return NextResponse.json(transformPayment(data));
+    if (body.bankTransactionId !== undefined || body.amount !== undefined) {
+      if (currentBankTxId !== null && currentBankTxId !== nextBankId) {
+        await supabase
+          .from('bank_transaction_allocations')
+          .delete()
+          .eq('entity_type', 'payment')
+          .eq('entity_id', id);
+      }
+      if (nextBankId != null) {
+        const { data: bt } = await supabase
+          .from('bank_transactions')
+          .select('account_id, amount')
+          .eq('id', nextBankId)
+          .single();
+        if (!bt) {
+          return NextResponse.json({ error: 'Bank transaction not found' }, { status: 404 });
+        }
+        const signed = Math.abs(nextAmount) * (Math.sign(Number(bt.amount)) || -1);
+        if (currentBankTxId === nextBankId) {
+          const { error: updErr } = await supabase
+            .from('bank_transaction_allocations')
+            .update({ amount: signed })
+            .eq('entity_type', 'payment')
+            .eq('entity_id', id);
+          if (updErr) return NextResponse.json({ error: updErr.message }, { status: 400 });
+        } else {
+          const { error: insErr } = await supabase.from('bank_transaction_allocations').insert({
+            account_id: bt.account_id,
+            bank_transaction_id: nextBankId,
+            entity_type: 'payment',
+            entity_id: Number(id),
+            amount: signed,
+          });
+          if (insErr) return NextResponse.json({ error: insErr.message }, { status: 400 });
+        }
+      }
+    }
+
+    return NextResponse.json(transformPayment(data, nextBankId));
   } catch (error: any) {
     console.error('Error updating payment:', error);
     return NextResponse.json(
@@ -149,7 +155,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -200,4 +206,3 @@ export async function DELETE(
     );
   }
 }
-

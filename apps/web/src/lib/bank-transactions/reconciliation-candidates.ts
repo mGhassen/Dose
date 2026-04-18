@@ -1,4 +1,4 @@
-export type ReconcilableEntityType = "sale" | "expense";
+export type ReconcilableEntityType = "sale" | "expense" | "entry" | "balance_movement";
 
 export type ReconcileCandidateFilters = {
   /** Only keep candidates whose amount equals tx amount (abs). */
@@ -9,32 +9,64 @@ export type ReconcileCandidateFilters = {
   searchText?: string;
 };
 
-function norm(s: string) {
+/** Shape covering every candidate kind we score. Only a subset of fields is populated per kind. */
+export type ReconcileCandidate = {
+  id: number;
+  amount: number;
+  /** sales date */
+  date?: string;
+  /** expense date */
+  expenseDate?: string;
+  /** entry/balance movement effective date */
+  entryDate?: string;
+  description?: string;
+  name?: string;
+  vendor?: string;
+  label?: string | null;
+};
+
+function norm(s: string): string {
   return s.trim().toLowerCase();
 }
 
-function matchesSearch(
-  entityType: ReconcilableEntityType,
-  c: { id: number; amount: number; date?: string; expenseDate?: string; description?: string; name?: string; vendor?: string },
-  q: string
-): boolean {
+function candidateDate(entityType: ReconcilableEntityType, c: ReconcileCandidate): string {
+  switch (entityType) {
+    case "sale":
+      return c.date ?? "";
+    case "expense":
+      return c.expenseDate ?? "";
+    case "entry":
+    case "balance_movement":
+      return c.entryDate ?? c.date ?? c.expenseDate ?? "";
+  }
+}
+
+function candidateTextBlob(entityType: ReconcilableEntityType, c: ReconcileCandidate): string {
+  const pieces: string[] = [String(c.id), String(c.amount)];
+  pieces.push(candidateDate(entityType, c));
+  switch (entityType) {
+    case "sale":
+      pieces.push(c.description ?? "");
+      break;
+    case "expense":
+      pieces.push(c.name ?? "", c.vendor ?? "", c.description ?? "");
+      break;
+    case "entry":
+    case "balance_movement":
+      pieces.push(c.label ?? "", c.description ?? "", c.name ?? "");
+      break;
+  }
+  return pieces.join(" ").toLowerCase();
+}
+
+function matchesSearch(entityType: ReconcilableEntityType, c: ReconcileCandidate, q: string): boolean {
   const n = norm(q);
   if (!n) return true;
-  const hay = [
-    String(c.id),
-    String(c.amount),
-    entityType === "sale" ? (c.date ?? "") : (c.expenseDate ?? ""),
-    entityType === "sale" ? (c.description ?? "") : (c.name ?? ""),
-    entityType === "expense" ? (c.vendor ?? "") : "",
-    entityType === "expense" ? (c.description ?? "") : "",
-  ]
-    .join(" ")
-    .toLowerCase();
-  return hay.includes(n);
+  return candidateTextBlob(entityType, c).includes(n);
 }
 
 /**
- * Heuristic score for ranking sale/expense candidates against a bank transaction.
+ * Heuristic score for ranking candidates against a bank transaction.
  * Higher is better.
  */
 export function scoreReconciliationCandidate(
@@ -45,15 +77,7 @@ export function scoreReconciliationCandidate(
     label: string | null;
     counterparty_name: string | null;
   },
-  c: {
-    id: number;
-    amount: number;
-    date?: string;
-    expenseDate?: string;
-    description?: string;
-    name?: string;
-    vendor?: string;
-  }
+  c: ReconcileCandidate
 ): number {
   const txAmount = Math.abs(Number(tx.amount));
   const candAmount = Math.abs(Number(c.amount));
@@ -61,16 +85,14 @@ export function scoreReconciliationCandidate(
   const scoreAmount = amountDiff === 0 ? 5000 : -amountDiff * 100;
 
   const txDate = tx.execution_date ? new Date(tx.execution_date + "T12:00:00").getTime() : 0;
-  const entityDateStr = entityType === "sale" ? c.date : c.expenseDate;
+  const entityDateStr = candidateDate(entityType, c);
   const entityTime = entityDateStr ? new Date(entityDateStr + "T12:00:00").getTime() : 0;
   const daysDiff = txDate && entityTime ? Math.abs((entityTime - txDate) / (24 * 60 * 60 * 1000)) : 999;
   const scoreDate = -daysDiff * 10;
 
   const txLabel = norm(tx.label ?? "");
   const txCounterparty = norm(tx.counterparty_name ?? "");
-  const nameOrDesc = norm(
-    entityType === "sale" ? (c.description ?? "") : [c.name ?? "", c.vendor ?? "", c.description ?? ""].join(" ")
-  );
+  const nameOrDesc = norm(candidateTextBlob(entityType, c));
 
   let textScore = 0;
   if (txLabel && nameOrDesc) {
@@ -87,7 +109,7 @@ export function scoreReconciliationCandidate(
   return scoreAmount + scoreDate + textScore;
 }
 
-export function filterReconciliationCandidates<T extends { amount: number; date?: string; expenseDate?: string; description?: string; name?: string; vendor?: string; id: number }>(
+export function filterReconciliationCandidates<T extends ReconcileCandidate>(
   entityType: ReconcilableEntityType,
   tx: { amount: number; execution_date: string },
   candidates: T[],
@@ -100,7 +122,7 @@ export function filterReconciliationCandidates<T extends { amount: number; date?
   return candidates.filter((c) => {
     if (filters.exactAmount && Math.abs(Number(c.amount)) !== txAmount) return false;
     if (windowDays != null && windowDays >= 0 && txTime) {
-      const entityDateStr = entityType === "sale" ? c.date : c.expenseDate;
+      const entityDateStr = candidateDate(entityType, c);
       const et = entityDateStr ? new Date(entityDateStr + "T12:00:00").getTime() : 0;
       if (!et) return false;
       const days = Math.abs((et - txTime) / (24 * 60 * 60 * 1000));
@@ -111,7 +133,7 @@ export function filterReconciliationCandidates<T extends { amount: number; date?
   });
 }
 
-export function sortReconciliationCandidates<T extends { amount: number; date?: string; expenseDate?: string; description?: string; name?: string; vendor?: string; id: number }>(
+export function sortReconciliationCandidates<T extends ReconcileCandidate>(
   entityType: ReconcilableEntityType,
   tx: {
     amount: number;

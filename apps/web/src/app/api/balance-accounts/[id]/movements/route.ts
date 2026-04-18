@@ -51,7 +51,25 @@ export async function GET(
       .order('occurred_on', { ascending: false })
       .order('id', { ascending: false });
     if (error) throw error;
-    return NextResponse.json(data || []);
+    const rows = data || [];
+    const ids = rows.map((r) => (r as { id: number }).id);
+    const bankMap = new Map<number, number>();
+    if (ids.length > 0) {
+      const { data: allocs } = await supabase
+        .from('bank_transaction_allocations')
+        .select('entity_id, bank_transaction_id')
+        .eq('entity_type', 'balance_movement')
+        .in('entity_id', ids);
+      for (const a of allocs ?? []) {
+        const row = a as { entity_id: number; bank_transaction_id: number };
+        bankMap.set(row.entity_id, row.bank_transaction_id);
+      }
+    }
+    const enriched = rows.map((r) => ({
+      ...r,
+      bank_transaction_id: bankMap.get((r as { id: number }).id) ?? null,
+    }));
+    return NextResponse.json(enriched);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Failed to list balance movements';
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -80,23 +98,6 @@ export async function POST(
     if (!parsed.success) return parsed.response;
     const body = parsed.data;
 
-    if (body.bank_transaction_id != null) {
-      const { data: bankTx } = await supabase
-        .from('bank_transactions')
-        .select('id, account_id, reconciled_entity_type, reconciled_entity_id')
-        .eq('id', body.bank_transaction_id)
-        .maybeSingle();
-      if (!bankTx || bankTx.account_id !== accountId) {
-        return NextResponse.json({ error: 'Bank transaction not found' }, { status: 404 });
-      }
-      if (bankTx.reconciled_entity_type && bankTx.reconciled_entity_id != null) {
-        return NextResponse.json(
-          { error: 'Bank transaction is already reconciled; clear reconciliation first' },
-          { status: 409 }
-        );
-      }
-    }
-
     const { data, error } = await supabase
       .from('balance_movements')
       .insert({
@@ -106,21 +107,10 @@ export async function POST(
         amount: body.amount,
         label: body.label ?? null,
         notes: body.notes ?? null,
-        bank_transaction_id: body.bank_transaction_id ?? null,
       })
       .select()
       .single();
     if (error) throw error;
-
-    if (body.bank_transaction_id != null) {
-      await supabase
-        .from('bank_transactions')
-        .update({
-          reconciled_entity_type: 'balance_movement',
-          reconciled_entity_id: data.id,
-        })
-        .eq('id', body.bank_transaction_id);
-    }
 
     return NextResponse.json(data, { status: 201 });
   } catch (error: unknown) {

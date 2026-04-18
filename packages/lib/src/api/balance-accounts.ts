@@ -25,7 +25,8 @@ export interface BalanceMovement {
   amount: number;
   label: string | null;
   notes: string | null;
-  bank_transaction_id: number | null;
+  /** Derived from `bank_transaction_allocations` when the server includes it. */
+  bank_transaction_id?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -50,7 +51,6 @@ export interface CreateBalanceMovementPayload {
   amount: number;
   label?: string | null;
   notes?: string | null;
-  bank_transaction_id?: number | null;
 }
 
 export interface UpdateBalanceMovementPayload {
@@ -58,11 +58,12 @@ export interface UpdateBalanceMovementPayload {
   amount?: number;
   label?: string | null;
   notes?: string | null;
-  bank_transaction_id?: number | null;
 }
 
 export interface AllocateBankToBalancePayload {
   balance_account_id: number;
+  /** Optional partial allocation amount. Defaults to the full bank tx amount. */
+  amount?: number;
   label?: string | null;
   notes?: string | null;
 }

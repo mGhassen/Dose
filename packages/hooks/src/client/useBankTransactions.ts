@@ -1,12 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   bankTransactionsApi,
-  type BankTransaction,
   type BankTransactionCreateExpensePayload,
   type BankTransactionCreateSalePayload,
   type BankTransactionAllocatePaymentPayload,
-  type BankTransactionAllocateReceiptsBulkPayload,
+  type BankTransactionSplitPayload,
 } from '@kit/lib';
+import type { BankTransactionAllocationEntityType } from '@kit/types';
 
 export function useBankTransactions(params?: {
   page?: number;
@@ -14,11 +14,11 @@ export function useBankTransactions(params?: {
   integration_id?: string;
   from_date?: string;
   to_date?: string;
-  reconciled?: 'true' | 'false';
+  reconciled?: 'any' | 'fully' | 'partial' | 'none';
   q?: string;
   min_amount?: string;
   max_amount?: string;
-  reconciled_entity_type?: string;
+  has_entity_type?: BankTransactionAllocationEntityType;
   sort_by?: 'execution_date' | 'amount' | 'label' | 'counterparty_name';
   sort_order?: 'asc' | 'desc';
 }) {
@@ -36,23 +36,36 @@ export function useBankTransaction(id: string | null) {
   });
 }
 
-export function useReconcileBankTransaction() {
+function invalidateAllBankTxRelated(
+  queryClient: ReturnType<typeof useQueryClient>,
+  id: string
+) {
+  queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+  queryClient.invalidateQueries({ queryKey: ['bank-transactions', id] });
+  queryClient.invalidateQueries({ queryKey: ['payments'] });
+  queryClient.invalidateQueries({ queryKey: ['entries'] });
+  queryClient.invalidateQueries({ queryKey: ['expenses'] });
+  queryClient.invalidateQueries({ queryKey: ['sales'] });
+  queryClient.invalidateQueries({ queryKey: ['balance-movements'] });
+  queryClient.invalidateQueries({ queryKey: ['balance-accounts'] });
+  queryClient.invalidateQueries({ queryKey: ['supplier-orders'] });
+}
+
+export function useSplitBankTransaction() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      reconciled_entity_type,
-      reconciled_entity_id,
-    }: {
-      id: string;
-      reconciled_entity_type: string | null;
-      reconciled_entity_id: number | null;
-    }) => bankTransactionsApi.reconcile(id, reconciled_entity_type, reconciled_entity_id),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-    },
+    mutationFn: ({ id, body }: { id: string; body: BankTransactionSplitPayload }) =>
+      bankTransactionsApi.split(id, body),
+    onSuccess: (_, variables) => invalidateAllBankTxRelated(queryClient, variables.id),
+  });
+}
+
+export function useDeleteBankTransactionAllocation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, allocationId }: { id: string; allocationId: number }) =>
+      bankTransactionsApi.deleteAllocation(id, allocationId),
+    onSuccess: (_, variables) => invalidateAllBankTxRelated(queryClient, variables.id),
   });
 }
 
@@ -61,13 +74,7 @@ export function useCreateExpenseFromBankTransaction() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: BankTransactionCreateExpensePayload }) =>
       bankTransactionsApi.createExpenseFromTransaction(id, body),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      queryClient.invalidateQueries({ queryKey: ['supplier-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-    },
+    onSuccess: (_, variables) => invalidateAllBankTxRelated(queryClient, variables.id),
   });
 }
 
@@ -76,12 +83,7 @@ export function useCreateSaleFromBankTransaction() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: BankTransactionCreateSalePayload }) =>
       bankTransactionsApi.createSaleFromTransaction(id, body),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-    },
+    onSuccess: (_, variables) => invalidateAllBankTxRelated(queryClient, variables.id),
   });
 }
 
@@ -90,12 +92,7 @@ export function useAllocatePaymentFromBankTransaction() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: BankTransactionAllocatePaymentPayload }) =>
       bankTransactionsApi.allocatePaymentFromTransaction(id, body),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['entries'] });
-    },
+    onSuccess: (_, variables) => invalidateAllBankTxRelated(queryClient, variables.id),
   });
 }
 
@@ -104,27 +101,6 @@ export function useAllocateReceiptFromBankTransaction() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: BankTransactionAllocatePaymentPayload }) =>
       bankTransactionsApi.allocateReceiptFromTransaction(id, body),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['entries'] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
-    },
-  });
-}
-
-export function useAllocateReceiptsBulkFromBankTransaction() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: BankTransactionAllocateReceiptsBulkPayload }) =>
-      bankTransactionsApi.allocateReceiptsBulkFromTransaction(id, body),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['bank-transactions', variables.id] });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['entries'] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
-    },
+    onSuccess: (_, variables) => invalidateAllBankTxRelated(queryClient, variables.id),
   });
 }

@@ -19,7 +19,7 @@ import {
 } from "@kit/ui/select";
 import { useDashboardPeriod } from "@/components/dashboard-period-provider";
 
-type ReconciledFilter = "all" | "true" | "false";
+type ReconciledFilter = "any" | "fully" | "partial" | "none";
 type SortColumn = "execution_date" | "amount" | "label" | "counterparty_name";
 const SORT_OPTIONS: { value: string; by: SortColumn; order: "asc" | "desc"; label: string }[] = [
   { value: "date_desc", by: "execution_date", order: "desc", label: "Date (newest first)" },
@@ -43,7 +43,7 @@ export default function BankTransactionsContent({
   const { dateRange } = useDashboardPeriod();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [reconciledFilter, setReconciledFilter] = useState<ReconciledFilter>("all");
+  const [reconciledFilter, setReconciledFilter] = useState<ReconciledFilter>("any");
   const [sortValue, setSortValue] = useState("date_desc");
   const [listSearch, setListSearch] = useState("");
   const [minAmount, setMinAmount] = useState("");
@@ -70,14 +70,16 @@ export default function BankTransactionsContent({
     limit: pageSize,
     from_date: dateRange.startDate,
     to_date: dateRange.endDate,
-    reconciled: reconciledFilter === "all" ? undefined : reconciledFilter,
+    reconciled: reconciledFilter === "any" ? undefined : reconciledFilter,
     sort_by: sortOption.by,
     sort_order: sortOption.order,
     q: debouncedListSearch.trim() || undefined,
     min_amount: minAmount.trim() || undefined,
     max_amount: maxAmount.trim() || undefined,
-    reconciled_entity_type:
-      linkedEntityType === "all" || !linkedEntityType ? undefined : linkedEntityType,
+    has_entity_type:
+      linkedEntityType === "all" || !linkedEntityType
+        ? undefined
+        : (linkedEntityType as "payment" | "balance_movement" | "expense" | "sale" | "entry"),
   });
 
   const list = data?.data ?? [];
@@ -131,14 +133,20 @@ export default function BankTransactionsContent({
         cell: ({ row }) => row.original.counterparty_name ?? "—",
       },
       {
-        accessorKey: "reconciled_entity_type",
+        accessorKey: "fully_reconciled",
         header: "Reconciled",
         cell: ({ row }) => {
           const r = row.original;
-          if (!r.reconciled_entity_type) return <span className="text-muted-foreground">—</span>;
+          const kinds = r.allocation_kinds ?? [];
+          if (kinds.length === 0) return <span className="text-muted-foreground">—</span>;
+          const label = kinds.join(", ");
+          if (r.fully_reconciled) {
+            return <span className="text-green-600">✓ {label}</span>;
+          }
+          const remaining = Number(r.remaining ?? 0);
           return (
-            <span className="text-muted-foreground">
-              {r.reconciled_entity_type} #{r.reconciled_entity_id}
+            <span className="text-amber-600">
+              partial ({label}, {remaining.toFixed(2)} left)
             </span>
           );
         },
@@ -153,7 +161,6 @@ export default function BankTransactionsContent({
       { value: "amount", label: "Amount", type: "number" as const },
       { value: "label", label: "Label", type: "text" as const },
       { value: "counterparty_name", label: "Counterparty", type: "text" as const },
-      { value: "reconciled_entity_type", label: "Reconciled", type: "text" as const },
     ],
     []
   );
@@ -164,7 +171,6 @@ export default function BankTransactionsContent({
       { value: "amount", label: "Amount", type: "number" },
       { value: "label", label: "Label", type: "text" },
       { value: "counterparty_name", label: "Counterparty", type: "text" },
-      { value: "reconciled_entity_type", label: "Reconciled", type: "text" },
     ],
     []
   );
@@ -252,16 +258,36 @@ export default function BankTransactionsContent({
                 placeholder="e.g. -10"
               />
             </div>
-            <div className="space-y-1 sm:col-span-2 lg:col-span-4">
-              <Label className="text-xs text-muted-foreground">Linked document type</Label>
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="text-xs text-muted-foreground">Reconciliation</Label>
+              <Select
+                value={reconciledFilter}
+                onValueChange={(v) => setReconciledFilter(v as ReconciledFilter)}
+              >
+                <SelectTrigger className="h-9 w-full">
+                  <SelectValue placeholder="Any" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any</SelectItem>
+                  <SelectItem value="fully">Fully reconciled</SelectItem>
+                  <SelectItem value="partial">Partially reconciled</SelectItem>
+                  <SelectItem value="none">Not reconciled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="text-xs text-muted-foreground">Linked entity type</Label>
               <Select value={linkedEntityType} onValueChange={setLinkedEntityType}>
-                <SelectTrigger className="h-9 w-full max-w-xs">
+                <SelectTrigger className="h-9 w-full">
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Any</SelectItem>
-                  <SelectItem value="sale">sale</SelectItem>
+                  <SelectItem value="payment">payment</SelectItem>
+                  <SelectItem value="balance_movement">balance_movement</SelectItem>
                   <SelectItem value="expense">expense</SelectItem>
+                  <SelectItem value="sale">sale</SelectItem>
+                  <SelectItem value="entry">entry</SelectItem>
                 </SelectContent>
               </Select>
             </div>

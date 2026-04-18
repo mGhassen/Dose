@@ -1600,7 +1600,6 @@ export interface BalanceMovement {
   amount: number;
   label: string | null;
   notes: string | null;
-  bank_transaction_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -1625,7 +1624,6 @@ export interface CreateBalanceMovementData {
   amount: number;
   label?: string | null;
   notes?: string | null;
-  bank_transaction_id?: number | null;
 }
 
 export interface UpdateBalanceMovementData {
@@ -1633,6 +1631,29 @@ export interface UpdateBalanceMovementData {
   amount?: number;
   label?: string | null;
   notes?: string | null;
-  bank_transaction_id?: number | null;
+}
+
+// ============================================================================
+// BANK TRANSACTION ALLOCATIONS
+// ============================================================================
+
+export type BankTransactionAllocationEntityType =
+  | 'payment'
+  | 'balance_movement'
+  | 'expense'
+  | 'sale'
+  | 'entry';
+
+export interface BankTransactionAllocation {
+  id: number;
+  account_id: string;
+  bank_transaction_id: number;
+  entity_type: BankTransactionAllocationEntityType;
+  entity_id: number;
+  amount: number;
+  label: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 

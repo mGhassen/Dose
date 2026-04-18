@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createPaymentSchema, type CreatePaymentInput } from '@/shared/zod-schemas';
-import { assertBankAllocationWithinCap } from '@/lib/ledger/bank-allocation-cap';
 
 export interface Payment {
   id: number;
@@ -37,7 +36,7 @@ export type UpdatePaymentData = Partial<{
   paymentGroupId: string | null;
 }>;
 
-function transformPayment(row: any): Payment {
+function transformPayment(row: any, bankTransactionId?: number | null): Payment {
   return {
     id: row.id,
     entryId: row.entry_id,
@@ -47,7 +46,7 @@ function transformPayment(row: any): Payment {
     paidDate: row.paid_date,
     paymentMethod: row.payment_method,
     notes: row.notes,
-    bankTransactionId: row.bank_transaction_id != null ? Number(row.bank_transaction_id) : undefined,
+    bankTransactionId: bankTransactionId != null ? Number(bankTransactionId) : undefined,
     paymentGroupId: row.payment_group_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -64,9 +63,26 @@ function insertPayloadFromBody(body: CreatePaymentInput, entryId: number) {
     payment_method: body.paymentMethod ?? null,
     notes: body.notes ?? null,
   };
-  if (body.bankTransactionId != null) row.bank_transaction_id = body.bankTransactionId;
   if (body.paymentGroupId != null && body.paymentGroupId !== "") row.payment_group_id = body.paymentGroupId;
   return row;
+}
+
+async function paymentBankTxMap(
+  supabase: ReturnType<typeof supabaseServer>,
+  paymentIds: number[]
+): Promise<Map<number, number>> {
+  const map = new Map<number, number>();
+  if (paymentIds.length === 0) return map;
+  const { data } = await supabase
+    .from('bank_transaction_allocations')
+    .select('entity_id, bank_transaction_id')
+    .eq('entity_type', 'payment')
+    .in('entity_id', paymentIds);
+  for (const a of data ?? []) {
+    const row = a as { entity_id: number; bank_transaction_id: number };
+    map.set(row.entity_id, row.bank_transaction_id);
+  }
+  return map;
 }
 
 async function ensureLoanPaymentExpense(
@@ -265,8 +281,17 @@ export async function GET(request: NextRequest) {
     }
 
     if (bankTransactionId) {
-      query = query.eq('bank_transaction_id', bankTransactionId);
-      countQuery = countQuery.eq('bank_transaction_id', bankTransactionId);
+      const { data: allocRows } = await supabase
+        .from('bank_transaction_allocations')
+        .select('entity_id')
+        .eq('entity_type', 'payment')
+        .eq('bank_transaction_id', bankTransactionId);
+      const ids = (allocRows ?? []).map((r) => (r as { entity_id: number }).entity_id);
+      if (ids.length === 0) {
+        return NextResponse.json(createPaginatedResponse([], 0, page, limit));
+      }
+      query = query.in('id', ids);
+      countQuery = countQuery.in('id', ids);
     }
 
     if (isPaid !== null && isPaid !== undefined && isPaid !== '') {
@@ -293,7 +318,12 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
     if (countError) throw countError;
 
-    const payments: Payment[] = (data || []).map(transformPayment);
+    const rows = data || [];
+    const bankMap = await paymentBankTxMap(
+      supabase,
+      rows.map((r) => (r as { id: number }).id)
+    );
+    const payments: Payment[] = rows.map((r) => transformPayment(r, bankMap.get((r as { id: number }).id)));
     const total = count || 0;
 
     return NextResponse.json(createPaginatedResponse(payments, total, page, limit));
@@ -340,13 +370,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
     }
 
-    if (body.bankTransactionId != null) {
-      const cap = await assertBankAllocationWithinCap(supabase, body.bankTransactionId, body.amount);
-      if (!cap.ok) {
-        return NextResponse.json({ error: cap.message }, { status: cap.status });
-      }
-    }
-
     const { data, error } = await supabase
       .from('payments')
       .insert(insertPayloadFromBody(body, entryId))
@@ -355,10 +378,38 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    if (body.bankTransactionId != null) {
+      const { data: bankTx } = await supabase
+        .from('bank_transactions')
+        .select('account_id, amount')
+        .eq('id', body.bankTransactionId)
+        .maybeSingle();
+      if (!bankTx) {
+        await supabase.from('payments').delete().eq('id', (data as { id: number }).id);
+        return NextResponse.json({ error: 'Bank transaction not found' }, { status: 404 });
+      }
+      const signed = Math.abs(body.amount) * (Math.sign(Number(bankTx.amount)) || -1);
+      const { error: allocErr } = await supabase.from('bank_transaction_allocations').insert({
+        account_id: bankTx.account_id,
+        bank_transaction_id: body.bankTransactionId,
+        entity_type: 'payment',
+        entity_id: (data as { id: number }).id,
+        amount: signed,
+        notes: body.notes ?? null,
+      });
+      if (allocErr) {
+        await supabase.from('payments').delete().eq('id', (data as { id: number }).id);
+        return NextResponse.json({ error: allocErr.message }, { status: 400 });
+      }
+    }
+
     await ensureLoanPaymentExpense(supabase, entryId, body.paymentDate);
     await ensureLeasingPaymentExpense(supabase, entryId, body.paymentDate);
 
-    return NextResponse.json(transformPayment(data), { status: 201 });
+    return NextResponse.json(
+      transformPayment(data, body.bankTransactionId ?? null),
+      { status: 201 }
+    );
   } catch (error: any) {
     console.error('Error creating payment:', error);
     return NextResponse.json(

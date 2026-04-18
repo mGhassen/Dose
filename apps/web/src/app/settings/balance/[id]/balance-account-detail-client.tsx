@@ -107,7 +107,7 @@ export function BalanceAccountDetailClient({ id }: Props) {
   const [linkNotes, setLinkNotes] = useState('');
 
   const { data: bankTxs } = useBankTransactions({
-    reconciled: 'false',
+    reconciled: 'none',
     limit: 50,
     q: bankTxSearch || undefined,
     sort_by: 'execution_date',
