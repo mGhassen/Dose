@@ -23,6 +23,17 @@ export function useLeasingById(id: string) {
   });
 }
 
+export function useAllLeasingSchedules(startMonth: string, endMonth: string) {
+  return useQuery({
+    queryKey: ['leasing', 'schedules', startMonth, endMonth],
+    queryFn: async () => {
+      const result = await leasingApi.getAllSchedules(startMonth, endMonth);
+      return result?.schedules || [];
+    },
+    enabled: !!startMonth && !!endMonth,
+  });
+}
+
 export function useCreateLeasing() {
   const queryClient = useQueryClient();
   

@@ -20,6 +20,8 @@ import {
 } from "@kit/ui/table";
 import { Badge } from "@kit/ui/badge";
 import { EditableScheduleRow } from "./loan-schedule-editable";
+import { ScheduleDriftAlert } from "../../_components/schedule-drift-alert";
+import { isLoanScheduleOutOfSync } from "@/lib/calculations/loans";
 
 interface LoanSchedulePageProps {
   params: Promise<{ id: string }>;
@@ -112,6 +114,8 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
     );
   }
 
+  const hasSchedulePayments = Array.isArray(schedule) && schedule.some((s) => s.isPaid);
+  const scheduleOutOfSync = loan && schedule ? isLoanScheduleOutOfSync(loan, schedule) : false;
   const totalPrincipal = schedule?.reduce((sum, entry) => sum + entry.principalPayment, 0) || 0;
   const totalInterest = schedule?.reduce((sum, entry) => sum + entry.interestPayment, 0) || 0;
   const totalPayments = schedule?.reduce((sum, entry) => sum + entry.totalPayment, 0) || 0;
@@ -220,6 +224,13 @@ export default function LoanSchedulePage({ params }: LoanSchedulePageProps) {
           </div>
         ) : schedule && schedule.length > 0 ? (
           <div className="flex flex-col flex-1 min-h-0 mt-4">
+            {scheduleOutOfSync && resolvedParams?.id && (
+              <ScheduleDriftAlert
+                loanId={resolvedParams.id}
+                hasPayments={hasSchedulePayments}
+                className="mb-3 shrink-0"
+              />
+            )}
             <div className="flex items-center justify-between shrink-0 mb-2">
               <p className="text-sm text-muted-foreground">
                 {schedule.length} payment(s) scheduled

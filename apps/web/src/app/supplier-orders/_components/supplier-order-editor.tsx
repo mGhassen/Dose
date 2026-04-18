@@ -19,7 +19,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
 import { CreateItemMultiStepDialog } from "@/components/create-item-multistep-dialog";
-import { AddSupplierDialog } from "@/components/add-supplier-dialog";
+import { SupplierFormDialog } from "@/components/supplier-form-dialog";
 import { useInventorySuppliers, useItems, useUnits, useVariablesByType } from "@kit/hooks";
 import { dateToYYYYMMDD, taxRulesApi } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
@@ -698,13 +698,13 @@ export function SupplierOrderEditor(props: {
         }}
       />
 
-      <AddSupplierDialog
+      <SupplierFormDialog
         open={addSupplierOpen}
         onOpenChange={setAddSupplierOpen}
         onCreated={(created) => {
           setState((s) => ({ ...s, supplierId: created.id }));
         }}
-        supplierTypes={["supplier"]}
+        defaultSupplierTypes={["supplier"]}
       />
     </div>
   );

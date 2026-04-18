@@ -71,6 +71,44 @@ export async function GET(
   }
 }
 
+const SCHEDULE_AFFECTING_FIELDS = [
+  'principalAmount',
+  'interestRate',
+  'durationMonths',
+  'startDate',
+  'offPaymentMonths',
+] as const;
+
+function arraysEqualUnordered(a: number[] | null | undefined, b: number[] | null | undefined): boolean {
+  const la = (a || []).slice().sort((x, y) => x - y);
+  const lb = (b || []).slice().sort((x, y) => x - y);
+  if (la.length !== lb.length) return false;
+  return la.every((v, i) => v === lb[i]);
+}
+
+async function loanHasPayments(
+  supabase: ReturnType<typeof supabaseServer>,
+  loanId: string | number
+): Promise<boolean> {
+  const { data: entries } = await supabase
+    .from('entries')
+    .select('id')
+    .eq('reference_id', parseInt(String(loanId)))
+    .eq('entry_type', 'loan_payment')
+    .eq('direction', 'output');
+
+  const entryIds = (entries || []).map((e: any) => e.id);
+  if (entryIds.length === 0) return false;
+
+  const { count } = await supabase
+    .from('payments')
+    .select('id', { count: 'exact', head: true })
+    .in('entry_id', entryIds)
+    .eq('is_paid', true);
+
+  return (count || 0) > 0;
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -84,6 +122,48 @@ export async function PUT(
     const body = parsed.data as UpdateLoanData;
 
     const supabase = supabaseServer();
+
+    const { data: currentRow, error: currentErr } = await supabase
+      .from('loans')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (currentErr) {
+      if (currentErr.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Loan not found' }, { status: 404 });
+      }
+      throw currentErr;
+    }
+
+    const current = transformLoan(currentRow);
+
+    const scheduleAffectingChanged = SCHEDULE_AFFECTING_FIELDS.some((field) => {
+      const next = (body as any)[field];
+      if (next === undefined) return false;
+      if (field === 'offPaymentMonths') {
+        return !arraysEqualUnordered(current.offPaymentMonths, next);
+      }
+      if (field === 'startDate') {
+        const currentDate = (current.startDate || '').split('T')[0];
+        return currentDate !== next;
+      }
+      return (current as any)[field] !== next;
+    });
+
+    if (scheduleAffectingChanged) {
+      const hasPayments = await loanHasPayments(supabase, id);
+      if (hasPayments) {
+        return NextResponse.json(
+          {
+            error: 'Cannot change schedule-related fields while payments exist. Delete the payments first.',
+            code: 'LOAN_HAS_PAYMENTS',
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const { data, error } = await supabase
       .from('loans')
       .update(transformToSnakeCase(body))

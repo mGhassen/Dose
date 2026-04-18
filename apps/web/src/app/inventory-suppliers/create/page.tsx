@@ -4,63 +4,43 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
-import { Input } from "@kit/ui/input";
-import { Label } from "@kit/ui/label";
-import { Textarea } from "@kit/ui/textarea";
-import { Checkbox } from "@kit/ui/checkbox";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { UnifiedSelector } from "@/components/unified-selector";
-import { useCreateInventorySupplier, useMetadataEnum } from "@kit/hooks";
+import { SupplierForm, SupplierFormValues, emptySupplierFormValues } from "@/components/supplier-form";
+import { useCreateInventorySupplier } from "@kit/hooks";
 import { toast } from "sonner";
 
 export default function CreateSupplierPage() {
   const router = useRouter();
   const createSupplier = useCreateInventorySupplier();
-  const { data: paymentTermsValues = [] } = useMetadataEnum("SupplierPaymentTerms");
-  const { data: supplierTypeValues = [] } = useMetadataEnum("SupplierType");
-  const paymentTermsItems = paymentTermsValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    contactPerson: "",
-    paymentTerms: "",
-    notes: "",
-    supplierType: ['supplier'] as ('supplier' | 'vendor' | 'lender' | 'customer')[],
-    isActive: true,
-  });
+
+  const [formData, setFormData] = useState<SupplierFormValues>(emptySupplierFormValues);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name) {
+    if (!formData.name.trim()) {
       toast.error("Please fill in the supplier name");
       return;
     }
 
     try {
       await createSupplier.mutateAsync({
-        name: formData.name,
-        email: formData.email || undefined,
-        phone: formData.phone || undefined,
-        address: formData.address || undefined,
-        contactPerson: formData.contactPerson || undefined,
+        name: formData.name.trim(),
+        email: formData.email.trim() || undefined,
+        phone: formData.phone.trim() || undefined,
+        address: formData.address.trim() || undefined,
+        contactPerson: formData.contactPerson.trim() || undefined,
         paymentTerms: formData.paymentTerms || undefined,
-        notes: formData.notes || undefined,
+        notes: formData.notes.trim() || undefined,
         supplierType: formData.supplierType,
         isActive: formData.isActive,
       });
       toast.success("Supplier created successfully");
       router.push('/inventory-suppliers');
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to create supplier");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to create supplier");
     }
-  };
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -78,119 +58,11 @@ export default function CreateSupplierPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="name">Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    placeholder="Supplier name"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    placeholder="supplier@example.com"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    placeholder="+1234567890"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="contactPerson">Contact Person</Label>
-                  <Input
-                    id="contactPerson"
-                    value={formData.contactPerson}
-                    onChange={(e) => handleInputChange('contactPerson', e.target.value)}
-                    placeholder="John Doe"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <UnifiedSelector
-                    label="Payment Terms"
-                    type="payment_terms"
-                    items={paymentTermsItems}
-                    selectedId={formData.paymentTerms || undefined}
-                    onSelect={(item) => handleInputChange('paymentTerms', item.id === 0 ? '' : String(item.id))}
-                    placeholder="Select payment terms"
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Textarea
-                    id="address"
-                    value={formData.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
-                    placeholder="Supplier address"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes}
-                    onChange={(e) => handleInputChange('notes', e.target.value)}
-                    placeholder="Additional notes"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-3 md:col-span-2">
-                  <Label>Supplier Type</Label>
-                  <div className="flex gap-4">
-                    {supplierTypeValues.map((ev) => {
-                      const typeValue = ev.name as 'supplier' | 'vendor' | 'lender' | 'customer';
-                      return (
-                      <div key={ev.name} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`type-${ev.name}`}
-                          checked={formData.supplierType.includes(typeValue)}
-                          onCheckedChange={(checked) => {
-                            const newTypes = checked
-                              ? [...formData.supplierType.filter(t => t !== typeValue), typeValue]
-                              : formData.supplierType.filter(t => t !== typeValue);
-                            handleInputChange('supplierType', newTypes.length > 0 ? newTypes : [supplierTypeValues[0]?.name ?? 'supplier']);
-                          }}
-                        />
-                        <Label htmlFor={`type-${ev.name}`} className="font-normal cursor-pointer">
-                          {ev.label ?? ev.name}
-                        </Label>
-                      </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="isActive"
-                    checked={formData.isActive}
-                    onCheckedChange={(checked) => handleInputChange('isActive', checked)}
-                  />
-                  <Label htmlFor="isActive" className="font-normal cursor-pointer">
-                    Active
-                  </Label>
-                </div>
-              </div>
+              <SupplierForm
+                value={formData}
+                onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
+                idPrefix="create"
+              />
 
               <div className="flex justify-end space-x-4">
                 <Button
@@ -213,4 +85,3 @@ export default function CreateSupplierPage() {
     </AppLayout>
   );
 }
-

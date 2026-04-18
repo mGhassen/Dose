@@ -16,13 +16,13 @@ import {
 } from "@kit/ui/dropdown-menu";
 import { Plus, Trash2, MoreVertical, Edit2, Check, X } from "lucide-react";
 import { Checkbox } from "@kit/ui/checkbox";
-import { useCreateActualPayment, useDeleteActualPayment } from "@kit/hooks";
+import { useCreatePayment, useDeletePayment } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { dateToYYYYMMDD } from "@kit/lib";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
 import { DatePicker } from "@kit/ui/date-picker";
-import type { ActualPayment } from "@kit/lib";
+import type { Entry } from "@kit/lib";
 import type { LeasingTimelineEntry } from "@/lib/calculations/leasing-timeline";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
@@ -30,11 +30,11 @@ interface EditableLeasingTimelineRowProps {
   entry: LeasingTimelineEntry;
   leasingId: number;
   leasingEndDate?: string | null;
-  allActualPayments?: ActualPayment[];
+  allEntries?: Entry[];
   onUpdate: () => void;
 }
 
-export function EditableLeasingTimelineRow({ entry, leasingId, leasingEndDate, allActualPayments, onUpdate }: EditableLeasingTimelineRowProps) {
+export function EditableLeasingTimelineRow({ entry, leasingId, leasingEndDate, allEntries = [], onUpdate }: EditableLeasingTimelineRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
@@ -45,35 +45,94 @@ export function EditableLeasingTimelineRow({ entry, leasingId, leasingEndDate, a
     amount: entry.amount.toString(),
     isFixedAmount: entry.isFixedAmount || false,
   });
-  
-  // Filter payments for this specific entry month from the passed allActualPayments
-  const actualPayments = allActualPayments?.filter(p => p.month === entry.month) || [];
-  
-  const totalPaid = actualPayments.reduce((sum, p) => sum + p.amount, 0);
-  const isFullyPaid = totalPaid >= entry.amount;
+
+  const scheduleEntry = entry.id != null
+    ? allEntries.find((e) => e.scheduleEntryId === entry.id)
+    : undefined;
+  const payments = scheduleEntry?.payments || [];
+  const totalPaid = payments
+    .filter((p) => p.isPaid)
+    .reduce((sum, p) => sum + p.amount, 0);
+  const isFullyPaid = entry.isPaid || totalPaid >= entry.amount;
   const remainingToPay = Math.max(0, entry.amount - totalPaid);
-  
-  const createPayment = useCreateActualPayment();
-  const deletePayment = useDeleteActualPayment();
+
+  const createPayment = useCreatePayment();
+  const deletePayment = useDeletePayment();
+
+  const resolveEntryId = async (): Promise<number> => {
+    if (scheduleEntry?.id) return scheduleEntry.id;
+    if (entry.entryId) return entry.entryId;
+
+    if (entry.id) {
+      const check = await fetch(
+        `/api/entries?direction=output&entryType=leasing_payment&referenceId=${leasingId}&scheduleEntryId=${entry.id}&limit=1`
+      );
+      if (check.ok) {
+        const data = await check.json();
+        if (data.data && data.data.length > 0) return data.data[0].id;
+      }
+    }
+
+    let timelineEntryId = entry.id;
+    if (!timelineEntryId) {
+      const createTimeline = await fetch(`/api/leasing/${leasingId}/timeline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          month: entry.month,
+          paymentDate: entry.paymentDate.split('T')[0],
+          amount: entry.amount,
+          isFixedAmount: entry.isFixedAmount || false,
+        }),
+      });
+      if (!createTimeline.ok) throw new Error('Failed to create timeline entry');
+      const created = await createTimeline.json();
+      timelineEntryId = created.id;
+      if (created.entryId) return created.entryId;
+    }
+
+    const entryRes = await fetch('/api/entries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        direction: 'output',
+        entryType: 'leasing_payment',
+        name: `Leasing Payment - ${entry.month}`,
+        amount: entry.amount,
+        entryDate: entry.paymentDate.split('T')[0],
+        dueDate: entry.paymentDate.split('T')[0],
+        referenceId: leasingId,
+        scheduleEntryId: timelineEntryId,
+        isActive: true,
+      }),
+    });
+    if (!entryRes.ok) throw new Error('Failed to create entry');
+    const created = await entryRes.json();
+    return created.id;
+  };
 
   const handleAddPayment = async (paidDate: string, amount: number, notes?: string) => {
     try {
+      const entryId = await resolveEntryId();
       await createPayment.mutateAsync({
-        paymentType: 'leasing',
-        direction: 'output', // Leasing payments are output (money going out)
-        referenceId: leasingId,
-        month: entry.month,
+        entryId,
         paymentDate: paidDate,
-        amount: amount,
+        amount,
         isPaid: true,
-        paidDate: paidDate,
-        notes: notes,
+        paidDate,
+        notes: notes || undefined,
       });
-      
+
       setIsPaidDialogOpen(false);
       onUpdate();
       toast.success("Payment recorded");
     } catch (error: any) {
+      if (error instanceof Error && (error.name === 'AbortError' || (error as any).isAbortError)) {
+        setIsPaidDialogOpen(false);
+        onUpdate();
+        toast.success("Payment recorded");
+        return;
+      }
       toast.error(error?.message || "Failed to record payment");
     }
   };
@@ -256,7 +315,7 @@ export function EditableLeasingTimelineRow({ entry, leasingId, leasingEndDate, a
           </Badge>
         </TableCell>
         <TableCell className="text-sm text-muted-foreground">
-          {actualPayments && actualPayments.length > 0 && actualPayments[0].notes && actualPayments[0].notes}
+          {payments && payments.length > 0 && payments[0].notes && payments[0].notes}
         </TableCell>
         <TableCell>
           <div className="flex items-center space-x-2">
@@ -331,7 +390,7 @@ export function EditableLeasingTimelineRow({ entry, leasingId, leasingEndDate, a
           </Badge>
         </TableCell>
         <TableCell className="text-sm text-muted-foreground">
-          {actualPayments && actualPayments.length > 0 && actualPayments[0].notes && actualPayments[0].notes}
+          {payments && payments.length > 0 && payments[0].notes && payments[0].notes}
         </TableCell>
         <TableCell>
           <DropdownMenu>
@@ -359,11 +418,11 @@ export function EditableLeasingTimelineRow({ entry, leasingId, leasingEndDate, a
                 <Plus className="mr-2 h-4 w-4" />
                 Add Payment
               </DropdownMenuItem>
-              {actualPayments && actualPayments.length > 0 && (
+              {payments && payments.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setShowPayments(!showPayments)}>
-                    {showPayments ? 'Hide' : 'Show'} Payments ({actualPayments.length})
+                    {showPayments ? 'Hide' : 'Show'} Payments ({payments.length})
                   </DropdownMenuItem>
                 </>
               )}
@@ -373,12 +432,12 @@ export function EditableLeasingTimelineRow({ entry, leasingId, leasingEndDate, a
       </TableRow>
       
       {/* Show partial payments */}
-      {showPayments && actualPayments && actualPayments.length > 0 && (
+      {showPayments && payments && payments.length > 0 && (
         <TableRow>
           <TableCell colSpan={6} className="bg-muted/30 p-4">
             <div className="space-y-2 py-2">
               <div className="text-sm font-medium">Partial Payments:</div>
-              {actualPayments.map((payment) => (
+              {payments.map((payment) => (
                 <div key={payment.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2">
                     <span>{formatDate(payment.paymentDate)}</span>

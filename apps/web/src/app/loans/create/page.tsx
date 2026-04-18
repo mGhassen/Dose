@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import type { LoanStatus } from "@kit/types";
 import { Checkbox } from "@kit/ui/checkbox";
 import { dateToYYYYMMDD } from "@kit/lib";
-import { AddVendorDialog } from "@/components/add-vendor-dialog";
+import { SupplierFormDialog } from "@/components/supplier-form-dialog";
 
 export default function CreateLoanPage() {
   const router = useRouter();
@@ -283,11 +283,11 @@ export default function CreateLoanPage() {
           </CardContent>
         </Card>
       </div>
-      <AddVendorDialog
+      <SupplierFormDialog
         open={addLenderOpen}
         onOpenChange={setAddLenderOpen}
         entityLabel="lender"
-        supplierTypes={['lender']}
+        defaultSupplierTypes={['lender']}
         onCreated={(lender) => handleInputChange('supplierId', String(lender.id))}
       />
     </AppLayout>

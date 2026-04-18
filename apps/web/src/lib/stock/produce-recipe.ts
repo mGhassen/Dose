@@ -41,6 +41,11 @@ export async function produceRecipe(
   const servingSize = recipeData.serving_size || 1;
   const multiplier = quantity / servingSize;
 
+  // IMPORTANT: only base ingredients (recipe_items) are deducted here.
+  // Per-modifier quantities (recipe_modifier_quantities) are resolved at SALE time,
+  // not at production time, because the actual supply item consumed depends on which
+  // option the customer picks (e.g. oat milk vs regular milk). See `/api/sales` /
+  // sales line-item creation for the sale-time deduction flow.
   for (const recipeItem of recipeData.items) {
     const item = recipeItem.item;
     if (!item) continue;

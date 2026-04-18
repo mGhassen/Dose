@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
@@ -36,8 +36,11 @@ interface SupplierOrderDetailPageProps {
 
 export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const shouldAutoReceive = searchParams?.get("receive") === "1";
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
+  const [autoReceiveHandled, setAutoReceiveHandled] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { data: order, isLoading } = useSupplierOrderById(resolvedParams?.id || "");
@@ -62,13 +65,36 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
     }
   }, [order]);
 
+  useEffect(() => {
+    if (!shouldAutoReceive || autoReceiveHandled) return;
+    if (!order?.items || order.items.length === 0) return;
+    if (order.status === SupplierOrderStatus.DELIVERED) return;
+    setAutoReceiveHandled(true);
+    setReceiveDialogOpen(true);
+    router.replace(`/supplier-orders/${order.id}`);
+  }, [shouldAutoReceive, autoReceiveHandled, order, router]);
+
   const handleSaveEdit = async (payload: SupplierOrderEditorSubmit) => {
     if (!resolvedParams?.id) return;
     if (payload.kind !== "update") return;
     try {
-      await updateOrder.mutateAsync({ id: resolvedParams.id, data: payload.data });
-      toast.success("Supplier order updated");
+      const wantsDeliver =
+        payload.data.status === SupplierOrderStatus.DELIVERED &&
+        order?.status !== SupplierOrderStatus.DELIVERED;
+
+      const dataToSave = wantsDeliver
+        ? { ...payload.data, status: order?.status ?? SupplierOrderStatus.PENDING }
+        : payload.data;
+
+      await updateOrder.mutateAsync({ id: resolvedParams.id, data: dataToSave });
       setEditOpen(false);
+
+      if (wantsDeliver) {
+        toast.info("Confirm received quantities to mark as delivered");
+        setReceiveDialogOpen(true);
+      } else {
+        toast.success("Supplier order updated");
+      }
     } catch (error: any) {
       toast.error(error?.message || "Failed to update supplier order");
     }

@@ -10,7 +10,7 @@ import { DatePicker } from "@kit/ui/date-picker";
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { AddVendorDialog } from "@/components/add-vendor-dialog";
+import { SupplierFormDialog } from "@/components/supplier-form-dialog";
 import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
@@ -290,10 +290,12 @@ export default function EditSubscriptionPage({ params }: EditSubscriptionPagePro
                               : undefined
                           }
                         />
-                        <AddVendorDialog
+                        <SupplierFormDialog
                           open={addVendorOpen}
                           onOpenChange={setAddVendorOpen}
                           onCreated={(v) => field.onChange(v.id)}
+                          entityLabel="vendor"
+                          defaultSupplierTypes={["vendor"]}
                         />
                       </>
                     )}

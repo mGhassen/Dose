@@ -435,6 +435,17 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
   const maxMonths = formData.startDate ? calculateMaxMonths() : 0;
   const monthOptions = Array.from({ length: Math.max(0, maxMonths) }, (_, i) => i + 1);
 
+  const { data: leasingTypeValues = [] } = useMetadataEnum("LeasingType");
+  const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
+  const leasingTypeItems = leasingTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const frequencyItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
+  const typeLabels: Record<string, string> = Object.fromEntries(
+    leasingTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
+  const frequencyLabels: Record<string, string> = Object.fromEntries(
+    recurrenceValues.map((ev) => [ev.name, ev.label ?? ev.name])
+  );
+
   if (isLoading || !resolvedParams) {
     return (
       <AppLayout>
@@ -458,17 +469,6 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
       </AppLayout>
     );
   }
-
-  const { data: leasingTypeValues = [] } = useMetadataEnum("LeasingType");
-  const { data: recurrenceValues = [] } = useMetadataEnum("ExpenseRecurrence");
-  const leasingTypeItems = leasingTypeValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
-  const frequencyItems = recurrenceValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
-  const typeLabels: Record<string, string> = Object.fromEntries(
-    leasingTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
-  );
-  const frequencyLabels: Record<string, string> = Object.fromEntries(
-    recurrenceValues.map((ev) => [ev.name, ev.label ?? ev.name])
-  );
 
   return (
     <AppLayout>

@@ -64,24 +64,43 @@ export async function POST(
 
     if (allEntriesError) throw allEntriesError;
     
-    // Fetch actual payments to determine which entries are partially paid
-    const { data: actualPayments, error: paymentsError } = await supabase
-      .from('actual_payments')
-      .select('*')
-      .eq('payment_type', 'leasing')
-      .eq('reference_id', id);
-    
-    if (paymentsError) {
-      console.warn(`[recalculate-timeline] Could not fetch actual payments:`, paymentsError);
-    }
-    
-    // Create a map of total paid per entry (by month)
+    // Fetch payments (via leasing_payment entries) to determine which timeline rows are partially paid
+    const timelineIds = (allEntries || []).map((e: any) => e.id);
+    const scheduleToMonth = new Map<number, string>();
+    (allEntries || []).forEach((e: any) => scheduleToMonth.set(e.id, e.month));
+
     const paidByMonth = new Map<string, number>();
-    (actualPayments || []).forEach((payment: any) => {
-      const month = payment.month; // YYYY-MM format
-      const current = paidByMonth.get(month) || 0;
-      paidByMonth.set(month, current + parseFloat(payment.amount || 0));
-    });
+    if (timelineIds.length > 0) {
+      const { data: ledgerRows } = await supabase
+        .from('entries')
+        .select('id, schedule_entry_id')
+        .eq('entry_type', 'leasing_payment')
+        .eq('reference_id', parseInt(id))
+        .in('schedule_entry_id', timelineIds);
+
+      const entryIdToTimelineId = new Map<number, number>();
+      (ledgerRows || []).forEach((r: any) => entryIdToTimelineId.set(r.id, r.schedule_entry_id));
+      const ledgerEntryIds = Array.from(entryIdToTimelineId.keys());
+
+      if (ledgerEntryIds.length > 0) {
+        const { data: paymentsData, error: paymentsError } = await supabase
+          .from('payments')
+          .select('entry_id, amount, is_paid')
+          .in('entry_id', ledgerEntryIds)
+          .eq('is_paid', true);
+        if (paymentsError) {
+          console.warn('[recalculate-timeline] Could not fetch payments:', paymentsError);
+        }
+        (paymentsData || []).forEach((p: any) => {
+          const timelineId = entryIdToTimelineId.get(p.entry_id);
+          if (timelineId == null) return;
+          const month = scheduleToMonth.get(timelineId);
+          if (!month) return;
+          const current = paidByMonth.get(month) || 0;
+          paidByMonth.set(month, current + parseFloat(p.amount || 0));
+        });
+      }
+    }
     
     // Helper function to check if entry is partially paid
     const isPartiallyPaid = (entry: any): boolean => {

@@ -49,7 +49,11 @@ import {
   TableRow,
 } from "@kit/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@kit/ui/alert";
+import { Info } from "lucide-react";
 import { EditableScheduleRow } from "./schedule/loan-schedule-editable";
+import { ScheduleDriftAlert } from "../_components/schedule-drift-alert";
+import { isLoanScheduleOutOfSync } from "@/lib/calculations/loans";
 
 interface LoanDetailsContentProps {
   loanId: string;
@@ -66,6 +70,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
   const [isDeletePaymentDialogOpen, setIsDeletePaymentDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isRegeneratePromptOpen, setIsRegeneratePromptOpen] = useState(false);
   
   const { data: loan, isLoading } = useLoanById(loanId);
   const { data: supplier } = useInventorySupplierById(loan?.supplierId?.toString() || "");
@@ -157,6 +162,9 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
   // Calculate payment totals
   const totalPaid = loanEntry ? (payments.reduce((sum, p) => sum + p.amount, 0)) : 0;
   const remainingToPay = loanEntry ? Math.max(0, loanEntry.amount - totalPaid) : 0;
+
+  const hasSchedulePayments = Array.isArray(schedule) && schedule.some((s) => s.isPaid);
+  const scheduleOutOfSync = loan && schedule ? isLoanScheduleOutOfSync(loan, schedule) : false;
   
   const [formData, setFormData] = useState({
     name: "",
@@ -197,26 +205,59 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
       return;
     }
 
+    const nextPrincipal = parseFloat(formData.principalAmount);
+    const nextRate = parseFloat(formData.interestRate);
+    const nextDuration = parseInt(formData.durationMonths);
+    const nextOffMonths = [...formData.offPaymentMonths].sort((a, b) => a - b);
+    const prevOffMonths = [...(loan?.offPaymentMonths || [])].sort((a, b) => a - b);
+
+    const scheduleAffectingChanged = !!loan && (
+      loan.principalAmount !== nextPrincipal ||
+      loan.interestRate !== nextRate ||
+      loan.durationMonths !== nextDuration ||
+      loan.startDate.split('T')[0] !== formData.startDate ||
+      JSON.stringify(prevOffMonths) !== JSON.stringify(nextOffMonths)
+    );
+
+    if (scheduleAffectingChanged && hasSchedulePayments) {
+      toast.error("Cannot change schedule-related fields while payments exist. Delete the payments first.");
+      return;
+    }
+
     try {
       await updateLoan.mutateAsync({
         id: loanId,
         data: {
           name: formData.name,
           loanNumber: formData.loanNumber,
-          principalAmount: parseFloat(formData.principalAmount),
-          interestRate: parseFloat(formData.interestRate),
-          durationMonths: parseInt(formData.durationMonths),
+          principalAmount: nextPrincipal,
+          interestRate: nextRate,
+          durationMonths: nextDuration,
           startDate: formData.startDate,
           status: formData.status,
           lender: formData.lender || undefined,
           description: formData.description || undefined,
-          offPaymentMonths: formData.offPaymentMonths.length > 0 ? formData.offPaymentMonths : undefined,
+          offPaymentMonths: nextOffMonths.length > 0 ? nextOffMonths : undefined,
         },
       });
       toast.success("Loan updated successfully");
       setIsEditing(false);
+      if (scheduleAffectingChanged && schedule && schedule.length > 0 && !hasSchedulePayments) {
+        setIsRegeneratePromptOpen(true);
+      }
     } catch (error: any) {
       toast.error(error?.message || "Failed to update loan");
+    }
+  };
+
+  const handleRegenerateFromPrompt = async () => {
+    try {
+      await generateSchedule.mutateAsync(loanId);
+      toast.success("Loan schedule regenerated successfully");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to regenerate loan schedule");
+    } finally {
+      setIsRegeneratePromptOpen(false);
     }
   };
 
@@ -333,6 +374,15 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
           <CardContent>
             {isEditing ? (
               <form onSubmit={handleSubmit} className="space-y-6">
+                {hasSchedulePayments && (
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>Schedule fields are locked</AlertTitle>
+                    <AlertDescription>
+                      This loan has recorded payments. Only name, number, lender, description and status can be modified. Delete the payments first to change schedule-related fields.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Name */}
                   <div className="space-y-2">
@@ -365,6 +415,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                       step="0.01"
                       value={formData.principalAmount}
                       onChange={(e) => handleInputChange('principalAmount', e.target.value)}
+                      disabled={hasSchedulePayments}
                       required
                     />
                   </div>
@@ -378,6 +429,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                       step="0.01"
                       value={formData.interestRate}
                       onChange={(e) => handleInputChange('interestRate', e.target.value)}
+                      disabled={hasSchedulePayments}
                       required
                     />
                   </div>
@@ -390,6 +442,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                       type="number"
                       value={formData.durationMonths}
                       onChange={(e) => handleInputChange('durationMonths', e.target.value)}
+                      disabled={hasSchedulePayments}
                       required
                     />
                   </div>
@@ -402,6 +455,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                       value={formData.startDate ? new Date(formData.startDate) : undefined}
                       onChange={(d) => handleInputChange("startDate", d ? dateToYYYYMMDD(d) : "")}
                       placeholder="Pick a date"
+                      disabled={hasSchedulePayments}
                     />
                   </div>
 
@@ -451,6 +505,7 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
                             id={`off-payment-${month}`}
                             checked={formData.offPaymentMonths.includes(month)}
                             onCheckedChange={() => handleOffPaymentMonthToggle(month)}
+                            disabled={hasSchedulePayments}
                           />
                           <Label
                             htmlFor={`off-payment-${month}`}
@@ -669,6 +724,13 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
         {!isEditing ? (
           schedule && schedule.length > 0 ? (
             <div className="flex flex-col flex-1 min-h-0">
+              {scheduleOutOfSync && (
+                <ScheduleDriftAlert
+                  loanId={loanId}
+                  hasPayments={hasSchedulePayments}
+                  className="mb-3 shrink-0"
+                />
+              )}
               <div className="flex items-center justify-between shrink-0 mb-2">
                 <p className="text-sm text-muted-foreground">
                   {schedule.length} payment(s) scheduled
@@ -1043,6 +1105,31 @@ export default function LoanDetailsContent({ loanId }: LoanDetailsContentProps) 
           isPending={deleteMutation.isPending}
           variant="destructive"
         />
+
+        <AlertDialog open={isRegeneratePromptOpen} onOpenChange={setIsRegeneratePromptOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Regenerate schedule?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Loan details affecting the schedule changed. Regenerate now to recalculate all installments. Existing schedule rows and linked loan-payment entries will be replaced.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={generateSchedule.isPending}>
+                Later
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleRegenerateFromPrompt();
+                }}
+                disabled={generateSchedule.isPending}
+              >
+                {generateSchedule.isPending ? "Regenerating..." : "Regenerate now"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );

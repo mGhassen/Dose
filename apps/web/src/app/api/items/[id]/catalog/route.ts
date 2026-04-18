@@ -166,6 +166,48 @@ export async function GET(
       });
     }
 
+    const listIds = modifierLists.map((l) => l.id);
+    const usedByRecipes: Record<
+      number,
+      Array<{ recipeId: number; recipeName: string; modifierCount: number }>
+    > = {};
+    if (listIds.length > 0) {
+      const { data: usage } = await supabase
+        .from('recipe_modifier_quantities')
+        .select(
+          'recipe_id, modifier:modifiers(id, modifier_list_id), recipe:recipes(id, name)'
+        )
+        .eq('enabled', true);
+      for (const row of (usage || []) as unknown as Array<{
+        recipe_id: number;
+        modifier:
+          | { id: number; modifier_list_id: number }
+          | Array<{ id: number; modifier_list_id: number }>
+          | null;
+        recipe:
+          | { id: number; name: string }
+          | Array<{ id: number; name: string }>
+          | null;
+      }>) {
+        const mod = Array.isArray(row.modifier) ? row.modifier[0] : row.modifier;
+        const recipe = Array.isArray(row.recipe) ? row.recipe[0] : row.recipe;
+        if (!mod || !recipe) continue;
+        const listId = mod.modifier_list_id;
+        if (!listIds.includes(listId)) continue;
+        if (!usedByRecipes[listId]) usedByRecipes[listId] = [];
+        const existing = usedByRecipes[listId].find((r) => r.recipeId === recipe.id);
+        if (existing) {
+          existing.modifierCount += 1;
+        } else {
+          usedByRecipes[listId].push({
+            recipeId: recipe.id,
+            recipeName: recipe.name,
+            modifierCount: 1,
+          });
+        }
+      }
+    }
+
     return NextResponse.json({
       parentItem,
       variantMeta,
@@ -173,6 +215,8 @@ export async function GET(
       modifierLists,
       /** Modifier lists were loaded from this item id (parent when this row is a variant). */
       modifierListsSourceItemId: modifierSourceItemId,
+      /** Per-modifier-list map of recipes that bind a quantity to this list. */
+      modifierListUsageByRecipe: usedByRecipes,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to load catalog';

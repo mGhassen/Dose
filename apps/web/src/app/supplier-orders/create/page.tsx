@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import AppLayout from "@/components/app-layout";
 import { useCreateSupplierOrder } from "@kit/hooks";
+import { SupplierOrderStatus } from "@kit/types";
 import { toast } from "sonner";
 import { SupplierOrderEditor } from "../_components/supplier-order-editor";
 
@@ -24,9 +25,13 @@ export default function CreateSupplierOrderPage() {
           onSubmit={async (payload) => {
             if (payload.kind !== "create") return;
             try {
-              const created = await createOrder.mutateAsync(payload.data);
+              const wantsDeliver = payload.data.status === SupplierOrderStatus.DELIVERED;
+              const dataToSave = wantsDeliver
+                ? { ...payload.data, status: SupplierOrderStatus.PENDING }
+                : payload.data;
+              const created = await createOrder.mutateAsync(dataToSave);
               toast.success("Supplier order created");
-              router.push(`/supplier-orders/${created.id}`);
+              router.push(`/supplier-orders/${created.id}${wantsDeliver ? "?receive=1" : ""}`);
             } catch (error: any) {
               toast.error(error?.message || "Failed to create supplier order");
             }

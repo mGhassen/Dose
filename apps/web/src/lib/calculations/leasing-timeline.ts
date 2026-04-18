@@ -17,6 +17,8 @@ export interface LeasingTimelineEntry {
   paidDate?: string;
   actualAmount?: number | null;
   notes?: string | null;
+  entryId?: number | null;
+  totalPaid?: number;
 }
 
 /**

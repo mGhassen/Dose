@@ -11,6 +11,12 @@ import {
   clearProducedFromRecipeOnItems,
   syncRecipeProducedItemIdColumn,
 } from '@/lib/recipes/produced-item-output-links';
+import {
+  fetchRecipeModifierQuantities,
+  groupModifierQuantitiesByList,
+  replaceRecipeModifierQuantities,
+  validateModifierQuantities,
+} from '@/lib/recipes/modifier-quantities';
 
 function transformRecipe(row: any): Recipe {
   return {
@@ -134,9 +140,14 @@ export async function GET(
     const producedItems = producedItemsData.map(transformItem);
     const producedItemData: any = producedItemsData[0] ?? null;
 
+    const modifierQuantities = await fetchRecipeModifierQuantities(supabase, Number(id));
+    const modifierListGroups = groupModifierQuantitiesByList(modifierQuantities);
+
     const recipe: RecipeWithItems = {
       ...transformRecipe(recipeData),
       producedItems: producedItems.length > 0 ? producedItems : undefined,
+      modifierQuantities,
+      modifierListGroups,
       items: (itemsData || []).map(ri => ({
         ...transformRecipeItem(ri),
         item: ri.item ? {
@@ -280,6 +291,23 @@ export async function PUT(
         .eq('id', id)
         .single();
       if (!refErr && refreshed) recipeData = refreshed;
+    }
+
+    if (body.modifierQuantities !== undefined) {
+      const valid = await validateModifierQuantities(
+        supabase,
+        Number(id),
+        body.modifierQuantities
+      );
+      if (!valid.ok) {
+        return NextResponse.json({ error: valid.message }, { status: valid.status });
+      }
+      const modErr = await replaceRecipeModifierQuantities(
+        supabase,
+        Number(id),
+        body.modifierQuantities
+      );
+      if (modErr.error) throw new Error(modErr.error);
     }
 
     return NextResponse.json(transformRecipe(recipeData));

@@ -42,7 +42,9 @@ export function useInventorySuppliers(params?: {
           },
         };
       } catch (error) {
-        console.error('[useInventorySuppliers] Error fetching suppliers:', error);
+        if ((error as any)?.name !== 'AbortError') {
+          console.error('[useInventorySuppliers] Error fetching suppliers:', error);
+        }
         throw error;
       }
     },

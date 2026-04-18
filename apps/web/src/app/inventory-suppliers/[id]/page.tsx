@@ -5,13 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
-import { Input } from "@kit/ui/input";
-import { Label } from "@kit/ui/label";
-import { Textarea } from "@kit/ui/textarea";
-import { Checkbox } from "@kit/ui/checkbox";
 import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
-import { UnifiedSelector } from "@/components/unified-selector";
+import { SupplierForm, SupplierFormValues, emptySupplierFormValues } from "@/components/supplier-form";
 import { Separator } from "@kit/ui/separator";
 import {
   DropdownMenu,
@@ -22,7 +18,7 @@ import {
 } from "@kit/ui/dropdown-menu";
 import { Save, X, Trash2, MoreVertical, Edit2, ShoppingCart, DollarSign, Package, TrendingUp, Building2, Plus } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useInventorySupplierById, useUpdateInventorySupplier, useDeleteInventorySupplier, useSupplierOrders, useItems, useStockMovements, useExpenses, useSubscriptions, useLeasing, useLoans, useMetadataEnum } from "@kit/hooks";
+import { useInventorySupplierById, useUpdateInventorySupplier, useDeleteInventorySupplier, useSupplierOrders, useItems, useStockMovements, useExpenses, useSubscriptions, useLeasing, useLoans } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
 import { formatCurrency } from "@kit/lib/config";
@@ -46,9 +42,6 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
   const { data: leasingResponse } = useLeasing();
   const updateSupplier = useUpdateInventorySupplier();
   const deleteMutation = useDeleteInventorySupplier();
-  const { data: paymentTermsValues = [] } = useMetadataEnum("SupplierPaymentTerms");
-  const { data: supplierTypeValues = [] } = useMetadataEnum("SupplierType");
-  const paymentTermsItems = paymentTermsValues.map((ev) => ({ id: ev.name, name: ev.label ?? ev.name }));
 
   const isVendor = useMemo(() => supplier?.supplierType?.includes('vendor') || false, [supplier?.supplierType]);
 
@@ -158,17 +151,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
     }).filter(Boolean);
   }, [itemsResponse?.data, stockMovementsResponse?.data, stats.itemIds, stats.itemQuantities]);
   
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    contactPerson: "",
-    paymentTerms: "",
-    notes: "",
-    supplierType: ['supplier'] as string[],
-    isActive: true,
-  });
+  const [formData, setFormData] = useState<SupplierFormValues>(emptySupplierFormValues);
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -184,7 +167,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
         contactPerson: supplier.contactPerson || "",
         paymentTerms: supplier.paymentTerms || "",
         notes: supplier.notes || "",
-        supplierType: supplier.supplierType || ['supplier'],
+        supplierType: (supplier.supplierType && supplier.supplierType.length > 0) ? supplier.supplierType : ['supplier'],
         isActive: supplier.isActive,
       });
     }
@@ -193,7 +176,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name) {
+    if (!formData.name.trim()) {
       toast.error("Please fill in the supplier name");
       return;
     }
@@ -203,22 +186,22 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
     try {
       await updateSupplier.mutateAsync({
         id: resolvedParams.id,
-          data: {
-            name: formData.name,
-            email: formData.email || undefined,
-            phone: formData.phone || undefined,
-            address: formData.address || undefined,
-            contactPerson: formData.contactPerson || undefined,
-            paymentTerms: formData.paymentTerms || undefined,
-            notes: formData.notes || undefined,
-            supplierType: formData.supplierType,
-            isActive: formData.isActive,
-          },
+        data: {
+          name: formData.name.trim(),
+          email: formData.email.trim() || undefined,
+          phone: formData.phone.trim() || undefined,
+          address: formData.address.trim() || undefined,
+          contactPerson: formData.contactPerson.trim() || undefined,
+          paymentTerms: formData.paymentTerms || undefined,
+          notes: formData.notes.trim() || undefined,
+          supplierType: formData.supplierType,
+          isActive: formData.isActive,
+        },
       });
       toast.success("Supplier updated successfully");
       setIsEditing(false);
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to update supplier");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to update supplier");
     }
   };
 
@@ -237,10 +220,6 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
       toast.error("Failed to delete supplier");
       console.error(error);
     }
-  };
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const getStatusBadge = (status: SupplierOrderStatus) => {
@@ -327,113 +306,11 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="name">Name *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="contactPerson">Contact Person</Label>
-                    <Input
-                      id="contactPerson"
-                      value={formData.contactPerson}
-                      onChange={(e) => handleInputChange('contactPerson', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <UnifiedSelector
-                      label="Payment Terms"
-                      type="payment_terms"
-                      items={paymentTermsItems}
-                      selectedId={formData.paymentTerms || undefined}
-                      onSelect={(item) => handleInputChange('paymentTerms', item.id === 0 ? '' : String(item.id))}
-                      placeholder="Select payment terms"
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Textarea
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) => handleInputChange('address', e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="notes">Notes</Label>
-                    <Textarea
-                      id="notes"
-                      value={formData.notes}
-                      onChange={(e) => handleInputChange('notes', e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-3 md:col-span-2">
-                    <Label>Supplier Type</Label>
-                    <div className="flex gap-4">
-                      {supplierTypeValues.map((ev) => {
-                        const typeValue = ev.name as 'supplier' | 'vendor' | 'lender' | 'customer';
-                        return (
-                        <div key={ev.name} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`type-${ev.name}`}
-                            checked={formData.supplierType.includes(typeValue)}
-                            onCheckedChange={(checked) => {
-                              const newTypes = checked
-                                ? [...formData.supplierType.filter(t => t !== typeValue), typeValue]
-                                : formData.supplierType.filter(t => t !== typeValue);
-                              handleInputChange('supplierType', newTypes.length > 0 ? newTypes : [supplierTypeValues[0]?.name ?? 'supplier']);
-                            }}
-                          />
-                          <Label htmlFor={`type-${ev.name}`} className="font-normal cursor-pointer">
-                            {ev.label ?? ev.name}
-                          </Label>
-                        </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="isActive"
-                      checked={formData.isActive}
-                      onCheckedChange={(checked) => handleInputChange('isActive', checked)}
-                    />
-                    <Label htmlFor="isActive" className="font-normal cursor-pointer">
-                      Active
-                    </Label>
-                  </div>
-                </div>
+                <SupplierForm
+                  value={formData}
+                  onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
+                  idPrefix="edit"
+                />
 
                 <div className="flex justify-end space-x-4">
                   <Button

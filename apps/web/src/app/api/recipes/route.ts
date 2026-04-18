@@ -9,6 +9,10 @@ import {
   validateProducedOutputItems,
   insertRecipeProducedLinks,
 } from '@/lib/recipes/produced-item-output-links';
+import {
+  replaceRecipeModifierQuantities,
+  validateModifierQuantities,
+} from '@/lib/recipes/modifier-quantities';
 
 function transformRecipe(row: any): Recipe {
   return {
@@ -177,6 +181,27 @@ export async function POST(request: NextRequest) {
       if (linkErr.error) {
         await supabase.from('recipes').delete().eq('id', recipeData.id);
         throw new Error(linkErr.error);
+      }
+    }
+
+    if (body.modifierQuantities && body.modifierQuantities.length > 0) {
+      const valid = await validateModifierQuantities(
+        supabase,
+        Number(recipeData.id),
+        body.modifierQuantities
+      );
+      if (!valid.ok) {
+        await supabase.from('recipes').delete().eq('id', recipeData.id);
+        return NextResponse.json({ error: valid.message }, { status: valid.status });
+      }
+      const modErr = await replaceRecipeModifierQuantities(
+        supabase,
+        Number(recipeData.id),
+        body.modifierQuantities
+      );
+      if (modErr.error) {
+        await supabase.from('recipes').delete().eq('id', recipeData.id);
+        throw new Error(modErr.error);
       }
     }
 

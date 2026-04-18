@@ -11,6 +11,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { CreateItemMultiStepDialog } from "@/components/create-item-multistep-dialog";
+import { RecipeModifiersSection, type RecipeModifierRowInput } from "@/components/recipe-modifiers-section";
 import { StatusPin } from "@/components/status-pin";
 import { Save, X, Trash2, Plus, ChefHat, MoreVertical, Edit2, AlertTriangle, CheckCircle, Package, Link2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
@@ -102,6 +103,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     isActive: true,
   });
   const [items, setItems] = useState<Array<{ itemId: number; quantity: number; unit: string; unitId?: number; notes?: string }>>([]);
+  const [modifierRows, setModifierRows] = useState<RecipeModifierRowInput[]>([]);
 
   useEffect(() => {
     params.then(setResolvedParams);
@@ -133,6 +135,17 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           notes: ri.notes,
         })));
       }
+      const modQtys = recipe.modifierQuantities ?? [];
+      setModifierRows(
+        modQtys.map((q) => ({
+          modifierId: q.modifierId,
+          quantity: q.quantity,
+          unit: q.unit,
+          unitId: q.unitId,
+          notes: q.notes,
+          enabled: q.enabled !== false,
+        }))
+      );
     }
   }, [recipe]);
 
@@ -162,6 +175,16 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           notes: formData.notes || undefined,
           isActive: formData.isActive,
           items: items.length > 0 ? items.map(i => ({ itemId: i.itemId, quantity: i.quantity, unit: i.unit, unitId: i.unitId, notes: i.notes })) : undefined,
+          modifierQuantities: modifierRows
+            .filter((r) => r.enabled && r.quantity > 0)
+            .map((r) => ({
+            modifierId: r.modifierId,
+            quantity: r.quantity,
+            unit: r.unit,
+            unitId: r.unitId,
+            notes: r.notes,
+            enabled: r.enabled,
+          })),
         },
       });
       toast.success("Recipe updated successfully");
@@ -457,17 +480,18 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                     </div>
                   </div>
 
-                  {/* Right Column: Items Section */}
-                  <div className="space-y-4">
+                  {/* Right Column: Items + Modifiers */}
+                  <div className="space-y-6">
+                    <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <Label className="text-base font-semibold">Items</Label>
+                      <Label className="text-base font-semibold">Ingredients</Label>
                       <Button type="button" variant="outline" size="sm" onClick={addItem}>
                         <Plus className="mr-2 h-4 w-4" />
-                        Add Item
+                        Add Ingredient
                       </Button>
                     </div>
 
-                    <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                       {items.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
                           <p>No items added yet</p>
@@ -532,6 +556,26 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                           </div>
                         ))
                       )}
+                    </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-base font-semibold">Modifiers</Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Per-recipe quantities for modifier lists attached to the produced item.
+                          Stock is deducted at sale time based on the option chosen.
+                        </p>
+                      </div>
+                      <RecipeModifiersSection
+                        producedItemId={
+                          (recipe as { producedItemId?: number | null })?.producedItemId ??
+                          (recipe.producedItems && recipe.producedItems[0]?.id) ??
+                          null
+                        }
+                        rows={modifierRows}
+                        onChange={setModifierRows}
+                      />
                     </div>
                   </div>
                 </div>
@@ -674,26 +718,85 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold">Items</h3>
-                      {costData && (
-                        <div className="text-right">
-                          <div className="text-sm text-muted-foreground">Estimated Cost</div>
-                          <div className="text-lg font-bold">
-                            {costData.hasAllPrices ? (
-                              <>
-                                {formatCurrency(costData.totalCost)} total
-                                {costData.servingSize > 1 && (
-                                  <span className="text-sm text-muted-foreground ml-2">
-                                    ({formatCurrency(costData.costPerServing)} per serving)
-                                  </span>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground">Price data incomplete</span>
+                      {costData && (() => {
+                        const hasModRange =
+                          Array.isArray(costData.modifierLists) &&
+                          costData.modifierLists.length > 0 &&
+                          costData.totalCostMax > costData.totalCostMin;
+                        return (
+                          <div className="text-right">
+                            <div className="text-sm text-muted-foreground">
+                              {hasModRange ? "Estimated Cost (starting at)" : "Estimated Cost"}
+                            </div>
+                            <div className="text-lg font-bold">
+                              {costData.hasAllPrices ? (
+                                <>
+                                  {hasModRange ? (
+                                    <>
+                                      {formatCurrency(costData.totalCostMin)} – {formatCurrency(costData.totalCostMax)}
+                                    </>
+                                  ) : (
+                                    <>{formatCurrency(costData.totalCost)} total</>
+                                  )}
+                                  {costData.servingSize > 1 && (
+                                    <span className="text-sm text-muted-foreground ml-2">
+                                      ({formatCurrency(costData.costPerServing)} per serving)
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground">Price data incomplete</span>
+                              )}
+                            </div>
+                            {costData.modifierLists && costData.modifierLists.length > 0 && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                Base {formatCurrency(costData.baseCost)} + modifiers
+                              </div>
                             )}
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
+                    {costData?.modifierLists && costData.modifierLists.length > 0 && (
+                      <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+                        <div className="text-sm font-medium">Modifiers (per option)</div>
+                        {costData.modifierLists.map((ml) => (
+                          <div key={ml.modifierListId} className="text-sm">
+                            <div className="font-medium text-muted-foreground">
+                              {ml.modifierListName || `List #${ml.modifierListId}`}
+                              {ml.options.length > 0 && (
+                                <span className="ml-2 text-xs font-normal">
+                                  {ml.minCost === ml.maxCost
+                                    ? formatCurrency(ml.minCost)
+                                    : `${formatCurrency(ml.minCost)} – ${formatCurrency(ml.maxCost)}`}
+                                </span>
+                              )}
+                            </div>
+                            <div className="ml-3 space-y-0.5">
+                              {ml.options.length === 0 ? (
+                                <div className="text-xs text-muted-foreground">No modifiers included</div>
+                              ) : (
+                                ml.options.map((o) => (
+                                  <div key={o.modifierId} className="flex justify-between text-xs">
+                                    <Link
+                                      href={o.supplyItemId ? `/items/${o.supplyItemId}` : "#"}
+                                      className="text-muted-foreground hover:underline"
+                                    >
+                                      {o.modifierName || `Modifier #${o.modifierId}`}
+                                      {o.supplyItemName ? ` · ${o.supplyItemName}` : ""}
+                                      {o.quantity > 0 ? ` · ${o.quantity}` : ""}
+                                    </Link>
+                                    <span className={o.hasPrice ? "" : "text-muted-foreground italic"}>
+                                      {o.hasPrice ? formatCurrency(o.totalCost) : "—"}
+                                    </span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                       {(recipe.items || (recipe as { ingredients?: unknown[] }).ingredients || []).map((ri: any, index: number) => {
                         const itemId = ri.itemId || ri.ingredientId;
@@ -1013,7 +1116,7 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
           setCreateItemDialogOpen(open);
           if (!open) setCreateItemTargetIndex(null);
         }}
-        defaultItemTypes={["item"]}
+        defaultItemTypes={["ingredient"]}
         onCreated={(created) => {
           setItems((prev) => {
             const next = [...prev];

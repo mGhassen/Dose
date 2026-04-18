@@ -17,7 +17,40 @@ export const recipesApi = {
     apiRequest<{ success: boolean; message: string; producedItem?: { id: number; name: string; quantity: number }; recipe: { id: string; name: string; quantityProduced: number } }>('POST', `/api/recipes/${id}/produce`, data),
   createProducedItem: (id: string) =>
     apiRequest<{ id: number; name: string; description?: string; unit: string; unitId?: number; category?: string; itemTypes: string[]; isActive: boolean; createdAt: string; updatedAt: string; producedFromRecipeId?: number }>('POST', `/api/recipes/${id}/create-produced-item`),
-  getCost: (id: string) => 
-    apiRequest<{ recipeId: number; recipeName: string; totalCost: number; costPerServing: number; servingSize: number; ingredients: Array<{ ingredientId: number; ingredientName: string; quantity: number; unit: string; unitPrice: number; totalCost: number; hasPrice: boolean }>; hasAllPrices: boolean }>('GET', `/api/recipes/${id}/cost`),
+  getCost: (id: string) =>
+    apiRequest<{
+      recipeId: number;
+      recipeName: string;
+      totalCost: number;
+      totalCostMin: number;
+      totalCostMax: number;
+      costPerServing: number;
+      servingSize: number;
+      baseCost: number;
+      ingredients: Array<{ ingredientId: number; ingredientName: string; quantity: number; unit: string; unitPrice: number; totalCost: number; hasPrice: boolean }>;
+      items?: Array<{ itemId: number; itemName: string; quantity: number; unit: string; unitPrice: number; totalCost: number; hasPrice: boolean }>;
+      modifierLists: Array<{
+        modifierListId: number;
+        modifierListName: string | null;
+        selectionType: string | null;
+        options: Array<{
+          modifierId: number;
+          modifierName: string | null;
+          supplyItemId: number | null;
+          supplyItemName: string | null;
+          quantity: number;
+          unitPrice: number;
+          totalCost: number;
+          hasPrice: boolean;
+          priceSource: 'recipe' | 'order' | 'history' | 'none';
+          enabled: boolean;
+        }>;
+        minCost: number;
+        maxCost: number;
+        defaultCost: number;
+        hasAllPrices: boolean;
+      }>;
+      hasAllPrices: boolean;
+    }>('GET', `/api/recipes/${id}/cost`),
 };
 

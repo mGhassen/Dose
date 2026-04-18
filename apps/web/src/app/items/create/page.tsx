@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { AddVendorDialog } from "@/components/add-vendor-dialog";
+import { SupplierFormDialog } from "@/components/supplier-form-dialog";
 import { ItemCategorySelector } from "@/components/item-category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
@@ -25,6 +25,7 @@ const ITEM_KIND_OPTIONS: { id: ItemKind; label: string }[] = [
   { id: "item", label: "Item" },
   { id: "product", label: "Product" },
   { id: "modifier", label: "Modifier" },
+  { id: "ingredient", label: "Ingredient" },
 ];
 import { toast } from "sonner";
 
@@ -170,10 +171,12 @@ export default function CreateItemPage() {
                     onCreateNew={() => setAddVendorOpen(true)}
                     placeholder="Select vendor"
                   />
-                  <AddVendorDialog
+                  <SupplierFormDialog
                     open={addVendorOpen}
                     onOpenChange={setAddVendorOpen}
                     onCreated={(v) => handleInputChange('vendorId', String(v.id))}
+                    entityLabel="vendor"
+                    defaultSupplierTypes={["vendor"]}
                   />
                 </div>
 

@@ -271,6 +271,12 @@ export async function POST(
     if (entriesToDelete.length > 0) {
       const idsToDelete = entriesToDelete.map((e: any) => e.id);
       await supabase
+        .from('entries')
+        .delete()
+        .eq('entry_type', 'leasing_payment')
+        .eq('reference_id', parseInt(id))
+        .in('schedule_entry_id', idsToDelete);
+      await supabase
         .from('leasing_timeline_entries')
         .delete()
         .in('id', idsToDelete);
@@ -284,19 +290,30 @@ export async function POST(
     if (entriesToUpdate.length > 0) {
       console.log(`[generate-timeline] Updating ${entriesToUpdate.length} entries in database (${entriesToUpdateCount} after startMonth)`);
       for (const entry of entriesToUpdate) {
-        const { id, ...updateData } = entry;
-        // Log the update to verify amounts are being updated
+        const { id: timelineId, ...updateData } = entry;
         if (entry.month > startMonth && !entry.is_fixed_amount) {
-          console.log(`[generate-timeline] UPDATE SQL: entry ${id} (month ${entry.month}) amount: ${updateData.amount}`);
+          console.log(`[generate-timeline] UPDATE SQL: entry ${timelineId} (month ${entry.month}) amount: ${updateData.amount}`);
         }
         const { error: updateError } = await supabase
           .from('leasing_timeline_entries')
           .update(updateData)
-          .eq('id', id);
+          .eq('id', timelineId);
         if (updateError) {
-          console.error(`[generate-timeline] Error updating entry ${id}:`, updateError);
+          console.error(`[generate-timeline] Error updating entry ${timelineId}:`, updateError);
           throw updateError;
         }
+
+        await supabase
+          .from('entries')
+          .update({
+            name: `${leasing.name} - ${entry.month}`,
+            amount: updateData.amount,
+            entry_date: updateData.payment_date,
+            due_date: updateData.payment_date,
+          })
+          .eq('entry_type', 'leasing_payment')
+          .eq('reference_id', parseInt(id))
+          .eq('schedule_entry_id', timelineId);
       }
       console.log(`[generate-timeline] Successfully updated ${entriesToUpdate.length} entries`);
     } else {
@@ -312,6 +329,24 @@ export async function POST(
         .select();
       if (insertError) throw insertError;
       insertedTimeline = inserted || [];
+
+      if (insertedTimeline.length > 0) {
+        const ledgerEntries = insertedTimeline.map((row: any) => ({
+          direction: 'output',
+          entry_type: 'leasing_payment',
+          name: `${leasing.name} - ${row.month}`,
+          amount: row.amount,
+          entry_date: row.payment_date,
+          due_date: row.payment_date,
+          reference_id: parseInt(id),
+          schedule_entry_id: row.id,
+          is_active: true,
+        }));
+        const { error: ledgerError } = await supabase.from('entries').insert(ledgerEntries);
+        if (ledgerError) {
+          console.error('[generate-timeline] Error inserting paired entries:', ledgerError);
+        }
+      }
     }
 
     // Fetch all entries to return

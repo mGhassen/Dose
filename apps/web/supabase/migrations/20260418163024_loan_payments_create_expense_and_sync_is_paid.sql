@@ -79,7 +79,17 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS payments_sync_loan_schedule ON payments;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'payments_sync_loan_schedule'
+      AND tgrelid = 'payments'::regclass
+  ) THEN
+    DROP TRIGGER payments_sync_loan_schedule ON payments;
+  END IF;
+END $$;
+
 CREATE TRIGGER payments_sync_loan_schedule
 AFTER INSERT OR UPDATE OR DELETE ON payments
 FOR EACH ROW EXECUTE FUNCTION trg_payments_sync_loan_schedule();

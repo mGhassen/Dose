@@ -69,6 +69,128 @@ function insertPayloadFromBody(body: CreatePaymentInput, entryId: number) {
   return row;
 }
 
+async function ensureLoanPaymentExpense(
+  supabase: ReturnType<typeof supabaseServer>,
+  entryId: number,
+  paymentDate: string
+): Promise<void> {
+  try {
+    const { data: entry } = await supabase
+      .from('entries')
+      .select('id, entry_type, reference_id, schedule_entry_id, name, description')
+      .eq('id', entryId)
+      .single();
+
+    if (!entry || entry.entry_type !== 'loan_payment') return;
+    const loanId = entry.reference_id;
+    const scheduleId = entry.schedule_entry_id;
+    if (loanId == null || scheduleId == null) return;
+
+    const { data: schedule } = await supabase
+      .from('loan_schedules')
+      .select('id, month, payment_date, total_payment')
+      .eq('id', scheduleId)
+      .single();
+    if (!schedule) return;
+
+    const expenseDate = schedule.payment_date;
+
+    const { data: existing } = await supabase
+      .from('expenses')
+      .select('id')
+      .eq('loan_id', loanId)
+      .eq('expense_type', 'loan')
+      .eq('expense_date', expenseDate)
+      .maybeSingle();
+    if (existing) return;
+
+    const { data: loan } = await supabase
+      .from('loans')
+      .select('name')
+      .eq('id', loanId)
+      .single();
+
+    const amount = parseFloat(schedule.total_payment);
+    await supabase.from('expenses').insert({
+      name: `${loan?.name ?? 'Loan'} - Payment Month ${schedule.month}`,
+      category: 'loan_repayment',
+      expense_type: 'loan',
+      amount,
+      subtotal: amount,
+      total_tax: 0,
+      total_discount: 0,
+      loan_id: loanId,
+      expense_date: expenseDate,
+      start_date: expenseDate,
+      description: entry.description ?? null,
+      is_active: true,
+    });
+  } catch (err) {
+    console.error('Failed to ensure loan payment expense:', err);
+  }
+}
+
+async function ensureLeasingPaymentExpense(
+  supabase: ReturnType<typeof supabaseServer>,
+  entryId: number,
+  paymentDate: string
+): Promise<void> {
+  try {
+    const { data: entry } = await supabase
+      .from('entries')
+      .select('id, entry_type, reference_id, schedule_entry_id, description')
+      .eq('id', entryId)
+      .single();
+
+    if (!entry || entry.entry_type !== 'leasing_payment') return;
+    const leasingId = entry.reference_id;
+    const timelineId = entry.schedule_entry_id;
+    if (leasingId == null || timelineId == null) return;
+
+    const { data: timeline } = await supabase
+      .from('leasing_timeline_entries')
+      .select('id, month, payment_date, amount')
+      .eq('id', timelineId)
+      .single();
+    if (!timeline) return;
+
+    const expenseDate = timeline.payment_date;
+
+    const { data: existing } = await supabase
+      .from('expenses')
+      .select('id')
+      .eq('leasing_id', leasingId)
+      .eq('expense_type', 'leasing')
+      .eq('expense_date', expenseDate)
+      .maybeSingle();
+    if (existing) return;
+
+    const { data: leasing } = await supabase
+      .from('leasing_payments')
+      .select('name')
+      .eq('id', leasingId)
+      .single();
+
+    const amount = parseFloat(timeline.amount);
+    await supabase.from('expenses').insert({
+      name: `${leasing?.name ?? 'Leasing'} - Payment ${timeline.month}`,
+      category: 'leasing',
+      expense_type: 'leasing',
+      amount,
+      subtotal: amount,
+      total_tax: 0,
+      total_discount: 0,
+      leasing_id: leasingId,
+      expense_date: expenseDate,
+      start_date: expenseDate,
+      description: entry.description ?? null,
+      is_active: true,
+    });
+  } catch (err) {
+    console.error('Failed to ensure leasing payment expense:', err);
+  }
+}
+
 async function resolveDocumentEntryId(
   supabase: ReturnType<typeof supabaseServer>,
   entryType: 'expense' | 'sale',
@@ -232,6 +354,9 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    await ensureLoanPaymentExpense(supabase, entryId, body.paymentDate);
+    await ensureLeasingPaymentExpense(supabase, entryId, body.paymentDate);
 
     return NextResponse.json(transformPayment(data), { status: 201 });
   } catch (error: any) {

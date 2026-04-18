@@ -18,7 +18,7 @@ import { dateToYYYYMMDD } from "@kit/lib";
 import { Checkbox } from "@kit/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@kit/ui/radio-group";
 import Link from "next/link";
-import { AddVendorDialog } from "@/components/add-vendor-dialog";
+import { SupplierFormDialog } from "@/components/supplier-form-dialog";
 
 export default function CreateLeasingPage() {
   const router = useRouter();
@@ -315,6 +315,7 @@ export default function CreateLeasingPage() {
                     value={formData.endDate ? new Date(formData.endDate) : undefined}
                     onChange={(d) => handleInputChange("endDate", d ? dateToYYYYMMDD(d) : "")}
                     placeholder="Pick a date"
+                    toYear={new Date().getFullYear() + 20}
                   />
                   {amountMode === "total" && (
                     <p className="text-xs text-muted-foreground">
@@ -437,11 +438,11 @@ export default function CreateLeasingPage() {
           </CardContent>
         </Card>
       </div>
-      <AddVendorDialog
+      <SupplierFormDialog
         open={addLessorOpen}
         onOpenChange={setAddLessorOpen}
         entityLabel="lessor"
-        supplierTypes={['lessor']}
+        defaultSupplierTypes={['lessor']}
         onCreated={(lessor) => handleInputChange('supplierId', String(lessor.id))}
       />
     </AppLayout>

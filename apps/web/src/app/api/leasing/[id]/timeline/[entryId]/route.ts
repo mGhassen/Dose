@@ -65,6 +65,21 @@ export async function PUT(
       throw error;
     }
 
+    const entryPatch: Record<string, unknown> = {};
+    if (updateData.amount !== undefined) entryPatch.amount = updateData.amount;
+    if (updateData.payment_date !== undefined) {
+      entryPatch.entry_date = updateData.payment_date;
+      entryPatch.due_date = updateData.payment_date;
+    }
+    if (Object.keys(entryPatch).length > 0) {
+      await supabase
+        .from('entries')
+        .update(entryPatch)
+        .eq('entry_type', 'leasing_payment')
+        .eq('reference_id', parseInt(id))
+        .eq('schedule_entry_id', parseInt(entryId));
+    }
+
     return NextResponse.json(transformTimelineEntry(data));
   } catch (error: any) {
     console.error('Error updating leasing timeline entry:', error);

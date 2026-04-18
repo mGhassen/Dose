@@ -1021,13 +1021,13 @@ export interface FinancialKPIs {
 // optional `modifiers.item_id` pointing at an inventory row for COGS when the add-on is stocked.
 
 /** Logical roles for an inventory row; combine when a SKU is e.g. both ingredient and sellable. */
-export type ItemKind = 'item' | 'product' | 'modifier';
+export type ItemKind = 'item' | 'product' | 'modifier' | 'ingredient';
 
 /** @deprecated Use ItemKind */
 export type ItemType = ItemKind;
 
 export function normalizeItemKinds(raw: unknown): ItemKind[] {
-  const allowed = new Set<ItemKind>(['item', 'product', 'modifier']);
+  const allowed = new Set<ItemKind>(['item', 'product', 'modifier', 'ingredient']);
   if (!Array.isArray(raw) || raw.length === 0) return ['item'];
   const out = raw.filter((x): x is ItemKind => typeof x === 'string' && allowed.has(x as ItemKind));
   return out.length ? [...new Set(out)] : ['item'];
@@ -1179,8 +1179,74 @@ export interface RecipeItem {
   item?: Item; // Can be either a regular item or another recipe
 }
 
+/**
+ * Per-recipe quantity consumed of a specific modifier option at sale-time.
+ * The modifier belongs to a list attached (via `item_modifier_list_links`) to
+ * at least one of the recipe's produced items.
+ */
+export interface RecipeModifierQuantity {
+  id: number;
+  recipeId: number;
+  modifierId: number;
+  quantity: number;
+  unit?: string;
+  unitId?: number;
+  notes?: string;
+  sortOrder?: number;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  /** Populated by API for display. */
+  modifier?: {
+    id: number;
+    name: string | null;
+    priceAmountCents: number | null;
+    supplyItemId: number | null;
+    supplyItemName?: string | null;
+    supplyItemUnit?: string | null;
+    supplyItemAffectsStock?: boolean;
+    modifierList: {
+      id: number;
+      name: string | null;
+      selectionType: string | null;
+    };
+  };
+}
+
+/** Grouped view of a recipe's modifier quantities by their modifier list. */
+export interface RecipeModifierListGroup {
+  modifierListId: number;
+  modifierListName: string | null;
+  selectionType: string | null;
+  modifiers: Array<{
+    modifierId: number;
+    modifierName: string | null;
+    supplyItemId: number | null;
+    supplyItemName: string | null;
+    priceAmountCents: number | null;
+    quantity: number;
+    unit?: string;
+    unitId?: number;
+    notes?: string;
+    sortOrder: number;
+    enabled: boolean;
+  }>;
+}
+
 export interface RecipeWithItems extends Recipe {
   items: RecipeItem[];
+  modifierQuantities?: RecipeModifierQuantity[];
+  modifierListGroups?: RecipeModifierListGroup[];
+}
+
+export interface RecipeModifierQuantityInput {
+  modifierId: number;
+  quantity: number;
+  unit?: string;
+  unitId?: number;
+  notes?: string;
+  sortOrder?: number;
+  enabled?: boolean;
 }
 
 export interface CreateRecipeData {
@@ -1204,6 +1270,7 @@ export interface CreateRecipeData {
     unitId?: number;
     notes?: string;
   }>;
+  modifierQuantities?: RecipeModifierQuantityInput[];
 }
 
 export interface UpdateRecipeData extends Partial<CreateRecipeData> {}

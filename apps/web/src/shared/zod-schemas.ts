@@ -370,7 +370,7 @@ export const createItemSchema = z
     isActive: z.boolean().optional(),
     affectsStock: z.boolean().optional(),
     itemTypes: z
-      .array(z.enum(["item", "product", "modifier"]))
+      .array(z.enum(["item", "product", "modifier", "ingredient"]))
       .min(1)
       .refine((a) => new Set(a).size === a.length, { message: "Duplicate kinds" })
       .optional(),
@@ -914,7 +914,17 @@ const recipeItemSchema = z.object({
   itemId: z.number(),
   quantity: z.number(),
   unit: z.string().optional(),
+  unitId: z.number().optional(),
   notes: z.string().optional(),
+});
+const recipeModifierQuantitySchema = z.object({
+  modifierId: z.number().int().positive(),
+  quantity: z.number().min(0, "Quantity must be non-negative"),
+  unit: z.string().optional(),
+  unitId: z.number().optional(),
+  notes: z.string().optional(),
+  sortOrder: z.number().int().optional(),
+  enabled: z.boolean().optional(),
 });
 export const createRecipeSchema = z.object({
   name: z.string().min(1),
@@ -931,6 +941,7 @@ export const createRecipeSchema = z.object({
   producedItemId: z.number().nullable().optional(),
   producedItemIds: z.array(z.number()).optional(),
   items: z.array(recipeItemSchema).optional(),
+  modifierQuantities: z.array(recipeModifierQuantitySchema).optional(),
 });
 export type CreateRecipeInput = z.infer<typeof createRecipeSchema>;
 export const updateRecipeSchema = createRecipeSchema.partial();

@@ -101,3 +101,25 @@ export function useDeleteItem() {
     },
   });
 }
+
+/**
+ * Returns the Square-catalog context (variants, modifier lists with their options and
+ * linked supply items) for an item. Used by the recipe editor to show attached modifier
+ * lists when an item is selected as the recipe's produced output.
+ */
+export function useItemCatalog(itemId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['items', itemId, 'catalog'],
+    queryFn: () => itemsApi.getCatalog(String(itemId)),
+    enabled: itemId != null && itemId > 0,
+  });
+}
+
+/** Convenience hook returning just the modifierLists array (or empty array). */
+export function useItemModifierLists(itemId: number | null | undefined) {
+  const { data, ...rest } = useItemCatalog(itemId);
+  return {
+    ...rest,
+    modifierLists: data?.modifierLists ?? [],
+  };
+}

@@ -91,3 +91,26 @@ export function getRemainingBalanceAtMonth(loan: Loan, month: number): number {
   return entry ? entry.remainingBalance : 0;
 }
 
+/**
+ * Check whether a stored loan schedule is out of sync with the loan's current fields.
+ * Returns true if any row differs in date or amounts (within a small epsilon for floats).
+ */
+export function isLoanScheduleOutOfSync(
+  loan: Loan,
+  schedule: LoanScheduleEntry[] | undefined | null
+): boolean {
+  if (!schedule || schedule.length === 0) return false;
+  const expected = calculateLoanSchedule(loan);
+  if (expected.length !== schedule.length) return true;
+  const eps = 0.01;
+  return expected.some((e, i) => {
+    const s = schedule[i];
+    return (
+      e.paymentDate !== s.paymentDate ||
+      Math.abs(e.totalPayment - s.totalPayment) > eps ||
+      Math.abs(e.principalPayment - s.principalPayment) > eps ||
+      Math.abs(e.interestPayment - s.interestPayment) > eps
+    );
+  });
+}
+

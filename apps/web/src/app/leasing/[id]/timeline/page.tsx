@@ -8,7 +8,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { ArrowLeft, Calendar, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLeasingById, useMetadataEnum } from "@kit/hooks";
+import { useLeasingById, useMetadataEnum, useEntries } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDate, formatMonthYear } from "@kit/lib/date-format";
@@ -56,9 +56,18 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
   const [timeline, setTimeline] = useState<LeasingTimelineEntry[]>([]);
   const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
 
+  const { data: entriesData } = useEntries({
+    direction: "output",
+    entryType: "leasing_payment",
+    referenceId: resolvedParams?.id ? Number(resolvedParams.id) : undefined,
+    includePayments: true,
+    limit: 5000,
+  });
+  const allEntries = entriesData?.data || [];
+
   const handleTimelineUpdate = () => {
-    queryClient.invalidateQueries({ queryKey: ['actual-payments'] });
-    // Refetch timeline entries
+    queryClient.invalidateQueries({ queryKey: ['entries'] });
+    queryClient.invalidateQueries({ queryKey: ['payments'] });
     if (resolvedParams?.id && startMonth && endMonth) {
       fetchTimelineEntries();
     }
@@ -353,6 +362,7 @@ export default function LeasingTimelinePage({ params }: LeasingTimelinePageProps
                         key={entry.id ? `entry-${entry.id}` : `${entry.month}-${index}`}
                         entry={entry}
                         leasingId={Number(resolvedParams?.id || 0)}
+                        allEntries={allEntries}
                         onUpdate={handleTimelineUpdate}
                       />
                     ))}

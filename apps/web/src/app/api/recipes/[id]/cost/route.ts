@@ -1,10 +1,12 @@
 // Recipe Cost Calculation API Route
-// Calculates the cost of a recipe based on ingredient prices from supplier orders
+// Calculates the cost of a recipe based on ingredient prices, plus per-modifier
+// option cost range (min / max / default). Cost resolution prefers an item's own
+// recipe when produced_from_recipe_id is set.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
-import { buildFactorMap, convertQuantity } from '@/lib/units/convert';
-import { getItemCostAsOf } from '@/lib/items/price-resolve';
+import { buildFactorMap } from '@/lib/units/convert';
+import { resolveItemUnitCost, type GetFactor } from '@/lib/items/resolve-cost';
 
 export async function GET(
   request: NextRequest,
@@ -14,11 +16,18 @@ export async function GET(
     const { id } = await params;
     const supabase = supabaseServer();
 
-    const { data: unitVariables } = await supabase.from('variables').select('id, value').eq('type', 'unit');
-    const factorMap = buildFactorMap((unitVariables || []).map((u: any) => ({ id: u.id, factorToBase: parseFloat(u.value ?? 1) })));
-    const getFactor = (unitId: number) => factorMap.get(unitId);
-    
-    // Get recipe with items from recipes table
+    const { data: unitVariables } = await supabase
+      .from('variables')
+      .select('id, value')
+      .eq('type', 'unit');
+    const factorMap = buildFactorMap(
+      (unitVariables || []).map((u: { id: number; value: string }) => ({
+        id: u.id,
+        factorToBase: parseFloat(u.value ?? '1'),
+      }))
+    );
+    const getFactor: GetFactor = (unitId: number) => factorMap.get(unitId);
+
     const { data: recipeData, error: recipeError } = await supabase
       .from('recipes')
       .select('*, items:recipe_items(*, item:items(*))')
@@ -27,93 +36,33 @@ export async function GET(
 
     if (recipeError) throw recipeError;
     if (!recipeData) {
-      return NextResponse.json(
-        { error: 'Recipe not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Recipe not found' }, { status: 404 });
     }
 
-    if (!recipeData.items || recipeData.items.length === 0) {
-      return NextResponse.json({
-        recipeId: Number(id),
-        recipeName: recipeData.name,
-        totalCost: 0,
-        costPerServing: 0,
-        servingSize: recipeData.serving_size || 1,
-        ingredients: [],
-        message: 'Recipe has no items',
-      });
-    }
+    const servingSize = recipeData.serving_size || 1;
+
+    // Recipes may reference their own produced item via a modifier. Guard recursion
+    // by seeding the "seen" set with the current recipe id.
+    const seen = new Set<number>([Number(id)]);
 
     const itemCosts = await Promise.all(
-      recipeData.items.map(async (ri: any) => {
+      (recipeData.items || []).map(async (ri: {
+        item_id: number;
+        quantity: string | number;
+        unit: string | null;
+        unit_id: number | null;
+        item?: { name?: string } | null;
+      }) => {
         const itemId = ri.item_id;
-        const recipeQty = parseFloat(ri.quantity);
-        const recipeUnitId = ri.unit_id;
-        let avgPricePerRecipeUnit = 0;
-        let priceSource: 'order' | 'history' = 'order';
-
-        if (avgPricePerRecipeUnit === 0) {
-          const threeMonthsAgo = new Date();
-          threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-          const { data: orderItems } = await supabase
-            .from('supplier_order_items')
-            .select('unit_price, unit, quantity, unit_id')
-            .eq('item_id', itemId)
-            .gte('created_at', threeMonthsAgo.toISOString())
-            .order('created_at', { ascending: false })
-            .limit(10);
-
-          if (orderItems && orderItems.length > 0 && recipeUnitId != null && getFactor(recipeUnitId) != null) {
-            let totalValueInRecipeUnit = 0;
-            let totalQtyInRecipeUnit = 0;
-            for (const oi of orderItems) {
-              const orderQty = parseFloat(oi.quantity);
-              const orderUnitId = oi.unit_id;
-              const qtyInRecipeUnit =
-                orderUnitId != null && getFactor(orderUnitId) != null
-                  ? convertQuantity(orderQty, orderUnitId, recipeUnitId, getFactor)
-                  : orderQty;
-              const pricePerRecipeUnit =
-                orderUnitId != null && getFactor(orderUnitId) != null
-                  ? parseFloat(oi.unit_price) * (getFactor(orderUnitId)! / getFactor(recipeUnitId)!)
-                  : parseFloat(oi.unit_price);
-              totalValueInRecipeUnit += qtyInRecipeUnit * pricePerRecipeUnit;
-              totalQtyInRecipeUnit += qtyInRecipeUnit;
-            }
-            avgPricePerRecipeUnit =
-              totalQtyInRecipeUnit > 0 ? totalValueInRecipeUnit / totalQtyInRecipeUnit : 0;
-          } else if (orderItems && orderItems.length > 0) {
-            const totalValue = orderItems.reduce(
-              (sum, item) => sum + parseFloat(item.unit_price) * parseFloat(item.quantity),
-              0
-            );
-            const totalQuantity = orderItems.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
-            avgPricePerRecipeUnit = totalQuantity > 0 ? totalValue / totalQuantity : 0;
-          }
-        }
-
-        if (avgPricePerRecipeUnit === 0 && ri.item) {
-          const todayStr = new Date().toISOString().split('T')[0];
-          const resolved = await getItemCostAsOf(supabase, itemId, todayStr);
-          if (resolved.unitCost != null && resolved.unitCost > 0) {
-            const itemUnitId = ri.item.unit_id;
-            if (
-              recipeUnitId != null &&
-              itemUnitId != null &&
-              getFactor(recipeUnitId) != null &&
-              getFactor(itemUnitId) != null
-            ) {
-              avgPricePerRecipeUnit = resolved.unitCost * (getFactor(itemUnitId)! / getFactor(recipeUnitId)!);
-            } else {
-              avgPricePerRecipeUnit = resolved.unitCost;
-            }
-            priceSource = 'history';
-          }
-        }
-
-        const itemCost = recipeQty * avgPricePerRecipeUnit;
-
+        const recipeQty =
+          typeof ri.quantity === 'string' ? parseFloat(ri.quantity) : ri.quantity;
+        const resolved = await resolveItemUnitCost(
+          supabase,
+          itemId,
+          ri.unit_id ?? null,
+          getFactor,
+          seen
+        );
         return {
           ingredientId: itemId,
           itemId,
@@ -121,34 +70,163 @@ export async function GET(
           itemName: ri.item?.name || `Item #${itemId}`,
           quantity: recipeQty,
           unit: ri.unit,
-          unitPrice: avgPricePerRecipeUnit,
-          totalCost: itemCost,
-          hasPrice: avgPricePerRecipeUnit > 0,
-          priceSource,
+          unitPrice: resolved.unitPrice,
+          totalCost: recipeQty * resolved.unitPrice,
+          hasPrice: resolved.hasPrice,
+          priceSource: resolved.source,
         };
       })
     );
 
-    const totalCost = itemCosts.reduce((sum, item) => sum + item.totalCost, 0);
-    const servingSize = recipeData.serving_size || 1;
-    const costPerServing = servingSize > 0 ? totalCost / servingSize : totalCost;
+    const baseCost = itemCosts.reduce((sum, item) => sum + item.totalCost, 0);
+
+    const { data: modifierRows } = await supabase
+      .from('recipe_modifier_quantities')
+      .select(
+        `
+        id, modifier_id, quantity, unit_id, enabled, sort_order,
+        modifier:modifiers(
+          id, name, price_amount_cents, sort_order, item_id, modifier_list_id,
+          item:items(id, name, unit, unit_id),
+          modifier_list:modifier_lists(id, name, selection_type)
+        )
+      `
+      )
+      .eq('recipe_id', id)
+      .eq('enabled', true);
+
+    type ModRow = {
+      id: number;
+      modifier_id: number;
+      quantity: string | number;
+      unit_id: number | null;
+      modifier: {
+        id: number;
+        name: string | null;
+        price_amount_cents: number | null;
+        sort_order: number | null;
+        item_id: number | null;
+        modifier_list_id: number;
+        item: { id: number; name: string; unit: string | null; unit_id: number | null } | null;
+        modifier_list: { id: number; name: string | null; selection_type: string | null } | null;
+      } | null;
+    };
+
+    type ResolvedOption = {
+      modifierId: number;
+      modifierName: string | null;
+      supplyItemId: number | null;
+      supplyItemName: string | null;
+      quantity: number;
+      unitPrice: number;
+      totalCost: number;
+      hasPrice: boolean;
+      priceSource: 'recipe' | 'order' | 'history' | 'none';
+      enabled: boolean;
+    };
+
+    const rowsByList = new Map<
+      number,
+      {
+        modifierListId: number;
+        modifierListName: string | null;
+        selectionType: string | null;
+        options: ResolvedOption[];
+      }
+    >();
+
+    for (const row of (modifierRows || []) as unknown as ModRow[]) {
+      const mod = row.modifier;
+      if (!mod) continue;
+      const listId = mod.modifier_list_id;
+      const listMeta = mod.modifier_list;
+      if (!rowsByList.has(listId)) {
+        rowsByList.set(listId, {
+          modifierListId: listId,
+          modifierListName: listMeta?.name ?? null,
+          selectionType: listMeta?.selection_type ?? null,
+          options: [],
+        });
+      }
+      const group = rowsByList.get(listId)!;
+
+      const recipeQty = typeof row.quantity === 'string' ? parseFloat(row.quantity) : row.quantity;
+      const recipeUnitId = row.unit_id ?? null;
+
+      let unitPrice = 0;
+      let hasPrice = false;
+      let source: ResolvedOption['priceSource'] = 'none';
+      if (mod.item_id != null) {
+        const resolved = await resolveItemUnitCost(
+          supabase,
+          mod.item_id,
+          recipeUnitId,
+          getFactor,
+          seen
+        );
+        unitPrice = resolved.unitPrice;
+        hasPrice = resolved.hasPrice;
+        source = resolved.source;
+      }
+
+      group.options.push({
+        modifierId: mod.id,
+        modifierName: mod.name,
+        supplyItemId: mod.item_id,
+        supplyItemName: mod.item?.name ?? null,
+        quantity: recipeQty,
+        unitPrice,
+        totalCost: recipeQty * unitPrice,
+        hasPrice,
+        priceSource: source,
+        enabled: true,
+      });
+    }
+
+    const modifierLists = Array.from(rowsByList.values()).map((group) => {
+      const priced = group.options.filter((o) => o.hasPrice);
+      const minCost = priced.length > 0 ? Math.min(...priced.map((o) => o.totalCost)) : 0;
+      const maxCost = priced.length > 0 ? Math.max(...priced.map((o) => o.totalCost)) : 0;
+      const defaultCost = minCost;
+      return {
+        modifierListId: group.modifierListId,
+        modifierListName: group.modifierListName,
+        selectionType: group.selectionType,
+        options: group.options,
+        minCost,
+        maxCost,
+        defaultCost,
+        hasAllPrices: group.options.length > 0 && group.options.every((o) => o.hasPrice),
+      };
+    });
+
+    const modifiersMin = modifierLists.reduce((s, m) => s + m.minCost, 0);
+    const modifiersMax = modifierLists.reduce((s, m) => s + m.maxCost, 0);
+    const modifiersDefault = modifierLists.reduce((s, m) => s + m.defaultCost, 0);
+
+    const totalCostMin = baseCost + modifiersMin;
+    const totalCostMax = baseCost + modifiersMax;
+    const totalCostDefault = baseCost + modifiersDefault;
 
     return NextResponse.json({
       recipeId: Number(id),
       recipeName: recipeData.name,
-      totalCost,
-      costPerServing,
+      totalCost: totalCostDefault,
+      totalCostMin,
+      totalCostMax,
+      costPerServing: servingSize > 0 ? totalCostDefault / servingSize : totalCostDefault,
       servingSize,
-      ingredients: itemCosts, // Keep for backward compatibility
+      baseCost,
+      ingredients: itemCosts,
       items: itemCosts,
-      hasAllPrices: itemCosts.every(item => item.hasPrice),
+      modifierLists,
+      hasAllPrices:
+        itemCosts.every((item) => item.hasPrice) &&
+        modifierLists.every((m) => m.hasAllPrices || m.options.length === 0),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to calculate recipe cost';
     console.error('Error calculating recipe cost:', error);
-    return NextResponse.json(
-      { error: 'Failed to calculate recipe cost', details: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to calculate recipe cost', details: message }, { status: 500 });
   }
 }
-

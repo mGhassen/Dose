@@ -13,6 +13,7 @@ const KIND_LABEL: Record<ItemKind, string> = {
   item: "Item",
   product: "Product",
   modifier: "Modifier",
+  ingredient: "Ingredient",
 };
 import { Badge } from "@kit/ui/badge";
 import { Label } from "@kit/ui/label";
@@ -254,7 +255,7 @@ export default function ItemsContent() {
           filterColumns={[
             { value: "name", label: "Name" },
             { value: "sku", label: "SKU" },
-            { value: "itemTypes", label: "Type", type: "select", options: [{ value: "item", label: "Item" }, { value: "product", label: "Product" }, { value: "modifier", label: "Modifier" }] },
+            { value: "itemTypes", label: "Type", type: "select", options: [{ value: "item", label: "Item" }, { value: "product", label: "Product" }, { value: "modifier", label: "Modifier" }, { value: "ingredient", label: "Ingredient" }] },
             { value: "categoryLabel", label: "Category", type: "select" },
             { value: "unit", label: "Unit", type: "select" },
             { value: "unitPrice", label: "Selling price" },

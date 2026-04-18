@@ -15,7 +15,7 @@ import {
 import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
-import { AddVendorDialog } from "@/components/add-vendor-dialog";
+import { SupplierFormDialog } from "@/components/supplier-form-dialog";
 import { ItemCategorySelector } from "@/components/item-category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Checkbox } from "@kit/ui/checkbox";
@@ -55,6 +55,7 @@ const ITEM_KIND_OPTIONS: { id: ItemKind; label: string }[] = [
   { id: "item", label: "Item" },
   { id: "product", label: "Product" },
   { id: "modifier", label: "Modifier" },
+  { id: "ingredient", label: "Ingredient" },
 ];
 import { toast } from "sonner";
 import { dateToYYYYMMDD, taxRulesApi, recipesApi } from "@kit/lib";
@@ -91,6 +92,10 @@ interface ItemCatalogPayload {
   parentItem: { id: number; name: string; isCatalogParent: boolean } | null;
   variantMeta: { nameSnapshot: string | null; squareVariationId: string | null } | null;
   modifierListsSourceItemId?: number;
+  modifierListUsageByRecipe?: Record<
+    number,
+    Array<{ recipeId: number; recipeName: string; modifierCount: number }>
+  >;
   variations: {
     id: number;
     variantItemId: number;
@@ -1349,8 +1354,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               {item.itemTypes?.includes("modifier") && (
                 <Badge variant="secondary" className="text-xs">Modifier</Badge>
               )}
+              {item.itemTypes?.includes("ingredient") && (
+                <Badge variant="secondary" className="text-xs">Ingredient</Badge>
+              )}
               {item.affectsStock === false && (
-                <Badge variant="outline" className="text-xs">No stock</Badge>
+                <Badge variant="outline" className="text-xs" title="Stock is not tracked for this item">
+                  No stock
+                </Badge>
               )}
               {item.isCatalogParent && (
                 <Badge variant="outline" className="text-xs">Catalog group</Badge>
@@ -1505,10 +1515,12 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       onCreateNew={() => setAddVendorOpen(true)}
                       placeholder="Select vendor"
                     />
-                    <AddVendorDialog
+                    <SupplierFormDialog
                       open={addVendorOpen}
                       onOpenChange={setAddVendorOpen}
                       onCreated={(v) => handleInputChange('vendorId', String(v.id))}
+                      entityLabel="vendor"
+                      defaultSupplierTypes={["vendor"]}
                     />
                   </div>
 
@@ -1523,15 +1535,21 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   </div>
 
                   {/* Affects Stock */}
-                  <div className="space-y-2 flex items-center space-x-2 pt-6">
-                    <Checkbox
-                      id="affectsStock"
-                      checked={formData.affectsStock}
-                      onCheckedChange={(checked) => handleInputChange('affectsStock', checked)}
-                    />
-                    <Label htmlFor="affectsStock" className="cursor-pointer">
-                      Affects stock (deduct on sale)
-                    </Label>
+                  <div className="space-y-1 pt-6">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="affectsStock"
+                        checked={formData.affectsStock}
+                        onCheckedChange={(checked) => handleInputChange('affectsStock', checked)}
+                      />
+                      <Label htmlFor="affectsStock" className="cursor-pointer">
+                        Affects stock (deduct on sale)
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground ml-6">
+                      When off, sales and recipe production skip stock movements for this item.
+                      Useful for virtual items (e.g. the default milk option).
+                    </p>
                   </div>
                 </div>
 
@@ -1764,6 +1782,30 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                                     Select {list.minSelected ?? 0}–{list.maxSelected ?? "∞"}
                                   </p>
                                 )}
+                                {(() => {
+                                  const usages =
+                                    catalogInfo?.modifierListUsageByRecipe?.[list.id] ?? [];
+                                  if (usages.length === 0) return null;
+                                  return (
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="text-xs text-muted-foreground">
+                                        Used by:
+                                      </span>
+                                      {usages.map((u) => (
+                                        <Link
+                                          key={u.recipeId}
+                                          href={`/recipes/${u.recipeId}`}
+                                          className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs hover:bg-accent"
+                                        >
+                                          <span>{u.recipeName}</span>
+                                          {u.modifierCount > 1 && (
+                                            <span className="text-muted-foreground">· {u.modifierCount}</span>
+                                          )}
+                                        </Link>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
                                 <ul className="text-sm space-y-1.5 pl-0 list-none">
                                   {list.modifiers.map((m) => (
                                     <li

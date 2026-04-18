@@ -10,6 +10,7 @@ import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { CreateItemMultiStepDialog } from "@/components/create-item-multistep-dialog";
+import { RecipeModifiersSection, type RecipeModifierRowInput } from "@/components/recipe-modifiers-section";
 import { Save, X, Plus, Trash2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateRecipe, useItems, useUnits, useItemById } from "@kit/hooks";
@@ -49,6 +50,7 @@ function CreateRecipeForm() {
   const [items, setItems] = useState<
     Array<{ itemId: number; quantity: number; unit: string; unitId?: number; notes?: string }>
   >([]);
+  const [modifierRows, setModifierRows] = useState<RecipeModifierRowInput[]>([]);
   const [createItemDialogOpen, setCreateItemDialogOpen] = useState(false);
   const [createItemTargetIndex, setCreateItemTargetIndex] = useState<number | null>(null);
 
@@ -108,6 +110,19 @@ function CreateRecipeForm() {
                 unitId: i.unitId,
                 notes: i.notes,
               }))
+            : undefined,
+        modifierQuantities:
+          modifierRows.length > 0
+            ? modifierRows
+                .filter((r) => r.enabled && r.quantity > 0)
+                .map((r) => ({
+                  modifierId: r.modifierId,
+                  quantity: r.quantity,
+                  unit: r.unit,
+                  unitId: r.unitId,
+                  notes: r.notes,
+                  enabled: r.enabled,
+                }))
             : undefined,
       });
       toast.success("Recipe created successfully");
@@ -280,16 +295,17 @@ function CreateRecipeForm() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-6">
+                    <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <Label className="text-base font-semibold">Items</Label>
+                      <Label className="text-base font-semibold">Ingredients</Label>
                       <Button type="button" variant="outline" size="sm" onClick={addItem}>
                         <Plus className="mr-2 h-4 w-4" />
-                        Add Item
+                        Add Ingredient
                       </Button>
                     </div>
 
-                    <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                       {items.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
                           <p>No items added yet</p>
@@ -355,6 +371,21 @@ function CreateRecipeForm() {
                         ))
                       )}
                     </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-base font-semibold">Modifiers</Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Per-recipe quantities for modifier lists attached to the produced item.
+                        </p>
+                      </div>
+                      <RecipeModifiersSection
+                        producedItemId={formData.producedItemId ?? null}
+                        rows={modifierRows}
+                        onChange={setModifierRows}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -379,7 +410,7 @@ function CreateRecipeForm() {
           setCreateItemDialogOpen(open);
           if (!open) setCreateItemTargetIndex(null);
         }}
-        defaultItemTypes={["item"]}
+        defaultItemTypes={["ingredient"]}
         onCreated={(created) => {
           setItems((prev) => {
             const next = [...prev];

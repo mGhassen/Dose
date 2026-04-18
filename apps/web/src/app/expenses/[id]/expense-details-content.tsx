@@ -37,7 +37,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { DatePicker } from "@kit/ui/date-picker";
-import { AddVendorDialog } from "@/components/add-vendor-dialog";
+import { SupplierFormDialog } from "@/components/supplier-form-dialog";
 import { CategorySelector } from "@/components/category-selector";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { InputGroupAttached } from "@/components/input-group";
@@ -788,10 +788,12 @@ export function ExpenseDetailContent({
                 onCreateNew={() => setAddVendorOpen(true)}
                 placeholder="Select vendor"
               />
-              <AddVendorDialog
+              <SupplierFormDialog
                 open={addVendorOpen}
                 onOpenChange={setAddVendorOpen}
                 onCreated={(v) => setFormData((p) => ({ ...p, supplierId: String(v.id) }))}
+                entityLabel="vendor"
+                defaultSupplierTypes={["vendor"]}
               />
             </div>
             <div className="space-y-2">
