@@ -43,6 +43,7 @@ import { DatePicker } from "@kit/ui/date-picker";
 import type { PersonnelType } from "@kit/types";
 import { projectPersonnelSalary } from "@/lib/calculations/personnel-projections";
 import { EditablePersonnelTimelineRow } from "../personnel-timeline-editable";
+import { ContractorHoursPanel } from "../_components/contractor-hours-panel";
 import {
   TableBody,
   TableCell,
@@ -169,7 +170,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     position: "",
     type: "" as PersonnelType | "",
     baseSalary: "",
-    salaryFrequency: "monthly" as "yearly" | "monthly" | "weekly",
+    salaryFrequency: "monthly" as "yearly" | "monthly" | "weekly" | "hourly",
     startDate: "",
     endDate: "",
     isActive: true,
@@ -211,13 +212,14 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
 
     try {
       const inputSalary = parseFloat(formData.baseSalary);
+      const isHourly = formData.salaryFrequency === 'hourly';
       let monthlySalary = inputSalary;
       if (formData.salaryFrequency === 'yearly') {
         monthlySalary = inputSalary / 12;
       } else if (formData.salaryFrequency === 'weekly') {
         monthlySalary = inputSalary * 52 / 12;
       }
-      const employerCharges = monthlySalary * socialSecurityRate;
+      const employerCharges = isHourly ? 0 : monthlySalary * socialSecurityRate;
 
       await updatePersonnel.mutateAsync({
         id: resolvedParams.id,
@@ -327,7 +329,8 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
     personnelTypeValues.map((ev) => [ev.name, ev.label ?? ev.name])
   );
 
-  const totalCost = personnel.baseSalary + (personnel.baseSalary * employeeSocialTaxRate);
+  const isHourly = personnel.salaryFrequency === 'hourly';
+  const totalCost = isHourly ? personnel.baseSalary : personnel.baseSalary + (personnel.baseSalary * employeeSocialTaxRate);
   const initials = `${personnel.firstName.charAt(0)}${personnel.lastName.charAt(0)}`.toUpperCase();
 
   return (
@@ -433,7 +436,9 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                   </div>
                   <UnifiedSelector label="Type" required type="type" items={personnelTypeItems} selectedId={formData.type || undefined} onSelect={(item) => handleInputChange('type', item.id === 0 ? '' : String(item.id))} placeholder="Select type" />
                   <div className="space-y-2">
-                    <Label htmlFor="baseSalary">Base Salary *</Label>
+                    <Label htmlFor="baseSalary">
+                      {formData.salaryFrequency === 'hourly' ? 'Hourly Rate *' : 'Base Salary *'}
+                    </Label>
                     <Input id="baseSalary" type="number" step="0.01" value={formData.baseSalary} onChange={(e) => handleInputChange('baseSalary', e.target.value)} required />
                   </div>
                   <div className="space-y-2">
@@ -479,7 +484,7 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
         <Tabs defaultValue="overview" className="flex flex-col flex-1 min-h-0 w-full mt-6">
           <TabsList className="grid w-full max-w-md grid-cols-2 shrink-0">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="timeline">Salary Timeline</TabsTrigger>
+            <TabsTrigger value="timeline">{isHourly ? "Hours" : "Salary Timeline"}</TabsTrigger>
           </TabsList>
           <TabsContent value="overview" className="flex-1 min-h-0 overflow-auto mt-4 data-[state=inactive]:hidden">
         <Card>
@@ -525,15 +530,28 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
                     Compensation
                   </h3>
                   <div className="grid gap-6 md:grid-cols-2">
-                    <DetailRow icon={Wallet} label="Base Salary">
-                      {formatCurrency(personnel.baseSalary)} <span className="text-muted-foreground font-normal">/ month</span>
+                    <DetailRow icon={Wallet} label={isHourly ? "Hourly Rate" : "Base Salary"}>
+                      {formatCurrency(personnel.baseSalary)}{' '}
+                      <span className="text-muted-foreground font-normal">
+                        / {isHourly ? 'hour' : 'month'}
+                      </span>
                     </DetailRow>
                     <DetailRow icon={Wallet} label="Frequency">
-                      <Badge variant="outline">{personnel.salaryFrequency === 'yearly' ? 'Yearly' : personnel.salaryFrequency === 'weekly' ? 'Weekly' : 'Monthly'}</Badge>
+                      <Badge variant="outline">
+                        {personnel.salaryFrequency === 'yearly'
+                          ? 'Yearly'
+                          : personnel.salaryFrequency === 'weekly'
+                          ? 'Weekly'
+                          : personnel.salaryFrequency === 'hourly'
+                          ? 'Hourly'
+                          : 'Monthly'}
+                      </Badge>
                     </DetailRow>
-                    <DetailRow icon={Wallet} label="Total Monthly Cost">
-                      <span className="text-primary font-semibold">{formatCurrency(totalCost)}</span>
-                    </DetailRow>
+                    {!isHourly && (
+                      <DetailRow icon={Wallet} label="Total Monthly Cost">
+                        <span className="text-primary font-semibold">{formatCurrency(totalCost)}</span>
+                      </DetailRow>
+                    )}
                   </div>
                 </div>
                 {personnel.notes && (
@@ -554,7 +572,9 @@ export default function PersonnelDetailPage({ params }: PersonnelDetailPageProps
         </Card>
           </TabsContent>
           <TabsContent value="timeline" className="flex flex-col flex-1 min-h-0 mt-4 data-[state=inactive]:hidden">
-            {mergedProjections.length === 0 ? (
+            {isHourly ? (
+              <ContractorHoursPanel personnel={personnel} />
+            ) : mergedProjections.length === 0 ? (
               <div className="flex flex-col items-center justify-center flex-1 min-h-0 rounded-lg border border-dashed py-16 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-4">
                   <Calendar className="h-6 w-6 text-muted-foreground" />

@@ -50,7 +50,7 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
     position: "",
     type: "" as PersonnelType | "",
     baseSalary: "",
-    salaryFrequency: "monthly" as "yearly" | "monthly" | "weekly",
+    salaryFrequency: "monthly" as "yearly" | "monthly" | "weekly" | "hourly",
     startDate: "",
     endDate: "",
     isActive: true,
@@ -92,17 +92,16 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
     if (!resolvedParams?.id) return;
 
     try {
-      // Calculate employer charges from base salary and social security rate
       const inputSalary = parseFloat(formData.baseSalary);
-      // Convert to monthly for calculation
+      const isHourly = formData.salaryFrequency === 'hourly';
       let monthlySalary = inputSalary;
       if (formData.salaryFrequency === 'yearly') {
         monthlySalary = inputSalary / 12;
       } else if (formData.salaryFrequency === 'weekly') {
         monthlySalary = inputSalary * 52 / 12;
       }
-      const employerCharges = monthlySalary * socialSecurityRate;
-      
+      const employerCharges = isHourly ? 0 : monthlySalary * socialSecurityRate;
+
       await updatePersonnel.mutateAsync({
         id: resolvedParams.id,
         data: {
@@ -231,9 +230,10 @@ export default function EditPersonnelPage({ params }: EditPersonnelPageProps) {
                   placeholder="Select type"
                 />
 
-                {/* Base Salary */}
                 <div className="space-y-2">
-                  <Label htmlFor="baseSalary">Base Salary *</Label>
+                  <Label htmlFor="baseSalary">
+                    {formData.salaryFrequency === 'hourly' ? 'Hourly Rate *' : 'Base Salary *'}
+                  </Label>
                   <Input
                     id="baseSalary"
                     type="number"

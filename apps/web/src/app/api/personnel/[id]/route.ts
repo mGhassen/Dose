@@ -25,15 +25,16 @@ function transformPersonnel(row: any): Personnel {
   };
 }
 
-// Convert salary to monthly based on frequency
-function convertToMonthlySalary(salary: number, frequency: 'yearly' | 'monthly' | 'weekly'): number {
+function convertToMonthlySalary(salary: number, frequency: 'yearly' | 'monthly' | 'weekly' | 'hourly'): number {
   switch (frequency) {
     case 'yearly':
       return salary / 12;
     case 'monthly':
       return salary;
     case 'weekly':
-      return salary * 52 / 12; // 52 weeks per year / 12 months
+      return salary * 52 / 12;
+    case 'hourly':
+      return salary;
     default:
       return salary;
   }

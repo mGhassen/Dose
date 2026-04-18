@@ -151,3 +151,79 @@ export function useUpdatePersonnelSalaryProjectionEntry() {
   });
 }
 
+export function usePersonnelHourEntries(personnelId: string) {
+  return useQuery({
+    queryKey: ['personnel', personnelId, 'hour-entries'],
+    queryFn: () => personnelApi.getHourEntries(personnelId),
+    enabled: !!personnelId,
+  });
+}
+
+export function useCreatePersonnelHourEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      personnelId,
+      data,
+    }: {
+      personnelId: string;
+      data: import('@kit/types').CreatePersonnelHourEntryData;
+    }) => personnelApi.createHourEntry(personnelId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['personnel', variables.personnelId, 'hour-entries'] });
+    },
+  });
+}
+
+export function useUpdatePersonnelHourEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      personnelId,
+      entryId,
+      data,
+    }: {
+      personnelId: string;
+      entryId: string;
+      data: import('@kit/types').UpdatePersonnelHourEntryData;
+    }) => personnelApi.updateHourEntry(personnelId, entryId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['personnel', variables.personnelId, 'hour-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    },
+  });
+}
+
+export function useDeletePersonnelHourEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ personnelId, entryId }: { personnelId: string; entryId: string }) =>
+      personnelApi.deleteHourEntry(personnelId, entryId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['personnel', variables.personnelId, 'hour-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    },
+  });
+}
+
+export function useMarkPersonnelHourEntryPaid() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      personnelId,
+      entryId,
+      data,
+    }: {
+      personnelId: string;
+      entryId: string;
+      data: { isPaid: boolean; paidDate?: string; category?: string };
+    }) => personnelApi.markHourEntryPaid(personnelId, entryId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['personnel', variables.personnelId, 'hour-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+    },
+  });
+}
+

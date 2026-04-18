@@ -498,8 +498,8 @@ export interface Personnel {
   email?: string;
   position: string;
   type: PersonnelType;
-  baseSalary: number; // Always stored as monthly salary
-  salaryFrequency: 'yearly' | 'monthly' | 'weekly'; // Frequency of the salary package
+  baseSalary: number; // Always stored as monthly salary (or hourly rate when salaryFrequency = 'hourly')
+  salaryFrequency: 'yearly' | 'monthly' | 'weekly' | 'hourly'; // Frequency of the salary package
   employerCharges: number; // Charges patronales (calculated, always percentage)
   employerChargesType: 'percentage' | 'fixed'; // Always 'percentage' now
   startDate: string;
@@ -569,8 +569,8 @@ export interface CreatePersonnelData {
   email?: string;
   position: string;
   type: PersonnelType;
-  baseSalary: number; // Input salary (will be converted to monthly)
-  salaryFrequency: 'yearly' | 'monthly' | 'weekly'; // Frequency of input salary
+  baseSalary: number; // Input salary (will be converted to monthly) or hourly rate when salaryFrequency = 'hourly'
+  salaryFrequency: 'yearly' | 'monthly' | 'weekly' | 'hourly'; // Frequency of input salary
   employerCharges: number; // Calculated from baseSalary and social security rate
   employerChargesType: 'percentage' | 'fixed'; // Always 'percentage'
   startDate: string;
@@ -580,6 +580,43 @@ export interface CreatePersonnelData {
 }
 
 export interface UpdatePersonnelData extends Partial<CreatePersonnelData> {}
+
+export type PersonnelHourEntryPeriodType = 'day' | 'week' | 'month';
+
+export interface PersonnelHourEntry {
+  id: number;
+  personnelId: number;
+  periodType: PersonnelHourEntryPeriodType;
+  startDate: string;
+  endDate: string;
+  hoursWorked: number;
+  hourlyRate: number;
+  taxVariableId?: number;
+  taxRatePercent: number;
+  amountGross: number;
+  amountTax: number;
+  amountNet: number;
+  isPaid: boolean;
+  paidDate?: string;
+  expenseId?: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePersonnelHourEntryData {
+  personnelId: number;
+  periodType: PersonnelHourEntryPeriodType;
+  startDate: string;
+  endDate: string;
+  hoursWorked: number;
+  hourlyRate: number;
+  taxVariableId?: number;
+  taxRatePercent?: number;
+  notes?: string;
+}
+
+export interface UpdatePersonnelHourEntryData extends Partial<CreatePersonnelHourEntryData> {}
 
 // ============================================================================
 // SALES (CA - Chiffre d'affaires) / TRANSACTIONS

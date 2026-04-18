@@ -1,5 +1,5 @@
 import { apiRequest } from './api';
-import type { Personnel, PersonnelProjection, PersonnelSalaryProjection, CreatePersonnelData, UpdatePersonnelData, CreatePersonnelSalaryProjectionData, UpdatePersonnelSalaryProjectionData, PaginatedResponse, PaginationParams } from '@kit/types';
+import type { Personnel, PersonnelProjection, PersonnelSalaryProjection, PersonnelHourEntry, CreatePersonnelData, UpdatePersonnelData, CreatePersonnelSalaryProjectionData, UpdatePersonnelSalaryProjectionData, CreatePersonnelHourEntryData, UpdatePersonnelHourEntryData, PaginatedResponse, PaginationParams } from '@kit/types';
 
 export const personnelApi = {
   getAll: (params?: PaginationParams) => {
@@ -29,5 +29,23 @@ export const personnelApi = {
     apiRequest<PersonnelSalaryProjection>('PUT', `/api/personnel/${id}/projections/${entryId}`, data),
   deleteSalaryProjectionEntry: (id: string, entryId: string) => 
     apiRequest<void>('DELETE', `/api/personnel/${id}/projections/${entryId}`),
+  getHourEntries: (id: string) =>
+    apiRequest<PersonnelHourEntry[]>('GET', `/api/personnel/${id}/hours`),
+  createHourEntry: (id: string, data: CreatePersonnelHourEntryData) =>
+    apiRequest<PersonnelHourEntry>('POST', `/api/personnel/${id}/hours`, data),
+  updateHourEntry: (id: string, entryId: string, data: UpdatePersonnelHourEntryData) =>
+    apiRequest<PersonnelHourEntry>('PUT', `/api/personnel/${id}/hours/${entryId}`, data),
+  deleteHourEntry: (id: string, entryId: string) =>
+    apiRequest<void>('DELETE', `/api/personnel/${id}/hours/${entryId}`),
+  markHourEntryPaid: (
+    id: string,
+    entryId: string,
+    data: { isPaid: boolean; paidDate?: string; category?: string }
+  ) =>
+    apiRequest<{ id: number; isPaid: boolean; paidDate?: string; expenseId?: number | null }>(
+      'POST',
+      `/api/personnel/${id}/hours/${entryId}/mark-paid`,
+      data
+    ),
 };
 

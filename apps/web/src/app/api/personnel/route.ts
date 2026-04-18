@@ -27,7 +27,7 @@ function transformPersonnel(row: any): Personnel {
 }
 
 // Convert salary to monthly based on frequency
-function convertToMonthlySalary(salary: number, frequency: 'yearly' | 'monthly' | 'weekly'): number {
+function convertToMonthlySalary(salary: number, frequency: 'yearly' | 'monthly' | 'weekly' | 'hourly'): number {
   switch (frequency) {
     case 'yearly':
       return salary / 12;
@@ -35,22 +35,23 @@ function convertToMonthlySalary(salary: number, frequency: 'yearly' | 'monthly' 
       return salary;
     case 'weekly':
       return salary * 52 / 12; // 52 weeks per year / 12 months
+    case 'hourly':
+      return salary; // Store hourly rate as-is in base_salary
     default:
       return salary;
   }
 }
 
 function transformToSnakeCase(data: CreatePersonnelData): any {
-  // Convert salary to monthly before storing
-  const monthlySalary = convertToMonthlySalary(data.baseSalary, data.salaryFrequency);
-  
+  const storedRate = convertToMonthlySalary(data.baseSalary, data.salaryFrequency);
+
   return {
     first_name: data.firstName,
     last_name: data.lastName,
     email: data.email,
     position: data.position,
     type: data.type,
-    base_salary: monthlySalary, // Store as monthly
+    base_salary: storedRate,
     salary_frequency: data.salaryFrequency,
     employer_charges: data.employerCharges,
     employer_charges_type: data.employerChargesType,

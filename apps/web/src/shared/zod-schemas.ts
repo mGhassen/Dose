@@ -80,7 +80,8 @@ export const INVESTMENT_TYPE_NAMES = ["equipment", "renovation", "technology", "
 export const DEPRECIATION_METHOD_NAMES = ["straight_line", "declining_balance", "units_of_production"] as const;
 export const STOCK_MOVEMENT_TYPE_NAMES = ["in", "out", "adjustment", "transfer", "waste", "expired"] as const;
 export const PAYMENT_METHOD_NAMES = ["cash", "card", "bank_transfer"] as const;
-export const SALARY_FREQUENCY_NAMES = ["yearly", "monthly", "weekly"] as const;
+export const SALARY_FREQUENCY_NAMES = ["yearly", "monthly", "weekly", "hourly"] as const;
+export const PERSONNEL_HOUR_PERIOD_TYPE_NAMES = ["day", "week", "month"] as const;
 export const BUDGET_PERIOD_NAMES = ["monthly", "quarterly", "yearly"] as const;
 export const SYNC_TYPE_NAMES = ["orders", "payments", "catalog", "locations", "transactions", "full"] as const;
 export const SYNC_PERIOD_MODE_NAMES = ["last_sync", "custom", "all"] as const;
@@ -716,6 +717,27 @@ export const createPersonnelProjectionSchema = z.object({
   notes: z.string().optional(),
 });
 export type CreatePersonnelProjectionInput = z.infer<typeof createPersonnelProjectionSchema>;
+
+export const createPersonnelHourEntrySchema = z.object({
+  periodType: z.enum(PERSONNEL_HOUR_PERIOD_TYPE_NAMES),
+  startDate: z.string().min(1),
+  endDate: z.string().min(1),
+  hoursWorked: z.number().nonnegative(),
+  hourlyRate: z.number().nonnegative(),
+  taxVariableId: z.number().int().positive().optional(),
+  taxRatePercent: z.number().nonnegative().optional(),
+  notes: z.string().optional(),
+});
+export type CreatePersonnelHourEntryInput = z.infer<typeof createPersonnelHourEntrySchema>;
+export const updatePersonnelHourEntrySchema = createPersonnelHourEntrySchema.partial();
+export type UpdatePersonnelHourEntryInput = z.infer<typeof updatePersonnelHourEntrySchema>;
+
+export const markPersonnelHourEntryPaidSchema = z.object({
+  isPaid: z.boolean(),
+  paidDate: z.string().optional(),
+  category: z.string().optional(),
+});
+export type MarkPersonnelHourEntryPaidInput = z.infer<typeof markPersonnelHourEntryPaidSchema>;
 
 const leasingTypeEnum = z.enum(LEASING_TYPE_NAMES);
 export const createLeasingSchema = z

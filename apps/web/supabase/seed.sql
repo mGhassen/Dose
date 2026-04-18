@@ -409,7 +409,8 @@ FROM metadata_enums e
 CROSS JOIN (VALUES
   ('yearly', 'Yearly', 'Annual salary', 1),
   ('monthly', 'Monthly', 'Monthly salary', 2),
-  ('weekly', 'Weekly', 'Weekly salary', 3)
+  ('weekly', 'Weekly', 'Weekly salary', 3),
+  ('hourly', 'Hourly', 'Hourly rate', 4)
 ) AS v(name, label, description, display_order)
 WHERE e.name = 'SalaryFrequency'
 ON CONFLICT (enum_id, name) DO NOTHING;
