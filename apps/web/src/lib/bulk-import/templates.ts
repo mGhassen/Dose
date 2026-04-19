@@ -13,12 +13,15 @@ export const BULK_IMPORT_COLUMNS: Record<BulkImportEntity, TemplateColumn[]> = {
   items: [
     { key: "name", description: "Item name", required: true },
     { key: "item_types", description: "Comma-separated: item, product, modifier, ingredient", required: true },
-    { key: "unit_id", description: "Unit id" },
-    { key: "category_id", description: "Category id" },
+    { key: "category_name", description: "Category by name (if category_id is empty)" },
+    { key: "category_id", description: "Optional category id — wins over category_name when set" },
+    { key: "unit_label", description: "Unit by label (if unit_id is empty)" },
+    { key: "unit_id", description: "Optional unit variable id — wins over unit_label when set" },
+    { key: "supplier_name", description: "Supplier by name (if vendor_id is empty)" },
+    { key: "vendor_id", description: "Optional supplier id — wins over supplier_name when set" },
     { key: "sku", description: "SKU" },
     { key: "unit_price", description: "Default sell price" },
     { key: "unit_cost", description: "Default cost" },
-    { key: "vendor_id", description: "Supplier id" },
     { key: "affects_stock", description: "true/false" },
   ],
   suppliers: [

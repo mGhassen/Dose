@@ -29,6 +29,10 @@ import {
 import { replacePaymentsForEntry } from "@/lib/ledger/replace-entry-payments";
 import type { BulkImportEntity } from "@/lib/bulk-import/constants";
 import { applyBulkReviewToRow, normalizeBulkReviewPayload } from "@/lib/bulk-import/apply-review-payload";
+import {
+  loadItemCatalogLookups,
+  resolveItemPayloadWithCatalog,
+} from "@/lib/bulk-import/resolve-item-catalog-ids";
 import { parseString, parseNumber, parseIntMaybe, parseBool } from "@/lib/bulk-import/normalize";
 
 type StagingRow = { data_type: string; source_id: string; payload: Record<string, unknown> };
@@ -174,6 +178,9 @@ export async function processBulkImportJob(
 
   const review = normalizeBulkReviewPayload(job.bulk_review_payload);
 
+  const itemCatalogLookups =
+    entity === "items" ? await loadItemCatalogLookups(supabase) : null;
+
   const stats: Record<string, number> = {
     imported: 0,
     failed: 0,
@@ -182,12 +189,15 @@ export async function processBulkImportJob(
   for (const row of rows) {
     const sourceId = row.source_id || "unknown";
     try {
-      const p = applyBulkReviewToRow(
+      let p = applyBulkReviewToRow(
         entity,
         sourceId,
         (row.payload || {}) as Record<string, unknown>,
         review
       );
+      if (entity === "items" && itemCatalogLookups) {
+        p = resolveItemPayloadWithCatalog(p, itemCatalogLookups);
+      }
       switch (entity) {
         case "suppliers": {
           const supplierTypeRaw = parseString((p as { supplierType?: unknown }).supplierType);

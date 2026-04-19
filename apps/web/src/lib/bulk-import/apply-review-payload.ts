@@ -64,17 +64,22 @@ function resolveItemsEntity(p: Record<string, unknown>, r: BulkReviewPayload): R
   const out = { ...p };
   const catName =
     parseString(out.categoryName as string) ??
-    parseString(out.category as string);
+    parseString(out.category as string) ??
+    parseString(out.category_name as string);
   if (out.categoryId == null && catName && r.categoryNameToId?.[catName] != null) {
     out.categoryId = r.categoryNameToId[catName];
   }
   const unitLabel =
-    parseString(out.unitLabel as string) ?? parseString(out.unit as string);
+    parseString(out.unitLabel as string) ??
+    parseString(out.unit as string) ??
+    parseString(out.unit_label as string);
   if (out.unitId == null && unitLabel && r.unitLabelToId?.[unitLabel] != null) {
     out.unitId = r.unitLabelToId[unitLabel];
   }
   const supName =
-    parseString(out.supplierName as string) ?? parseString(out.vendorName as string);
+    parseString(out.supplierName as string) ??
+    parseString(out.vendorName as string) ??
+    parseString(out.supplier_name as string);
   if (out.vendorId == null && supName && r.supplierNameToId?.[supName] != null) {
     out.vendorId = r.supplierNameToId[supName];
   }

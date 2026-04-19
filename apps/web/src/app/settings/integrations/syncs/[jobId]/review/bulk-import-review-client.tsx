@@ -398,7 +398,8 @@ export function BulkImportReviewClient() {
               <span className="font-mono text-xs">
                 bySourceId, categoryNameToId, unitLabelToId, supplierNameToId, skuToItemId, itemNameToId
               </span>
-              . Staged rows can use semantic names (e.g. categoryName + maps) where the parser provides them.
+              . Items: use category_id / unit_id / vendor_id if you have them; otherwise category_name,
+              unit_label, supplier_name (or maps below).
             </CardDescription>
           </CardHeader>
           <CardContent>

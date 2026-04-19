@@ -53,13 +53,28 @@ function collectFromPayload(
   switch (entity) {
     case "items": {
       if (parseIntMaybe(p.categoryId) == null) {
-        add(cats, parseString(p.categoryName as string) ?? parseString(p.category as string));
+        add(
+          cats,
+          parseString(p.categoryName as string) ??
+            parseString(p.category as string) ??
+            parseString(p.category_name as string)
+        );
       }
       if (parseIntMaybe(p.unitId) == null) {
-        add(units, parseString(p.unitLabel as string) ?? parseString(p.unit as string));
+        add(
+          units,
+          parseString(p.unitLabel as string) ??
+            parseString(p.unit as string) ??
+            parseString(p.unit_label as string)
+        );
       }
       if (parseIntMaybe(p.vendorId) == null) {
-        add(sups, parseString(p.supplierName as string) ?? parseString(p.vendorName as string));
+        add(
+          sups,
+          parseString(p.supplierName as string) ??
+            parseString(p.vendorName as string) ??
+            parseString(p.supplier_name as string)
+        );
       }
       break;
     }
