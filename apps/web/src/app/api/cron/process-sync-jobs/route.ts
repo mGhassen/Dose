@@ -10,6 +10,7 @@ import {
   getNextStepSequence,
 } from '@/app/api/integrations/[id]/sync/sync-processor';
 import { processPennylaneSyncJob } from '@/app/api/integrations/[id]/sync/pennylane-processor';
+import { processBulkImportJob } from '@/app/api/integrations/[id]/sync/bulk-import-processor';
 import {
   recoverMissingCatalog,
   backfillAffectedSales,
@@ -95,6 +96,65 @@ async function runProcessor(specificJobId?: number) {
           completed_at: new Date().toISOString(),
         })
         .eq('id', job.id);
+      continue;
+    }
+
+    if (integration.integration_type === 'csv_bulk') {
+      const { data: bulkRows, error: bulkErr } = await supabase
+        .from('sync_pennylane_data')
+        .select('data_type, source_id, payload')
+        .eq('job_id', job.id);
+      if (bulkErr) {
+        await supabase
+          .from('sync_jobs')
+          .update({
+            status: 'failed',
+            error_message: bulkErr.message,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', job.id);
+        continue;
+      }
+      const rows = (bulkRows ?? []) as { data_type: string; source_id: string; payload: any }[];
+      try {
+        const result = await processBulkImportJob(supabase, job, integration, rows);
+        const completedAt = new Date().toISOString();
+        await supabase
+          .from('sync_jobs')
+          .update({
+            status: 'completed',
+            completed_at: completedAt,
+            error_message: result.error_message ?? null,
+            stats: result.stats,
+          })
+          .eq('id', job.id);
+        await supabase
+          .from('integrations')
+          .update({
+            last_sync_at: completedAt,
+            last_sync_status: 'success',
+            last_sync_error: result.error_message ?? null,
+          })
+          .eq('id', job.integration_id);
+      } catch (e: any) {
+        const completedAt = new Date().toISOString();
+        await supabase
+          .from('sync_jobs')
+          .update({
+            status: 'failed',
+            completed_at: completedAt,
+            error_message: e?.message || 'Bulk import processing failed',
+          })
+          .eq('id', job.id);
+        await supabase
+          .from('integrations')
+          .update({
+            last_sync_at: completedAt,
+            last_sync_status: 'error',
+            last_sync_error: e?.message || 'Bulk import processing failed',
+          })
+          .eq('id', job.integration_id);
+      }
       continue;
     }
 

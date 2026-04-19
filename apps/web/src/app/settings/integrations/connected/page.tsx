@@ -10,6 +10,7 @@ import {
   Square, 
   Wallet,
   FileSpreadsheet,
+  Database,
   CheckCircle2, 
   XCircle, 
   Clock,
@@ -24,6 +25,7 @@ const AVAILABLE_INTEGRATIONS = [
   { type: 'square', name: 'Square POS', icon: Square, color: 'text-blue-500' },
   { type: 'pennylane', name: 'Pennylane', icon: Wallet, color: 'text-emerald-600' },
   { type: 'csv_bank', name: 'Bank statements (CSV/Excel)', icon: FileSpreadsheet, color: 'text-violet-600' },
+  { type: 'csv_bulk', name: 'Bulk data (CSV/Excel)', icon: Database, color: 'text-teal-600' },
 ];
 
 function getStatusBadge(status: string) {
@@ -47,6 +49,8 @@ function getIntegrationIcon(type: string) {
       return Square;
     case 'csv_bank':
       return FileSpreadsheet;
+    case 'csv_bulk':
+      return Database;
     default:
       return Settings;
   }

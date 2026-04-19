@@ -74,6 +74,12 @@ export const integrationsApi = {
     formData.set('file', file);
     return apiRequest<{ job_id: number; message?: string }>('POST', `/api/integrations/${id}/import-bank-file`, formData, undefined, { timeout: 120000 });
   },
+  importBulkFile: (id: string, file: File, entity: string) => {
+    const formData = new FormData();
+    formData.set('file', file);
+    formData.set('entity', entity);
+    return apiRequest<{ job_id: number; message?: string }>('POST', `/api/integrations/${id}/import-bulk-file`, formData, undefined, { timeout: 120000 });
+  },
   backfillSaleItems: (id: string, params?: { offset?: number; limit?: number }) => {
     const sp = new URLSearchParams();
     if (params?.offset != null) sp.set('offset', String(params.offset));

@@ -21,7 +21,9 @@ import { Checkbox } from "@kit/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@kit/ui/radio-group";
 import { Save, X, Trash2, Calendar, MoreVertical, Edit2, Download } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useLeasingById, useUpdateLeasing, useDeleteLeasing, useActualPayments, useInventorySupplierById, useMetadataEnum } from "@kit/hooks";
+import { useLeasingById, useUpdateLeasing, useDeleteLeasing, useInventorySupplierById, useMetadataEnum } from "@kit/hooks";
+import { useQuery } from "@tanstack/react-query";
+import { entriesApi } from "@kit/lib";
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatCurrency } from "@kit/lib/config";
@@ -63,11 +65,19 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
   const [timeline, setTimeline] = useState<LeasingTimelineEntry[]>([]);
   const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
   
-  // Fetch all actual payments for this leasing once, instead of per-row
-  const { data: allActualPayments } = useActualPayments({
-    paymentType: 'leasing',
-    referenceId: resolvedParams?.id || '',
+  const { data: leasingEntriesPage } = useQuery({
+    queryKey: ["entries", "leasing-detail", resolvedParams?.id],
+    queryFn: () =>
+      entriesApi.getAll({
+        entryType: "leasing_payment",
+        referenceId: Number(resolvedParams!.id),
+        direction: "output",
+        includePayments: true,
+        limit: 2000,
+      }),
+    enabled: !!resolvedParams?.id,
   });
+  const allEntries = leasingEntriesPage?.data ?? [];
   
   const [formData, setFormData] = useState({
     name: "",
@@ -89,7 +99,8 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
   }, [params]);
 
   const handleTimelineUpdate = () => {
-    queryClient.invalidateQueries({ queryKey: ['actual-payments'] });
+    queryClient.invalidateQueries({ queryKey: ["actual-payments"] });
+    queryClient.invalidateQueries({ queryKey: ["entries"] });
     // Just refetch timeline entries, don't regenerate
     if (resolvedParams?.id && leasing) {
       fetchTimelineEntries(false); // Pass false to skip generation
@@ -1010,7 +1021,7 @@ export default function LeasingDetailPageClient({ params }: LeasingDetailPagePro
                         entry={entry}
                         leasingId={Number(resolvedParams?.id || 0)}
                         leasingEndDate={leasing.endDate}
-                        allActualPayments={allActualPayments || []}
+                        allEntries={allEntries}
                         onUpdate={handleTimelineUpdate}
                       />
                     ))}

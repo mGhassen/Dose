@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { isConvertibleDimension } from "@/lib/units/dimensions";
+import type { BulkImportEntity } from "@/lib/bulk-import/constants";
+import { BULK_IMPORT_ENTITY_NAMES } from "@/lib/bulk-import/constants";
 
 export async function parseRequestBody<T>(
   request: Request,
@@ -989,6 +991,11 @@ export const createIntegrationSchema = z.object({
   sync_frequency: z.string().optional(),
 });
 export type CreateIntegrationInput = z.infer<typeof createIntegrationSchema>;
+
+export const bulkImportEntitySchema = z.enum(
+  BULK_IMPORT_ENTITY_NAMES as unknown as [BulkImportEntity, ...BulkImportEntity[]]
+);
+export type BulkImportEntityInput = z.infer<typeof bulkImportEntitySchema>;
 export const updateIntegrationSchema = z.object({
   name: z.string().min(1).optional(),
   status: z.string().optional(),

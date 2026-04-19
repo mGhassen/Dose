@@ -180,6 +180,19 @@ export function useImportBankFile() {
   });
 }
 
+export function useImportBulkFile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, file, entity }: { id: string; file: File; entity: string }) =>
+      integrationsApi.importBulkFile(id, file, entity),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['integrations'] });
+      queryClient.invalidateQueries({ queryKey: ['integrations', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['integrations', variables.id, 'sync', 'jobs'] });
+    },
+  });
+}
+
 export function useBackfillSaleItems() {
   return useMutation({
     mutationFn: ({ id, offset, limit }: { id: string; offset?: number; limit?: number }) =>

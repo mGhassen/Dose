@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useIntegrationById, useSyncIntegration, useSyncJobs, useRetrySyncJob, useDisconnectIntegration, useImportBankFile, useBackfillSaleItems } from '@kit/hooks';
+import { useIntegrationById, useSyncIntegration, useSyncJobs, useRetrySyncJob, useDisconnectIntegration, useImportBankFile, useImportBulkFile, useBackfillSaleItems } from '@kit/hooks';
 import AppLayout from '@/components/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { Button } from '@kit/ui/button';
@@ -38,6 +38,7 @@ import {
   Upload,
   X,
   Wrench,
+  Database,
 } from 'lucide-react';
 import { useToast } from '@kit/hooks';
 import { cn } from '@kit/lib/utils';
@@ -46,6 +47,15 @@ import SquareDataView from '../square-data-view';
 import { Alert, AlertDescription } from '@kit/ui/alert';
 import { ConfirmationDialog } from '@/components/confirmation-dialog';
 import { SyncPeriodDialog, type SyncPeriodSelection } from './sync-period-dialog';
+import {
+  BULK_IMPORT_ENTITY_NAMES,
+  BULK_IMPORT_ENTITY_LABELS,
+  type BulkImportEntity,
+} from '@/lib/bulk-import/constants';
+import { buildBulkImportExampleCsv, bulkImportTemplateHint } from '@/lib/bulk-import/templates';
+import { buildBulkImportExampleXlsxBlob } from '@/lib/bulk-import/example-xlsx';
+import { Label } from '@kit/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@kit/ui/select';
 
 function getStatusBadge(status: string) {
   switch (status) {
@@ -70,6 +80,8 @@ function getIntegrationIcon(type: string) {
       return Wallet;
     case 'csv_bank':
       return FileSpreadsheet;
+    case 'csv_bulk':
+      return Database;
     default:
       return Settings;
   }
@@ -201,9 +213,12 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
   const [isDisconnectDialogOpen, setIsDisconnectDialogOpen] = useState(false);
   const [isSyncPeriodOpen, setIsSyncPeriodOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
+  const [bulkEntity, setBulkEntity] = useState<BulkImportEntity>('suppliers');
   const { data: integration, isLoading } = useIntegrationById(id);
   const syncIntegration = useSyncIntegration();
   const importBankFile = useImportBankFile();
+  const importBulkFile = useImportBulkFile();
   const backfillSaleItems = useBackfillSaleItems();
   const { data: syncJobs = [] } = useSyncJobs(id);
   const retrySyncJob = useRetrySyncJob();
@@ -250,6 +265,43 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
     }
     try {
       const res = await importBankFile.mutateAsync({ id, file: importFile });
+      if (res?.job_id != null) {
+        window.location.href = `/settings/integrations/syncs/${res.job_id}`;
+        toast({ title: 'Import started', description: `Job #${res.job_id}` });
+      }
+    } catch (e: any) {
+      toast({ title: 'Import failed', description: e?.message || 'Failed to import file', variant: 'destructive' });
+    }
+  };
+
+  const downloadBulkExampleCsv = () => {
+    const { filename, content } = buildBulkImportExampleCsv(bulkEntity);
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadBulkExampleXlsx = () => {
+    const { filename, blob } = buildBulkImportExampleXlsxBlob(bulkEntity);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleBulkImport = async () => {
+    if (!bulkImportFile) {
+      toast({ title: 'Missing file', description: 'Pick a CSV or .xlsx file first.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const res = await importBulkFile.mutateAsync({ id, file: bulkImportFile, entity: bulkEntity });
       if (res?.job_id != null) {
         window.location.href = `/settings/integrations/syncs/${res.job_id}`;
         toast({ title: 'Import started', description: `Job #${res.job_id}` });
@@ -562,6 +614,54 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
               </Card>
             )}
 
+            {integration.integration_type === 'csv_bulk' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Bulk data import</CardTitle>
+                  <CardDescription>
+                    Choose what you are importing, download the example file for that entity, then upload your CSV or
+                    Excel (.xlsx).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2 max-w-md">
+                    <Label htmlFor="bulk-entity">Entity to import</Label>
+                    <Select value={bulkEntity} onValueChange={(v) => setBulkEntity(v as BulkImportEntity)}>
+                      <SelectTrigger id="bulk-entity">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BULK_IMPORT_ENTITY_NAMES.map((key) => (
+                          <SelectItem key={key} value={key}>
+                            {BULK_IMPORT_ENTITY_LABELS[key]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{bulkImportTemplateHint(bulkEntity)}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={downloadBulkExampleCsv}>
+                      Download example (.csv)
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={downloadBulkExampleXlsx}>
+                      Download example (.xlsx)
+                    </Button>
+                  </div>
+                  <CsvBankImportDropzone
+                    onImport={handleBulkImport}
+                    file={bulkImportFile}
+                    onFileChange={setBulkImportFile}
+                    isImporting={importBulkFile.isPending}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Recipes and supplier orders: use the two-sheet Excel layout (see downloaded .xlsx). Other entities
+                    use a single sheet or CSV.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Sync Jobs Card */}
             <Card>
               <CardHeader>
@@ -592,7 +692,7 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                     </div>
                     {lastJob.stats && typeof lastJob.stats === 'object' && (
                       <p className="text-sm text-muted-foreground">
-                        Imported: {[lastJob.stats.items_imported, lastJob.stats.orders_imported, lastJob.stats.payments_imported, lastJob.stats.transactions_imported].filter(Boolean).join(', ') || '—'}
+                        Imported: {[lastJob.stats.imported, lastJob.stats.items_imported, lastJob.stats.orders_imported, lastJob.stats.payments_imported, lastJob.stats.transactions_imported].filter((x) => x != null).join(', ') || '—'}
                         {(lastJob.stats.items_failed || lastJob.stats.orders_failed || lastJob.stats.payments_failed) ? (
                           <span className="text-destructive ml-2">
                             Failed: {[lastJob.stats.items_failed, lastJob.stats.orders_failed, lastJob.stats.payments_failed].filter(Boolean).join(', ')}

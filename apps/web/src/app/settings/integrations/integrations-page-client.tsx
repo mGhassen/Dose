@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   ExternalLink,
   Activity,
+  Database,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@kit/hooks';
@@ -83,6 +84,7 @@ export function IntegrationsPageClient() {
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isOpeningCsvBank, setIsOpeningCsvBank] = useState(false);
+  const [isOpeningCsvBulk, setIsOpeningCsvBulk] = useState(false);
 
   const openCsvBankImport = async () => {
     try {
@@ -103,6 +105,28 @@ export function IntegrationsPageClient() {
       toast({ title: 'Error', description: e?.message || 'Failed to open import', variant: 'destructive' });
     } finally {
       setIsOpeningCsvBank(false);
+    }
+  };
+
+  const openCsvBulkImport = async () => {
+    try {
+      setIsOpeningCsvBulk(true);
+      const existing = await integrationsApi.getByType('csv_bulk');
+      if (existing?.id) {
+        router.push(`/settings/integrations/${existing.id}`);
+        return;
+      }
+      const created = await createIntegration.mutateAsync({
+        integration_type: 'csv_bulk' as any,
+        name: 'Bulk data (CSV/Excel)',
+        config: {},
+        sync_frequency: 'manual' as any,
+      });
+      if (created?.id) router.push(`/settings/integrations/${created.id}`);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Failed to open bulk import', variant: 'destructive' });
+    } finally {
+      setIsOpeningCsvBulk(false);
     }
   };
 
@@ -325,6 +349,29 @@ export function IntegrationsPageClient() {
                   <Button onClick={openCsvBankImport} disabled={isOpeningCsvBank}>
                     {isOpeningCsvBank ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 mr-2" />}
                     Import file
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-teal-200 dark:border-teal-900">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-teal-500/10">
+                      <Database className="h-5 w-5 text-teal-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold">Bulk data import (CSV/Excel)</h2>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        Import recipes, items, suppliers, sales, and more. Pick an entity, download the example
+                        template, then upload your file.
+                      </p>
+                    </div>
+                  </div>
+                  <Button onClick={openCsvBulkImport} disabled={isOpeningCsvBulk}>
+                    {isOpeningCsvBulk ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Database className="h-4 w-4 mr-2" />}
+                    Open bulk import
                   </Button>
                 </div>
               </CardContent>
