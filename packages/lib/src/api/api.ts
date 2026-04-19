@@ -135,7 +135,8 @@ export async function apiRequest<T>(
         }
         
         const is404 = response.status === 404;
-        if (!is404) {
+        const isUnauthorized = response.status === 401;
+        if (!is404 && !isUnauthorized) {
           console.error(`[API Error] ${method} ${endpoint} -> ${response.status} ${response.statusText}`);
           console.error(`[API Error] Response Body: ${errorText.substring(0, 500)}${errorText.length > 500 ? '...' : ''}`);
           console.error(`[API Error] Full URL: ${url}`);
@@ -208,9 +209,10 @@ export async function apiRequest<T>(
       }
       const status = (error as any)?.status;
       const isExpected404 = status === 404;
+      const isExpected401 = status === 401;
       const isAbort =
         error instanceof Error && (error.name === 'AbortError' || (error as any).isAbortError);
-      if (!isExpected404 && !isAbort) {
+      if (!isExpected404 && !isExpected401 && !isAbort) {
         console.error('API request error:', error);
       }
       throw error;

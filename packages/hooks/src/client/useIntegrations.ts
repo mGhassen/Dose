@@ -27,8 +27,10 @@ export function useIntegrations() {
         // Ensure we always return an array
         return Array.isArray(data) ? data : [];
       } catch (error) {
-        console.error('Error fetching integrations:', error);
-        // Return empty array on error to prevent infinite loops
+        const status = (error as { status?: number })?.status;
+        if (status !== 401) {
+          console.error('Error fetching integrations:', error);
+        }
         return [];
       }
     },
