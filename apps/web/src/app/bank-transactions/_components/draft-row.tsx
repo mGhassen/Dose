@@ -20,8 +20,9 @@ import {
   useInventorySuppliers,
   useItems,
   useSales,
+  useMetadataEnum,
 } from "@kit/hooks";
-import { EXPENSE_CATEGORY_NAMES, SALES_TYPE_NAMES } from "@/shared/zod-schemas";
+import { SALES_TYPE_NAMES } from "@/shared/zod-schemas";
 import type { DraftLine } from "./allocation-types";
 
 type Props = {
@@ -297,6 +298,7 @@ function NewExpenseBody({
   draft,
   update,
 }: Props & { draft: Extract<DraftLine, { kind: "new_expense" }> }) {
+  const { data: expenseCategories = [] } = useMetadataEnum("ExpenseCategory");
   const { data: suppliersRes } = useInventorySuppliers({ limit: 300 });
   const suppliers = (suppliersRes?.data ?? []).map((s) => ({ id: s.id, name: s.name }));
 
@@ -317,9 +319,9 @@ function NewExpenseBody({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {EXPENSE_CATEGORY_NAMES.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
+            {expenseCategories.map((c) => (
+              <SelectItem key={c.id} value={c.name}>
+                {c.label ?? c.name}
               </SelectItem>
             ))}
           </SelectContent>

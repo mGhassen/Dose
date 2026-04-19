@@ -61,10 +61,23 @@ export async function GET(request: NextRequest) {
 
     const supabase = supabaseServer();
 
+    let pItemIds: number[] | null = null;
+    if (itemIdRaw) {
+      const id = Number(itemIdRaw);
+      if (!Number.isFinite(id)) {
+        return NextResponse.json(
+          { error: 'Invalid itemId', details: 'itemId must be a number' },
+          { status: 400 }
+        );
+      }
+      const { getGroupMemberIds } = await import('@/lib/items/group-members');
+      pItemIds = await getGroupMemberIds(supabase, id);
+    }
+
     const { data, error } = await supabase.rpc('stock_movements_analytics', {
       p_start_date: startDate ?? null,
       p_end_date: endDate ? `${endDate}T23:59:59.999Z` : null,
-      p_item_id: itemIdRaw ? Number(itemIdRaw) : null,
+      p_item_ids: pItemIds,
       p_movement_types: types,
     });
 

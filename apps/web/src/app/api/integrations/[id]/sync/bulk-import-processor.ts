@@ -27,6 +27,7 @@ import {
   insertRecipeProducedLinks,
 } from "@/lib/recipes/produced-item-output-links";
 import { replacePaymentsForEntry } from "@/lib/ledger/replace-entry-payments";
+import { expenseCategoryNameIsActive } from "@/lib/metadata-expense-category";
 import type { BulkImportEntity } from "@/lib/bulk-import/constants";
 import { applyBulkReviewToRow, normalizeBulkReviewPayload } from "@/lib/bulk-import/apply-review-payload";
 import {
@@ -388,6 +389,9 @@ export async function processBulkImportJob(
           const parsed = createExpenseSchema.safeParse(p);
           if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid expense");
           const body = parsed.data;
+          if (!(await expenseCategoryNameIsActive(supabase, body.category))) {
+            throw new Error("Invalid expense category (not in active ExpenseCategory metadata)");
+          }
           const { data, error } = await supabase
             .from("expenses")
             .insert({
@@ -431,6 +435,9 @@ export async function processBulkImportJob(
           const parsed = createSubscriptionSchema.safeParse(p);
           if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid subscription");
           const body = parsed.data;
+          if (!(await expenseCategoryNameIsActive(supabase, body.category))) {
+            throw new Error("Invalid subscription category (not in active ExpenseCategory metadata)");
+          }
           const { data: itemRow, error: itemError } = await supabase
             .from("items")
             .insert({

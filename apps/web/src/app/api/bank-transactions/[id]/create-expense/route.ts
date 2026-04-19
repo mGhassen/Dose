@@ -3,6 +3,10 @@ import { supabaseServer } from '@kit/lib/supabase';
 import { parseBody, bankTransactionCreateExpenseBodySchema } from '@/shared/zod-schemas';
 import type { BankTransactionCreateExpenseBody } from '@/shared/zod-schemas';
 import { executeBankTransactionSplit } from '@/lib/bank-transactions/execute-split';
+import {
+  expenseCategoryNameIsActive,
+  invalidExpenseCategoryResponse,
+} from '@/lib/metadata-expense-category';
 
 /** Thin wrapper: create a new expense and link it to a debit bank transaction. */
 export async function POST(
@@ -22,6 +26,10 @@ export async function POST(
     const body: BankTransactionCreateExpenseBody = parsed.data;
 
     const supabase = supabaseServer();
+    if (!(await expenseCategoryNameIsActive(supabase, body.category))) {
+      return invalidExpenseCategoryResponse();
+    }
+
     const { data: bankTx } = await supabase
       .from('bank_transactions')
       .select('amount')

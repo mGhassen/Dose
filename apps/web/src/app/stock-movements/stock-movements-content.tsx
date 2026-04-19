@@ -11,6 +11,7 @@ import {
   useStockMovementsAnalytics,
   useStockMovementById,
   useDeleteStockMovement,
+  useItemById,
   useItems,
   useMetadataEnum,
 } from "@kit/hooks";
@@ -584,7 +585,14 @@ export default function StockMovementsContent() {
   const { data: itemsResponse } = useItems({ limit: 1000, excludeCatalogParents: true });
   const items: Item[] = itemsResponse?.data ?? [];
   const itemMap = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
-  const selectedItem = selectedItemId ? itemMap.get(Number(selectedItemId)) : undefined;
+  const selectedItemFromList = useMemo(
+    () => (selectedItemId ? itemMap.get(Number(selectedItemId)) : undefined),
+    [itemMap, selectedItemId]
+  );
+  const { data: selectedItemFetched } = useItemById(
+    selectedItemId && !selectedItemFromList ? selectedItemId : ""
+  );
+  const selectedItem = selectedItemFromList ?? selectedItemFetched ?? undefined;
 
   const tableMovements: MovementWithIngredient[] =
     (tableResponse?.data as MovementWithIngredient[]) || [];
@@ -1278,6 +1286,7 @@ export default function StockMovementsContent() {
         <AnalyticsBlock
           activeTab={analyticsTab}
           onTabChange={setAnalyticsTab}
+          selectedItemId={selectedItemId}
           selectedItem={selectedItem}
           balanceChartData={balanceChartData}
           startingBalance={startingBalance}
@@ -1416,6 +1425,7 @@ export default function StockMovementsContent() {
 type AnalyticsBlockProps = {
   activeTab: string;
   onTabChange: (v: string) => void;
+  selectedItemId: string;
   selectedItem?: Item;
   balanceChartData: Array<{ date: string; in: number; out: number; balance: number }>;
   startingBalance: number;
@@ -1494,6 +1504,7 @@ function EmptyChart({
 function AnalyticsBlock({
   activeTab,
   onTabChange,
+  selectedItemId,
   selectedItem,
   balanceChartData,
   startingBalance,
@@ -1531,17 +1542,17 @@ function AnalyticsBlock({
           <div>
             <CardTitle>Stock analytics</CardTitle>
             <CardDescription>
-              {selectedItem
-                ? `Detailed insights for ${selectedItem.name}`
+              {selectedItemId
+                ? `Detailed insights for ${selectedItem?.name ?? "…"}`
                 : "Detailed insights across all items"}
             </CardDescription>
           </div>
-          {selectedItem && balanceChartData.length > 0 ? (
+          {selectedItemId && balanceChartData.length > 0 ? (
             <div className="flex gap-6 text-sm">
               <div>
                 <div className="text-xs uppercase text-muted-foreground">Start</div>
                 <div className="font-semibold tabular-nums">
-                  {formatSignedNumber(startingBalance)} {selectedItem.unit}
+                  {formatSignedNumber(startingBalance)} {unitLabel}
                 </div>
               </div>
               <div>
@@ -1556,7 +1567,7 @@ function AnalyticsBlock({
                       : ""
                   )}
                 >
-                  {formatSignedNumber(endingBalance)} {selectedItem.unit}
+                  {formatSignedNumber(endingBalance)} {unitLabel}
                 </div>
               </div>
             </div>
@@ -1567,12 +1578,12 @@ function AnalyticsBlock({
         <Tabs value={activeTab} onValueChange={onTabChange}>
           <TabsList className="flex-wrap">
             <TabsTrigger value="activity">Daily activity</TabsTrigger>
-            <TabsTrigger value="balance" disabled={!selectedItem}>
+            <TabsTrigger value="balance" disabled={!selectedItemId}>
               Running balance
             </TabsTrigger>
             <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
             <TabsTrigger value="categories">By category</TabsTrigger>
-            <TabsTrigger value="items" disabled={!!selectedItem}>
+            <TabsTrigger value="items" disabled={!!selectedItemId}>
               Top items
             </TabsTrigger>
             <TabsTrigger value="types">By type</TabsTrigger>
@@ -1620,12 +1631,12 @@ function AnalyticsBlock({
           </TabsContent>
 
           <TabsContent value="balance" className="mt-4">
-            {!selectedItem || balanceChartData.length === 0 ? (
+            {!selectedItemId || balanceChartData.length === 0 ? (
               <EmptyChart
                 hasActiveFilters={hasActiveFilters}
                 resetFilters={resetFilters}
                 message={
-                  !selectedItem
+                  !selectedItemId
                     ? "Pick an item to see its running balance"
                     : "No movements in this period"
                 }
@@ -1672,7 +1683,7 @@ function AnalyticsBlock({
                     contentStyle={TOOLTIP_STYLE}
                     labelFormatter={(v) => formatDate(v as string)}
                     formatter={(value: number, key: string) => [
-                      `${formatSignedNumber(value)} ${selectedItem.unit}`,
+                      `${formatSignedNumber(value)} ${selectedItem?.unit ?? unitLabel}`,
                       key === "in" ? "IN" : key === "out" ? "OUT" : "Balance",
                     ]}
                     cursor={{ fill: "rgba(139, 92, 246, 0.08)" }}

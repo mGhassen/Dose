@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
 import { DatePicker } from "@kit/ui/date-picker";
@@ -11,16 +11,26 @@ import { Textarea } from "@kit/ui/textarea";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useCreateStockMovement, useItems, useUnits, useMetadataEnum } from "@kit/hooks";
+import { useCreateStockMovement, useItemById, useItems, useUnits, useMetadataEnum } from "@kit/hooks";
 import { toast } from "sonner";
 import { StockMovementType } from "@kit/types";
 import { dateToYYYYMMDD } from "@kit/lib";
 
-export default function CreateStockMovementPage() {
+function CreateStockMovementForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const createMovement = useCreateStockMovement();
   const { data: itemsResponse } = useItems({ limit: 1000 });
-  
+
+  const itemParam = searchParams.get("itemId");
+  const itemIdParsed = itemParam ? parseInt(itemParam, 10) : NaN;
+  const prefillItemId =
+    !Number.isNaN(itemIdParsed) && itemIdParsed > 0 ? itemIdParsed : null;
+  const { data: prefillItem } = useItemById(
+    prefillItemId != null ? String(prefillItemId) : ""
+  );
+  const prefilledFromQueryRef = useRef<number | null>(null);
+
   const items = itemsResponse?.data || [];
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
@@ -35,6 +45,19 @@ export default function CreateStockMovementPage() {
     notes: "",
     movementDate: dateToYYYYMMDD(new Date()),
   });
+
+  const selectableItems = items.filter((i) => i.isActive && !i.isCatalogParent);
+
+  useEffect(() => {
+    if (prefillItemId == null || !prefillItem) return;
+    if (prefilledFromQueryRef.current === prefillItemId) return;
+    prefilledFromQueryRef.current = prefillItemId;
+    setFormData((prev) => ({
+      ...prev,
+      itemId: String(prefillItem.id),
+      unitId: prefillItem.unitId ?? prev.unitId,
+    }));
+  }, [prefillItemId, prefillItem]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,12 +123,19 @@ export default function CreateStockMovementPage() {
                     label="Item"
                     required
                     type="item"
-                    items={items.filter((i) => i.isActive && i.itemTypes?.includes("item")).map((item) => ({
+                    items={selectableItems.map((item) => ({
                       ...item,
                       id: item.id,
                       name: `${item.name} (${item.unit})`,
                     }))}
-                    selectedId={formData.itemId ? parseInt(formData.itemId) : undefined}
+                    selectedId={formData.itemId ? parseInt(formData.itemId, 10) : undefined}
+                    selectedDisplayName={
+                      formData.itemId &&
+                      prefillItem &&
+                      prefillItem.id === parseInt(formData.itemId, 10)
+                        ? `${prefillItem.name} (${prefillItem.unit})`
+                        : undefined
+                    }
                     onSelect={(item) => handleInputChange('itemId', item.id === 0 ? '' : String(item.id))}
                     placeholder="Select item"
                     getDisplayName={(item) => item.name ?? `Item ${item.id}`}
@@ -202,3 +232,18 @@ export default function CreateStockMovementPage() {
   );
 }
 
+export default function CreateStockMovementPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppLayout>
+          <div className="flex min-h-[200px] items-center justify-center text-muted-foreground">
+            Loading…
+          </div>
+        </AppLayout>
+      }
+    >
+      <CreateStockMovementForm />
+    </Suspense>
+  );
+}

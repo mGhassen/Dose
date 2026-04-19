@@ -19,6 +19,10 @@ import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/led
 import { toPositiveItemId } from '@/lib/merge-selector-items';
 import { hydrateExpenseLineItemItems } from '@/lib/expenses/hydrate-expense-line-item-items';
 import { replaceExpenseStockMovements } from '@/lib/expenses/replace-expense-stock-movements';
+import {
+  expenseCategoryNameIsActive,
+  invalidExpenseCategoryResponse,
+} from '@/lib/metadata-expense-category';
 
 async function rollbackCreatedExpenseTransaction(
   supabase: SupabaseClient,
@@ -208,9 +212,13 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const body = parsed.data;
 
+    const supabase = supabaseServer();
+    if (!(await expenseCategoryNameIsActive(supabase, body.category))) {
+      return invalidExpenseCategoryResponse();
+    }
+
     if ('lineItems' in body && Array.isArray(body.lineItems) && body.lineItems.length > 0) {
       const txBody = body as import('@/shared/zod-schemas').CreateExpenseTransactionInput;
-      const supabase = supabaseServer();
       const { getTaxRateAndRuleForExpenseLineWithItemTaxes } = await import('@/lib/item-taxes-resolve');
       const { lineTaxAmount, to2Decimals } = await import('@/lib/transaction-tax');
       const dateStr = (txBody.expenseDate || '').split('T')[0] || txBody.expenseDate;
@@ -394,7 +402,6 @@ export async function POST(request: NextRequest) {
 
     const bodyLegacy = body as unknown as CreateExpenseData;
 
-    const supabase = supabaseServer();
     const { data, error } = await supabase
       .from('expenses')
       .insert(transformToSnakeCase(bodyLegacy))

@@ -8,6 +8,10 @@ import { toPositiveItemId } from '@/lib/merge-selector-items';
 import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
 import { hydrateExpenseLineItemItems } from '@/lib/expenses/hydrate-expense-line-item-items';
 import { replaceExpenseStockMovements } from '@/lib/expenses/replace-expense-stock-movements';
+import {
+  expenseCategoryNameIsActive,
+  invalidExpenseCategoryResponse,
+} from '@/lib/metadata-expense-category';
 
 function transformLineItem(row: any): ExpenseLineItem {
   const subscription = row.subscription;
@@ -295,8 +299,15 @@ export async function PUT(
     if (!parsed.success) return parsed.response;
     const body = parsed.data;
 
+    const supabase = supabaseServer();
+    if (
+      body.category !== undefined &&
+      !(await expenseCategoryNameIsActive(supabase, body.category))
+    ) {
+      return invalidExpenseCategoryResponse();
+    }
+
     if (Array.isArray(body.lineItems) && body.lineItems.length > 0) {
-      const supabase = supabaseServer();
       const updated = await updateExpenseAsTransaction(supabase, id, {
         name: body.name!,
         category: body.category!,
@@ -310,8 +321,6 @@ export async function PUT(
       });
       return NextResponse.json(updated);
     }
-
-    const supabase = supabaseServer();
 
     if (body.supplierOrderId != null) {
       const { data: conflict } = await supabase

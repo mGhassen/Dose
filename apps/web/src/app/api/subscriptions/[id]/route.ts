@@ -5,6 +5,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Subscription, UpdateSubscriptionData } from '@kit/types';
 import { parseRequestBody, updateSubscriptionSchema } from '@/shared/zod-schemas';
+import {
+  expenseCategoryNameIsActive,
+  invalidExpenseCategoryResponse,
+} from '@/lib/metadata-expense-category';
 
 function transformSubscription(row: any): Subscription {
   return {
@@ -85,6 +89,12 @@ export async function PUT(
     if (!parsed.success) return parsed.response;
     const body = parsed.data as UpdateSubscriptionData;
     const supabase = supabaseServer();
+    if (
+      body.category !== undefined &&
+      !(await expenseCategoryNameIsActive(supabase, body.category))
+    ) {
+      return invalidExpenseCategoryResponse();
+    }
     const { data, error } = await supabase
       .from('subscriptions')
       .update(transformToSnakeCase(body))

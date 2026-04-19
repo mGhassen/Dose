@@ -231,6 +231,11 @@ export const pathsConfig: NavigationConfig = {
           translationKey: "stockMovements"
         },
         {
+          title: "stock-levels",
+          url: "/stock-levels",
+          translationKey: "stockLevels"
+        },
+        {
           title: "expiry-dates",
           url: "/expiry-dates",
           translationKey: "expiryDates"

@@ -6,6 +6,10 @@ import { supabaseServer } from '@kit/lib/supabase';
 import type { Subscription, CreateSubscriptionData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createSubscriptionSchema } from '@/shared/zod-schemas';
+import {
+  expenseCategoryNameIsActive,
+  invalidExpenseCategoryResponse,
+} from '@/lib/metadata-expense-category';
 
 function transformSubscription(row: any): Subscription {
   return {
@@ -112,6 +116,9 @@ export async function POST(request: NextRequest) {
     const body = parsed.data as CreateSubscriptionData;
 
     const supabase = supabaseServer();
+    if (!(await expenseCategoryNameIsActive(supabase, body.category))) {
+      return invalidExpenseCategoryResponse();
+    }
 
     const { data: itemRow, error: itemError } = await supabase
       .from('items')

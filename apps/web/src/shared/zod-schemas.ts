@@ -53,16 +53,6 @@ export function parseBody<T>(
   return { success: true, data: result.data };
 }
 
-export const EXPENSE_CATEGORY_NAMES = [
-  "rent",
-  "utilities",
-  "supplies",
-  "marketing",
-  "insurance",
-  "maintenance",
-  "professional_services",
-  "other",
-] as const;
 export const EXPENSE_RECURRENCE_NAMES = ["one_time", "monthly", "quarterly", "yearly", "custom"] as const;
 export const SALES_TYPE_NAMES = ["on_site", "delivery", "takeaway", "catering", "other"] as const;
 export const VARIABLE_TYPE_NAMES = [
@@ -93,12 +83,13 @@ export const SUPPLIER_PAYMENT_TERMS_NAMES = ["net_30", "net_15", "cod", "due_on_
 // Supplier types are metadata-driven (not hardcoded here).
 export const GLOBAL_DATE_FILTER_PRESET_NAMES = ["this_month", "this_quarter", "this_year", "custom"] as const;
 
-const expenseCategoryEnum = z.enum(EXPENSE_CATEGORY_NAMES);
 const expenseRecurrenceEnum = z.enum(EXPENSE_RECURRENCE_NAMES);
+
+const expenseCategoryValue = z.string().min(1, "Category is required");
 
 export const createSubscriptionSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  category: expenseCategoryEnum,
+  category: expenseCategoryValue,
   amount: z.number().min(0, "Amount must be non-negative"),
   recurrence: expenseRecurrenceEnum,
   startDate: z.string().min(1, "Start date is required"),
@@ -152,7 +143,7 @@ export type UpdatePaymentInput = z.infer<typeof updatePaymentSchema>;
 export const createSubscriptionFormSchema = z
   .object({
     name: z.string().min(1, "Name is required"),
-    category: expenseCategoryEnum.optional(),
+    category: expenseCategoryValue.optional(),
     amount: z.coerce.number().min(0, "Amount must be non-negative"),
     recurrence: expenseRecurrenceEnum,
     startDate: z.string().min(1, "Start date is required"),
@@ -197,7 +188,7 @@ export type PaymentSliceInput = z.infer<typeof paymentSliceSchema>;
 
 export const createExpenseTransactionSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  category: expenseCategoryEnum,
+  category: expenseCategoryValue,
   expenseDate: z.string().min(1, "Expense date is required"),
   description: z.string().optional(),
   supplierId: z.number().optional(),
@@ -213,7 +204,7 @@ const expenseTypeEnum = z.enum(['expense', 'subscription', 'leasing', 'loan', 'p
 
 export const createExpenseSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  category: expenseCategoryEnum,
+  category: expenseCategoryValue,
   amount: z.number().min(0),
   expenseType: expenseTypeEnum.optional(),
   expenseDate: z.string().min(1, "Expense date is required"),
@@ -240,7 +231,7 @@ export type BankTransactionAllocatePaymentBody = z.infer<typeof bankTransactionA
 
 export const updateExpenseSchema = z.object({
   name: z.string().min(1).optional(),
-  category: expenseCategoryEnum.optional(),
+  category: expenseCategoryValue.optional(),
   amount: z.number().min(0).optional(),
   expenseType: expenseTypeEnum.optional(),
   expenseDate: z.string().min(1).optional(),
@@ -293,7 +284,7 @@ export type UpdateSaleTransactionInput = z.infer<typeof updateSaleTransactionSch
 export const createExpenseTransactionFormSchema = z
   .object({
     name: z.string().min(1, "Name is required"),
-    category: expenseCategoryEnum.optional(),
+    category: expenseCategoryValue.optional(),
     expenseDate: z.string().min(1, "Expense date is required"),
     description: z.string().optional(),
     supplierId: z.union([z.number(), z.string().transform((s) => (s === "" ? undefined : Number(s)))]).optional(),
