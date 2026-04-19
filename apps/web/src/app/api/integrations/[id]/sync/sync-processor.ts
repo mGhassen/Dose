@@ -1124,7 +1124,7 @@ export async function processSyncJob(
         const hasAnyMappedItem = stockLines.some((l) => l.itemId != null && l.quantity > 0);
         const stockRes = await replaceSaleStockMovements(supabase as unknown as DbSupabaseClient, {
           saleId,
-          movementDate: dateStr,
+          movementDate: saleDateIso,
           lines: stockLines,
           preload: { itemsById, recipesById },
         });

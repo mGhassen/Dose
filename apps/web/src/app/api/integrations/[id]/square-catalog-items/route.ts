@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@kit/lib/supabase";
 import { ensureRecipeForProduceOnSaleProduct } from "@/lib/recipes/ensure-recipe-for-produce-on-sale-product";
 
@@ -133,10 +133,16 @@ export async function PATCH(
       const { error } = await supabase.from("items").update({ produce_on_sale: u.produceOnSale }).eq("id", u.itemId);
       if (error) throw error;
       if (u.produceOnSale) {
-        const link = await ensureRecipeForProduceOnSaleProduct(supabase, u.itemId);
-        if (!link.ok) {
-          return NextResponse.json({ error: link.message, itemId: u.itemId }, { status: 400 });
-        }
+        const itemId = u.itemId;
+        after(() => {
+          void (async () => {
+            const sb = supabaseServer();
+            const link = await ensureRecipeForProduceOnSaleProduct(sb, itemId);
+            if (!link.ok) {
+              console.error("[square-catalog-items] ensureRecipeForProduceOnSaleProduct failed:", link.message, "item", itemId);
+            }
+          })();
+        });
       }
     }
 

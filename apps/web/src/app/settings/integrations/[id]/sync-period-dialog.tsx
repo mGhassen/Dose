@@ -23,9 +23,11 @@ interface Props {
   lastSyncAt: string | null | undefined;
   onConfirm: (selection: SyncPeriodSelection) => void | Promise<void>;
   isPending?: boolean;
+  /** Primary action label (e.g. "Continue" when period is chosen before other steps). */
+  confirmLabel?: string;
 }
 
-export function SyncPeriodDialog({ open, onOpenChange, lastSyncAt, onConfirm, isPending }: Props) {
+export function SyncPeriodDialog({ open, onOpenChange, lastSyncAt, onConfirm, isPending, confirmLabel = 'Start sync' }: Props) {
   const hasLastSync = Boolean(lastSyncAt);
   const [mode, setMode] = useState<SyncPeriodMode>(hasLastSync ? 'last_sync' : 'all');
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
@@ -143,7 +145,7 @@ export function SyncPeriodDialog({ open, onOpenChange, lastSyncAt, onConfirm, is
             ) : (
               <>
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Start sync
+                {confirmLabel}
               </>
             )}
           </Button>

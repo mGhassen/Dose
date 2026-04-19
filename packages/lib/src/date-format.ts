@@ -578,3 +578,97 @@ export function formatPrettyDate(date: string | Date | null | undefined): string
     });
   }
 }
+
+/** Default IANA zone for server-side sync windows (matches `cleanTimezone` fallback). */
+export const BUSINESS_TIMEZONE_EUROPE_PARIS = 'Europe/Paris';
+
+const ymdKey = (p: { y: number; m: number; d: number }) => p.y * 10000 + p.m * 100 + p.d;
+
+function addGregorianDays(y: number, m: number, d: number, delta: number): { y: number; m: number; d: number } {
+  const t = new Date(Date.UTC(y, m - 1, d + delta));
+  return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
+}
+
+function daysInGregorianMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/**
+ * Calendar Y-M-D for an instant, in an IANA timezone (Intl only, no extra deps).
+ */
+export function getDatePartsInTimeZone(date: Date, timeZone: string): { y: number; m: number; d: number } {
+  const s = new Intl.DateTimeFormat('sv-SE', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+  const [y, m, d] = s.split('-').map(Number);
+  return { y, m, d };
+}
+
+/** First UTC instant where the local calendar date in `timeZone` is (y, m, d). */
+export function startOfZonedCalendarDayUtc(y: number, m: number, d: number, timeZone: string): Date {
+  const target = ymdKey({ y, m, d });
+  let lo = Date.UTC(y, m - 1, d) - 2 * 86400000;
+  let hi = Date.UTC(y, m - 1, d) + 2 * 86400000;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const p = getDatePartsInTimeZone(new Date(mid), timeZone);
+    const val = ymdKey(p);
+    if (val < target) lo = mid + 1;
+    else hi = mid;
+  }
+  return new Date(lo);
+}
+
+/** Start of the local calendar day in `timeZone` that contains `instant`. */
+export function startOfZonedCalendarDayForInstant(instant: Date, timeZone: string): Date {
+  const { y, m, d } = getDatePartsInTimeZone(instant, timeZone);
+  return startOfZonedCalendarDayUtc(y, m, d, timeZone);
+}
+
+function endOfZonedCalendarDayForYmd(y: number, m: number, d: number, timeZone: string): Date {
+  const next = addGregorianDays(y, m, d, 1);
+  const nextStart = startOfZonedCalendarDayUtc(next.y, next.m, next.d, timeZone);
+  return new Date(nextStart.getTime() - 1);
+}
+
+/** Last millisecond of the local calendar day in `timeZone` for `instant`’s local date. */
+export function endOfZonedCalendarDay(instant: Date, timeZone: string): Date {
+  const { y, m, d } = getDatePartsInTimeZone(instant, timeZone);
+  return endOfZonedCalendarDayForYmd(y, m, d, timeZone);
+}
+
+/** Jan 1 00:00:00.000 local in `timeZone`, as UTC. */
+export function startOfZonedYearJanFirstUtc(year: number, timeZone: string): Date {
+  return startOfZonedCalendarDayUtc(year, 1, 1, timeZone);
+}
+
+/**
+ * Split [start, end] into month-sized chunks using month boundaries in `timeZone`.
+ * Mirrors the old server-local `getMonthlyDateRanges`: first chunk starts at midnight (in `timeZone`)
+ * of the calendar day that contains `start`, then each next chunk starts on the 1st of the next month.
+ */
+export function getMonthlyZonedRanges(
+  start: Date,
+  end: Date,
+  timeZone: string
+): { startAt: string; endAt: string }[] {
+  const ranges: { startAt: string; endAt: string }[] = [];
+  let cur = startOfZonedCalendarDayForInstant(start, timeZone);
+
+  while (cur.getTime() <= end.getTime()) {
+    const { y, m } = getDatePartsInTimeZone(cur, timeZone);
+    const dim = daysInGregorianMonth(y, m);
+    const monthEnd = endOfZonedCalendarDayForYmd(y, m, dim, timeZone);
+    const rangeEnd = monthEnd.getTime() > end.getTime() ? end : monthEnd;
+    ranges.push({
+      startAt: cur.toISOString(),
+      endAt: rangeEnd.toISOString(),
+    });
+    const next = m === 12 ? { y: y + 1, m: 1 } : { y, m: m + 1 };
+    cur = startOfZonedCalendarDayUtc(next.y, next.m, 1, timeZone);
+  }
+  return ranges;
+}

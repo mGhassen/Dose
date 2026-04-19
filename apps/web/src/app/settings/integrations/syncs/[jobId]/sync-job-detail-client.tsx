@@ -248,7 +248,8 @@ export function SyncJobDetailClient() {
   }
 
   const steps: SyncJobStep[] = job.steps ?? [];
-  const isRunning = job.status === 'pending' || job.status === 'processing';
+  const isRunning =
+    job.status === 'staging' || job.status === 'pending' || job.status === 'processing';
   const hasErrors = Boolean(job.error_message || (job.errors && job.errors.length > 0));
   const stepProgress = stepsProgress(steps);
 
@@ -272,7 +273,11 @@ export function SyncJobDetailClient() {
     return (
       <Badge variant="secondary" className="gap-1.5">
         <Loader2 className="h-3.5 w-3 animate-spin" />
-        {job.status === 'processing' ? 'Running' : 'Pending'}
+        {job.status === 'staging'
+          ? 'Fetching from source'
+          : job.status === 'processing'
+            ? 'Running'
+            : 'Pending'}
       </Badge>
     );
   };

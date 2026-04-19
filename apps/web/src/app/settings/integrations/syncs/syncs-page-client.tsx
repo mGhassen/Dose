@@ -45,6 +45,7 @@ function formatDuration(startedAt?: string | null, completedAt?: string | null):
 
 function phaseLabel(status: string): string {
   switch (status) {
+    case 'staging': return 'Phase 1: fetching';
     case 'pending': return 'Phase 2: pending';
     case 'processing': return 'Phase 2: running';
     case 'completed': return 'Phase 2: done';
@@ -82,7 +83,9 @@ export function SyncsPageClient() {
   const { data: jobs = [], isLoading } = useAllSyncJobs(filters);
   const { data: integrations = [] } = useIntegrations();
 
-  const runningCount = jobs.filter((j) => j.status === 'pending' || j.status === 'processing').length;
+  const runningCount = jobs.filter(
+    (j) => j.status === 'staging' || j.status === 'pending' || j.status === 'processing'
+  ).length;
   const failedCount = jobs.filter((j) => j.status === 'failed').length;
   const completedCount = jobs.filter((j) => j.status === 'completed').length;
 
@@ -114,7 +117,7 @@ export function SyncsPageClient() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{runningCount}</div>
-              <p className="text-xs text-muted-foreground">Phase 2 pending or in progress</p>
+              <p className="text-xs text-muted-foreground">Fetching or importing</p>
             </CardContent>
           </Card>
           <Card>
@@ -146,6 +149,7 @@ export function SyncsPageClient() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="staging">Staging</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
@@ -228,7 +232,7 @@ export function SyncsPageClient() {
                       <TableCell>
                         {job.status === 'completed' && <CheckCircle2 className="h-4 w-4 text-green-500 inline mr-1" />}
                         {job.status === 'failed' && <XCircle className="h-4 w-4 text-destructive inline mr-1" />}
-                        {(job.status === 'pending' || job.status === 'processing') && (
+                        {(job.status === 'staging' || job.status === 'pending' || job.status === 'processing') && (
                           <Loader2 className="h-4 w-4 animate-spin text-blue-500 inline mr-1" />
                         )}
                         <Badge

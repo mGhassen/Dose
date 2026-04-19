@@ -1,28 +1,21 @@
 // Integration Sync Route – Phase 1 only: fetch from Square, write to staging, create job, return 202
 
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import {
+  BUSINESS_TIMEZONE_EUROPE_PARIS,
+  endOfZonedCalendarDay,
+  getDatePartsInTimeZone,
+  getMonthlyZonedRanges,
+  startOfZonedYearJanFirstUtc,
+} from '@kit/lib/date-format';
 
 const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
 const SQUARE_API_BASE = SQUARE_USE_SANDBOX
   ? 'https://connect.squareupsandbox.com'
   : 'https://connect.squareup.com';
 
-function getMonthlyDateRanges(start: Date, end: Date): { startAt: string; endAt: string }[] {
-  const ranges: { startAt: string; endAt: string }[] = [];
-  const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
-  while (cur <= end) {
-    const chunkEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0, 23, 59, 59, 999);
-    const rangeEnd = chunkEnd > end ? end : chunkEnd;
-    ranges.push({
-      startAt: new Date(cur).toISOString(),
-      endAt: rangeEnd.toISOString(),
-    });
-    cur.setMonth(cur.getMonth() + 1);
-    cur.setDate(1);
-  }
-  return ranges;
-}
+const SYNC_TZ = BUSINESS_TIMEZONE_EUROPE_PARIS;
 
 async function getIntegrationAndVerifyAccess(
   supabase: any,
@@ -64,7 +57,7 @@ function resolveFullSyncRange(
   period: FullSyncPeriod | undefined
 ): { start: Date; end: Date } {
   const now = new Date();
-  const defaultEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const defaultEnd = endOfZonedCalendarDay(now, SYNC_TZ);
   const LOOKBACK_YEARS = 7;
   const mode = period?.mode ?? 'all';
 
@@ -74,7 +67,8 @@ function resolveFullSyncRange(
   if (mode === 'last_sync' && integration.last_sync_at) {
     return { start: new Date(integration.last_sync_at), end: defaultEnd };
   }
-  return { start: new Date(now.getFullYear() - LOOKBACK_YEARS, 0, 1), end: defaultEnd };
+  const { y } = getDatePartsInTimeZone(now, SYNC_TZ);
+  return { start: startOfZonedYearJanFirstUtc(y - LOOKBACK_YEARS, SYNC_TZ), end: defaultEnd };
 }
 
 async function fetchAndStageSquare(
@@ -198,10 +192,11 @@ async function fetchAndStageSquare(
         ? new Date(new Date(integration.last_sync_at).getTime() - 5 * 60 * 1000)
         : null;
       const ORDER_LOOKBACK_YEARS = 7;
-      startDate = lastSync ?? new Date(now.getFullYear() - ORDER_LOOKBACK_YEARS, 0, 1);
-      orderEndDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      const yParis = getDatePartsInTimeZone(now, SYNC_TZ).y;
+      startDate = lastSync ?? startOfZonedYearJanFirstUtc(yParis - ORDER_LOOKBACK_YEARS, SYNC_TZ);
+      orderEndDate = endOfZonedCalendarDay(now, SYNC_TZ);
     }
-    const ranges = getMonthlyDateRanges(startDate, orderEndDate);
+    const ranges = getMonthlyZonedRanges(startDate, orderEndDate, SYNC_TZ);
     let ordersStepAdded = false;
 
     for (const range of ranges) {
@@ -282,12 +277,13 @@ async function fetchAndStageSquare(
       paymentsStart = range.start;
       paymentsEnd = range.end;
     } else {
+      const yParis = getDatePartsInTimeZone(now, SYNC_TZ).y;
       paymentsStart = integration.last_sync_at != null
         ? new Date(integration.last_sync_at)
-        : new Date(now.getFullYear() - 7, 0, 1);
-      paymentsEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        : startOfZonedYearJanFirstUtc(yParis - 7, SYNC_TZ);
+      paymentsEnd = endOfZonedCalendarDay(now, SYNC_TZ);
     }
-    const paymentRanges = getMonthlyDateRanges(paymentsStart, paymentsEnd);
+    const paymentRanges = getMonthlyZonedRanges(paymentsStart, paymentsEnd, SYNC_TZ);
     let paymentsStepAdded = false;
 
     for (const range of paymentRanges) {
@@ -492,7 +488,8 @@ export async function POST(
       .insert({
         integration_id: integration.id,
         sync_type: syncType,
-        status: 'pending',
+        /** Until Square/Pennylane staging finishes, cron must not process (would import 0 rows). */
+        status: 'staging',
         stats: {},
       })
       .select('id')
@@ -509,46 +506,65 @@ export async function POST(
     const isPennylane = integration.integration_type === 'pennylane';
     const effectiveSyncType = isPennylane ? (syncType === 'full' ? 'transactions' : syncType) : syncType;
     if (isPennylane && effectiveSyncType !== 'transactions') {
+      await supabase.from('sync_jobs').delete().eq('id', jobId);
       return NextResponse.json(
         { error: 'Pennylane sync only supports sync_type: "transactions" or "full"' },
         { status: 400 }
       );
     }
 
-    const result = isPennylane
-      ? await fetchAndStagePennylane(supabase, integration, jobId, effectiveSyncType)
-      : await fetchAndStageSquare(supabase, integration, jobId, syncType, period);
-
-    if (result.error) {
-      await supabase
-        .from('sync_jobs')
-        .update({
-          status: 'failed',
-          error_message: result.error,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', jobId);
-      return NextResponse.json(
-        { job_id: jobId, status: 'failed', error_message: result.error },
-        { status: 200 }
-      );
-    }
-
-    await supabase
-      .from('sync_jobs')
-      .update({ stats: result.stats || {} })
-      .eq('id', jobId);
-
-    await supabase
-      .from('integrations')
-      .update({ last_sync_status: 'in_progress', last_sync_error: null })
-      .eq('id', id);
-
     const origin = request.nextUrl.origin;
-    const secret = process.env.CRON_SECRET;
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (secret) headers['x-cron-secret'] = secret;
-    fetch(`${origin}/api/cron/process-sync-jobs?job_id=${jobId}`, { method: 'POST', headers }).catch(() => {});
+    const cronSecret = process.env.CRON_SECRET;
+
+    after(async () => {
+      const supabaseBg = supabaseServer();
+      try {
+        const result = isPennylane
+          ? await fetchAndStagePennylane(supabaseBg, integration, jobId, effectiveSyncType)
+          : await fetchAndStageSquare(supabaseBg, integration, jobId, syncType, period);
+
+        if (result.error) {
+          await supabaseBg
+            .from('sync_jobs')
+            .update({
+              status: 'failed',
+              error_message: result.error,
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', jobId);
+          return;
+        }
+
+        await supabaseBg
+          .from('sync_jobs')
+          .update({
+            status: 'pending',
+            stats: result.stats || {},
+          })
+          .eq('id', jobId);
+
+        await supabaseBg
+          .from('integrations')
+          .update({ last_sync_status: 'in_progress', last_sync_error: null })
+          .eq('id', id);
+
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (cronSecret) headers['x-cron-secret'] = cronSecret;
+        await fetch(`${origin}/api/cron/process-sync-jobs?job_id=${jobId}`, { method: 'POST', headers }).catch(() => {});
+      } catch (e: unknown) {
+        console.error('[Sync] Background staging failed:', e);
+        const msg = e instanceof Error ? e.message : String(e);
+        const supabaseErr = supabaseServer();
+        await supabaseErr
+          .from('sync_jobs')
+          .update({
+            status: 'failed',
+            error_message: msg,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', jobId);
+      }
+    });
 
     return NextResponse.json(
       { job_id: jobId, message: 'Sync started. Processing in background.' },

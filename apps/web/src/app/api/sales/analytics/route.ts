@@ -28,6 +28,15 @@ function daysBetween(startDate: string, endDate: string): number {
   return Math.max(1, Math.round((end - start) / 86400000) + 1);
 }
 
+/** sales.date is TIMESTAMPTZ; group by UTC calendar day, not the raw ISO string (which is unique per sale). */
+function utcCalendarDay(dateIso: string): string {
+  const t = Date.parse(dateIso);
+  if (Number.isNaN(t)) {
+    return dateIso.length >= 10 ? dateIso.slice(0, 10) : dateIso;
+  }
+  return new Date(t).toISOString().slice(0, 10);
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -100,7 +109,8 @@ export async function GET(request: NextRequest) {
 
     const dailyData: Record<string, number> = {};
     sales.forEach(sale => {
-      dailyData[sale.date] = (dailyData[sale.date] || 0) + sale.amount;
+      const dayKey = utcCalendarDay(sale.date);
+      dailyData[dayKey] = (dailyData[dayKey] || 0) + sale.amount;
     });
 
     const dailyChartData = Object.entries(dailyData)

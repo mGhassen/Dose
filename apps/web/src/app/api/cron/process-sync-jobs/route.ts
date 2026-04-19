@@ -231,6 +231,28 @@ async function runProcessor(specificJobId?: number) {
       continue;
     }
 
+    const { count: stagedTotal, error: stagedErr } = await supabase
+      .from('sync_square_data')
+      .select('*', { count: 'exact', head: true })
+      .eq('job_id', job.id);
+    if (stagedErr) {
+      await supabase
+        .from('sync_jobs')
+        .update({
+          status: 'failed',
+          error_message: stagedErr.message,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', job.id);
+      continue;
+    }
+    if ((stagedTotal ?? 0) === 0) {
+      const { data: jr } = await supabase.from('sync_jobs').select('created_at').eq('id', job.id).maybeSingle();
+      if (jr?.created_at && Date.now() - new Date(jr.created_at).getTime() < 120_000) {
+        continue;
+      }
+    }
+
     const { count, error: countErr } = await supabase
       .from('sync_square_data')
       .select('*', { count: 'exact', head: true })

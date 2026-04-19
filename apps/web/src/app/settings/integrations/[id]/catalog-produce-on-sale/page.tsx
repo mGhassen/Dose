@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getAuthToken } from "@kit/lib/api";
@@ -23,12 +23,14 @@ export default function CatalogProduceOnSalePage() {
   const syncType = (searchParams.get("sync") as "catalog" | "full" | null) ?? "catalog";
   const { toast } = useToast();
   const syncIntegration = useSyncIntegration();
-  const { data: integration } = useIntegrationById(id);
+  const { data: integration, isSuccess: integrationLoaded } = useIntegrationById(id);
 
   const [rows, setRows] = useState<SquareCatalogItemRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [periodOpen, setPeriodOpen] = useState(false);
+  const [pendingPeriod, setPendingPeriod] = useState<SyncPeriodSelection | null>(null);
+  const didAutoOpenPeriod = useRef(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -36,6 +38,7 @@ export default function CatalogProduceOnSalePage() {
     try {
       const token = getAuthToken();
       const res = await fetch(`/api/integrations/${id}/square-catalog-items`, {
+        credentials: "include",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error(await res.text());
@@ -57,6 +60,12 @@ export default function CatalogProduceOnSalePage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (syncType !== "full" || !integrationLoaded || didAutoOpenPeriod.current) return;
+    didAutoOpenPeriod.current = true;
+    setPeriodOpen(true);
+  }, [syncType, integrationLoaded]);
+
   const setProduce = (itemId: number, produceOnSale: boolean) => {
     setRows((prev) => prev.map((r) => (r.itemId === itemId ? { ...r, produceOnSale } : r)));
   };
@@ -71,6 +80,7 @@ export default function CatalogProduceOnSalePage() {
     if (updates.length === 0) return;
     const patchRes = await fetch(`/api/integrations/${id}/square-catalog-items`, {
       method: "PATCH",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -91,12 +101,13 @@ export default function CatalogProduceOnSalePage() {
         syncType: syncType === "full" ? "full" : "catalog",
         ...(syncType === "full" && period ? { period } : {}),
       });
-      const jobId = res?.job_id;
-      if (jobId != null) {
-        window.location.href = `/settings/integrations/syncs/${jobId}`;
+      const jobId = res && typeof res === "object" && "job_id" in res ? (res as { job_id?: number }).job_id : undefined;
+      if (jobId != null && Number.isFinite(jobId)) {
+        setSaving(false);
+        router.replace(`/settings/integrations/syncs/${jobId}`);
         return;
       }
-      toast({ title: "Sync started", description: "Check integrations for status." });
+      toast({ title: "Sync started", description: "No job id returned — check integrations for status." });
       router.push(`/settings/integrations/${id}`);
     } catch (e: unknown) {
       toast({
@@ -110,12 +121,21 @@ export default function CatalogProduceOnSalePage() {
   };
 
   const onClickStart = () => {
-    if (syncType === "full") {
+    if (syncType === "full" && !pendingPeriod) {
       setPeriodOpen(true);
       return;
     }
-    void runSyncAfterSave();
+    void runSyncAfterSave(syncType === "full" ? pendingPeriod ?? undefined : undefined);
   };
+
+  const periodSummary =
+    pendingPeriod?.mode === "last_sync"
+      ? "Since last sync"
+      : pendingPeriod?.mode === "custom"
+        ? "Custom date range"
+        : pendingPeriod?.mode === "all"
+          ? "All from start"
+          : null;
 
   return (
     <AppLayout>
@@ -145,9 +165,32 @@ export default function CatalogProduceOnSalePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {syncType === "full" && (
-              <p className="text-sm text-muted-foreground">
-                After saving, a <strong>full</strong> sync will run (catalog + orders + payments as configured).
-              </p>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  Full sync pulls orders and payments for the <strong>data period</strong> you choose (catalog and
+                  locations are refreshed regardless). Pick produced-on-sale defaults below, then{' '}
+                  <strong>Save &amp; start sync</strong>.
+                </p>
+                {pendingPeriod ? (
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>
+                      Period: <span className="text-foreground font-medium">{periodSummary}</span>
+                    </span>
+                    <button
+                      type="button"
+                      className="text-primary underline underline-offset-2 text-sm font-normal"
+                      onClick={() => setPeriodOpen(true)}
+                    >
+                      Change
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-amber-700 dark:text-amber-500">
+                    Choose the sync period in the dialog (it opens automatically), or click Save &amp; start sync to open
+                    it.
+                  </p>
+                )}
+              </div>
             )}
             {syncType === "catalog" && (
               <p className="text-sm text-muted-foreground">
@@ -214,10 +257,11 @@ export default function CatalogProduceOnSalePage() {
             open={periodOpen}
             onOpenChange={setPeriodOpen}
             lastSyncAt={integration?.last_sync_at}
-            isPending={saving || syncIntegration.isPending}
+            isPending={false}
+            confirmLabel="Continue"
             onConfirm={async (selection) => {
+              setPendingPeriod(selection);
               setPeriodOpen(false);
-              await runSyncAfterSave(selection);
             }}
           />
         )}

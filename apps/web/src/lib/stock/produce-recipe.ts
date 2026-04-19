@@ -6,6 +6,8 @@ export interface ProduceRecipeOptions {
   quantity: number;
   location?: string | null;
   notes?: string;
+  /** ISO instant for ingredient OUT / finished IN rows. Defaults to now. */
+  movementDate?: string;
   /** Required when recipe has multiple linked produced items. */
   producedItemId?: number;
   /** Required when recipe has 0 linked items (name for the new item to create). */
@@ -17,7 +19,15 @@ export async function produceRecipe(
   recipeId: string,
   options: ProduceRecipeOptions
 ): Promise<{ producedItemId: number }> {
-  const { quantity, location = null, notes, producedItemId: requestedItemId, producedItemName } = options;
+  const {
+    quantity,
+    location = null,
+    notes,
+    movementDate: movementDateOpt,
+    producedItemId: requestedItemId,
+    producedItemName,
+  } = options;
+  const movementDate = movementDateOpt ?? new Date().toISOString();
 
   const { data: unitVariables } = await supabase.from('variables').select('id, value').eq('type', 'unit');
   const factorMap = buildFactorMap((unitVariables || []).map((u: any) => ({ id: u.id, factorToBase: parseFloat(u.value ?? 1) })));
@@ -65,7 +75,7 @@ export async function produceRecipe(
       reference_type: StockMovementReferenceType.RECIPE,
       reference_id: Number(recipeId),
       location,
-      movement_date: new Date().toISOString(),
+      movement_date: movementDate,
       notes: `Used in recipe: ${recipeData.name} (${quantity} servings)${notes ? ` - ${notes}` : ''}`,
     });
 
@@ -142,7 +152,7 @@ export async function produceRecipe(
     reference_type: StockMovementReferenceType.RECIPE,
     reference_id: Number(recipeId),
     location,
-    movement_date: new Date().toISOString(),
+    movement_date: movementDate,
     notes: `Produced from recipe: ${recipeData.name}${notes ? ` - ${notes}` : ''}`,
   });
 

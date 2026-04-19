@@ -209,7 +209,11 @@ export function useSyncJobs(integrationId: string) {
     enabled: !!integrationId,
     refetchInterval: (query) => {
       const jobs = query.state.data as { status?: string }[] | undefined;
-      const hasPending = Array.isArray(jobs) && jobs.some((j) => j.status === 'pending' || j.status === 'processing');
+      const hasPending =
+        Array.isArray(jobs) &&
+        jobs.some(
+          (j) => j.status === 'staging' || j.status === 'pending' || j.status === 'processing'
+        );
       return hasPending ? 2000 : false;
     },
   });
@@ -222,7 +226,8 @@ export function useSyncJob(jobId: number | null) {
     enabled: jobId != null,
     refetchInterval: (query) => {
       const data = query.state.data as { status?: string } | undefined;
-      return data?.status === 'pending' || data?.status === 'processing' ? 2000 : false;
+      const s = data?.status;
+      return s === 'staging' || s === 'pending' || s === 'processing' ? 2000 : false;
     },
   });
 }
@@ -294,7 +299,11 @@ export function useAllSyncJobs(filters?: { status?: string; integration_id?: str
     },
     refetchInterval: (query) => {
       const jobs = query.state.data as { status?: string }[] | undefined;
-      const hasPending = Array.isArray(jobs) && jobs.some((j) => j.status === 'pending' || j.status === 'processing');
+      const hasPending =
+        Array.isArray(jobs) &&
+        jobs.some(
+          (j) => j.status === 'staging' || j.status === 'pending' || j.status === 'processing'
+        );
       return hasPending ? 2500 : false;
     },
   });

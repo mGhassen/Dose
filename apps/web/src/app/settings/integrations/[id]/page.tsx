@@ -685,7 +685,9 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                         <div className="flex items-center gap-2 mt-1">
                           {lastJob.status === 'completed' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
                           {lastJob.status === 'failed' && <XCircle className="w-4 h-4 text-red-500" />}
-                          {(lastJob.status === 'pending' || lastJob.status === 'processing') && (
+                          {(lastJob.status === 'staging' ||
+                            lastJob.status === 'pending' ||
+                            lastJob.status === 'processing') && (
                             <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                           )}
                           <Badge variant={lastJob.status === 'failed' ? 'destructive' : lastJob.status === 'completed' ? 'default' : 'secondary'}>

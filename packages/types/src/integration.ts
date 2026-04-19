@@ -624,7 +624,7 @@ export interface SyncJob {
   id: number;
   integration_id: number;
   sync_type: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'staging' | 'pending' | 'processing' | 'completed' | 'failed';
   created_at: string;
   started_at?: string;
   completed_at?: string;

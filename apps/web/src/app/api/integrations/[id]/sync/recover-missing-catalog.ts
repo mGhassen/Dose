@@ -305,6 +305,12 @@ export async function backfillAffectedSales(
       if (!staged?.payload) continue;
 
       const order = staged.payload;
+      const orderDate = (order?.created_at || '').split('T')[0];
+      const fallbackDateStr = orderDate || dateStr;
+      const saleDateIso =
+        typeof order?.created_at === 'string' && order.created_at.length > 0
+          ? order.created_at
+          : `${fallbackDateStr}T12:00:00.000Z`;
       const seq: { catalogObjectId: string | null; isModifier: boolean }[] = [];
       for (const line of order.line_items || []) {
         seq.push({ catalogObjectId: line.catalog_object_id || null, isModifier: false });
@@ -378,7 +384,7 @@ export async function backfillAffectedSales(
 
       const res = await replaceSaleStockMovements(supabase as any, {
         saleId,
-        movementDate: dateStr,
+        movementDate: saleDateIso,
         lines: stockLines,
       });
       if (!res.ok) {

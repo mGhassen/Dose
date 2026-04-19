@@ -27,6 +27,22 @@ export type StockReplacePreload = {
   recipesById: Map<number, PreloadedRecipe>;
 };
 
+/** Sale OUT rows use this instant; recipe production uses one minute earlier. */
+function resolveSaleMovementInstant(movementDate: string): string {
+  const s = movementDate.trim();
+  if (!s) return new Date().toISOString();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s}T12:00:00.000Z`;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return new Date().toISOString();
+  return d.toISOString();
+}
+
+function instantOneMinuteBefore(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return new Date(Date.now() - 60_000).toISOString();
+  return new Date(t - 60_000).toISOString();
+}
+
 async function resolveRecipeRow(
   supabase: SupabaseClient,
   recipeId: number,
@@ -59,6 +75,8 @@ export async function replaceSaleStockMovements(
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { saleId, movementDate, lines, preload } = params;
+  const saleInstant = resolveSaleMovementInstant(movementDate);
+  const productionInstant = instantOneMinuteBefore(saleInstant);
 
   const { error: delErr } = await supabase
     .from("stock_movements")
@@ -163,7 +181,7 @@ export async function replaceSaleStockMovements(
         unit_id: effectiveItem.unit_id ?? null,
         reference_type: StockMovementReferenceType.SALE,
         reference_id: saleId,
-        movement_date: movementDate,
+        movement_date: saleInstant,
         notes: `Sale #${saleId}`,
       });
     } else if (recipe) {
@@ -188,6 +206,7 @@ export async function replaceSaleStockMovements(
         location: null,
         notes: `Sale #${saleId}`,
         producedItemId: item.id,
+        movementDate: productionInstant,
       });
       if (pr.producedItemId !== item.id) {
         await rollback();
@@ -202,7 +221,7 @@ export async function replaceSaleStockMovements(
       unit_id: item.unit_id ?? null,
       reference_type: StockMovementReferenceType.SALE,
       reference_id: saleId,
-      movement_date: movementDate,
+      movement_date: saleInstant,
       notes: `Sale #${saleId}`,
     });
     if (recipeMoveErr) {
@@ -228,6 +247,7 @@ export async function replaceSaleStockMovements(
         quantity: l.quantity,
         location: null,
         notes: `Sale #${saleId}`,
+        movementDate: productionInstant,
       });
       producedItemId = result.producedItemId;
       producedItemUnitId = recipe.unit_id ?? null;
@@ -240,6 +260,7 @@ export async function replaceSaleStockMovements(
           quantity: l.quantity - stock,
           location: null,
           notes: `Sale #${saleId}`,
+          movementDate: productionInstant,
         });
       }
     }
@@ -251,7 +272,7 @@ export async function replaceSaleStockMovements(
       unit_id: producedItemUnitId,
       reference_type: StockMovementReferenceType.SALE,
       reference_id: saleId,
-      movement_date: movementDate,
+      movement_date: saleInstant,
       notes: `Sale #${saleId}`,
     });
     if (recipeMoveErr) {
