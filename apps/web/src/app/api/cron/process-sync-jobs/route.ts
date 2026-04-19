@@ -47,11 +47,18 @@ export async function POST(request: NextRequest) {
 async function runProcessor(specificJobId?: number) {
   const supabase = supabaseServer();
 
-  let jobs: { id: number; integration_id: number; sync_type: string; status: string }[];
+  let jobs: {
+    id: number;
+    integration_id: number;
+    sync_type: string;
+    status: string;
+    bulk_review_status: string | null;
+    bulk_review_payload: unknown;
+  }[];
   if (specificJobId) {
     const { data, error } = await supabase
       .from('sync_jobs')
-      .select('id, integration_id, sync_type, status')
+      .select('id, integration_id, sync_type, status, bulk_review_status, bulk_review_payload')
       .eq('id', specificJobId)
       .in('status', ['pending', 'processing']);
     if (error) {
@@ -62,7 +69,7 @@ async function runProcessor(specificJobId?: number) {
   } else {
     const { data, error } = await supabase
       .from('sync_jobs')
-      .select('id, integration_id, sync_type, status')
+      .select('id, integration_id, sync_type, status, bulk_review_status, bulk_review_payload')
       .in('status', ['pending', 'processing'])
       .order('created_at', { ascending: true })
       .limit(5);
@@ -74,14 +81,6 @@ async function runProcessor(specificJobId?: number) {
   }
 
   for (const job of jobs) {
-    if (job.status === 'pending') {
-      const { error: updateErr } = await supabase
-        .from('sync_jobs')
-        .update({ status: 'processing', started_at: new Date().toISOString() })
-        .eq('id', job.id);
-      if (updateErr) continue;
-    }
-
     const { data: integration, error: intErr } = await supabase
       .from('integrations')
       .select('*')
@@ -97,6 +96,20 @@ async function runProcessor(specificJobId?: number) {
         })
         .eq('id', job.id);
       continue;
+    }
+    if (
+      integration.integration_type === 'csv_bulk' &&
+      job.bulk_review_status !== 'ready'
+    ) {
+      continue;
+    }
+
+    if (job.status === 'pending') {
+      const { error: updateErr } = await supabase
+        .from('sync_jobs')
+        .update({ status: 'processing', started_at: new Date().toISOString() })
+        .eq('id', job.id);
+      if (updateErr) continue;
     }
 
     if (integration.integration_type === 'csv_bulk') {
@@ -124,6 +137,7 @@ async function runProcessor(specificJobId?: number) {
           .update({
             status: 'completed',
             completed_at: completedAt,
+            bulk_review_status: 'complete',
             error_message: result.error_message ?? null,
             stats: result.stats,
           })

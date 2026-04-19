@@ -120,34 +120,97 @@ function csvEscape(cell: string): string {
   return cell;
 }
 
-export function buildBulkImportExampleCsv(entity: BulkImportEntity): { filename: string; content: string } {
+/** Headers + one sample row for templates (CSV and XLSX Data sheet). */
+export function bulkImportExampleDataRow(entity: BulkImportEntity): { headers: string[]; values: string[] } {
   const cols = BULK_IMPORT_COLUMNS[entity];
   const headers = cols.map((c) => c.key);
   const sample: Record<string, string> = {};
   for (const c of cols) {
-    sample[c.key] = c.required ? `<${c.key}>` : "";
+    sample[c.key] = c.required ? "" : "";
   }
   if (entity === "items") {
     sample["name"] = "Example item";
     sample["item_types"] = "item";
-  }
-  if (entity === "sales") {
+    sample["sku"] = "SKU-001";
+    sample["unit_price"] = "12.50";
+  } else if (entity === "sales") {
     sample["sale_group_id"] = "g1";
     sample["date"] = "2026-01-15";
     sample["type"] = "on_site";
     sample["item_id"] = "1";
     sample["quantity"] = "2";
     sample["unit_price"] = "3.50";
-  }
-  if (entity === "supplier_orders") {
+  } else if (entity === "supplier_orders") {
     sample["order_key"] = "ord1";
     sample["supplier_id"] = "1";
     sample["item_id"] = "1";
     sample["quantity"] = "10";
     sample["unit"] = "kg";
     sample["unit_price"] = "5";
+  } else if (entity === "suppliers") {
+    sample["name"] = "Acme Foods";
+    sample["email"] = "orders@example.com";
+  } else if (entity === "recipe") {
+    sample["name"] = "House vinaigrette";
+    sample["description"] = "Demo row";
+  } else if (entity === "expenses") {
+    sample["name"] = "Electricity";
+    sample["category"] = "utilities";
+    sample["amount"] = "120";
+    sample["expense_date"] = "2026-01-10";
+  } else if (entity === "subscriptions") {
+    sample["name"] = "Software";
+    sample["category"] = "supplies";
+    sample["amount"] = "49";
+    sample["recurrence"] = "monthly";
+    sample["start_date"] = "2026-01-01";
+  } else if (entity === "loans") {
+    sample["name"] = "Equipment loan";
+    sample["loan_number"] = "LN-1001";
+    sample["principal_amount"] = "10000";
+    sample["interest_rate"] = "0.05";
+    sample["duration_months"] = "36";
+    sample["start_date"] = "2026-01-01";
+  } else if (entity === "loan_payments") {
+    sample["loan_id"] = "1";
+    sample["schedule_entry_id"] = "1";
+    sample["payment_date"] = "2026-02-01";
+    sample["amount"] = "300";
+  } else if (entity === "personnel") {
+    sample["first_name"] = "Jane";
+    sample["last_name"] = "Doe";
+    sample["position"] = "Chef";
+    sample["type"] = "full_time";
+    sample["base_salary"] = "42000";
+    sample["salary_frequency"] = "yearly";
+    sample["employer_charges"] = "0";
+    sample["employer_charges_type"] = "percentage";
+    sample["start_date"] = "2026-01-01";
+  } else if (entity === "leasing") {
+    sample["name"] = "Kitchen equipment";
+    sample["type"] = "finance";
+    sample["amount"] = "500";
+    sample["start_date"] = "2026-01-01";
+    sample["frequency"] = "monthly";
+  } else if (entity === "stock_movements") {
+    sample["item_id"] = "1";
+    sample["movement_type"] = "in";
+    sample["quantity"] = "5";
+    sample["unit"] = "kg";
+    sample["movement_date"] = "2026-01-15";
   }
-  const line = headers.map((h) => csvEscape(sample[h] ?? "")).join(",");
+  for (const c of cols) {
+    if (sample[c.key] === "" && c.required) {
+      sample[c.key] = `<${c.key}>`;
+    }
+  }
+  const values = headers.map((h) => sample[h] ?? "");
+  return { headers, values };
+}
+
+export function buildBulkImportExampleCsv(entity: BulkImportEntity): { filename: string; content: string } {
+  const { headers, values } = bulkImportExampleDataRow(entity);
+  const line = values.map((v) => csvEscape(v)).join(",");
   const headerLine = headers.map(csvEscape).join(",");
   return {
     filename: `bulk-import-${entity}-example.csv`,

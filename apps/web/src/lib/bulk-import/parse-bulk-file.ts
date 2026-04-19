@@ -54,6 +54,19 @@ function findSheet(wb: XLSX.WorkBook, name: string): XLSX.WorkSheet | null {
   return sn ? wb.Sheets[sn]! : null;
 }
 
+/** Prefer tab "Data"; otherwise first sheet that is not Instructions/readme (so Instructions can be first). */
+function dataSheetForFlatImport(wb: XLSX.WorkBook): XLSX.WorkSheet | null {
+  const data = findSheet(wb, "Data");
+  if (data) return data;
+  const skip = new Set(["instructions", "instruction", "readme"]);
+  for (const name of wb.SheetNames) {
+    if (!skip.has(name.toLowerCase())) {
+      return wb.Sheets[name] ?? null;
+    }
+  }
+  return null;
+}
+
 function parseXlsx(entity: BulkImportEntity, wb: XLSX.WorkBook): StagedBulkRow[] {
   if (entity === "recipe") {
     const recipesWs = findSheet(wb, "recipes");
@@ -157,8 +170,7 @@ function parseXlsx(entity: BulkImportEntity, wb: XLSX.WorkBook): StagedBulkRow[]
     }
   }
 
-  const sheetName = wb.SheetNames[0];
-  const ws = sheetName ? wb.Sheets[sheetName] : null;
+  const ws = dataSheetForFlatImport(wb);
   if (!ws) return [];
   const rows = jsonRows(ws).map((r) => rowKeysToCamel(r));
   return parseFlatRows(entity, rows);

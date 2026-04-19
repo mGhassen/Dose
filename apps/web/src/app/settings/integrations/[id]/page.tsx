@@ -303,8 +303,11 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
     try {
       const res = await importBulkFile.mutateAsync({ id, file: bulkImportFile, entity: bulkEntity });
       if (res?.job_id != null) {
-        window.location.href = `/settings/integrations/syncs/${res.job_id}`;
-        toast({ title: 'Import started', description: `Job #${res.job_id}` });
+        window.location.href = `/settings/integrations/syncs/${res.job_id}/review`;
+        toast({
+          title: 'File staged',
+          description: (res as { message?: string }).message ?? `Job #${res.job_id} — review before apply.`,
+        });
       }
     } catch (e: any) {
       toast({ title: 'Import failed', description: e?.message || 'Failed to import file', variant: 'destructive' });

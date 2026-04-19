@@ -94,6 +94,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .from("sync_jobs")
         .update({
           status: "failed",
+          bulk_review_status: "cancelled",
           error_message: uploadRes.error.message,
           completed_at: new Date().toISOString(),
         })
@@ -109,6 +110,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .from("sync_jobs")
         .update({
           status: "failed",
+          bulk_review_status: "cancelled",
           error_message: e?.message || "Failed to parse file",
           completed_at: new Date().toISOString(),
           source_file_path: storagePath,
@@ -122,6 +124,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .from("sync_jobs")
         .update({
           status: "failed",
+          bulk_review_status: "cancelled",
           error_message: "No rows parsed from file",
           completed_at: new Date().toISOString(),
           stats: { import_file_path: storagePath, rows_staged: 0 },
@@ -147,6 +150,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           .from("sync_jobs")
           .update({
             status: "failed",
+            bulk_review_status: "cancelled",
             error_message: insertErr.message,
             completed_at: new Date().toISOString(),
             stats: { import_file_path: storagePath, rows_staged: i },
@@ -160,6 +164,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await supabase
       .from("sync_jobs")
       .update({
+        bulk_review_status: "needs_review",
         stats: {
           import_file_path: storagePath,
           original_filename: originalName,
@@ -170,18 +175,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       })
       .eq("id", jobId);
 
-    await supabase
-      .from("integrations")
-      .update({ last_sync_status: "in_progress", last_sync_error: null })
-      .eq("id", integration.id);
-
-    const origin = request.nextUrl.origin;
-    const secret = process.env.CRON_SECRET;
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (secret) headers["x-cron-secret"] = secret;
-    fetch(`${origin}/api/cron/process-sync-jobs?job_id=${jobId}`, { method: "POST", headers }).catch(() => {});
-
-    return NextResponse.json({ job_id: jobId, message: "Import started. Processing in background." }, { status: 202 });
+    return NextResponse.json(
+      {
+        job_id: jobId,
+        bulk_review_status: "needs_review",
+        message: "File staged. Open the import review step to map fields and apply.",
+      },
+      { status: 202 }
+    );
   } catch (e: any) {
     const status = typeof e?.status === "number" ? e.status : 500;
     return NextResponse.json({ error: e?.message || "Failed to import bulk file" }, { status });

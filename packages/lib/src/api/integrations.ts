@@ -17,6 +17,7 @@ import type {
   SquareListCatalogResponse,
   PaginatedResponse,
   PaginationParams,
+  BulkImportPreviewResponse,
 } from '@kit/types';
 
 export const integrationsApi = {
@@ -124,6 +125,28 @@ export const integrationsApi = {
     apiRequest<SyncJobWithErrors>('GET', `/api/sync-jobs/${jobId}`),
   retrySyncJob: (jobId: number) =>
     apiRequest<{ job_id: number; message: string }>('POST', `/api/sync-jobs/${jobId}/retry`),
+  getBulkImportPreview: (jobId: number, params?: { limit?: number; offset?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.limit != null) searchParams.set('limit', String(params.limit));
+    if (params?.offset != null) searchParams.set('offset', String(params.offset));
+    const q = searchParams.toString();
+    return apiRequest<BulkImportPreviewResponse>(
+      'GET',
+      `/api/sync-jobs/${jobId}/bulk-preview${q ? `?${q}` : ''}`
+    );
+  },
+  putBulkImportReview: (jobId: number, bulk_review_payload: Record<string, unknown>) =>
+    apiRequest<{ job_id: number; bulk_review_payload: Record<string, unknown> }>(
+      'PUT',
+      `/api/sync-jobs/${jobId}/bulk-review`,
+      { bulk_review_payload }
+    ),
+  bulkApplySyncJob: (jobId: number, bulk_review_payload?: Record<string, unknown>) =>
+    apiRequest<{ job_id: number; message: string }>(
+      'POST',
+      `/api/sync-jobs/${jobId}/bulk-apply`,
+      bulk_review_payload !== undefined ? { bulk_review_payload } : {}
+    ),
   getAllSyncJobs: (params?: { status?: string; integration_id?: string; limit?: number; offset?: number }) => {
     const searchParams = new URLSearchParams();
     if (params?.status) searchParams.set('status', params.status);

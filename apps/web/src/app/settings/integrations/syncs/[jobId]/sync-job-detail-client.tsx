@@ -292,6 +292,13 @@ export function SyncJobDetailClient() {
               <h1 className="text-2xl font-semibold tracking-tight">Job #{job.id}</h1>
               {statusBadge()}
               <span className="text-muted-foreground text-sm">{job.sync_type}</span>
+              {(job.bulk_review_status === 'needs_review' || job.bulk_review_status === 'ready') &&
+                job.status !== 'completed' &&
+                job.status !== 'processing' && (
+                  <Button size="sm" asChild>
+                    <Link href={`/settings/integrations/syncs/${job.id}/review`}>Review import</Link>
+                  </Button>
+                )}
             </div>
           </div>
           {(job.status === 'failed' || job.status === 'completed') && (

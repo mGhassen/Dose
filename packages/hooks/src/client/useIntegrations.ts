@@ -237,6 +237,52 @@ export function useRetrySyncJob() {
   });
 }
 
+export function useBulkImportPreview(
+  jobId: number | null,
+  params?: { limit?: number; offset?: number }
+) {
+  return useQuery({
+    queryKey: ['sync-jobs', jobId, 'bulk-preview', params],
+    queryFn: () => integrationsApi.getBulkImportPreview(jobId!, params),
+    enabled: jobId != null,
+  });
+}
+
+export function usePutBulkImportReview() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      jobId,
+      bulk_review_payload,
+    }: {
+      jobId: number;
+      bulk_review_payload: Record<string, unknown>;
+    }) => integrationsApi.putBulkImportReview(jobId, bulk_review_payload),
+    onSuccess: (_, { jobId }) => {
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', jobId, 'bulk-preview'] });
+    },
+  });
+}
+
+export function useBulkApplySyncJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      jobId,
+      bulk_review_payload,
+    }: {
+      jobId: number;
+      bulk_review_payload?: Record<string, unknown>;
+    }) => integrationsApi.bulkApplySyncJob(jobId, bulk_review_payload),
+    onSuccess: (_, { jobId }) => {
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', jobId, 'bulk-preview'] });
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', 'all'] });
+    },
+  });
+}
+
 export function useAllSyncJobs(filters?: { status?: string; integration_id?: string; limit?: number; offset?: number }) {
   return useQuery({
     queryKey: ['sync-jobs', 'all', filters],

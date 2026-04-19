@@ -630,6 +630,61 @@ export interface SyncJob {
   completed_at?: string;
   error_message?: string;
   stats?: Record<string, number>;
+  source_file_path?: string | null;
+  bulk_review_status?: 'none' | 'needs_review' | 'ready' | 'complete' | 'cancelled';
+  bulk_review_payload?: Record<string, unknown>;
+}
+
+export interface BulkImportTemplateColumn {
+  key: string;
+  description: string;
+  required?: boolean;
+}
+
+export interface BulkImportPreviewRow {
+  data_type: string;
+  source_id: string;
+  payload: unknown;
+}
+
+export interface BulkImportResolutionHints {
+  suggested_payload: {
+    bySourceId?: Record<string, Record<string, unknown>>;
+    categoryNameToId?: Record<string, number>;
+    unitLabelToId?: Record<string, number>;
+    supplierNameToId?: Record<string, number>;
+    skuToItemId?: Record<string, number>;
+    itemNameToId?: Record<string, number>;
+  };
+  unresolved: {
+    categoryNames: string[];
+    unitLabels: string[];
+    supplierNames: string[];
+    skus: string[];
+    itemNames: string[];
+  };
+  ambiguous_item_names: Record<string, Array<{ id: number; name: string; sku: string | null }>>;
+}
+
+export interface BulkImportPreviewResponse {
+  job: {
+    id: number;
+    integration_id: number;
+    sync_type: string;
+    status: string;
+    bulk_review_status: string;
+    bulk_review_payload: Record<string, unknown>;
+    stats: Record<string, unknown>;
+    source_file_path: string | null;
+    error_message: string | null;
+    created_at: unknown;
+  };
+  entity: string;
+  rows_staged: number;
+  rows: BulkImportPreviewRow[];
+  pagination: { limit: number; offset: number; total: number };
+  template_columns: BulkImportTemplateColumn[];
+  resolution_hints: BulkImportResolutionHints | null;
 }
 
 export interface SyncJobStep {

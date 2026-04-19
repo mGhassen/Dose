@@ -28,6 +28,7 @@ import {
 } from "@/lib/recipes/produced-item-output-links";
 import { replacePaymentsForEntry } from "@/lib/ledger/replace-entry-payments";
 import type { BulkImportEntity } from "@/lib/bulk-import/constants";
+import { applyBulkReviewToRow, normalizeBulkReviewPayload } from "@/lib/bulk-import/apply-review-payload";
 import { parseString, parseNumber, parseIntMaybe, parseBool } from "@/lib/bulk-import/normalize";
 
 type StagingRow = { data_type: string; source_id: string; payload: Record<string, unknown> };
@@ -161,13 +162,17 @@ function convertPersonnelToSnake(data: import("@/shared/zod-schemas").CreatePers
 
 export async function processBulkImportJob(
   supabase: SupabaseClient,
-  job: { id: number; integration_id: number; sync_type: string },
+  job: { id: number; integration_id: number; sync_type: string; bulk_review_payload?: unknown },
   integration: { id: number; account_id: string },
   stagingRows: StagingRow[]
 ): Promise<{ status: "completed" | "failed"; error_message?: string; stats: Record<string, number> }> {
   const entity = job.sync_type as BulkImportEntity;
   const jobId = job.id;
-  const rows = stagingRows.filter((r) => r.data_type === "bulk_row");
+  const rows = stagingRows.filter(
+    (r) => r.data_type === "bulk_row" || r.data_type === "bulk_semantic_row"
+  );
+
+  const review = normalizeBulkReviewPayload(job.bulk_review_payload);
 
   const stats: Record<string, number> = {
     imported: 0,
@@ -177,7 +182,12 @@ export async function processBulkImportJob(
   for (const row of rows) {
     const sourceId = row.source_id || "unknown";
     try {
-      const p = row.payload || {};
+      const p = applyBulkReviewToRow(
+        entity,
+        sourceId,
+        (row.payload || {}) as Record<string, unknown>,
+        review
+      );
       switch (entity) {
         case "suppliers": {
           const supplierTypeRaw = parseString((p as { supplierType?: unknown }).supplierType);
