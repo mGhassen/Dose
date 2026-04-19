@@ -920,38 +920,57 @@ export type ReceiveOrderInput = z.infer<typeof receiveOrderSchema>;
 const recipeItemSchema = z.object({
   itemId: z.number(),
   quantity: z.number(),
-  unit: z.string().optional(),
-  unitId: z.number().optional(),
-  notes: z.string().optional(),
+  unit: z.string().nullish(),
+  unitId: z.number().nullish(),
+  notes: z.string().nullish(),
 });
 const recipeModifierQuantitySchema = z.object({
   modifierId: z.number().int().positive(),
   quantity: z.number().min(0, "Quantity must be non-negative"),
-  unit: z.string().optional(),
-  unitId: z.number().optional(),
-  notes: z.string().optional(),
-  sortOrder: z.number().int().optional(),
-  enabled: z.boolean().optional(),
+  unit: z.string().nullish(),
+  unitId: z.number().nullish(),
+  notes: z.string().nullish(),
+  sortOrder: z.number().int().nullish(),
+  enabled: z.boolean().nullish(),
 });
 export const createRecipeSchema = z.object({
   name: z.string().min(1),
-  description: z.string().optional(),
-  unit: z.string().optional(),
-  unitId: z.number().optional(),
-  category: z.string().optional(),
-  servingSize: z.number().optional(),
-  preparationTime: z.number().optional(),
-  cookingTime: z.number().optional(),
-  instructions: z.string().optional(),
-  notes: z.string().optional(),
-  isActive: z.boolean().optional(),
+  description: z.string().nullish(),
+  unit: z.string().nullish(),
+  unitId: z.number().nullish(),
+  category: z.string().nullish(),
+  servingSize: z.number().nullish(),
+  preparationTime: z.number().nullish(),
+  cookingTime: z.number().nullish(),
+  instructions: z.string().nullish(),
+  notes: z.string().nullish(),
+  isActive: z.boolean().nullish(),
   producedItemId: z.number().nullable().optional(),
-  producedItemIds: z.array(z.number()).optional(),
-  items: z.array(recipeItemSchema).optional(),
-  modifierQuantities: z.array(recipeModifierQuantitySchema).optional(),
+  producedItemIds: z.array(z.number()).nullish(),
+  items: z.array(recipeItemSchema).nullish(),
+  modifierQuantities: z.array(recipeModifierQuantitySchema).nullish(),
 });
 export type CreateRecipeInput = z.infer<typeof createRecipeSchema>;
-export const updateRecipeSchema = createRecipeSchema.partial();
+
+/** JSON commonly sends explicit `null`; Zod `.optional()` does not accept `null`. */
+function nullsToUndefinedDeep(value: unknown): unknown {
+  if (value === null) return undefined;
+  if (Array.isArray(value)) return value.map(nullsToUndefinedDeep);
+  if (value !== null && typeof value === "object" && !(value instanceof Date)) {
+    const o = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(o)) {
+      out[k] = nullsToUndefinedDeep(o[k]);
+    }
+    return out;
+  }
+  return value;
+}
+
+export const updateRecipeSchema = z.preprocess(
+  nullsToUndefinedDeep,
+  createRecipeSchema.partial()
+);
 export type UpdateRecipeInput = z.infer<typeof updateRecipeSchema>;
 
 export const produceRecipeSchema = z.object({
