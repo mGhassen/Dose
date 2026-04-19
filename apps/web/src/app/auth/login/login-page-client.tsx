@@ -366,6 +366,27 @@ export function LoginPageClient({ loginImages }: LoginPageClientProps) {
                         "Analyst"
                       )}
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        handlePrefilledLogin(
+                          "pending@dose.com",
+                          "password123"
+                        )
+                      }
+                      disabled={isLoading}
+                      className="text-xs col-span-2"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          Logging in...
+                        </>
+                      ) : (
+                        "Pending"
+                      )}
+                    </Button>
                   </div>
                   <div className="space-y-1 text-center text-xs text-muted-foreground">
                     <p>
@@ -376,6 +397,10 @@ export function LoginPageClient({ loginImages }: LoginPageClientProps) {
                     </p>
                     <p>
                       <strong>User/Analyst:</strong> Standard user access
+                    </p>
+                    <p>
+                      <strong>Pending:</strong> Profile status pending (approval
+                      flow)
                     </p>
                   </div>
                 </div>
