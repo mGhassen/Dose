@@ -34,9 +34,7 @@ export async function produceRecipe(
     throw new Error('Recipe not found');
   }
 
-  if (!recipeData.items || recipeData.items.length === 0) {
-    throw new Error('Recipe has no items');
-  }
+  const recipeItems = recipeData.items ?? [];
 
   const servingSize = recipeData.serving_size || 1;
   const multiplier = quantity / servingSize;
@@ -46,7 +44,7 @@ export async function produceRecipe(
   // not at production time, because the actual supply item consumed depends on which
   // option the customer picks (e.g. oat milk vs regular milk). See `/api/sales` /
   // sales line-item creation for the sale-time deduction flow.
-  for (const recipeItem of recipeData.items) {
+  for (const recipeItem of recipeItems) {
     const item = recipeItem.item;
     if (!item) continue;
 

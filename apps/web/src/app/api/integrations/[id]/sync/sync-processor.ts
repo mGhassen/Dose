@@ -32,6 +32,7 @@ import {
   type PreloadedRecipe,
 } from '@/lib/sales/replace-sale-stock-movements';
 import type { MissingCatalogHint } from './recover-missing-catalog';
+import { ensureRecipeForProduceOnSaleProduct } from '@/lib/recipes/ensure-recipe-for-produce-on-sale-product';
 
 type SupabaseClient = { from: (table: string) => any };
 
@@ -720,6 +721,7 @@ export async function processSyncJob(
               item_types: ['product'],
               is_active: !variationArchived,
               is_catalog_parent: false,
+              produce_on_sale: true,
             })
             .select('id')
             .single();
@@ -740,6 +742,17 @@ export async function processSyncJob(
             taxIds,
             taxInclusionByTaxId
           );
+
+          const recipeLink = await ensureRecipeForProduceOnSaleProduct(supabase as any, newItem.id as number);
+          if (!recipeLink.ok) {
+            await recordImportError(
+              supabase,
+              jobId,
+              'catalog_variation',
+              variationId,
+              `Recipe link (produce-on-sale): ${recipeLink.message}`
+            );
+          }
 
           if (parentItemId != null) {
             await supabase.from('item_variations').insert({
@@ -852,28 +865,34 @@ export async function processSyncJob(
       }
     }
 
-    const [costMap, itemsRows, recipesRows] = await Promise.all([
+    const [costMap, itemsRowsResult] = await Promise.all([
       getItemCostsAsOfBatch(supabase, costPairs),
       referencedItemIds.size > 0
         ? supabase
             .from('items')
-            .select('id, unit_id, produced_from_recipe_id, affects_stock')
+            .select('id, unit_id, produced_from_recipe_id, affects_stock, produce_on_sale')
             .in('id', Array.from(referencedItemIds))
         : Promise.resolve({ data: [] as PreloadedItem[] }),
-      referencedItemIds.size > 0
-        ? supabase
-            .from('recipes')
-            .select('id, unit_id')
-            .in('id', Array.from(referencedItemIds))
-        : Promise.resolve({ data: [] as PreloadedRecipe[] }),
     ]);
 
+    const itemsRows = itemsRowsResult?.data ?? [];
+    const recipeIdsForPreload = new Set<number>([...referencedItemIds]);
+    for (const it of itemsRows as PreloadedItem[]) {
+      if (it.produced_from_recipe_id != null) {
+        recipeIdsForPreload.add(it.produced_from_recipe_id);
+      }
+    }
+    const { data: recipesData } =
+      recipeIdsForPreload.size > 0
+        ? await supabase.from('recipes').select('id, unit_id').in('id', Array.from(recipeIdsForPreload))
+        : { data: [] as PreloadedRecipe[] };
+
     const itemsById = new Map<number, PreloadedItem>();
-    for (const it of (itemsRows?.data ?? []) as PreloadedItem[]) {
+    for (const it of itemsRows as PreloadedItem[]) {
       itemsById.set(it.id, it);
     }
     const recipesById = new Map<number, PreloadedRecipe>();
-    for (const r of (recipesRows?.data ?? []) as PreloadedRecipe[]) {
+    for (const r of (recipesData ?? []) as PreloadedRecipe[]) {
       recipesById.set(r.id, r);
     }
     const resolveCost = (itemId: number, dateStr: string): number | null => {

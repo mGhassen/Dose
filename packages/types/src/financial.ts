@@ -1117,6 +1117,13 @@ export interface Item {
   type?: string;
   /** When false, sales for this item do not create stock movements. */
   affectsStock?: boolean;
+  /**
+   * When true, a production recipe is linked (or created) for this SKU so sales use `produceRecipe`.
+   * Square catalog imports default this to true for new items (overridable in catalog review).
+   */
+  produceOnSale?: boolean;
+  /** Max units producible from linked recipe given current ingredient stock (theoretical; shared ingredients). */
+  producibleEstimate?: number | null;
   /** Square catalog: parent row for a product with variations (not a sellable SKU). */
   isCatalogParent?: boolean;
   servingSize?: number;
@@ -1167,6 +1174,7 @@ export interface CreateItemData {
   isActive?: boolean;
   itemTypes?: ItemKind[];
   affectsStock?: boolean;
+  produceOnSale?: boolean;
   type?: string;
 }
 

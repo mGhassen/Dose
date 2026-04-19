@@ -1115,6 +1115,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     notes: "",
     isActive: true,
     affectsStock: true,
+    produceOnSale: false,
     itemTypes: ["item"] as ItemKind[],
   });
   const { data: unitsData } = useUnits();
@@ -1250,6 +1251,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         notes: item.notes || "",
         isActive: item.isActive,
         affectsStock: item.affectsStock ?? true,
+        produceOnSale: item.produceOnSale ?? false,
         itemTypes: item.itemTypes?.length ? item.itemTypes : (["item"] as ItemKind[]),
       });
     }
@@ -1278,6 +1280,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           notes: formData.notes || undefined,
           isActive: formData.isActive,
           affectsStock: formData.affectsStock,
+          produceOnSale: formData.produceOnSale,
           itemTypes: formData.itemTypes,
         },
       });
@@ -1551,6 +1554,26 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       Useful for virtual items (e.g. the default milk option).
                     </p>
                   </div>
+
+                  {!item.producedFromRecipeId && (
+                    <div className="space-y-1 pt-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="produceOnSale"
+                          checked={formData.produceOnSale}
+                          onCheckedChange={(checked) => handleInputChange("produceOnSale", checked)}
+                        />
+                        <Label htmlFor="produceOnSale" className="cursor-pointer">
+                          Produced on sale
+                        </Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground ml-6">
+                        When on, we create a production recipe linked to this SKU (if needed) so sales run
+                        through recipe production (ingredient OUT + finished IN, then sale OUT). Add ingredients to
+                        that recipe to deduct stock. Ignored when a recipe is already linked.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Description */}
@@ -1617,6 +1640,18 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                       <div className="text-sm text-muted-foreground mt-2">
                         From {stockMovementsResponse?.data?.length || 0} movements
                       </div>
+                      {item.producibleEstimate != null && (
+                        <div className="text-sm mt-3 pt-3 border-t border-blue-200/60 dark:border-blue-800/60 max-w-md">
+                          <span className="font-medium text-foreground">
+                            ~{item.producibleEstimate} {item.unit || "units"}
+                          </span>
+                          <span className="text-muted-foreground"> max from ingredients (recipe)</span>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Theoretical bottleneck from current ingredient stock; ingredients may be shared with other
+                            products.
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <div className="text-right">
                       {calculatedStock.total === 0 ? (
@@ -1677,193 +1712,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   </CardContent>
                 </Card>
               </div>
-
-              {(item.isCatalogParent ||
-                catalogInfo?.parentItem ||
-                (catalogInfo?.variations?.length ?? 0) > 0 ||
-                (catalogInfo?.modifierLists?.length ?? 0) > 0) && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Catalog (Square)</CardTitle>
-                    <CardDescription>
-                      Variants, modifier lists, and parent links from the integrated catalog.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {catalogLoading ? (
-                      <div className="flex justify-center py-6">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-                      </div>
-                    ) : (
-                      <>
-                        {catalogInfo?.parentItem && (
-                          <div>
-                            <p className="text-sm font-medium mb-2">Parent catalog group</p>
-                            <Link
-                              href={`/items/${catalogInfo.parentItem.id}`}
-                              className="text-primary hover:underline inline-flex items-center gap-1"
-                            >
-                              {catalogInfo.parentItem.name}
-                              <ChevronRight className="h-4 w-4" />
-                            </Link>
-                            {catalogInfo.variantMeta?.nameSnapshot && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Variation: {catalogInfo.variantMeta.nameSnapshot}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        {item.isCatalogParent && (catalogInfo?.variations?.length ?? 0) > 0 && (
-                          <div>
-                            <p className="text-sm font-medium mb-2">Variants (sellable SKUs)</p>
-                            <p className="text-xs text-muted-foreground mb-2">
-                              Selling price and history apply to each variant, not this group row.
-                            </p>
-                            <div className="rounded-md border overflow-hidden">
-                              <table className="w-full text-sm">
-                                <thead>
-                                  <tr className="border-b bg-muted/50">
-                                    <th className="text-left p-2 font-medium">Name</th>
-                                    <th className="text-left p-2 font-medium">SKU</th>
-                                    <th className="text-right p-2 font-medium w-[100px]">Open</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {catalogInfo!.variations.map((v) => (
-                                    <tr key={v.id} className="border-b last:border-0">
-                                      <td className="p-2">{v.name}</td>
-                                      <td className="p-2 font-mono text-muted-foreground">{v.sku || "—"}</td>
-                                      <td className="p-2 text-right">
-                                        <Link href={`/items/${v.variantItemId}`}>
-                                          <Button variant="ghost" size="sm" className="h-8">
-                                            View
-                                          </Button>
-                                        </Link>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-
-                        {(catalogInfo?.modifierLists?.length ?? 0) > 0 && (
-                          <div className="space-y-4">
-                            <div>
-                              <p className="text-sm font-medium">Modifier lists</p>
-                              {catalogInfo?.modifierListsSourceItemId != null &&
-                                catalogInfo.modifierListsSourceItemId !== item.id && (
-                                  <p className="text-xs text-muted-foreground mt-0.5">
-                                    From parent catalog group (item #{catalogInfo.modifierListsSourceItemId})
-                                  </p>
-                                )}
-                            </div>
-                            {catalogInfo!.modifierLists.map((list) => (
-                              <div key={list.id} className="rounded-lg border bg-muted/20 p-3 space-y-2">
-                                <div className="flex flex-wrap items-center gap-2 justify-between">
-                                  <span className="font-medium">{list.name || `List #${list.id}`}</span>
-                                  <div className="flex gap-1 flex-wrap">
-                                    {list.selectionType && (
-                                      <Badge variant="secondary" className="text-xs font-normal">
-                                        {list.selectionType}
-                                      </Badge>
-                                    )}
-                                    {!list.enabled && (
-                                      <Badge variant="outline" className="text-xs">
-                                        Disabled
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                                {(list.minSelected != null || list.maxSelected != null) && (
-                                  <p className="text-xs text-muted-foreground">
-                                    Select {list.minSelected ?? 0}–{list.maxSelected ?? "∞"}
-                                  </p>
-                                )}
-                                {(() => {
-                                  const usages =
-                                    catalogInfo?.modifierListUsageByRecipe?.[list.id] ?? [];
-                                  if (usages.length === 0) return null;
-                                  return (
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                      <span className="text-xs text-muted-foreground">
-                                        Used by:
-                                      </span>
-                                      {usages.map((u) => (
-                                        <Link
-                                          key={u.recipeId}
-                                          href={`/recipes/${u.recipeId}`}
-                                          className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs hover:bg-accent"
-                                        >
-                                          <span>{u.recipeName}</span>
-                                          {u.modifierCount > 1 && (
-                                            <span className="text-muted-foreground">· {u.modifierCount}</span>
-                                          )}
-                                        </Link>
-                                      ))}
-                                    </div>
-                                  );
-                                })()}
-                                <ul className="text-sm space-y-1.5 pl-0 list-none">
-                                  {list.modifiers.map((m) => (
-                                    <li
-                                      key={m.id}
-                                      className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 last:border-0 pb-1.5 last:pb-0"
-                                    >
-                                      <span>
-                                        {m.name || "—"}
-                                        {m.supplyItemId != null && (
-                                          <span className="text-muted-foreground text-xs ml-2">
-                                            →{" "}
-                                            <Link
-                                              href={`/items/${m.supplyItemId}`}
-                                              className="text-primary hover:underline"
-                                            >
-                                              {m.supplyItemName || "item"}
-                                            </Link>
-                                          </span>
-                                        )}
-                                      </span>
-                                      <div className="flex items-center gap-3">
-                                        {m.supplyItemId != null && (
-                                          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-                                            <Switch
-                                              checked={m.supplyItemAffectsStock}
-                                              onCheckedChange={(checked) =>
-                                                toggleModifierAffectsStock(m.supplyItemId!, checked)
-                                              }
-                                            />
-                                            <span>Affects stock</span>
-                                          </label>
-                                        )}
-                                        <span className="text-muted-foreground tabular-nums text-xs">
-                                          {m.priceAmountCents != null
-                                            ? formatCurrency(m.priceAmountCents / 100)
-                                            : "—"}
-                                        </span>
-                                      </div>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {item.isCatalogParent &&
-                          (catalogInfo?.variations?.length ?? 0) === 0 &&
-                          (catalogInfo?.modifierLists?.length ?? 0) === 0 && (
-                            <p className="text-sm text-muted-foreground">
-                              No linked variants or modifier lists in the catalog for this group yet.
-                            </p>
-                          )}
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
 
               <Tabs defaultValue="movements" className="w-full">
                 <TabsList className="grid w-full max-w-2xl grid-cols-4">
@@ -2139,138 +1987,334 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
             <div className="lg:col-span-4 space-y-6">
               <Card>
-                <CardHeader>
-                  <CardTitle>Item Details</CardTitle>
-                  <CardDescription>Basic information</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Name</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <StatusPin active={item.isActive} title={item.isActive ? "Active" : "Inactive"} />
-                      <p className="text-base font-semibold">{item.name}</p>
-                    </div>
-                  </div>
-
-                  {item.sku && (
-                    <>
-                      <Separator />
+                <Tabs defaultValue="item-data" className="w-full">
+                  <CardHeader className="pb-3">
+                    <TabsList className="grid w-full grid-cols-3 h-auto gap-1 p-1">
+                      <TabsTrigger value="item-data" className="text-xs px-1.5 py-2">
+                        Item data
+                      </TabsTrigger>
+                      <TabsTrigger value="square-catalog" className="text-xs px-1.5 py-2">
+                        Square variation
+                      </TabsTrigger>
+                      <TabsTrigger value="modifiers" className="text-xs px-1.5 py-2">
+                        Modifiers
+                      </TabsTrigger>
+                    </TabsList>
+                  </CardHeader>
+                  <CardContent>
+                    <TabsContent value="item-data" className="mt-0 space-y-4">
                       <div>
-                        <label className="text-xs font-medium text-muted-foreground">SKU</label>
-                        <p className="text-sm mt-1 font-mono">{item.sku}</p>
-                      </div>
-                    </>
-                  )}
-
-                  {item.category && (
-                    <>
-                      <Separator />
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Category</label>
-                        <p className="text-sm mt-1">{item.category.label ?? item.category.name}</p>
-                      </div>
-                    </>
-                  )}
-
-                  {item.unit && (
-                    <>
-                      <Separator />
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Unit</label>
-                        <p className="text-sm mt-1">{item.unit}</p>
-                      </div>
-                    </>
-                  )}
-
-                  {supplierName && (
-                    <>
-                      <Separator />
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Vendor</label>
-                        <div className="mt-1">
-                          <Badge variant="outline">{supplierName}</Badge>
+                        <label className="text-xs font-medium text-muted-foreground">Name</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <StatusPin active={item.isActive} title={item.isActive ? "Active" : "Inactive"} />
+                          <p className="text-base font-semibold">{item.name}</p>
                         </div>
                       </div>
-                    </>
-                  )}
 
-                  {item.itemTypes?.includes("product") && !item.isCatalogParent && !isEditing && (
-                    <>
+                      {item.sku && (
+                        <>
+                          <Separator />
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">SKU</label>
+                            <p className="text-sm mt-1 font-mono">{item.sku}</p>
+                          </div>
+                        </>
+                      )}
+
+                      {item.category && (
+                        <>
+                          <Separator />
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">Category</label>
+                            <p className="text-sm mt-1">{item.category.label ?? item.category.name}</p>
+                          </div>
+                        </>
+                      )}
+
+                      {item.unit && (
+                        <>
+                          <Separator />
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">Unit</label>
+                            <p className="text-sm mt-1">{item.unit}</p>
+                          </div>
+                        </>
+                      )}
+
+                      {supplierName && (
+                        <>
+                          <Separator />
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">Vendor</label>
+                            <div className="mt-1">
+                              <Badge variant="outline">{supplierName}</Badge>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {item.itemTypes?.includes("product") && !item.isCatalogParent && !isEditing && (
+                        <>
+                          <Separator />
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">Recipe output</label>
+                            <div className="mt-2 flex flex-col gap-2">
+                              {item.producedFromRecipeId ? (
+                                <>
+                                  <Link href={`/recipes/${item.producedFromRecipeId}`} className="w-full">
+                                    <Button variant="outline" size="sm" className="w-full">
+                                      View recipe
+                                    </Button>
+                                  </Link>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive"
+                                    disabled={updateRecipe.isPending}
+                                    onClick={async () => {
+                                      const rid = item.producedFromRecipeId;
+                                      if (!rid || !item.id) return;
+                                      try {
+                                        const recipe = await recipesApi.getById(String(rid));
+                                        const currentIds =
+                                          (recipe as { producedItems?: { id: number }[] }).producedItems?.map(
+                                            (p) => p.id
+                                          ) ?? [];
+                                        const nextIds = currentIds.filter((id) => id !== item.id);
+                                        await updateRecipe.mutateAsync({
+                                          id: String(rid),
+                                          data: { producedItemIds: nextIds },
+                                        });
+                                        await refetchItem();
+                                        toast.success("Unlinked from recipe");
+                                      } catch (e: unknown) {
+                                        toast.error(e instanceof Error ? e.message : "Failed to unlink");
+                                      }
+                                    }}
+                                  >
+                                    Unlink from recipe
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button variant="outline" size="sm" className="w-full" asChild>
+                                    <Link href={`/recipes/create?producedItemId=${item.id}`}>Create recipe</Link>
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full"
+                                    onClick={() => {
+                                      setLinkRecipeId(null);
+                                      setLinkRecipeOpen(true);
+                                    }}
+                                  >
+                                    <Link2 className="mr-2 h-4 w-4" />
+                                    Link existing recipe
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
                       <Separator />
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">Recipe output</label>
-                        <div className="mt-2 flex flex-col gap-2">
-                          {item.producedFromRecipeId ? (
-                            <>
-                              <Link href={`/recipes/${item.producedFromRecipeId}`} className="w-full">
-                                <Button variant="outline" size="sm" className="w-full">
-                                  View recipe
-                                </Button>
+
+                      <div className="space-y-2 text-xs text-muted-foreground">
+                        <div>
+                          <span className="font-medium">Created:</span> {formatDate(item.createdAt)}
+                        </div>
+                        <div>
+                          <span className="font-medium">Updated:</span> {formatDate(item.updatedAt)}
+                        </div>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="square-catalog" className="mt-0 space-y-4">
+                      {catalogLoading ? (
+                        <div className="flex justify-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                        </div>
+                      ) : (
+                        <>
+                          {catalogInfo?.parentItem && (
+                            <div>
+                              <p className="text-sm font-medium mb-2">Parent catalog group</p>
+                              <Link
+                                href={`/items/${catalogInfo.parentItem.id}`}
+                                className="text-primary hover:underline inline-flex items-center gap-1"
+                              >
+                                {catalogInfo.parentItem.name}
+                                <ChevronRight className="h-4 w-4" />
                               </Link>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive"
-                                disabled={updateRecipe.isPending}
-                                onClick={async () => {
-                                  const rid = item.producedFromRecipeId;
-                                  if (!rid || !item.id) return;
-                                  try {
-                                    const recipe = await recipesApi.getById(String(rid));
-                                    const currentIds =
-                                      (recipe as { producedItems?: { id: number }[] }).producedItems?.map(
-                                        (p) => p.id
-                                      ) ?? [];
-                                    const nextIds = currentIds.filter((id) => id !== item.id);
-                                    await updateRecipe.mutateAsync({
-                                      id: String(rid),
-                                      data: { producedItemIds: nextIds },
-                                    });
-                                    await refetchItem();
-                                    toast.success("Unlinked from recipe");
-                                  } catch (e: unknown) {
-                                    toast.error(e instanceof Error ? e.message : "Failed to unlink");
-                                  }
-                                }}
-                              >
-                                Unlink from recipe
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button variant="outline" size="sm" className="w-full" asChild>
-                                <Link href={`/recipes/create?producedItemId=${item.id}`}>Create recipe</Link>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full"
-                                onClick={() => {
-                                  setLinkRecipeId(null);
-                                  setLinkRecipeOpen(true);
-                                }}
-                              >
-                                <Link2 className="mr-2 h-4 w-4" />
-                                Link existing recipe
-                              </Button>
-                            </>
+                              {catalogInfo.variantMeta?.nameSnapshot && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Variation: {catalogInfo.variantMeta.nameSnapshot}
+                                </p>
+                              )}
+                            </div>
                           )}
+
+                          {item.isCatalogParent && (catalogInfo?.variations?.length ?? 0) > 0 && (
+                            <div>
+                              <p className="text-sm font-medium mb-2">Variants (sellable SKUs)</p>
+                              <p className="text-xs text-muted-foreground mb-2">
+                                Selling price and history apply to each variant, not this group row.
+                              </p>
+                              <div className="rounded-md border overflow-hidden">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="border-b bg-muted/50">
+                                      <th className="text-left p-2 font-medium">Name</th>
+                                      <th className="text-left p-2 font-medium">SKU</th>
+                                      <th className="text-right p-2 font-medium w-[100px]">Open</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {catalogInfo!.variations.map((v) => (
+                                      <tr key={v.id} className="border-b last:border-0">
+                                        <td className="p-2">{v.name}</td>
+                                        <td className="p-2 font-mono text-muted-foreground">{v.sku || "—"}</td>
+                                        <td className="p-2 text-right">
+                                          <Link href={`/items/${v.variantItemId}`}>
+                                            <Button variant="ghost" size="sm" className="h-8">
+                                              View
+                                            </Button>
+                                          </Link>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+
+                          {!catalogInfo?.parentItem &&
+                            !(item.isCatalogParent && (catalogInfo?.variations?.length ?? 0) > 0) && (
+                              <p className="text-sm text-muted-foreground">
+                                {item.isCatalogParent &&
+                                (catalogInfo?.variations?.length ?? 0) === 0
+                                  ? "No linked variants in the catalog for this group yet."
+                                  : "No Square catalog parent or variation link for this item."}
+                              </p>
+                            )}
+                        </>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="modifiers" className="mt-0 space-y-4">
+                      {catalogLoading ? (
+                        <div className="flex justify-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
                         </div>
-                      </div>
-                    </>
-                  )}
-
-                  <Separator />
-
-                  <div className="space-y-2 text-xs text-muted-foreground">
-                    <div>
-                      <span className="font-medium">Created:</span> {formatDate(item.createdAt)}
-                    </div>
-                    <div>
-                      <span className="font-medium">Updated:</span> {formatDate(item.updatedAt)}
-                    </div>
-                  </div>
-                </CardContent>
+                      ) : (catalogInfo?.modifierLists?.length ?? 0) > 0 ? (
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-sm font-medium">Modifier lists</p>
+                            {catalogInfo?.modifierListsSourceItemId != null &&
+                              catalogInfo.modifierListsSourceItemId !== item.id && (
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  From parent catalog group (item #{catalogInfo.modifierListsSourceItemId})
+                                </p>
+                              )}
+                          </div>
+                          {catalogInfo!.modifierLists.map((list) => (
+                            <div key={list.id} className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2 justify-between">
+                                <span className="font-medium">{list.name || `List #${list.id}`}</span>
+                                <div className="flex gap-1 flex-wrap">
+                                  {list.selectionType && (
+                                    <Badge variant="secondary" className="text-xs font-normal">
+                                      {list.selectionType}
+                                    </Badge>
+                                  )}
+                                  {!list.enabled && (
+                                    <Badge variant="outline" className="text-xs">
+                                      Disabled
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              {(list.minSelected != null || list.maxSelected != null) && (
+                                <p className="text-xs text-muted-foreground">
+                                  Select {list.minSelected ?? 0}–{list.maxSelected ?? "∞"}
+                                </p>
+                              )}
+                              {(() => {
+                                const usages = catalogInfo?.modifierListUsageByRecipe?.[list.id] ?? [];
+                                if (usages.length === 0) return null;
+                                return (
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-xs text-muted-foreground">Used by:</span>
+                                    {usages.map((u) => (
+                                      <Link
+                                        key={u.recipeId}
+                                        href={`/recipes/${u.recipeId}`}
+                                        className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs hover:bg-accent"
+                                      >
+                                        <span>{u.recipeName}</span>
+                                        {u.modifierCount > 1 && (
+                                          <span className="text-muted-foreground">· {u.modifierCount}</span>
+                                        )}
+                                      </Link>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                              <ul className="text-sm space-y-1.5 pl-0 list-none">
+                                {list.modifiers.map((m) => (
+                                  <li
+                                    key={m.id}
+                                    className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 last:border-0 pb-1.5 last:pb-0"
+                                  >
+                                    <span>
+                                      {m.name || "—"}
+                                      {m.supplyItemId != null && (
+                                        <span className="text-muted-foreground text-xs ml-2">
+                                          →{" "}
+                                          <Link
+                                            href={`/items/${m.supplyItemId}`}
+                                            className="text-primary hover:underline"
+                                          >
+                                            {m.supplyItemName || "item"}
+                                          </Link>
+                                        </span>
+                                      )}
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                      {m.supplyItemId != null && (
+                                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                                          <Switch
+                                            checked={m.supplyItemAffectsStock}
+                                            onCheckedChange={(checked) =>
+                                              toggleModifierAffectsStock(m.supplyItemId!, checked)
+                                            }
+                                          />
+                                          <span>Affects stock</span>
+                                        </label>
+                                      )}
+                                      <span className="text-muted-foreground tabular-nums text-xs">
+                                        {m.priceAmountCents != null
+                                          ? formatCurrency(m.priceAmountCents / 100)
+                                          : "—"}
+                                      </span>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No modifier lists in the catalog for this item.
+                        </p>
+                      )}
+                    </TabsContent>
+                  </CardContent>
+                </Tabs>
               </Card>
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">

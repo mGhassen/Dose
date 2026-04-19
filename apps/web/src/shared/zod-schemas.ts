@@ -348,6 +348,7 @@ export const createItemSchema = z
     defaultTaxRatePercent: z.number().optional(),
     isActive: z.boolean().optional(),
     affectsStock: z.boolean().optional(),
+    produceOnSale: z.boolean().optional(),
     itemTypes: z
       .array(z.enum(["item", "product", "modifier", "ingredient"]))
       .min(1)

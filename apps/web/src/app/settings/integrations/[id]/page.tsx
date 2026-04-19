@@ -46,7 +46,6 @@ import { formatDateTime } from '@kit/lib/date-format';
 import SquareDataView from '../square-data-view';
 import { Alert, AlertDescription } from '@kit/ui/alert';
 import { ConfirmationDialog } from '@/components/confirmation-dialog';
-import { SyncPeriodDialog, type SyncPeriodSelection } from './sync-period-dialog';
 import {
   BULK_IMPORT_ENTITY_NAMES,
   BULK_IMPORT_ENTITY_LABELS,
@@ -211,7 +210,6 @@ export default function IntegrationDetailPage({ params }: { params: Promise<{ id
 function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string; activeTab: string; setActiveTab: (tab: string) => void }) {
   const router = useRouter();
   const [isDisconnectDialogOpen, setIsDisconnectDialogOpen] = useState(false);
-  const [isSyncPeriodOpen, setIsSyncPeriodOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
   const [bulkEntity, setBulkEntity] = useState<BulkImportEntity>('suppliers');
@@ -230,7 +228,7 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
 
   const handleSync = async (
     syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'transactions' | 'full' = 'full',
-    period?: SyncPeriodSelection
+    period?: { mode: 'last_sync' | 'custom' | 'all'; startAt?: string; endAt?: string }
   ) => {
     try {
       const res = await syncIntegration.mutateAsync({ id, syncType, period });
@@ -454,7 +452,7 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                         <DropdownMenuItem
                           onSelect={(e) => {
                             e.preventDefault();
-                            setIsSyncPeriodOpen(true);
+                            router.push(`/settings/integrations/${id}/catalog-produce-on-sale?sync=full`);
                           }}
                           disabled={syncIntegration.isPending}
                         >
@@ -485,7 +483,10 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                           Sync Payments
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => handleSync('catalog')}
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            router.push(`/settings/integrations/${id}/catalog-produce-on-sale?sync=catalog`);
+                          }}
                           disabled={syncIntegration.isPending}
                         >
                           <Package className="w-4 h-4 mr-2" />
@@ -777,18 +778,6 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
           isPending={disconnectIntegration.isPending}
           variant="destructive"
         />
-        {integration.integration_type === 'square' && (
-          <SyncPeriodDialog
-            open={isSyncPeriodOpen}
-            onOpenChange={setIsSyncPeriodOpen}
-            lastSyncAt={integration.last_sync_at}
-            isPending={syncIntegration.isPending}
-            onConfirm={async (selection) => {
-              setIsSyncPeriodOpen(false);
-              await handleSync('full', selection);
-            }}
-          />
-        )}
       </div>
     </AppLayout>
   );

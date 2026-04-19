@@ -422,7 +422,11 @@ export default function IntegrationsContent() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleSync(squareIntegration.id, 'full')}
+                    onClick={() =>
+                      router.push(
+                        `/settings/integrations/${squareIntegration.id}/catalog-produce-on-sale?sync=full`
+                      )
+                    }
                     disabled={syncIntegration.isPending}
                   >
                     {syncIntegration.isPending ? (
@@ -458,7 +462,11 @@ export default function IntegrationsContent() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleSync(squareIntegration.id, 'catalog')}
+                    onClick={() =>
+                      router.push(
+                        `/settings/integrations/${squareIntegration.id}/catalog-produce-on-sale?sync=catalog`
+                      )
+                    }
                     disabled={syncIntegration.isPending}
                   >
                     <Package className="w-4 h-4 mr-2" />

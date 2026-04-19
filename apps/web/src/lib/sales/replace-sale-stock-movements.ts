@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { StockMovementType, StockMovementReferenceType } from "@kit/types";
 import { getItemStock } from "@/lib/stock/get-item-stock";
 import { produceRecipe } from "@/lib/stock/produce-recipe";
+import { ensureRecipeForProduceOnSaleProduct } from "@/lib/recipes/ensure-recipe-for-produce-on-sale-product";
 
 export type SaleStockLine = {
   itemId?: number;
@@ -13,6 +14,7 @@ export type PreloadedItem = {
   unit_id: number | null;
   produced_from_recipe_id: number | null;
   affects_stock: boolean | null;
+  produce_on_sale: boolean | null;
 };
 
 export type PreloadedRecipe = {
@@ -25,13 +27,27 @@ export type StockReplacePreload = {
   recipesById: Map<number, PreloadedRecipe>;
 };
 
+async function resolveRecipeRow(
+  supabase: SupabaseClient,
+  recipeId: number,
+  preload?: StockReplacePreload
+): Promise<{ ok: true; recipe: PreloadedRecipe } | { ok: false; message: string }> {
+  if (preload?.recipesById.has(recipeId)) {
+    return { ok: true, recipe: preload.recipesById.get(recipeId)! };
+  }
+  const { data, error } = await supabase.from("recipes").select("id, unit_id").eq("id", recipeId).maybeSingle();
+  if (error) return { ok: false, message: error.message };
+  if (!data) return { ok: false, message: `Recipe ${recipeId} not found` };
+  return { ok: true, recipe: data as PreloadedRecipe };
+}
+
 /**
  * Deletes sale-sourced movements then rewrites OUT rows from resolved sale lines
  * (same semantics as create sale transaction).
  *
  * When `preload` is provided, items/recipes lookups are served from memory and
- * all non-recipe OUT rows go out as a single bulk insert. The recipe branch
- * stays sequential (rare path that calls produceRecipe).
+ * most non-recipe OUT rows go out as a single bulk insert. Recipe-backed paths
+ * call `produceRecipe` when needed (produce-on-sale catalog items get a linked recipe first).
  */
 export async function replaceSaleStockMovements(
   supabase: SupabaseClient,
@@ -59,7 +75,7 @@ export async function replaceSaleStockMovements(
       .eq("reference_id", saleId);
   };
 
-  type OutRow = {
+  type MovementRow = {
     item_id: number;
     movement_type: StockMovementType;
     quantity: number;
@@ -70,8 +86,9 @@ export async function replaceSaleStockMovements(
     movement_date: string;
     notes: string;
   };
-  const directOutRows: OutRow[] = [];
+  const directOutRows: MovementRow[] = [];
   const recipeLines: { line: SaleStockLine; recipe: PreloadedRecipe }[] = [];
+  const recipeBackedProductLines: { line: SaleStockLine; item: PreloadedItem }[] = [];
 
   for (const l of lines) {
     if (!l.itemId || l.quantity <= 0) continue;
@@ -86,7 +103,7 @@ export async function replaceSaleStockMovements(
       const [itemResult, recipeResult] = await Promise.all([
         supabase
           .from("items")
-          .select("id, unit_id, produced_from_recipe_id, affects_stock")
+          .select("id, unit_id, produced_from_recipe_id, affects_stock, produce_on_sale")
           .eq("id", l.itemId)
           .maybeSingle(),
         supabase.from("recipes").select("id, unit_id").eq("id", l.itemId).maybeSingle(),
@@ -105,12 +122,45 @@ export async function replaceSaleStockMovements(
 
     if (item) {
       if (item.affects_stock === false) continue;
+
+      let effectiveItem: PreloadedItem = item;
+      if (item.produce_on_sale === true && item.produced_from_recipe_id == null) {
+        const ens = await ensureRecipeForProduceOnSaleProduct(supabase, item.id);
+        if (!ens.ok) {
+          await rollback();
+          return { ok: false, message: ens.message };
+        }
+        const { data: refreshed, error: refErr } = await supabase
+          .from("items")
+          .select("id, unit_id, produced_from_recipe_id, affects_stock, produce_on_sale")
+          .eq("id", item.id)
+          .single();
+        if (refErr || !refreshed) {
+          await rollback();
+          return { ok: false, message: refErr?.message ?? "Failed to reload item after linking recipe" };
+        }
+        effectiveItem = refreshed as PreloadedItem;
+        if (preload) {
+          preload.itemsById.set(item.id, effectiveItem);
+        }
+      }
+
+      if (effectiveItem.produced_from_recipe_id != null) {
+        const resolved = await resolveRecipeRow(supabase, effectiveItem.produced_from_recipe_id, preload);
+        if (!resolved.ok) {
+          await rollback();
+          return { ok: false, message: resolved.message };
+        }
+        recipeBackedProductLines.push({ line: l, item: effectiveItem });
+        continue;
+      }
+
       directOutRows.push({
-        item_id: item.id,
+        item_id: effectiveItem.id,
         movement_type: StockMovementType.OUT,
         quantity: l.quantity,
         unit: "unit",
-        unit_id: item.unit_id ?? null,
+        unit_id: effectiveItem.unit_id ?? null,
         reference_type: StockMovementReferenceType.SALE,
         reference_id: saleId,
         movement_date: movementDate,
@@ -126,6 +176,38 @@ export async function replaceSaleStockMovements(
     if (outError) {
       await rollback();
       return { ok: false, message: outError.message };
+    }
+  }
+
+  for (const { line: l, item } of recipeBackedProductLines) {
+    const recipeId = item.produced_from_recipe_id!;
+    const stock = await getItemStock(supabase, item.id, null);
+    if (stock < l.quantity) {
+      const pr = await produceRecipe(supabase, String(recipeId), {
+        quantity: l.quantity - stock,
+        location: null,
+        notes: `Sale #${saleId}`,
+        producedItemId: item.id,
+      });
+      if (pr.producedItemId !== item.id) {
+        await rollback();
+        return { ok: false, message: "Produced item mismatch for recipe-backed sale line" };
+      }
+    }
+    const { error: recipeMoveErr } = await supabase.from("stock_movements").insert({
+      item_id: item.id,
+      movement_type: StockMovementType.OUT,
+      quantity: l.quantity,
+      unit: "unit",
+      unit_id: item.unit_id ?? null,
+      reference_type: StockMovementReferenceType.SALE,
+      reference_id: saleId,
+      movement_date: movementDate,
+      notes: `Sale #${saleId}`,
+    });
+    if (recipeMoveErr) {
+      await rollback();
+      return { ok: false, message: recipeMoveErr.message };
     }
   }
 
@@ -177,5 +259,6 @@ export async function replaceSaleStockMovements(
       return { ok: false, message: recipeMoveErr.message };
     }
   }
+
   return { ok: true };
 }

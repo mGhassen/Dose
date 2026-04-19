@@ -10,6 +10,7 @@ import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createItemSchema } from '@/shared/zod-schemas';
 import { getUnitVariableMap } from '../_utils/unit-variables';
 import { applyTaxRulesToItem } from '@/lib/item-taxes-resolve';
+import { ensureRecipeForProduceOnSaleProduct } from '@/lib/recipes/ensure-recipe-for-produce-on-sale-product';
 
 function mapCategoryRow(row: any): Item['category'] {
   const c = row?.category;
@@ -48,6 +49,7 @@ function transformItem(
     notes: row.notes,
     producedFromRecipeId: row.produced_from_recipe_id,
     affectsStock: row.affects_stock ?? true,
+    produceOnSale: row.produce_on_sale ?? false,
     isCatalogParent: row.is_catalog_parent ?? false,
     groupId: row.group_id ?? null,
     groupName: group?.name ?? null,
@@ -70,6 +72,7 @@ function transformToSnakeCase(data: CreateItemData): any {
   if (data.categoryId !== undefined) result.category_id = data.categoryId;
   if (data.unitId != null) result.unit_id = data.unitId;
   if (data.affectsStock !== undefined) result.affects_stock = data.affectsStock;
+  if (data.produceOnSale !== undefined) result.produce_on_sale = data.produceOnSale;
   return result;
 }
 
@@ -279,6 +282,20 @@ export async function POST(request: NextRequest) {
         );
       } catch (taxErr) {
         console.error('Error auto-applying tax rules to item:', taxErr);
+      }
+      if ((itemData as { produce_on_sale?: boolean }).produce_on_sale === true) {
+        const link = await ensureRecipeForProduceOnSaleProduct(supabase as any, itemData.id);
+        if (!link.ok) {
+          return NextResponse.json({ error: link.message }, { status: 400 });
+        }
+        if (link.created) {
+          const { data: refreshed } = await supabase
+            .from('items')
+            .select(ITEM_SELECT_WITH_CATEGORY)
+            .eq('id', itemData.id)
+            .single();
+          if (refreshed) Object.assign(itemData, refreshed);
+        }
       }
     }
 
