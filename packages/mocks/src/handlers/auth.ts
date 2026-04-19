@@ -422,7 +422,7 @@ export const authHandlers = [
     });
   }),
 
-  // Check Status
+  // Check Status (GET — legacy; client uses POST)
   http.get('/api/auth/check-status', ({ request }) => {
     const url = new URL(request.url);
     const email = url.searchParams.get('email');
@@ -454,6 +454,35 @@ export const authHandlers = [
         role: user.role,
         status: user.status
       }
+    });
+  }),
+
+  http.post('/api/auth/check-status', async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as { email?: string };
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+
+    if (!email) {
+      return HttpResponse.json(
+        { success: false, error: 'Email is required' },
+        { status: 400 }
+      );
+    }
+
+    const user = mockData.users.find(
+      (u) => u.email.toLowerCase() === email
+    );
+
+    if (!user) {
+      return HttpResponse.json({
+        success: false,
+        error: 'Account not found',
+      });
+    }
+
+    return HttpResponse.json({
+      success: true,
+      status: String(user.status || 'active').toLowerCase(),
+      authStatus: 'confirmed' as const,
     });
   }),
 
