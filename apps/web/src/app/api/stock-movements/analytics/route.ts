@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import {
+  appDefaultTimeZone,
+  endUtcIsoForCalendarYmd,
+  inclusiveUtcRangeFromYmdStrings,
+  startUtcIsoForCalendarYmd,
+} from '@kit/lib/date-format';
 
 export type StockMovementsAnalytics = {
   totals: {
@@ -74,9 +80,22 @@ export async function GET(request: NextRequest) {
       pItemIds = await getGroupMemberIds(supabase, id);
     }
 
+    const tz = appDefaultTimeZone();
+    let pStart: string | null = null;
+    let pEnd: string | null = null;
+    if (startDate && endDate) {
+      const { startUtc, endUtc } = inclusiveUtcRangeFromYmdStrings(startDate, endDate, tz);
+      pStart = startUtc.toISOString();
+      pEnd = endUtc.toISOString();
+    } else if (startDate) {
+      pStart = startUtcIsoForCalendarYmd(startDate, tz);
+    } else if (endDate) {
+      pEnd = endUtcIsoForCalendarYmd(endDate, tz);
+    }
+
     const { data, error } = await supabase.rpc('stock_movements_analytics', {
-      p_start_date: startDate ?? null,
-      p_end_date: endDate ? `${endDate}T23:59:59.999Z` : null,
+      p_start_date: pStart,
+      p_end_date: pEnd,
       p_item_ids: pItemIds,
       p_movement_types: types,
     });

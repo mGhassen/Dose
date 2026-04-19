@@ -56,6 +56,7 @@ import {
   TooltipTrigger,
 } from "@kit/ui/tooltip";
 import { formatDate, formatDateTime } from "@kit/lib/date-format";
+import { dateToYYYYMMDD, parseYYYYMMDDToLocalDate } from "@kit/lib/date-utils";
 import { cn } from "@kit/lib/utils";
 import { toast } from "sonner";
 import {
@@ -229,8 +230,8 @@ const TYPE_ORDER: StockMovementType[] = [
 ];
 
 function shiftRangeBack(range: { startDate: string; endDate: string }) {
-  const start = new Date(range.startDate);
-  const end = new Date(range.endDate);
+  const start = parseYYYYMMDDToLocalDate(range.startDate);
+  const end = parseYYYYMMDDToLocalDate(range.endDate);
   const days = Math.max(
     1,
     Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
@@ -660,17 +661,13 @@ export default function StockMovementsContent() {
   };
 
   const dayBuckets = useMemo(() => {
-    const start = new Date(dateRange.startDate);
-    const end = new Date(dateRange.endDate);
+    const start = parseYYYYMMDDToLocalDate(dateRange.startDate);
+    const end = parseYYYYMMDDToLocalDate(dateRange.endDate);
     const days: string[] = [];
     const d = new Date(start);
     while (d <= end) {
-      days.push(
-        `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
-          d.getUTCDate()
-        ).padStart(2, "0")}`
-      );
-      d.setUTCDate(d.getUTCDate() + 1);
+      days.push(dateToYYYYMMDD(d));
+      d.setDate(d.getDate() + 1);
     }
     return days;
   }, [dateRange.startDate, dateRange.endDate]);

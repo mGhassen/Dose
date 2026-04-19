@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
-
-function daysBetween(startDate: string, endDate: string): number {
-  const start = new Date(`${startDate}T00:00:00Z`).getTime();
-  const end = new Date(`${endDate}T00:00:00Z`).getTime();
-  return Math.max(1, Math.round((end - start) / 86400000) + 1);
-}
+import {
+  appDefaultTimeZone,
+  inclusiveDaysBetweenYmd,
+  inclusiveUtcRangeFromYmdStrings,
+  timestamptzBoundsFromYmdRange,
+} from '@kit/lib';
 
 function median(nums: number[]): number {
   if (nums.length === 0) return 0;
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       endDate = `${y}-12-31`;
     }
 
-    const endInclusive = `${endDate}T23:59:59.999Z`;
+    const salesDateBounds = timestamptzBoundsFromYmdRange(startDate, endDate);
     const supabase = supabaseServer();
 
     const saleDateById = new Map<number, string>();
@@ -79,8 +79,8 @@ export async function GET(request: NextRequest) {
       const { data, error } = await supabase
         .from('sales')
         .select('id, date')
-        .gte('date', startDate!)
-        .lte('date', endInclusive)
+        .gte('date', salesDateBounds.gte)
+        .lte('date', salesDateBounds.lte)
         .order('id', { ascending: true })
         .range(page * pageSize, (page + 1) * pageSize - 1);
       if (error) throw error;
@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const periodDays = daysBetween(startDate, endDate);
+    const periodDays = inclusiveDaysBetweenYmd(startDate, endDate);
 
     const productAgg = new Map<
       number,
@@ -480,8 +480,8 @@ export async function GET(request: NextRequest) {
       hasTimeData,
     };
 
-    const cutoff = new Date(`${endDate}T23:59:59.999Z`);
-    cutoff.setUTCDate(cutoff.getUTCDate() - deadStockWindowDays);
+    const { endUtc } = inclusiveUtcRangeFromYmdStrings(startDate, endDate, appDefaultTimeZone());
+    const cutoff = new Date(endUtc.getTime() - deadStockWindowDays * 86400000);
 
     const lastSaleAndLife = new Map<number, { last: string | null; lifetime: number }>();
     let lp = 0;

@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import { lastDayYmdForYm, timestamptzBoundsFromYmdRange } from '@kit/lib';
 import type { SalesSummary, Sale, SalesType } from '@kit/types';
 
 function transformSale(row: any): Sale {
@@ -36,12 +37,10 @@ export async function GET(request: NextRequest) {
 
     const supabase = supabaseServer();
     
-    // Fetch all sales in the date range
-    const startDate = `${startMonth}-01`;
-    const endDateObj = new Date(`${endMonth}-01`);
-    endDateObj.setMonth(endDateObj.getMonth() + 1);
-    endDateObj.setDate(0);
-    const endDate = endDateObj.toISOString().split('T')[0];
+    const salesDateBounds = timestamptzBoundsFromYmdRange(
+      `${startMonth}-01`,
+      lastDayYmdForYm(endMonth)
+    );
 
     // Fetch all sales with pagination to get all records
     let allSales: any[] = [];
@@ -53,8 +52,8 @@ export async function GET(request: NextRequest) {
       const { data, error } = await supabase
         .from('sales')
         .select('*')
-        .gte('date', startDate)
-        .lte('date', endDate)
+        .gte('date', salesDateBounds.gte)
+        .lte('date', salesDateBounds.lte)
         .order('date', { ascending: true })
         .range(page * pageSize, (page + 1) * pageSize - 1);
 

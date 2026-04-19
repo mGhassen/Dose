@@ -672,3 +672,49 @@ export function getMonthlyZonedRanges(
   }
   return ranges;
 }
+
+function parseYmdStrict(ymd: string): { y: number; m: number; d: number } {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
+  if (!m) throw new Error(`Invalid YYYY-MM-DD: ${ymd}`);
+  return { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) };
+}
+
+/**
+ * Inclusive UTC bounds for wall-clock calendar [startYmd .. endYmd] in `timeZone`
+ * (e.g. Europe/Paris). Use for filtering timestamptz columns so “today” is the full
+ * local 24h, not UTC midnight–23:59Z (which breaks Paris evening / early morning).
+ */
+export function inclusiveUtcRangeFromYmdStrings(
+  startYmd: string,
+  endYmd: string,
+  timeZone: string
+): { startUtc: Date; endUtc: Date } {
+  const s = parseYmdStrict(startYmd);
+  const e = parseYmdStrict(endYmd);
+  const startUtc = startOfZonedCalendarDayUtc(s.y, s.m, s.d, timeZone);
+  const endDayStart = startOfZonedCalendarDayUtc(e.y, e.m, e.d, timeZone);
+  const endUtc = endOfZonedCalendarDay(endDayStart, timeZone);
+  if (startUtc.getTime() > endUtc.getTime()) {
+    throw new Error('startDate must be before or equal to endDate');
+  }
+  return { startUtc, endUtc };
+}
+
+export function startUtcIsoForCalendarYmd(startYmd: string, timeZone: string): string {
+  const { y, m, d } = parseYmdStrict(startYmd);
+  return startOfZonedCalendarDayUtc(y, m, d, timeZone).toISOString();
+}
+
+export function endUtcIsoForCalendarYmd(endYmd: string, timeZone: string): string {
+  const { y, m, d } = parseYmdStrict(endYmd);
+  const dayStart = startOfZonedCalendarDayUtc(y, m, d, timeZone);
+  return endOfZonedCalendarDay(dayStart, timeZone).toISOString();
+}
+
+/** Server/API default: `NEXT_PUBLIC_TIMEZONE` or Paris (matches app settings default). */
+export function appDefaultTimeZone(): string {
+  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_TIMEZONE) {
+    return process.env.NEXT_PUBLIC_TIMEZONE;
+  }
+  return BUSINESS_TIMEZONE_EUROPE_PARIS;
+}

@@ -7,7 +7,7 @@ import {
   type DateRange,
 } from "@kit/lib/date-periods";
 import { formatShortDate } from "@kit/lib/date-format";
-import { dateToYYYYMMDD } from "@kit/lib/date-utils";
+import { dateToYYYYMMDD, parseYYYYMMDDToLocalDate } from "@kit/lib/date-utils";
 import {
   Select,
   SelectContent,
@@ -57,13 +57,13 @@ export function DashboardPeriodFilter({ value, onChange }: DashboardPeriodFilter
 
   type CalendarRange = { from?: Date; to?: Date };
   const [customRange, setCustomRange] = useState<CalendarRange>({
-    from: value.startDate ? new Date(value.startDate) : undefined,
-    to: value.endDate ? new Date(value.endDate) : undefined,
+    from: value.startDate ? parseYYYYMMDDToLocalDate(value.startDate) : undefined,
+    to: value.endDate ? parseYYYYMMDDToLocalDate(value.endDate) : undefined,
   });
   useEffect(() => {
     setCustomRange({
-      from: value.startDate ? new Date(value.startDate) : undefined,
-      to: value.endDate ? new Date(value.endDate) : undefined,
+      from: value.startDate ? parseYYYYMMDDToLocalDate(value.startDate) : undefined,
+      to: value.endDate ? parseYYYYMMDDToLocalDate(value.endDate) : undefined,
     });
   }, [value.startDate, value.endDate]);
   const [rangePopoverOpen, setRangePopoverOpen] = useState(false);
@@ -77,8 +77,8 @@ export function DashboardPeriodFilter({ value, onChange }: DashboardPeriodFilter
     setPreset(v);
     if (v === CUSTOM_VALUE) {
       setCustomRange({
-        from: value.startDate ? new Date(value.startDate) : undefined,
-        to: value.endDate ? new Date(value.endDate) : undefined,
+        from: value.startDate ? parseYYYYMMDDToLocalDate(value.startDate) : undefined,
+        to: value.endDate ? parseYYYYMMDDToLocalDate(value.endDate) : undefined,
       });
     } else {
       const range = getDateRangeForPreset(v as DatePeriodPreset);

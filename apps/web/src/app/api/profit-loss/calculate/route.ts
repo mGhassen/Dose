@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import { timestamptzBoundsForYm } from '@kit/lib';
 import { calculateProfitAndLoss } from '@/lib/calculations/financial-statements';
 import type { ProfitAndLoss, Sale, Expense, Personnel, LeasingPayment, DepreciationEntry, LoanScheduleEntry, Variable, ExpenseCategory } from '@kit/types';
 
@@ -137,9 +138,11 @@ export async function POST(request: NextRequest) {
     endDateObj.setDate(0);
     const endDate = endDateObj.toISOString().split('T')[0];
 
+    const salesDateBounds = timestamptzBoundsForYm(month);
+
     // Fetch all related data
     const [salesResult, expensesResult, subscriptionsResult, personnelResult, leasingResult, depreciationResult, loansResult, variablesResult, actualPaymentsResult] = await Promise.all([
-      supabase.from('sales').select('*').gte('date', startDate).lte('date', endDate),
+      supabase.from('sales').select('*').gte('date', salesDateBounds.gte).lte('date', salesDateBounds.lte),
       supabase.from('expenses').select('*'),
       supabase.from('subscriptions').select('*').eq('is_active', true),
       supabase.from('personnel').select('*').eq('is_active', true),

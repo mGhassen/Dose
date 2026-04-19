@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import { timestamptzBoundsForYm } from '@kit/lib';
 import { calculateWorkingCapital } from '@/lib/calculations/financial-statements';
 import type { WorkingCapital, Sale } from '@kit/types';
 
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
     endDateObj.setMonth(endDateObj.getMonth() + 1);
     endDateObj.setDate(0);
     const endDate = endDateObj.toISOString().split('T')[0];
+    const salesDateBounds = timestamptzBoundsForYm(month);
 
     // Fetch sales for accounts receivable calculation
     // For simplicity, we'll use a percentage of monthly sales as receivables
@@ -46,8 +48,8 @@ export async function POST(request: NextRequest) {
     const { data: salesData, error: salesError } = await supabase
       .from('sales')
       .select('*')
-      .gte('date', startDate)
-      .lte('date', endDate);
+      .gte('date', salesDateBounds.gte)
+      .lte('date', salesDateBounds.lte);
 
     if (salesError) throw salesError;
 

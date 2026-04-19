@@ -6,6 +6,7 @@ import type { Sale, CreateSaleData, CreateTransactionPayload, SaleLineItem, Pagi
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createSaleTransactionSchema } from '@/shared/zod-schemas';
 import { executeCreateSaleTransaction } from '@/lib/sales/execute-create-sale-transaction';
+import { timestamptzBoundsForYm, timestamptzBoundsFromYmdRange } from '@kit/lib';
 
 function transformSale(row: any): Sale {
   const subtotal = row.subtotal != null ? parseFloat(row.subtotal) : 0;
@@ -79,23 +80,19 @@ export async function GET(request: NextRequest) {
       .order('date', { ascending: false });
 
     if (startDateParam && endDateParam) {
-      query = query.gte('date', startDateParam).lte('date', endDateParam);
-      countQuery = countQuery.gte('date', startDateParam).lte('date', endDateParam);
+      const { gte, lte } = timestamptzBoundsFromYmdRange(startDateParam, endDateParam);
+      query = query.gte('date', gte).lte('date', lte);
+      countQuery = countQuery.gte('date', gte).lte('date', lte);
     } else {
       if (year) {
-        const startDate = `${year}-01-01`;
-        const endDate = `${year}-12-31`;
-        query = query.gte('date', startDate).lte('date', endDate);
-        countQuery = countQuery.gte('date', startDate).lte('date', endDate);
+        const { gte, lte } = timestamptzBoundsFromYmdRange(`${year}-01-01`, `${year}-12-31`);
+        query = query.gte('date', gte).lte('date', lte);
+        countQuery = countQuery.gte('date', gte).lte('date', lte);
       }
       if (month) {
-        const startOfMonth = `${month}-01`;
-        const endOfMonth = new Date(`${month}-01`);
-        endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-        endOfMonth.setDate(0);
-        const endDate = endOfMonth.toISOString().split('T')[0];
-        query = query.gte('date', startOfMonth).lte('date', endDate);
-        countQuery = countQuery.gte('date', startOfMonth).lte('date', endDate);
+        const { gte, lte } = timestamptzBoundsForYm(month);
+        query = query.gte('date', gte).lte('date', lte);
+        countQuery = countQuery.gte('date', gte).lte('date', lte);
       }
     }
 

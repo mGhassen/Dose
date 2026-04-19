@@ -13,7 +13,8 @@ export type DatePeriodPreset =
   | 'this_year'
   | 'last_year';
 
-import { dateToYYYYMMDD } from './date-utils';
+import { dateToYYYYMMDD, formatYYYYMMDDParts, resolveUserTimeZoneForSession } from './date-utils';
+import { getDatePartsInTimeZone } from './date-format';
 
 export interface DateRange {
   startDate: string; // YYYY-MM-DD
@@ -21,159 +22,161 @@ export interface DateRange {
   label?: string;
 }
 
-function toISODate(d: Date): string {
-  return dateToYYYYMMDD(d);
+function addCalendarDays(y: number, m: number, d: number, delta: number): { y: number; m: number; d: number } {
+  const t = new Date(Date.UTC(y, m - 1, d + delta));
+  return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
 }
 
-function startOfWeek(d: Date): Date {
-  const copy = new Date(d);
-  const day = copy.getDay();
-  const diff = copy.getDate() - day + (day === 0 ? -6 : 1); // Monday = start
-  copy.setDate(diff);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+function daysInGregorianMonth(y: number, month: number): number {
+  return new Date(Date.UTC(y, month, 0)).getUTCDate();
 }
 
-function endOfWeek(d: Date): Date {
-  const start = startOfWeek(d);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 6);
-  end.setHours(23, 59, 59, 999);
-  return end;
+/** Monday (Gregorian) of the week containing (y,m,d); week starts Monday (EU). */
+function startOfWeekMonday(y: number, m: number, d: number): { y: number; m: number; d: number } {
+  const dow = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
+  const toMon = dow === 0 ? -6 : 1 - dow;
+  return addCalendarDays(y, m, d, toMon);
 }
 
-function startOfMonth(d: Date): Date {
-  const copy = new Date(d);
-  copy.setDate(1);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+function startOfQuarterYMD(y: number, m: number): { y: number; m: number; d: number } {
+  const qStartMonth = Math.floor((m - 1) / 3) * 3 + 1;
+  return { y, m: qStartMonth, d: 1 };
 }
 
-function endOfMonth(d: Date): Date {
-  const copy = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  copy.setHours(23, 59, 59, 999);
-  return copy;
+function endOfQuarterYMD(y: number, m: number): { y: number; m: number; d: number } {
+  const start = startOfQuarterYMD(y, m);
+  const endMonth = start.m + 2;
+  const lastDay = daysInGregorianMonth(start.y, endMonth);
+  return { y: start.y, m: endMonth, d: lastDay };
 }
 
-function startOfQuarter(d: Date): Date {
-  const copy = new Date(d);
-  copy.setMonth(Math.floor(copy.getMonth() / 3) * 3, 1);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+function addCalendarMonths(y: number, m: number, d: number, addM: number): { y: number; m: number; d: number } {
+  let nm = m + addM;
+  let ny = y;
+  while (nm > 12) {
+    nm -= 12;
+    ny += 1;
+  }
+  while (nm < 1) {
+    nm += 12;
+    ny -= 1;
+  }
+  const dim = daysInGregorianMonth(ny, nm);
+  const dd = Math.min(d, dim);
+  return { y: ny, m: nm, d: dd };
 }
 
-function endOfQuarter(d: Date): Date {
-  const start = startOfQuarter(d);
-  const end = new Date(start.getFullYear(), start.getMonth() + 3, 0);
-  end.setHours(23, 59, 59, 999);
-  return end;
-}
-
+/**
+ * Preset ranges use the **calendar date in the user’s timezone** (from settings), not `Date` local midnight
+ * in the browser — that mismatch caused “today / yesterday” and custom ranges to shift by one day.
+ */
 export function getDateRangeForPreset(preset: DatePeriodPreset, refDate = new Date()): DateRange {
-  const today = new Date(refDate);
-  today.setHours(0, 0, 0, 0);
+  const tz = resolveUserTimeZoneForSession();
+  const { y: cy, m: cm, d: cd } = getDatePartsInTimeZone(refDate, tz);
+  const todayStr = formatYYYYMMDDParts(cy, cm, cd);
 
   switch (preset) {
-    case 'today': {
-      const end = new Date(today);
-      end.setHours(23, 59, 59, 999);
-      return { startDate: toISODate(today), endDate: toISODate(end), label: 'Today' };
-    }
+    case 'today':
+      return { startDate: todayStr, endDate: todayStr, label: 'Today' };
     case 'yesterday': {
-      const d = new Date(today);
-      d.setDate(d.getDate() - 1);
-      const end = new Date(d);
-      end.setHours(23, 59, 59, 999);
-      return { startDate: toISODate(d), endDate: toISODate(end), label: 'Yesterday' };
+      const p = addCalendarDays(cy, cm, cd, -1);
+      const s = formatYYYYMMDDParts(p.y, p.m, p.d);
+      return { startDate: s, endDate: s, label: 'Yesterday' };
     }
     case 'this_week': {
-      const start = startOfWeek(today);
-      const end = endOfWeek(today);
-      return { startDate: toISODate(start), endDate: toISODate(end), label: 'This week' };
+      const mon = startOfWeekMonday(cy, cm, cd);
+      const sun = addCalendarDays(mon.y, mon.m, mon.d, 6);
+      return {
+        startDate: formatYYYYMMDDParts(mon.y, mon.m, mon.d),
+        endDate: formatYYYYMMDDParts(sun.y, sun.m, sun.d),
+        label: 'This week',
+      };
     }
     case 'last_week': {
-      const thisWeekStart = startOfWeek(today);
-      const lastWeekStart = new Date(thisWeekStart);
-      lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-      const lastWeekEnd = new Date(lastWeekStart);
-      lastWeekEnd.setDate(lastWeekEnd.getDate() + 6);
-      lastWeekEnd.setHours(23, 59, 59, 999);
+      const thisMon = startOfWeekMonday(cy, cm, cd);
+      const lastMon = addCalendarDays(thisMon.y, thisMon.m, thisMon.d, -7);
+      const lastSun = addCalendarDays(lastMon.y, lastMon.m, lastMon.d, 6);
       return {
-        startDate: toISODate(lastWeekStart),
-        endDate: toISODate(lastWeekEnd),
+        startDate: formatYYYYMMDDParts(lastMon.y, lastMon.m, lastMon.d),
+        endDate: formatYYYYMMDDParts(lastSun.y, lastSun.m, lastSun.d),
         label: 'Last week',
       };
     }
     case 'this_month': {
-      const start = startOfMonth(today);
-      const end = endOfMonth(today);
-      return { startDate: toISODate(start), endDate: toISODate(end), label: 'This month' };
+      const lastD = daysInGregorianMonth(cy, cm);
+      return {
+        startDate: formatYYYYMMDDParts(cy, cm, 1),
+        endDate: formatYYYYMMDDParts(cy, cm, lastD),
+        label: 'This month',
+      };
     }
     case 'last_month': {
-      const firstOfThisMonth = startOfMonth(today);
-      const lastMonthEnd = new Date(firstOfThisMonth);
-      lastMonthEnd.setDate(0);
-      const lastMonthStart = startOfMonth(lastMonthEnd);
-      lastMonthEnd.setHours(23, 59, 59, 999);
+      const firstThis = { y: cy, m: cm, d: 1 };
+      const lastPrev = addCalendarDays(firstThis.y, firstThis.m, firstThis.d, -1);
+      const firstPrev = { y: lastPrev.y, m: lastPrev.m, d: 1 };
       return {
-        startDate: toISODate(lastMonthStart),
-        endDate: toISODate(lastMonthEnd),
+        startDate: formatYYYYMMDDParts(firstPrev.y, firstPrev.m, firstPrev.d),
+        endDate: formatYYYYMMDDParts(lastPrev.y, lastPrev.m, lastPrev.d),
         label: 'Last month',
       };
     }
     case 'this_quarter': {
-      const start = startOfQuarter(today);
-      const end = endOfQuarter(today);
-      return { startDate: toISODate(start), endDate: toISODate(end), label: 'This quarter' };
+      const start = startOfQuarterYMD(cy, cm);
+      const end = endOfQuarterYMD(cy, cm);
+      return {
+        startDate: formatYYYYMMDDParts(start.y, start.m, start.d),
+        endDate: formatYYYYMMDDParts(end.y, end.m, end.d),
+        label: 'This quarter',
+      };
     }
     case 'last_quarter': {
-      const thisQStart = startOfQuarter(today);
-      const lastQEnd = new Date(thisQStart);
-      lastQEnd.setDate(0);
-      const lastQStart = startOfQuarter(lastQEnd);
-      lastQEnd.setHours(23, 59, 59, 999);
+      const thisQ = startOfQuarterYMD(cy, cm);
+      const dayBefore = addCalendarDays(thisQ.y, thisQ.m, thisQ.d, -1);
+      const lastQStart = startOfQuarterYMD(dayBefore.y, dayBefore.m);
+      const lastQEnd = endOfQuarterYMD(dayBefore.y, dayBefore.m);
       return {
-        startDate: toISODate(lastQStart),
-        endDate: toISODate(lastQEnd),
+        startDate: formatYYYYMMDDParts(lastQStart.y, lastQStart.m, lastQStart.d),
+        endDate: formatYYYYMMDDParts(lastQEnd.y, lastQEnd.m, lastQEnd.d),
         label: 'Last quarter',
       };
     }
     case 'last_3_months': {
-      const end = new Date(refDate);
-      end.setHours(23, 59, 59, 999);
-      const start = new Date(end);
-      start.setMonth(start.getMonth() - 3);
-      start.setHours(0, 0, 0, 0);
-      return { startDate: toISODate(start), endDate: toISODate(end), label: 'Last 3 months' };
+      const start = addCalendarMonths(cy, cm, cd, -3);
+      return {
+        startDate: formatYYYYMMDDParts(start.y, start.m, start.d),
+        endDate: todayStr,
+        label: 'Last 3 months',
+      };
     }
     case 'last_6_months': {
-      const end = new Date(refDate);
-      end.setHours(23, 59, 59, 999);
-      const start = new Date(end);
-      start.setMonth(start.getMonth() - 6);
-      start.setHours(0, 0, 0, 0);
-      return { startDate: toISODate(start), endDate: toISODate(end), label: 'Last 6 months' };
+      const start = addCalendarMonths(cy, cm, cd, -6);
+      return {
+        startDate: formatYYYYMMDDParts(start.y, start.m, start.d),
+        endDate: todayStr,
+        label: 'Last 6 months',
+      };
     }
     case 'last_12_months': {
-      const end = new Date(refDate);
-      end.setHours(23, 59, 59, 999);
-      const start = new Date(end);
-      start.setMonth(start.getMonth() - 12);
-      start.setHours(0, 0, 0, 0);
-      return { startDate: toISODate(start), endDate: toISODate(end), label: 'Last 12 months' };
+      const start = addCalendarMonths(cy, cm, cd, -12);
+      return {
+        startDate: formatYYYYMMDDParts(start.y, start.m, start.d),
+        endDate: todayStr,
+        label: 'Last 12 months',
+      };
     }
-    case 'this_year': {
-      const start = new Date(today.getFullYear(), 0, 1);
-      const end = new Date(today.getFullYear(), 11, 31);
-      end.setHours(23, 59, 59, 999);
-      return { startDate: toISODate(start), endDate: toISODate(end), label: 'This year' };
-    }
+    case 'this_year':
+      return {
+        startDate: formatYYYYMMDDParts(cy, 1, 1),
+        endDate: formatYYYYMMDDParts(cy, 12, 31),
+        label: 'This year',
+      };
     case 'last_year': {
-      const y = today.getFullYear() - 1;
-      const start = new Date(y, 0, 1);
-      const end = new Date(y, 11, 31);
-      end.setHours(23, 59, 59, 999);
-      return { startDate: toISODate(start), endDate: toISODate(end), label: 'Last year' };
+      const ly = cy - 1;
+      return {
+        startDate: formatYYYYMMDDParts(ly, 1, 1),
+        endDate: formatYYYYMMDDParts(ly, 12, 31),
+        label: 'Last year',
+      };
     }
   }
 }

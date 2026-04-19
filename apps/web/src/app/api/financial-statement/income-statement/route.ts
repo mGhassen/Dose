@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import { timestamptzBoundsFromYmdRange } from '@kit/lib';
 import type { ExpenseCategory, SalesType } from '@kit/types';
 
 interface IncomeStatementData {
@@ -175,6 +176,8 @@ export async function GET(request: NextRequest) {
       endDate = `${year}-12-31`;
     }
 
+    const salesDateBounds = timestamptzBoundsFromYmdRange(startDate, endDate);
+
     // Fetch all actual data
     const [
       salesResult,
@@ -190,8 +193,8 @@ export async function GET(request: NextRequest) {
       supabase
         .from('sales')
         .select('*')
-        .gte('date', startDate)
-        .lte('date', endDate)
+        .gte('date', salesDateBounds.gte)
+        .lte('date', salesDateBounds.lte)
         .order('date', { ascending: true }),
       
       // Expenses

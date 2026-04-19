@@ -16,6 +16,7 @@ export * from './user-settings';
 export * from './year-utils';
 export * from './date-periods';
 export * from './date-utils';
+export * from './timestamptz-bounds';
 
 // Export all API modules
 export * from './api/users';

@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import { getMonthsInRange } from '@kit/lib/date-periods';
+import { inclusiveDaysBetweenYmd, timestamptzBoundsFromYmdRange } from '@kit/lib';
 import type { Sale } from '@kit/types';
 
 function transformSale(row: any): Sale {
@@ -20,12 +21,6 @@ function transformSale(row: any): Sale {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
-}
-
-function daysBetween(startDate: string, endDate: string): number {
-  const start = new Date(`${startDate}T00:00:00Z`).getTime();
-  const end = new Date(`${endDate}T00:00:00Z`).getTime();
-  return Math.max(1, Math.round((end - start) / 86400000) + 1);
 }
 
 /** sales.date is TIMESTAMPTZ; group by UTC calendar day, not the raw ISO string (which is unique per sale). */
@@ -51,6 +46,7 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = supabaseServer();
+    const salesDateBounds = timestamptzBoundsFromYmdRange(startDate, endDate);
 
     let allSales: any[] = [];
     let page = 0;
@@ -61,8 +57,8 @@ export async function GET(request: NextRequest) {
       const { data, error } = await supabase
         .from('sales')
         .select('*')
-        .gte('date', startDate)
-        .lte('date', endDate)
+        .gte('date', salesDateBounds.gte)
+        .lte('date', salesDateBounds.lte)
         .order('date', { ascending: true })
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
@@ -125,7 +121,7 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 10);
 
-    const periodDays = daysBetween(startDate, endDate);
+    const periodDays = inclusiveDaysBetweenYmd(startDate, endDate);
 
     return NextResponse.json({
       typeBreakdown: Object.entries(typeBreakdown).map(([type, amount]) => ({

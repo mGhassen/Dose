@@ -2,6 +2,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import {
+  appDefaultTimeZone,
+  endUtcIsoForCalendarYmd,
+  inclusiveUtcRangeFromYmdStrings,
+  startUtcIsoForCalendarYmd,
+} from '@kit/lib/date-format';
 import type { StockMovement, CreateStockMovementData, PaginatedResponse } from '@kit/types';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 
@@ -60,14 +66,24 @@ export async function GET(request: NextRequest) {
       itemIds = await getGroupMemberIds(supabase, Number(itemId));
     }
 
+    const tz = appDefaultTimeZone();
+
     const applyFilters = <T extends { eq: any; in: any; gte: any; lte: any }>(q: T): T => {
       let out: any = q;
       if (itemIds && itemIds.length > 1) out = out.in('item_id', itemIds);
       else if (itemIds && itemIds.length === 1) out = out.eq('item_id', itemIds[0]);
       if (types.length === 1) out = out.eq('movement_type', types[0]);
       else if (types.length > 1) out = out.in('movement_type', types);
-      if (startDate) out = out.gte('movement_date', startDate);
-      if (endDate) out = out.lte('movement_date', `${endDate}T23:59:59.999Z`);
+      // Full local calendar days in app TZ — not UTC 00:00–23:59Z (off-by-one vs Paris).
+      if (startDate && endDate) {
+        const { startUtc, endUtc } = inclusiveUtcRangeFromYmdStrings(startDate, endDate, tz);
+        out = out.gte('movement_date', startUtc.toISOString());
+        out = out.lte('movement_date', endUtc.toISOString());
+      } else if (startDate) {
+        out = out.gte('movement_date', startUtcIsoForCalendarYmd(startDate, tz));
+      } else if (endDate) {
+        out = out.lte('movement_date', endUtcIsoForCalendarYmd(endDate, tz));
+      }
       return out as T;
     };
 

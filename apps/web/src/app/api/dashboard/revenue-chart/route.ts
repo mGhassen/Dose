@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import { getMonthsInRange } from '@kit/lib/date-periods';
+import { timestamptzBoundsFromYmdRange } from '@kit/lib';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +16,7 @@ export async function GET(request: NextRequest) {
     const firstMonth = monthsInRange[0];
     const lastMonth = monthsInRange[monthsInRange.length - 1];
     const supabase = supabaseServer();
+    const salesDateBounds = timestamptzBoundsFromYmdRange(startDate, endDate);
 
     const { data: plRows } = await supabase
       .from('profit_and_loss')
@@ -36,8 +38,8 @@ export async function GET(request: NextRequest) {
       const { data, error } = await supabase
         .from('sales')
         .select('date, subtotal, total_tax, total_discount')
-        .gte('date', startDate)
-        .lte('date', endDate)
+        .gte('date', salesDateBounds.gte)
+        .lte('date', salesDateBounds.lte)
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
       if (error) throw error;

@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import { lastDayYmdForYm, timestamptzBoundsFromYmdRange } from '@kit/lib';
 import type { CashFlowEntry, Sale, Expense, LeasingPayment, Personnel, LoanScheduleEntry } from '@kit/types';
 
 function transformSale(row: any): Sale {
@@ -105,15 +106,12 @@ export async function GET(request: NextRequest) {
 
     const supabase = supabaseServer();
     
-    // Fetch all related data for the date range
     const startDate = `${startMonth}-01`;
-    const endDateObj = new Date(`${endMonth}-01`);
-    endDateObj.setMonth(endDateObj.getMonth() + 1);
-    endDateObj.setDate(0);
-    const endDate = endDateObj.toISOString().split('T')[0];
+    const endDate = lastDayYmdForYm(endMonth);
+    const salesDateBounds = timestamptzBoundsFromYmdRange(startDate, endDate);
 
     const [salesResult, expensesResult, subscriptionsResult, leasingResult, personnelResult, loansResult, actualPaymentsResult] = await Promise.all([
-      supabase.from('sales').select('*').gte('date', startDate).lte('date', endDate),
+      supabase.from('sales').select('*').gte('date', salesDateBounds.gte).lte('date', salesDateBounds.lte),
       supabase.from('expenses').select('*'),
       supabase.from('subscriptions').select('*').eq('is_active', true),
       supabase.from('leasing_payments').select('*').eq('is_active', true),
