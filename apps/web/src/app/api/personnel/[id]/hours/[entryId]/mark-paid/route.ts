@@ -81,10 +81,15 @@ export async function POST(
         })
         .select()
         .single();
-      if (insertErr) throw insertErr;
+      if (insertErr || !expenseRow?.id) {
+        return NextResponse.json(
+          { error: 'Failed to create expense', details: insertErr?.message ?? 'No row' },
+          { status: 500 }
+        );
+      }
       expenseId = expenseRow.id;
 
-      await supabase.from('expense_line_items').insert({
+      const { error: lineErr } = await supabase.from('expense_line_items').insert({
         expense_id: expenseId,
         item_id: null,
         quantity: entry.hours_worked,
@@ -96,6 +101,13 @@ export async function POST(
         line_total: gross,
         sort_order: 0,
       });
+      if (lineErr) {
+        await supabase.from('expenses').delete().eq('id', expenseId);
+        return NextResponse.json(
+          { error: 'Failed to create expense line items', details: lineErr.message },
+          { status: 500 }
+        );
+      }
 
       const { data: entryRow, error: entryErr } = await supabase
         .from('entries')
@@ -112,13 +124,24 @@ export async function POST(
         })
         .select('id')
         .single();
-      if (entryErr) {
-        console.error('Error creating entry for personnel hour expense:', entryErr);
-      } else if (entryRow?.id) {
-        const { error: payErr } = await replacePaymentsForEntry(supabase, entryRow.id, [
-          { amount: gross, paymentDate: paidDate },
-        ]);
-        if (payErr) console.error('Error creating payments for personnel hour expense:', payErr);
+      if (entryErr || !entryRow?.id) {
+        await supabase.from('expenses').delete().eq('id', expenseId);
+        return NextResponse.json(
+          { error: 'Failed to create ledger entry', details: entryErr?.message ?? 'No entry id' },
+          { status: 500 }
+        );
+      }
+
+      const payRes = await replacePaymentsForEntry(supabase, entryRow.id, [
+        { amount: gross, paymentDate: paidDate },
+      ]);
+      if (payRes.error) {
+        await supabase.from('entries').delete().eq('id', entryRow.id);
+        await supabase.from('expenses').delete().eq('id', expenseId);
+        return NextResponse.json(
+          { error: 'Failed to record payments', details: payRes.error },
+          { status: 500 }
+        );
       }
     }
 

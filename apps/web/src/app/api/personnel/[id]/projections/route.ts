@@ -2,6 +2,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import {
+  syncPersonnelSalaryProjectionLedger,
+  type PersonnelSalaryProjectionRow,
+} from '@/lib/ledger/personnel-salary-projection-ledger';
 
 function transformProjectionEntry(row: any) {
   return {
@@ -163,6 +167,18 @@ export async function POST(
 
       if (error) throw error;
       projectionEntry = data;
+    }
+
+    const ledger = await syncPersonnelSalaryProjectionLedger(
+      supabase,
+      Number(id),
+      projectionEntry as PersonnelSalaryProjectionRow
+    );
+    if (ledger.error) {
+      return NextResponse.json(
+        { error: 'Failed to sync personnel salary ledger', details: ledger.error },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(transformProjectionEntry(projectionEntry));

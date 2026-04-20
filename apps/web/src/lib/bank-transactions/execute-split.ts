@@ -14,6 +14,7 @@ const ALLOCATABLE_OUTPUT_ENTRY_TYPES = new Set([
   'subscription_payment',
   'leasing_payment',
   'expense_payment',
+  'personnel_salary_payment',
 ]);
 
 const ALLOCATABLE_INPUT_ENTRY_TYPES = new Set(['sale']);

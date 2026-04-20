@@ -251,8 +251,8 @@ export async function POST(request: NextRequest) {
     let actualExpensesTotal = 0;
     if (outputPayments.length > 0) {
       // Filter output payments by expense-related types
-      const expensePayments = outputPayments.filter((p: any) => 
-        ['expense', 'subscription', 'leasing'].includes(p.payment_type)
+      const expensePayments = outputPayments.filter((p: any) =>
+        ['expense', 'subscription', 'leasing', 'personnel'].includes(p.payment_type)
       );
       actualExpensesTotal = expensePayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
     } else {

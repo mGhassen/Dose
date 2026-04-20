@@ -2,6 +2,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import {
+  removePersonnelSalaryProjectionLedger,
+  syncPersonnelSalaryProjectionLedger,
+  type PersonnelSalaryProjectionRow,
+} from '@/lib/ledger/personnel-salary-projection-ledger';
 
 function transformProjectionEntry(row: any) {
   return {
@@ -93,6 +98,18 @@ export async function PUT(
 
     if (error) throw error;
 
+    const ledger = await syncPersonnelSalaryProjectionLedger(
+      supabase,
+      Number(id),
+      data as PersonnelSalaryProjectionRow
+    );
+    if (ledger.error) {
+      return NextResponse.json(
+        { error: 'Failed to sync personnel salary ledger', details: ledger.error },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(transformProjectionEntry(data));
   } catch (error: any) {
     console.error('Error updating personnel salary projection:', error);
@@ -124,6 +141,14 @@ export async function DELETE(
       return NextResponse.json(
         { error: 'Projection entry not found' },
         { status: 404 }
+      );
+    }
+
+    const cleared = await removePersonnelSalaryProjectionLedger(supabase, Number(id), Number(entryId));
+    if (cleared.error) {
+      return NextResponse.json(
+        { error: 'Failed to remove personnel salary ledger', details: cleared.error },
+        { status: 500 }
       );
     }
 
