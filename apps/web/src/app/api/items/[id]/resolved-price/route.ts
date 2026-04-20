@@ -68,6 +68,11 @@ export async function GET(
     return NextResponse.json({
       unitPrice: selling.unitPrice,
       unitCost: cost.unitCost,
+      unitCostUnitId: cost.unitId,
+      /** Normalized rate is per one of `unitCostUnitId` (always basis 1 after history normalization). */
+      costPerUnitBasisQuantity: cost.basisQuantity,
+      /** Raw cost history row: `amount` for `basisQuantity` of `unitId` (null if not from history). */
+      costHistoryQuote: cost.historyQuote,
       taxIncluded: effectiveSellingTaxIncluded,
       costTaxIncluded: effectiveCostTaxIncluded,
       date: dateStr,

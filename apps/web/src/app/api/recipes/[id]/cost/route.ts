@@ -115,6 +115,15 @@ export async function GET(
       /** Unit the unitPrice is expressed in (recipe row unit, else supply item native unit). */
       unitId: number | null;
       unitLabel: string;
+      /** Basis qty the stored cost line uses when `priceSource` is `history` (e.g. 1 for “per 1 L”); otherwise 1. */
+      basisQuantity: number | null;
+      /** When `priceSource` is `history`: raw stored line before unit conversion. */
+      costQuote: {
+        amount: number;
+        basisQuantity: number;
+        unitId: number | null;
+        unitLabel: string;
+      } | null;
     };
 
     const rowsByList = new Map<
@@ -146,14 +155,13 @@ export async function GET(
       const recipeUnitId = row.unit_id ?? null;
       const itemUnitId = mod.item?.unit_id ?? null;
       const pricingUnitId = recipeUnitId ?? itemUnitId ?? null;
-      const unitLabel =
-        pricingUnitId != null
-          ? conversionContext.symbolMap.get(pricingUnitId)?.trim() || `unit#${pricingUnitId}`
-          : 'unit';
 
       let unitPrice = 0;
       let hasPrice = false;
       let source: ResolvedOption['priceSource'] = 'none';
+      let denomUnitId: number | null = pricingUnitId;
+      let basisQty: number | null = 1;
+      let costQuote: ResolvedOption['costQuote'] = null;
       if (mod.item_id != null) {
         const resolved = await resolveItemUnitCost(
           supabase,
@@ -165,7 +173,26 @@ export async function GET(
         unitPrice = resolved.unitPrice;
         hasPrice = resolved.hasPrice;
         source = resolved.source;
+        denomUnitId = resolved.denominatorUnitId ?? pricingUnitId;
+        basisQty = resolved.costQuote?.basisQuantity ?? resolved.basisQuantity;
+        if (resolved.costQuote) {
+          const q = resolved.costQuote;
+          costQuote = {
+            amount: q.amount,
+            basisQuantity: q.basisQuantity,
+            unitId: q.unitId,
+            unitLabel:
+              q.unitId != null
+                ? conversionContext.symbolMap.get(q.unitId)?.trim() || `unit#${q.unitId}`
+                : 'unit',
+          };
+        }
       }
+
+      const unitLabel =
+        denomUnitId != null
+          ? conversionContext.symbolMap.get(denomUnitId)?.trim() || `unit#${denomUnitId}`
+          : 'unit';
 
       group.options.push({
         modifierId: mod.id,
@@ -178,8 +205,10 @@ export async function GET(
         hasPrice,
         priceSource: source,
         enabled: true,
-        unitId: pricingUnitId,
+        unitId: denomUnitId,
         unitLabel,
+        basisQuantity: hasPrice ? basisQty : null,
+        costQuote: hasPrice ? costQuote : null,
       });
     }
 

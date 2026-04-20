@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
     const movementType = searchParams.get('movementType');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const locationParam = searchParams.get('location');
 
     const supabase = supabaseServer();
 
@@ -74,6 +75,9 @@ export async function GET(request: NextRequest) {
       else if (itemIds && itemIds.length === 1) out = out.eq('item_id', itemIds[0]);
       if (types.length === 1) out = out.eq('movement_type', types[0]);
       else if (types.length > 1) out = out.in('movement_type', types);
+      if (locationParam != null && locationParam.trim() !== '') {
+        out = out.eq('location', locationParam.trim());
+      }
       // Full local calendar days in app TZ — not UTC 00:00–23:59Z (off-by-one vs Paris).
       if (startDate && endDate) {
         const { startUtc, endUtc } = inclusiveUtcRangeFromYmdStrings(startDate, endDate, tz);

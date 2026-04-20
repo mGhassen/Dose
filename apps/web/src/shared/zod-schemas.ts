@@ -460,6 +460,10 @@ export const createItemPriceHistorySchema = z.object({
   effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "effectiveDate must be YYYY-MM-DD"),
   value: z.number().min(0, "value must be non-negative"),
   taxIncluded: z.boolean().optional(),
+  /** Cost history only: unit variable id that `value` (unit_cost) is denominated in. */
+  unitId: z.number().int().positive().nullable().optional(),
+  /** Cost: `value` applies to this many of `unitId` (default 1 = price per one unit). */
+  costBasisQuantity: z.number().positive().optional(),
 });
 export type CreateItemPriceHistoryInput = z.infer<typeof createItemPriceHistorySchema>;
 
@@ -468,10 +472,18 @@ export const updateItemPriceHistorySchema = z
     effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     value: z.number().min(0).optional(),
     taxIncluded: z.boolean().optional(),
+    unitId: z.number().int().positive().nullable().optional(),
+    costBasisQuantity: z.number().positive().optional(),
   })
-  .refine((d) => d.effectiveDate !== undefined || d.value !== undefined || d.taxIncluded !== undefined, {
-    message: "No updates provided",
-  });
+  .refine(
+    (d) =>
+      d.effectiveDate !== undefined ||
+      d.value !== undefined ||
+      d.taxIncluded !== undefined ||
+      d.unitId !== undefined ||
+      d.costBasisQuantity !== undefined,
+    { message: "No updates provided" }
+  );
 export type UpdateItemPriceHistoryInput = z.infer<typeof updateItemPriceHistorySchema>;
 
 const variableTypeEnum = z.enum(VARIABLE_TYPE_NAMES);
@@ -973,6 +985,7 @@ export const produceRecipeSchema = z.object({
   quantity: z.number().min(0.000001, "Quantity must be greater than 0"),
   location: z.string().optional(),
   notes: z.string().optional(),
+  movementDate: z.string().optional(),
   producedItemId: z.number().optional(),
   producedItemName: z.string().optional(),
 });

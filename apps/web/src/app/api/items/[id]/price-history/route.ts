@@ -28,12 +28,13 @@ export async function GET(
     const table = type === 'sell' ? 'item_selling_price_history' : 'item_cost_history';
     const valueCol = type === 'sell' ? 'unit_price' : 'unit_cost';
     const taxIncludedCol = ', tax_included';
+    const costExtra = type === 'cost' ? ', unit_id, cost_basis_quantity' : '';
 
     const memberIds = await getGroupMemberIds(supabase, itemId);
 
     const { data, error } = await supabase
       .from(table)
-      .select('id, item_id, effective_date, ' + valueCol + taxIncludedCol)
+      .select('id, item_id, effective_date, ' + valueCol + taxIncludedCol + costExtra)
       .in('item_id', memberIds)
       .order('effective_date', { ascending: false })
       .order('id', { ascending: false });
@@ -82,6 +83,11 @@ export async function GET(
           const expenseRule = await getTaxRateAndRuleForExpenseLineWithItemTaxes(supabase, itemId, itemCategory, dateStr, itemCreatedAt);
           if (entry.taxIncluded === undefined) entry.taxIncluded = expenseRule.taxInclusive ?? false;
           entry.resolvedTax = { expense: { rate: expenseRule.rate ?? 0, taxInclusive: expenseRule.taxInclusive ?? false } };
+          const uid = row.unit_id as number | null | undefined;
+          (entry as { unitId?: number | null }).unitId = uid != null ? Number(uid) : null;
+          const bq = row.cost_basis_quantity as string | number | null | undefined;
+          (entry as { basisQuantity?: number }).basisQuantity =
+            bq != null && bq !== "" ? Number(bq) : 1;
         }
         return entry;
       })
@@ -105,7 +111,8 @@ export async function POST(
     const { id } = await params;
     const parsed = await parseRequestBody(request, createItemPriceHistorySchema);
     if (!parsed.success) return parsed.response;
-    const { type, effectiveDate, value, taxIncluded } = parsed.data;
+    const { type, effectiveDate, value, taxIncluded, unitId: bodyUnitId, costBasisQuantity } =
+      parsed.data;
     const supabase = supabaseServer();
     const itemId = parseInt(id, 10);
     if (Number.isNaN(itemId)) {
@@ -117,21 +124,46 @@ export async function POST(
     const payload: Record<string, unknown> = { item_id: itemId, effective_date: effectiveDate, [valueCol]: value };
     if (taxIncluded !== undefined) payload.tax_included = taxIncluded;
 
-    const { data, error } = await supabase
-      .from(table)
-      .insert(payload)
-      .select('id, effective_date, ' + valueCol + ', tax_included')
-      .single();
+    if (type === 'cost') {
+      let costUnitId: number | null | undefined = bodyUnitId;
+      if (costUnitId === undefined) {
+        const { data: it } = await supabase.from('items').select('unit_id').eq('id', itemId).maybeSingle();
+        costUnitId = it?.unit_id ?? null;
+      }
+      payload.unit_id = costUnitId ?? null;
+      payload.cost_basis_quantity =
+        costBasisQuantity != null && costBasisQuantity > 0 ? costBasisQuantity : 1;
+    }
+
+    const selectCols =
+      type === 'cost'
+        ? 'id, effective_date, ' + valueCol + ', tax_included, unit_id, cost_basis_quantity'
+        : 'id, effective_date, ' + valueCol + ', tax_included';
+
+    const { data, error } = await supabase.from(table).insert(payload).select(selectCols).single();
 
     if (error) throw error;
 
     const row = data as unknown as Record<string, unknown>;
-    const res: { id: number; effectiveDate: string; value: number; taxIncluded?: boolean } = {
+    const res: {
+      id: number;
+      effectiveDate: string;
+      value: number;
+      taxIncluded?: boolean;
+      unitId?: number | null;
+      basisQuantity?: number;
+    } = {
       id: row.id as number,
       effectiveDate: row.effective_date as string,
       value: row[valueCol] != null ? parseFloat(String(row[valueCol])) : value,
     };
     if (row.tax_included != null) res.taxIncluded = !!row.tax_included;
+    if (type === 'cost') {
+      const uid = row.unit_id as number | null | undefined;
+      res.unitId = uid != null ? Number(uid) : null;
+      const bq = row.cost_basis_quantity as string | number | null | undefined;
+      res.basisQuantity = bq != null && bq !== "" ? Number(bq) : 1;
+    }
     return NextResponse.json(res, { status: 200 });
   } catch (error: unknown) {
     const err = error as { message?: string };

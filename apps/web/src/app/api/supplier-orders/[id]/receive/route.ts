@@ -319,7 +319,7 @@ export async function POST(
           reference_type: StockMovementReferenceType.SUPPLIER_ORDER,
           reference_id: referenceId,
           location: receiveItem.location || null,
-          movement_date: new Date().toISOString(),
+          movement_date: effectiveDate,
           notes: `Received from supplier order #${orderData.order_number || id}`,
         });
 
@@ -352,6 +352,8 @@ export async function POST(
           effective_date: effectiveDate,
           unit_cost: newAvg,
           tax_included: taxInclusive,
+          unit_id: itemUnitId,
+          cost_basis_quantity: 1,
         });
       }
     }

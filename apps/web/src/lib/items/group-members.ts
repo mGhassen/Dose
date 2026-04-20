@@ -38,3 +38,19 @@ export async function getGroupMemberIds(
   const ids = (members || []).map((m: any) => m.id);
   return ids.length > 0 ? ids : [itemId];
 }
+
+/** For pricing/cost resolution, history and supplier data are keyed on the merged group's canonical item. */
+export async function resolveCanonicalItemIdForCost(supabase: Supa, itemId: number): Promise<number> {
+  const { data } = await supabase
+    .from('items')
+    .select('group_id')
+    .eq('id', itemId)
+    .maybeSingle();
+  if (!data?.group_id) return itemId;
+  const { data: group } = await supabase
+    .from('item_groups')
+    .select('canonical_item_id')
+    .eq('id', data.group_id)
+    .maybeSingle();
+  return group?.canonical_item_id ?? itemId;
+}

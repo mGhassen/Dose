@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@kit/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/ui/card";
@@ -22,6 +22,35 @@ import {
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { StockVariationCharts } from "./stock-variation-charts";
+import type { StockMovement } from "@kit/types";
+import { StockMovementType, StockMovementReferenceType } from "@kit/types";
+
+function normLoc(s: string | null | undefined): string {
+  return (s ?? "").trim();
+}
+
+const qtyFmt = new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 });
+
+function signedDeltaForBalance(m: StockMovement): number {
+  if (m.movementType === StockMovementType.IN) return m.quantity;
+  if (
+    m.movementType === StockMovementType.OUT ||
+    m.movementType === StockMovementType.WASTE ||
+    m.movementType === StockMovementType.EXPIRED
+  ) {
+    return -m.quantity;
+  }
+  if (m.movementType === StockMovementType.TRANSFER) return 0;
+  return m.quantity;
+}
+
+function activityLabel(m: StockMovement): string | null {
+  if (m.movementType !== StockMovementType.IN) return null;
+  if (m.referenceType === StockMovementReferenceType.SUPPLIER_ORDER) return "Received";
+  if (m.referenceType === StockMovementReferenceType.RECIPE) return "Produced";
+  return null;
+}
 
 interface StockLevelDetailPageProps {
   params: Promise<{ id: string }>;
@@ -32,9 +61,11 @@ export default function StockLevelDetailPage({ params }: StockLevelDetailPagePro
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const { data: stockLevel, isLoading } = useStockLevelById(resolvedParams?.id || "");
-  const { data: movementsResponse } = useStockMovements({ 
+  const namedLoc = stockLevel?.location?.trim();
+  const { data: movementsResponse } = useStockMovements({
     itemId: stockLevel?.itemId?.toString(),
-    limit: 10 
+    limit: namedLoc ? 200 : 3000,
+    ...(namedLoc ? { location: namedLoc } : {}),
   });
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const updateStockLevel = useUpdateStockLevel();
@@ -65,6 +96,26 @@ export default function StockLevelDetailPage({ params }: StockLevelDetailPagePro
       });
     }
   }, [stockLevel]);
+
+  const movementsAtLocation = useMemo(() => {
+    const raw = movementsResponse?.data ?? [];
+    const loc = normLoc(stockLevel?.location);
+    return raw
+      .filter((m) => normLoc(m.location) === loc)
+      .sort((a, b) => new Date(b.movementDate).getTime() - new Date(a.movementDate).getTime());
+  }, [movementsResponse?.data, stockLevel?.location]);
+
+  const recentWithBalance = useMemo(() => {
+    if (stockLevel == null) return [];
+    let running = stockLevel.quantity;
+    return movementsAtLocation.slice(0, 10).map((m) => {
+      const onHandAfter = running;
+      running -= signedDeltaForBalance(m);
+      return { movement: m, onHandAfter };
+    });
+  }, [movementsAtLocation, stockLevel]);
+
+  const lastActivityDate = movementsAtLocation[0]?.movementDate;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,7 +188,6 @@ export default function StockLevelDetailPage({ params }: StockLevelDetailPagePro
 
   const isLowStock = stockLevel.minimumStockLevel && stockLevel.quantity <= stockLevel.minimumStockLevel;
   const isOutOfStock = stockLevel.quantity <= 0;
-  const recentMovements = movementsResponse?.data || [];
 
   return (
     <AppLayout>
@@ -309,8 +359,14 @@ export default function StockLevelDetailPage({ params }: StockLevelDetailPagePro
                     </div>
                   )}
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Last Updated</label>
-                    <p className="text-base mt-1">{formatDate(stockLevel.lastUpdated)}</p>
+                    <label className="text-sm font-medium text-muted-foreground">Last activity</label>
+                    <p className="text-base mt-1">
+                      {lastActivityDate
+                        ? formatDate(lastActivityDate)
+                        : stockLevel.lastUpdated
+                          ? formatDate(stockLevel.lastUpdated)
+                          : "—"}
+                    </p>
                   </div>
                 </div>
               )}
@@ -319,31 +375,43 @@ export default function StockLevelDetailPage({ params }: StockLevelDetailPagePro
 
           <Card>
             <CardHeader>
-              <CardTitle>Recent Movements</CardTitle>
-              <CardDescription>Latest stock movements for this item</CardDescription>
+              <CardTitle>Recent activity</CardTitle>
+              <CardDescription>Latest changes at this location (effective date).</CardDescription>
             </CardHeader>
             <CardContent>
-              {recentMovements.length > 0 ? (
+              {recentWithBalance.length > 0 ? (
                 <div className="space-y-2">
-                  {recentMovements.map((movement) => {
-                    const isIn = movement.movementType === 'in';
+                  {recentWithBalance.map(({ movement, onHandAfter }) => {
+                    const isIn = movement.movementType === StockMovementType.IN;
+                    const tag = activityLabel(movement);
                     return (
-                      <div key={movement.id} className="flex items-center justify-between p-2 border rounded-lg">
-                        <div className="flex items-center gap-2">
+                      <div key={movement.id} className="flex items-center justify-between gap-2 p-2 border rounded-lg">
+                        <div className="flex items-center gap-2 min-w-0">
                           {isIn ? (
-                            <TrendingUp className="h-4 w-4 text-green-500" />
+                            <TrendingUp className="h-4 w-4 shrink-0 text-green-500" />
                           ) : (
-                            <TrendingDown className="h-4 w-4 text-blue-500" />
+                            <TrendingDown className="h-4 w-4 shrink-0 text-blue-500" />
                           )}
-                          <div>
-                            <div className="text-sm font-medium">{movement.movementType.toUpperCase()}</div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium">
+                              {movement.movementType.toUpperCase()}
+                              {tag ? (
+                                <span className="text-muted-foreground font-normal"> · {tag}</span>
+                              ) : null}
+                            </div>
                             <div className="text-xs text-muted-foreground">
                               {formatDate(movement.movementDate)}
                             </div>
                           </div>
                         </div>
-                        <div className="text-sm font-medium">
-                          {isIn ? '+' : '-'}{movement.quantity} {movement.unit}
+                        <div className="text-right shrink-0">
+                          <div className="text-sm font-medium tabular-nums">
+                            {isIn ? "+" : "−"}
+                            {qtyFmt.format(movement.quantity)} {movement.unit}
+                          </div>
+                          <div className="text-xs text-muted-foreground tabular-nums">
+                            On hand {qtyFmt.format(onHandAfter)} {stockLevel.unit}
+                          </div>
                         </div>
                       </div>
                     );
@@ -362,6 +430,13 @@ export default function StockLevelDetailPage({ params }: StockLevelDetailPagePro
             </CardContent>
           </Card>
         </div>
+
+        <StockVariationCharts
+          itemId={stockLevel.itemId}
+          location={stockLevel.location}
+          currentQuantity={stockLevel.quantity}
+          unit={stockLevel.unit}
+        />
 
         {isLowStock && !isOutOfStock && (
           <Card className="border-orange-200 bg-orange-50">

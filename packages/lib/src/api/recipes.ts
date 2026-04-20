@@ -48,6 +48,13 @@ export const recipesApi = {
           enabled: boolean;
           unitId: number | null;
           unitLabel: string;
+          basisQuantity: number | null;
+          costQuote: {
+            amount: number;
+            basisQuantity: number;
+            unitId: number | null;
+            unitLabel: string;
+          } | null;
         }>;
         minCost: number;
         maxCost: number;

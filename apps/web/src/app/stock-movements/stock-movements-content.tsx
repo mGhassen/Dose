@@ -48,7 +48,6 @@ import {
   SheetTitle,
 } from "@kit/ui/sheet";
 import { Skeleton } from "@kit/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import {
   Tooltip as UiTooltip,
   TooltipContent,
@@ -78,24 +77,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ComposedChart,
-  Legend,
-  Line,
-  Pie,
-  PieChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Area, AreaChart, Line, ResponsiveContainer } from "recharts";
 
 type MovementWithIngredient = StockMovement & { ingredientId?: number };
 
@@ -506,15 +488,6 @@ export default function StockMovementsContent() {
     const raw = urlSearchParams.get("open");
     return raw ? Number(raw) : null;
   });
-  const [analyticsTab, setAnalyticsTab] = useState<string>(
-    urlSearchParams.get("itemId") ? "balance" : "activity"
-  );
-
-  useEffect(() => {
-    if (selectedItemId) setAnalyticsTab((prev) => (prev === "activity" ? "balance" : prev));
-    else setAnalyticsTab((prev) => (prev === "balance" ? "activity" : prev));
-  }, [selectedItemId]);
-
   useEffect(() => {
     setTablePage(1);
   }, [
@@ -706,89 +679,6 @@ export default function StockMovementsContent() {
 
   const unitLabel = selectedItem?.unit ?? "units";
 
-  const balanceChartData = useMemo(() => {
-    if (!selectedItemId) return [];
-    let running = 0;
-    return dailyByType.map((d) => {
-      running += d.net;
-      return {
-        date: d.date,
-        in: d.in,
-        out: -(d.out + d.waste + d.expired),
-        balance: running,
-      };
-    });
-  }, [dailyByType, selectedItemId]);
-
-  const startingBalance = 0;
-  const endingBalance = balanceChartData.length
-    ? balanceChartData[balanceChartData.length - 1].balance
-    : 0;
-
-  const multiItemTopSeries = useMemo(
-    () => ({ data: [] as any[], keys: [] as string[] }),
-    []
-  );
-
-  const typeDistribution = useMemo(() => {
-    return TYPE_ORDER.map((t) => {
-      const found = (analytics?.by_type ?? []).find((x) => x.type === t);
-      return {
-        name: TYPE_META[t].label,
-        value: Number(found?.count ?? 0),
-        type: t,
-      };
-    }).filter((e) => e.value > 0);
-  }, [analytics]);
-
-  const dailyActivity = useMemo(
-    () =>
-      dailyByType.map((d) => ({
-        date: d.date,
-        IN: d.in,
-        OUT: -d.out,
-        WASTE: -d.waste,
-        EXPIRED: -d.expired,
-        ADJ: d.adj,
-      })),
-    [dailyByType]
-  );
-
-  const categoryBreakdown = useMemo(
-    () =>
-      (analytics?.by_category ?? []).slice(0, 12).map((c) => ({
-        name: c.name,
-        in: Number(c.qty_in),
-        out: Number(c.qty_out),
-        net: Number(c.net),
-        count: Number(c.count),
-      })),
-    [analytics]
-  );
-
-  const topItemsBreakdown = useMemo(
-    () =>
-      (analytics?.top_items ?? []).slice(0, 10).map((it) => ({
-        id: it.item_id,
-        name: it.name,
-        unit: it.unit,
-        in: Number(it.qty_in),
-        out: Number(it.qty_out),
-        net: Number(it.net),
-        count: Number(it.count),
-      })),
-    [analytics]
-  );
-
-  const locationBreakdown = useMemo(
-    () =>
-      (analytics?.by_location ?? []).slice(0, 8).map((l) => ({
-        name: l.name,
-        value: Number(l.value),
-      })),
-    [analytics]
-  );
-
   const heatmapData = useMemo(() => {
     if (dailyByType.length === 0) return { weeks: [], max: 0 };
     const max = Math.max(1, ...dailyByType.map((d) => d.count));
@@ -822,45 +712,10 @@ export default function StockMovementsContent() {
     return { weeks, max };
   }, [dailyByType]);
 
-  const weekdayBreakdown = useMemo(() => {
-    const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    return labels.map((label, i) => {
-      const dow = i + 1;
-      const found = (analytics?.weekday ?? []).find((w) => w.dow === dow);
-      return {
-        name: label,
-        count: Number(found?.count ?? 0),
-        qty: Number(found?.qty ?? 0),
-      };
-    });
-  }, [analytics]);
-
-  const referenceBreakdown = useMemo(
-    () =>
-      (analytics?.by_reference ?? []).map((r) => ({
-        name: r.name === "Manual" ? "Manual" : prettyReferenceLabel(r.name),
-        value: Number(r.value),
-      })),
-    [analytics]
-  );
-
   const COLOR_IN = "#10b981";
   const COLOR_OUT = "#f43f5e";
   const COLOR_BALANCE = "#8b5cf6";
   const COLOR_ADJ = "#f59e0b";
-  const COLOR_TRANS = "#3b82f6";
-
-  const chartColors = [COLOR_IN, COLOR_OUT, COLOR_BALANCE, COLOR_ADJ, COLOR_TRANS];
-
-  const pieFillForType = (t: StockMovementType): string => {
-    if (t === StockMovementType.IN) return COLOR_IN;
-    if (t === StockMovementType.OUT) return COLOR_OUT;
-    if (t === StockMovementType.ADJUSTMENT) return COLOR_ADJ;
-    if (t === StockMovementType.TRANSFER) return COLOR_TRANS;
-    return "#ef4444";
-  };
-
-  const xTickInterval = Math.max(0, Math.floor(dayBuckets.length / 12));
 
   const resetFilters = () => {
     setSelectedItemId("");
@@ -1281,32 +1136,11 @@ export default function StockMovementsContent() {
         </Card>
       ) : (
         <AnalyticsBlock
-          activeTab={analyticsTab}
-          onTabChange={setAnalyticsTab}
           selectedItemId={selectedItemId}
           selectedItem={selectedItem}
-          balanceChartData={balanceChartData}
-          startingBalance={startingBalance}
-          endingBalance={endingBalance}
-          dailyActivity={dailyActivity}
-          multiItemTopSeries={multiItemTopSeries as any}
-          categoryBreakdown={categoryBreakdown}
-          topItemsBreakdown={topItemsBreakdown}
-          locationBreakdown={locationBreakdown}
-          referenceBreakdown={referenceBreakdown}
           heatmapData={heatmapData}
-          weekdayBreakdown={weekdayBreakdown}
-          typeDistribution={typeDistribution}
-          chartColors={chartColors}
-          pieFillForType={pieFillForType}
-          xTickInterval={xTickInterval}
-          unitLabel={unitLabel}
           hasActiveFilters={hasActiveFilters}
           resetFilters={resetFilters}
-          colorIn={COLOR_IN}
-          colorOut={COLOR_OUT}
-          colorBalance={COLOR_BALANCE}
-          colorAdj={COLOR_ADJ}
         />
       )}
 
@@ -1420,34 +1254,8 @@ export default function StockMovementsContent() {
 }
 
 type AnalyticsBlockProps = {
-  activeTab: string;
-  onTabChange: (v: string) => void;
   selectedItemId: string;
   selectedItem?: Item;
-  balanceChartData: Array<{ date: string; in: number; out: number; balance: number }>;
-  startingBalance: number;
-  endingBalance: number;
-  dailyActivity: Array<{
-    date: string;
-    IN: number;
-    OUT: number;
-    WASTE: number;
-    EXPIRED: number;
-    ADJ: number;
-  }>;
-  multiItemTopSeries: { data: any[]; keys: string[] } | any[];
-  categoryBreakdown: Array<{ name: string; in: number; out: number; net: number; count: number }>;
-  topItemsBreakdown: Array<{
-    id: number;
-    name: string;
-    unit: string;
-    in: number;
-    out: number;
-    net: number;
-    count: number;
-  }>;
-  locationBreakdown: Array<{ name: string; value: number }>;
-  referenceBreakdown: Array<{ name: string; value: number }>;
   heatmapData: {
     weeks: Array<{
       weekStart: string;
@@ -1455,26 +1263,9 @@ type AnalyticsBlockProps = {
     }>;
     max: number;
   };
-  weekdayBreakdown: Array<{ name: string; count: number; qty: number }>;
-  typeDistribution: Array<{ name: string; value: number; type: StockMovementType }>;
-  chartColors: string[];
-  pieFillForType: (t: StockMovementType) => string;
-  xTickInterval: number;
-  unitLabel: string;
   hasActiveFilters: boolean;
   resetFilters: () => void;
-  colorIn: string;
-  colorOut: string;
-  colorBalance: string;
-  colorAdj: string;
 };
-
-const TOOLTIP_STYLE = {
-  background: "hsl(var(--card))",
-  border: "1px solid hsl(var(--border))",
-  borderRadius: 8,
-  fontSize: 12,
-} as const;
 
 function EmptyChart({
   hasActiveFilters,
@@ -1499,589 +1290,103 @@ function EmptyChart({
 }
 
 function AnalyticsBlock({
-  activeTab,
-  onTabChange,
   selectedItemId,
   selectedItem,
-  balanceChartData,
-  startingBalance,
-  endingBalance,
-  dailyActivity,
-  multiItemTopSeries,
-  categoryBreakdown,
-  topItemsBreakdown,
-  locationBreakdown,
-  referenceBreakdown,
   heatmapData,
-  weekdayBreakdown,
-  typeDistribution,
-  chartColors,
-  pieFillForType,
-  xTickInterval,
-  unitLabel,
   hasActiveFilters,
   resetFilters,
-  colorIn,
-  colorOut,
-  colorBalance,
-  colorAdj,
 }: AnalyticsBlockProps) {
-  const xTickFormatter = (v: string) =>
-    new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  const totalDailyActivity = dailyActivity.reduce(
-    (acc, d) => acc + d.IN + Math.abs(d.OUT) + Math.abs(d.WASTE) + Math.abs(d.EXPIRED) + Math.abs(d.ADJ),
-    0
-  );
   return (
-            <Card>
+    <Card>
       <CardHeader className="pb-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <CardTitle>Stock analytics</CardTitle>
+          <CardDescription>
+            {selectedItemId
+              ? `Activity heatmap for ${selectedItem?.name ?? "…"}`
+              : "Activity heatmap across all items"}
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {heatmapData.weeks.length === 0 || heatmapData.max === 0 ? (
+          <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
+        ) : (
           <div>
-            <CardTitle>Stock analytics</CardTitle>
-            <CardDescription>
-              {selectedItemId
-                ? `Detailed insights for ${selectedItem?.name ?? "…"}`
-                : "Detailed insights across all items"}
-            </CardDescription>
-          </div>
-          {selectedItemId && balanceChartData.length > 0 ? (
-            <div className="flex gap-6 text-sm">
-              <div>
-                <div className="text-xs uppercase text-muted-foreground">Start</div>
-                <div className="font-semibold tabular-nums">
-                  {formatSignedNumber(startingBalance)} {unitLabel}
-                </div>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Activity calendar
               </div>
-              <div>
-                <div className="text-xs uppercase text-muted-foreground">End</div>
-                <div
-                  className={cn(
-                    "font-semibold tabular-nums",
-                    endingBalance > 0
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : endingBalance < 0
-                      ? "text-rose-600 dark:text-rose-400"
-                      : ""
-                  )}
-                >
-                  {formatSignedNumber(endingBalance)} {unitLabel}
-                </div>
+              <div className="text-xs text-muted-foreground">
+                Max: {heatmapData.max} movements / day
               </div>
             </div>
-          ) : null}
-        </div>
-              </CardHeader>
-              <CardContent>
-        <Tabs value={activeTab} onValueChange={onTabChange}>
-          <TabsList className="flex-wrap">
-            <TabsTrigger value="activity">Daily activity</TabsTrigger>
-            <TabsTrigger value="balance" disabled={!selectedItemId}>
-              Running balance
-            </TabsTrigger>
-            <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
-            <TabsTrigger value="categories">By category</TabsTrigger>
-            <TabsTrigger value="items" disabled={!!selectedItemId}>
-              Top items
-            </TabsTrigger>
-            <TabsTrigger value="types">By type</TabsTrigger>
-            <TabsTrigger value="locations">Locations</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="activity" className="mt-4">
-            {totalDailyActivity === 0 ? (
-              <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
-            ) : (
-              <ResponsiveContainer width="100%" height={360}>
-                <BarChart
-                  data={dailyActivity}
-                  margin={{ top: 12, right: 16, left: 0, bottom: 8 }}
-                  stackOffset="sign"
-                >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                      <XAxis 
-                        dataKey="date" 
-                    tickFormatter={xTickFormatter}
-                    tick={{ fontSize: 11 }}
-                    interval={xTickInterval}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={45} />
-                  <ReferenceLine y={0} stroke="hsl(var(--border))" />
-                      <Tooltip 
-                    contentStyle={TOOLTIP_STYLE}
-                    labelFormatter={(v) => formatDate(v as string)}
-                    formatter={(value: number, name: string) => [
-                      `${formatSignedNumber(value)} ${selectedItem?.unit ?? unitLabel}`,
-                      name,
-                    ]}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
-                  <Bar dataKey="IN" stackId="s" fill={colorIn} maxBarSize={18} />
-                  <Bar dataKey="ADJ" stackId="s" fill={colorAdj} maxBarSize={18} />
-                  <Bar dataKey="OUT" stackId="s" fill={colorOut} maxBarSize={18} />
-                  <Bar dataKey="WASTE" stackId="s" fill="#ef4444" maxBarSize={18} />
-                  <Bar dataKey="EXPIRED" stackId="s" fill="#a16207" maxBarSize={18} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </TabsContent>
-
-          <TabsContent value="balance" className="mt-4">
-            {!selectedItemId || balanceChartData.length === 0 ? (
-              <EmptyChart
-                hasActiveFilters={hasActiveFilters}
-                resetFilters={resetFilters}
-                message={
-                  !selectedItemId
-                    ? "Pick an item to see its running balance"
-                    : "No movements in this period"
-                }
-              />
-            ) : (
-              <ResponsiveContainer width="100%" height={360}>
-                <ComposedChart
-                  data={balanceChartData}
-                  margin={{ top: 12, right: 16, left: 0, bottom: 8 }}
-                >
-                  <defs>
-                    <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={colorBalance} stopOpacity={0.35} />
-                      <stop offset="100%" stopColor={colorBalance} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={xTickFormatter}
-                    tick={{ fontSize: 11 }}
-                    interval={xTickInterval}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    yAxisId="left"
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(v) => formatNumber(v)}
-                    tickLine={false}
-                    axisLine={false}
-                    width={45}
-                  />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(v) => formatNumber(v)}
-                    tickLine={false}
-                    axisLine={false}
-                    width={45}
-                  />
-                  <Tooltip
-                    contentStyle={TOOLTIP_STYLE}
-                    labelFormatter={(v) => formatDate(v as string)}
-                    formatter={(value: number, key: string) => [
-                      `${formatSignedNumber(value)} ${selectedItem?.unit ?? unitLabel}`,
-                      key === "in" ? "IN" : key === "out" ? "OUT" : "Balance",
-                    ]}
-                    cursor={{ fill: "rgba(139, 92, 246, 0.08)" }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} iconType="circle" />
-                  <ReferenceLine yAxisId="right" y={0} stroke="hsl(var(--border))" />
-                  <Area
-                    yAxisId="right"
-                              type="monotone" 
-                    dataKey="balance"
-                    name="Balance"
-                    stroke={colorBalance}
-                    strokeWidth={2.5}
-                    fill="url(#balanceGradient)"
-                    isAnimationActive={false}
-                  />
-                  <Bar
-                    yAxisId="left"
-                    dataKey="in"
-                    name="IN"
-                    fill={colorIn}
-                    radius={[3, 3, 0, 0]}
-                    maxBarSize={14}
-                  />
-                  <Bar
-                    yAxisId="left"
-                    dataKey="out"
-                    name="OUT"
-                    fill={colorOut}
-                    radius={[0, 0, 3, 3]}
-                    maxBarSize={14}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            )}
-          </TabsContent>
-
-          <TabsContent value="categories" className="mt-4">
-            {categoryBreakdown.length === 0 ? (
-              <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
-            ) : (
-              <ResponsiveContainer
-                width="100%"
-                height={Math.max(280, categoryBreakdown.length * 36)}
-              >
-                <BarChart
-                  data={categoryBreakdown}
-                  layout="vertical"
-                  margin={{ top: 8, right: 24, left: 16, bottom: 8 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize: 11 }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v) => formatNumber(v)}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tick={{ fontSize: 12 }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={140}
-                  />
-                  <Tooltip
-                    contentStyle={TOOLTIP_STYLE}
-                    formatter={(value: number, name: string) => [
-                      `${formatNumber(value)}`,
-                      name === "in" ? "IN" : name === "out" ? "OUT" : name,
-                    ]}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
-                  <Bar dataKey="in" name="IN" stackId="c" fill={colorIn} radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="out" name="OUT" stackId="c" fill={colorOut} radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </TabsContent>
-
-          <TabsContent value="items" className="mt-4">
-            {topItemsBreakdown.length === 0 ? (
-              <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
-            ) : (
-              <div className="space-y-4">
-                <div className="text-xs text-muted-foreground">
-                  Top {topItemsBreakdown.length} items by movement count · IN (right) vs OUT (left)
-                </div>
-                <ResponsiveContainer
-                  width="100%"
-                  height={Math.max(320, topItemsBreakdown.length * 40)}
-                >
-                  <BarChart
-                    data={topItemsBreakdown.map((it) => ({
-                      ...it,
-                      inSigned: it.in,
-                      outSigned: -it.out,
-                    }))}
-                    layout="vertical"
-                    margin={{ top: 8, right: 32, left: 16, bottom: 8 }}
-                    stackOffset="sign"
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      className="stroke-muted"
-                      horizontal={false}
-                    />
-                    <XAxis
-                      type="number"
-                      tick={{ fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => formatNumber(Math.abs(v))}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      tick={{ fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                      width={180}
-                    />
-                    <ReferenceLine x={0} stroke="hsl(var(--border))" />
-                    <Tooltip
-                      contentStyle={TOOLTIP_STYLE}
-                      formatter={(value: number, name: string, p: any) => {
-                        const unit = p?.payload?.unit ?? "";
-                        return [
-                          `${formatNumber(Math.abs(value))} ${unit}`,
-                          name === "outSigned" ? "OUT" : "IN",
-                        ];
-                      }}
-                      labelFormatter={(label, payload) => {
-                        const row: any = payload?.[0]?.payload;
-                        if (!row) return label as string;
-                        return `${row.name} · ${formatNumber(row.count)} movements · net ${formatSignedNumber(
-                          row.net
-                        )} ${row.unit}`;
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
-                    <Bar
-                      dataKey="outSigned"
-                      name="OUT"
-                      stackId="t"
-                      fill={colorOut}
-                      radius={[4, 0, 0, 4]}
-                    />
-                    <Bar
-                      dataKey="inSigned"
-                      name="IN"
-                      stackId="t"
-                      fill={colorIn}
-                      radius={[0, 4, 4, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="heatmap" className="mt-4">
-            {heatmapData.weeks.length === 0 || heatmapData.max === 0 ? (
-              <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
-            ) : (
-              <div className="space-y-6">
-                <div>
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Activity calendar
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Max: {heatmapData.max} movements / day
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto pb-2">
-                    <TooltipProvider delayDuration={100}>
-                      <div className="flex gap-1">
-                        <div className="flex flex-col gap-1 pr-2 text-[10px] text-muted-foreground">
-                          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
-                            <div
-                              key={d}
-                              className={cn("h-4 leading-4", i % 2 === 1 ? "opacity-0" : "")}
-                            >
-                              {d}
-                            </div>
-                          ))}
-                        </div>
-                        {heatmapData.weeks.map((w, wi) => (
-                          <div key={wi} className="flex flex-col gap-1">
-                            {w.cells.map((cell, di) => {
-                              if (!cell) {
-                                return (
-                                  <div
-                                    key={di}
-                                    className="h-4 w-4 rounded-sm bg-muted/30"
-                                  />
-                                );
-                              }
-                              const opacity = cell.count === 0 ? 0.08 : 0.15 + 0.85 * cell.intensity;
-                              return (
-                                <UiTooltip key={di}>
-                                  <TooltipTrigger asChild>
-                                    <div
-                                      className="h-4 w-4 cursor-pointer rounded-sm ring-1 ring-inset ring-black/5 transition hover:ring-2 hover:ring-violet-400"
-                                      style={{
-                                        background:
-                                          cell.count === 0
-                                            ? "hsl(var(--muted))"
-                                            : `rgba(139, 92, 246, ${opacity})`,
-                                      }}
-                                    />
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <div className="text-xs">
-                                      <div className="font-medium">{formatDate(cell.date)}</div>
-                                      <div className="text-muted-foreground">
-                                        {cell.count} movement{cell.count === 1 ? "" : "s"}
-                                      </div>
-                                    </div>
-                                  </TooltipContent>
-                                </UiTooltip>
-                          );
-                        })}
-                          </div>
-                        ))}
-                      </div>
-                    </TooltipProvider>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>Less</span>
-                    {[0.1, 0.3, 0.55, 0.8, 1].map((o) => (
+            <div className="overflow-x-auto pb-2">
+              <TooltipProvider delayDuration={100}>
+                <div className="flex gap-1">
+                  <div className="flex flex-col gap-1 pr-2 text-[10px] text-muted-foreground">
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
                       <div
-                        key={o}
-                        className="h-3 w-3 rounded-sm"
-                        style={{ background: `rgba(139, 92, 246, ${o})` }}
-                      />
-                    ))}
-                    <span>More</span>
-                  </div>
-                </div>
-                <div>
-                  <div className="mb-3 text-xs uppercase tracking-wide text-muted-foreground">
-                    By day of week
-                  </div>
-                  <ResponsiveContainer width="100%" height={180}>
-                    <BarChart
-                      data={weekdayBreakdown}
-                      margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        className="stroke-muted"
-                        vertical={false}
-                      />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 11 }}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11 }}
-                        tickLine={false}
-                        axisLine={false}
-                        width={35}
-                      />
-                      <Tooltip
-                        contentStyle={TOOLTIP_STYLE}
-                        formatter={(value: number) => [
-                          `${formatNumber(value)} movements`,
-                          "",
-                        ]}
-                      />
-                      <Bar
-                        dataKey="count"
-                        fill={colorBalance}
-                        radius={[3, 3, 0, 0]}
-                        maxBarSize={28}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                  </div>
-                )}
-          </TabsContent>
-
-          <TabsContent value="types" className="mt-4">
-            {typeDistribution.length === 0 ? (
-              <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                      data={typeDistribution}
-                        dataKey="value"
-                      nameKey="name"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={2}
+                        key={d}
+                        className={cn("h-4 leading-4", i % 2 === 1 ? "opacity-0" : "")}
                       >
-                      {typeDistribution.map((entry) => (
-                        <Cell key={entry.type} fill={pieFillForType(entry.type)} />
-                        ))}
-                      </Pie>
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
-                    </PieChart>
-                  </ResponsiveContainer>
-                <div className="space-y-2">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                    By reference source
+                        {d}
+                      </div>
+                    ))}
                   </div>
-                  {referenceBreakdown.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">No data</div>
-                  ) : (
-                    <ul className="space-y-1.5">
-                      {referenceBreakdown.map((r, i) => {
-                        const total = referenceBreakdown.reduce((a, b) => a + b.value, 0) || 1;
-                        const pct = Math.round((r.value / total) * 100);
+                  {heatmapData.weeks.map((w, wi) => (
+                    <div key={wi} className="flex flex-col gap-1">
+                      {w.cells.map((cell, di) => {
+                        if (!cell) {
+                          return (
+                            <div key={di} className="h-4 w-4 rounded-sm bg-muted/30" />
+                          );
+                        }
+                        const opacity = cell.count === 0 ? 0.08 : 0.15 + 0.85 * cell.intensity;
                         return (
-                          <li key={r.name} className="flex items-center gap-3 text-sm">
-                            <div
-                              className="h-2.5 w-2.5 shrink-0 rounded-full"
-                              style={{ background: chartColors[i % chartColors.length] }}
-                            />
-                            <span className="flex-1 truncate">{r.name}</span>
-                            <span className="tabular-nums text-muted-foreground">
-                              {formatNumber(r.value)}
-                            </span>
-                            <span className="w-10 text-right tabular-nums text-muted-foreground">
-                              {pct}%
-                            </span>
-                          </li>
+                          <UiTooltip key={di}>
+                            <TooltipTrigger asChild>
+                              <div
+                                className="h-4 w-4 cursor-pointer rounded-sm ring-1 ring-inset ring-black/5 transition hover:ring-2 hover:ring-violet-400"
+                                style={{
+                                  background:
+                                    cell.count === 0
+                                      ? "hsl(var(--muted))"
+                                      : `rgba(139, 92, 246, ${opacity})`,
+                                }}
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-xs">
+                                <div className="font-medium">{formatDate(cell.date)}</div>
+                                <div className="text-muted-foreground">
+                                  {cell.count} movement{cell.count === 1 ? "" : "s"}
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          </UiTooltip>
                         );
                       })}
-                    </ul>
-                  )}
+                    </div>
+                  ))}
+                </div>
+              </TooltipProvider>
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Less</span>
+              {[0.1, 0.3, 0.55, 0.8, 1].map((o) => (
+                <div
+                  key={o}
+                  className="h-3 w-3 rounded-sm"
+                  style={{ background: `rgba(139, 92, 246, ${o})` }}
+                />
+              ))}
+              <span>More</span>
+            </div>
           </div>
-              </div>
-            )}
-        </TabsContent>
-
-          <TabsContent value="locations" className="mt-4">
-            {locationBreakdown.length === 0 ? (
-              <EmptyChart hasActiveFilters={hasActiveFilters} resetFilters={resetFilters} />
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2">
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={locationBreakdown}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={2}
-                    >
-                      {locationBreakdown.map((_, i) => (
-                        <Cell key={i} fill={chartColors[i % chartColors.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="space-y-2">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Top locations
-                  </div>
-                  <ul className="space-y-1.5">
-                    {locationBreakdown.map((r, i) => {
-                      const total = locationBreakdown.reduce((a, b) => a + b.value, 0) || 1;
-                      const pct = Math.round((r.value / total) * 100);
-                        return (
-                        <li key={r.name} className="flex items-center gap-3 text-sm">
-                          <div
-                            className="h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ background: chartColors[i % chartColors.length] }}
-                          />
-                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="flex-1 truncate">{r.name}</span>
-                          <span className="tabular-nums text-muted-foreground">
-                            {formatNumber(r.value)}
-                          </span>
-                          <span className="w-10 text-right tabular-nums text-muted-foreground">
-                            {pct}%
-                          </span>
-                        </li>
-                        );
-                      })}
-                  </ul>
-                </div>
-                </div>
-              )}
-          </TabsContent>
-        </Tabs>
-            </CardContent>
-          </Card>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

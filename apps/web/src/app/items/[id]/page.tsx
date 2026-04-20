@@ -82,6 +82,10 @@ interface PriceHistoryEntry {
   effectiveDate: string;
   value: number | null;
   taxIncluded?: boolean;
+  /** Cost history: unit variable id this cost is denominated in */
+  unitId?: number | null;
+  /** Cost: quantity of `unitId` the line `value` applies to (default 1). */
+  basisQuantity?: number;
   resolvedTax?: Record<string, { rate: number; taxInclusive: boolean }>;
 }
 
@@ -148,6 +152,8 @@ function HistoryEntryTable({
   addLabel,
   valueLabel,
   emptyMessage,
+  costUnitOptions,
+  defaultCostUnitId,
 }: {
   itemId: string;
   type: 'sell' | 'cost';
@@ -163,6 +169,10 @@ function HistoryEntryTable({
   addLabel: string;
   valueLabel: string;
   emptyMessage: string;
+  /** Cost rows: unit choices for denomination */
+  costUnitOptions?: { id: number; label: string }[];
+  /** Default unit id when adding a cost row */
+  defaultCostUnitId?: number | null;
 }) {
   const [adding, setAdding] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
@@ -173,17 +183,35 @@ function HistoryEntryTable({
   const [editDate, setEditDate] = useState('');
   const [editValue, setEditValue] = useState('');
   const [editInclusive, setEditInclusive] = useState(false);
+  const [addCostUnitId, setAddCostUnitId] = useState<number | null>(null);
+  const [editCostUnitId, setEditCostUnitId] = useState<number | null>(null);
+  const [addCostBasisQty, setAddCostBasisQty] = useState("1");
+  const [editCostBasisQty, setEditCostBasisQty] = useState("1");
   const [deleting, setDeleting] = useState<number | null>(null);
+
+  const showCostUnit = type === 'cost' && costUnitOptions && costUnitOptions.length > 0;
 
   const handleAdd = async () => {
     if (!addDate || addValue === '' || Number.isNaN(parseFloat(addValue))) return;
     const value = parseFloat(addValue);
-    const body: { type: 'sell' | 'cost'; effectiveDate: string; value: number; taxIncluded?: boolean } = {
+    const body: {
+      type: 'sell' | 'cost';
+      effectiveDate: string;
+      value: number;
+      taxIncluded?: boolean;
+      unitId?: number | null;
+      costBasisQuantity?: number;
+    } = {
       type,
       effectiveDate: addDate,
       value,
     };
     body.taxIncluded = addInclusive;
+    if (showCostUnit) {
+      body.unitId = addCostUnitId ?? defaultCostUnitId ?? costUnitOptions![0]?.id ?? null;
+      const bq = parseFloat(addCostBasisQty);
+      if (!Number.isNaN(bq) && bq > 0) body.costBasisQuantity = bq;
+    }
     try {
       const res = await fetch(`/api/items/${itemId}/price-history`, {
         method: 'POST',
@@ -195,6 +223,8 @@ function HistoryEntryTable({
         setAddDate('');
         setAddValue('');
         setAddInclusive(false);
+        setAddCostUnitId(defaultCostUnitId ?? null);
+        setAddCostBasisQty("1");
         onRefetch();
         toast.success('Added');
       } else {
@@ -211,6 +241,10 @@ function HistoryEntryTable({
     setEditDate(e.effectiveDate);
     setEditValue(e.value != null ? String(e.value) : '');
     setEditInclusive(e.taxIncluded ?? false);
+    setEditCostUnitId(e.unitId ?? null);
+    setEditCostBasisQty(
+      e.basisQuantity != null && e.basisQuantity > 0 ? String(e.basisQuantity) : "1"
+    );
   };
 
   const cancelEdit = () => {
@@ -218,15 +252,28 @@ function HistoryEntryTable({
     setEditDate('');
     setEditValue('');
     setEditInclusive(false);
+    setEditCostUnitId(null);
+    setEditCostBasisQty("1");
   };
 
   const handleUpdate = async () => {
     if (editingId == null || !editDate || editValue === '' || Number.isNaN(parseFloat(editValue))) return;
-    const payload: { effectiveDate: string; value: number; taxIncluded?: boolean } = {
+    const payload: {
+      effectiveDate: string;
+      value: number;
+      taxIncluded?: boolean;
+      unitId?: number | null;
+      costBasisQuantity?: number;
+    } = {
       effectiveDate: editDate,
       value: parseFloat(editValue),
     };
     payload.taxIncluded = editInclusive;
+    if (showCostUnit) {
+      payload.unitId = editCostUnitId;
+      const bq = parseFloat(editCostBasisQty);
+      if (!Number.isNaN(bq) && bq > 0) payload.costBasisQuantity = bq;
+    }
     try {
       const res = await fetch(`/api/items/${itemId}/price-history/${editingId}?type=${type}`, {
         method: 'PATCH',
@@ -285,7 +332,16 @@ function HistoryEntryTable({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">{emptyMessage}</span>
-        <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+        <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (showCostUnit) {
+                setAddCostUnitId(defaultCostUnitId ?? costUnitOptions![0]?.id ?? null);
+              }
+              setAdding(true);
+            }}
+          >
             <Plus className="h-4 w-4 mr-1.5" />
             {addLabel}
           </Button>
@@ -294,7 +350,17 @@ function HistoryEntryTable({
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-10 px-4 text-center">
           <DollarSign className="h-10 w-10 text-muted-foreground/60 mb-3" />
           <p className="text-sm font-medium text-muted-foreground">No entries yet</p>
-          <Button variant="outline" size="sm" className="mt-4" onClick={() => setAdding(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4"
+            onClick={() => {
+              if (showCostUnit) {
+                setAddCostUnitId(defaultCostUnitId ?? costUnitOptions![0]?.id ?? null);
+              }
+              setAdding(true);
+            }}
+          >
             <Plus className="h-4 w-4 mr-1.5" />
             Add first entry
           </Button>
@@ -305,6 +371,12 @@ function HistoryEntryTable({
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-left font-medium p-3">Effective date</th>
+                {showCostUnit && (
+                  <th className="text-left font-medium p-3">Per unit</th>
+                )}
+                {showCostUnit && (
+                  <th className="text-right font-medium p-3 tabular-nums">Basis qty</th>
+                )}
                 <th className="text-right font-medium p-3">
                   {useCostTaxColumn ? 'Price (excl. tax)' : 'Price'}
                 </th>
@@ -336,6 +408,18 @@ function HistoryEntryTable({
                 >
                   <>
                       <td className="p-3 font-medium">{formatDate(e.effectiveDate)}</td>
+                      {showCostUnit && (
+                        <td className="p-3 text-sm text-muted-foreground">
+                          {e.unitId != null
+                            ? costUnitOptions!.find((o) => o.id === e.unitId)?.label ?? "—"
+                            : "—"}
+                        </td>
+                      )}
+                      {showCostUnit && (
+                        <td className="p-3 text-right tabular-nums text-sm text-muted-foreground">
+                          {e.basisQuantity != null && e.basisQuantity > 0 ? e.basisQuantity : 1}
+                        </td>
+                      )}
                       {useCostTaxColumn ? (() => {
                         const r = e.resolvedTax?.expense;
                         const rate = r?.rate ?? 0;
@@ -439,6 +523,8 @@ function HistoryEntryTable({
             setAddDate('');
             setAddValue('');
             setAddInclusive(false);
+            setAddCostUnitId(defaultCostUnitId ?? null);
+            setAddCostBasisQty("1");
           }
         }}>
           <DialogContent className="sm:max-w-2xl">
@@ -532,6 +618,50 @@ function HistoryEntryTable({
                   />
                 )}
               </div>
+              {showCostUnit && (
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs text-muted-foreground">Cost is per</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    value={
+                      (editingId != null ? editCostUnitId : addCostUnitId) != null
+                        ? String(editingId != null ? editCostUnitId : addCostUnitId)
+                        : String(defaultCostUnitId ?? costUnitOptions![0]?.id ?? "")
+                    }
+                    onChange={(ev) => {
+                      const v = ev.target.value === "" ? null : parseInt(ev.target.value, 10);
+                      if (editingId != null) setEditCostUnitId(v);
+                      else setAddCostUnitId(v);
+                    }}
+                  >
+                    {costUnitOptions!.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {showCostUnit && (
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs text-muted-foreground">Quantity for line total</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min="1e-9"
+                    placeholder="1"
+                    className="h-10"
+                    value={editingId != null ? editCostBasisQty : addCostBasisQty}
+                    onChange={(ev) => {
+                      if (editingId != null) setEditCostBasisQty(ev.target.value);
+                      else setAddCostBasisQty(ev.target.value);
+                    }}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Line amount applies to this many of the unit above (e.g. 1 for €2.50 per 1 L).
+                  </p>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => {
@@ -540,6 +670,8 @@ function HistoryEntryTable({
                 setAddDate('');
                 setAddValue('');
                 setAddInclusive(false);
+                setAddCostUnitId(defaultCostUnitId ?? null);
+                setAddCostBasisQty("1");
               }}>
                 Cancel
               </Button>
@@ -1981,6 +2113,11 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                           addLabel="Add"
                           valueLabel="Cost"
                           emptyMessage="Add dates and costs for valuation and recipes."
+                          costUnitOptions={(unitsData || []).map((u) => ({
+                            id: u.id,
+                            label: (u.symbol?.trim() || u.name || "").trim() || `#${u.id}`,
+                          }))}
+                          defaultCostUnitId={formData.unitId}
                         />
                       )}
                     </CardContent>

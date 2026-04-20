@@ -20,6 +20,7 @@ import AppLayout from "@/components/app-layout";
 import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useCreateProducedItem, useItems, useUnits, useProduceRecipe, useRecipeCost, useStockLevels, useItemCategories } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
+import { dateToYYYYMMDD } from "@kit/lib";
 import { formatCurrency, formatCurrencyPerUnit } from "@kit/lib/config";
 import {
   Dialog,
@@ -38,6 +39,7 @@ import {
 } from "@kit/ui/dropdown-menu";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { InputGroupAttached } from "@/components/input-group";
+import { DatePicker } from "@kit/ui/date-picker";
 import {
   buildUnitConversionContext,
   convertQuantityWithContext,
@@ -56,6 +58,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const [produceQuantity, setProduceQuantity] = useState("1");
   const [produceLocation, setProduceLocation] = useState("");
   const [produceNotes, setProduceNotes] = useState("");
+  const [produceDate, setProduceDate] = useState(() => dateToYYYYMMDD(new Date()));
   const [produceItemName, setProduceItemName] = useState("");
   const [produceSelectedItemId, setProduceSelectedItemId] = useState<number | null>(null);
   const { data: recipe, isLoading, refetch: refetchRecipe } = useRecipeById(resolvedParams?.id || "");
@@ -312,7 +315,13 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
         unitConversionContext
       );
       const requiredQuantity = conversionResult.quantity;
-      if (conversionResult.warning) {
+      // Recipe lines can be mass/volume while the catalog item uses a count unit for the
+      // finished good; stock is still compared in the recipe line's unit. Dimension mismatch
+      // is expected here — only warn on real conversion problems.
+      if (
+        conversionResult.warning &&
+        conversionResult.warning.reason !== "dimension_mismatch"
+      ) {
         warnings.push(`${item?.name || `Item ${itemId}`}: ${conversionResult.warning.detail}`);
       }
       const itemName = item?.name || `Item ${itemId}`;
@@ -820,8 +829,16 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                                         {o.hasPrice ? formatCurrency(o.totalCost) : "—"}
                                       </div>
                                       {o.hasPrice && (
-                                        <div className="text-[10px] text-muted-foreground tabular-nums">
-                                          {formatCurrencyPerUnit(o.unitPrice)}/{displayUnit || "unit"}
+                                        <div className="text-[10px] text-muted-foreground tabular-nums space-y-0.5">
+                                          <div>
+                                            {formatCurrencyPerUnit(o.unitPrice)}/{displayUnit || "unit"}
+                                          </div>
+                                          {o.costQuote != null && (
+                                            <div className="opacity-90">
+                                              {formatCurrency(o.costQuote.amount)} / {o.costQuote.basisQuantity}{" "}
+                                              {o.costQuote.unitLabel}
+                                            </div>
+                                          )}
                                         </div>
                                       )}
                                     </div>
@@ -932,6 +949,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           if (open) {
             setProduceItemName("");
             setProduceSelectedItemId(null);
+            setProduceDate(dateToYYYYMMDD(new Date()));
           }
         }}
       >
@@ -970,6 +988,15 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                 Recipe output quantity: {recipe?.outputQuantity ?? recipe?.servingSize ?? 1}{" "}
                 {recipeOutputUnitLabel}
               </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="produceDate">Production date</Label>
+              <DatePicker
+                id="produceDate"
+                value={produceDate ? new Date(produceDate) : undefined}
+                onChange={(d) => setProduceDate(d ? dateToYYYYMMDD(d) : dateToYYYYMMDD(new Date()))}
+                placeholder="Pick date"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
@@ -1036,11 +1063,19 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                       unitConversionContext
                     );
                     const quantityToDeduct = quantityResult.quantity;
-                    const displayUnit = item?.unit || ri.unit;
+                    const recipeLineUnitLabel =
+                      (sourceUnitId != null
+                        ? units.find((u) => u.id === sourceUnitId)?.symbol?.trim() ||
+                          units.find((u) => u.id === sourceUnitId)?.name?.trim()
+                        : null) || ri.unit;
+                    const displayUnit = recipeLineUnitLabel || item?.unit || ri.unit;
                     const availableStock = itemId ? (stockLevelMap.get(itemId) || 0) : 0;
                     const hasEnough = availableStock >= quantityToDeduct;
                     const isOutOfStock = availableStock === 0;
-                    
+                    const showIngredientConversionWarning =
+                      quantityResult.warning &&
+                      quantityResult.warning.reason !== "dimension_mismatch";
+
                     return (
                       <div key={idx} className={`text-sm p-2 rounded border ${hasEnough ? 'bg-background' : 'bg-destructive/10 border-destructive'}`}>
                         <div className="flex items-center justify-between">
@@ -1075,7 +1110,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                               </span>
                             )}
                           </div>
-                          {quantityResult.warning && (
+                          {showIngredientConversionWarning && quantityResult.warning && (
                             <div className="text-xs text-amber-700 dark:text-amber-400">
                               Conversion warning: {quantityResult.warning.detail}
                             </div>
@@ -1146,6 +1181,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                       quantity: parseFloat(produceQuantity),
                       location: produceLocation || undefined,
                       notes: produceNotes || undefined,
+                      movementDate: produceDate,
                       ...(producedItems.length === 0 && produceItemName.trim() ? { producedItemName: produceItemName.trim() } : {}),
                       ...(producedItems.length >= 2 && produceSelectedItemId ? { producedItemId: produceSelectedItemId } : {}),
                     },

@@ -6,6 +6,15 @@ import {
 } from "@/lib/units/convert";
 import { loadUnitConversionContext } from "@/lib/units/context";
 
+function movementInstantFromInput(input?: string): string {
+  if (!input?.trim()) return new Date().toISOString();
+  const s = input.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s}T12:00:00.000Z`;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return new Date().toISOString();
+  return d.toISOString();
+}
+
 export interface ProduceRecipeOptions {
   quantity: number;
   location?: string | null;
@@ -31,7 +40,7 @@ export async function produceRecipe(
     producedItemId: requestedItemId,
     producedItemName,
   } = options;
-  const movementDate = movementDateOpt ?? new Date().toISOString();
+  const movementDate = movementInstantFromInput(movementDateOpt);
   const conversionContext = await loadUnitConversionContext(supabase);
 
   const { data: recipeData, error: recipeError } = await supabase
@@ -70,7 +79,10 @@ export async function produceRecipe(
         conversionContext
       );
       quantityToDeduct = quantityResult.quantity;
-      if (quantityResult.warning) {
+      if (
+        quantityResult.warning &&
+        quantityResult.warning.reason !== "dimension_mismatch"
+      ) {
         logUnitConversionWarning(
           "produce-recipe:ingredient-deduction",
           quantityResult.warning

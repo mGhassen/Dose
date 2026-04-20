@@ -24,6 +24,7 @@ export async function POST(
       notes: body.notes,
       producedItemId: body.producedItemId,
       producedItemName: body.producedItemName,
+      movementDate: body.movementDate,
     });
 
     const { data: recipeData } = await supabase

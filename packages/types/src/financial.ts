@@ -1360,6 +1360,8 @@ export interface ProduceRecipeData {
   quantity: number;
   location?: string;
   notes?: string;
+  /** Calendar day (YYYY-MM-DD) or ISO instant for ingredient OUT / finished IN rows. */
+  movementDate?: string;
   /** Required when recipe has multiple linked produced items. */
   producedItemId?: number;
   /** Required when recipe has 0 linked items (name for the new item to create). */
