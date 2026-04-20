@@ -57,9 +57,13 @@ export default function RecipesContent() {
       ),
     },
     {
-      accessorKey: "servingSize",
-      header: "Serving Size",
-      cell: ({ row }) => row.original.servingSize ? `${row.original.servingSize} servings` : <span className="text-muted-foreground">—</span>,
+      accessorKey: "outputQuantity",
+      header: "Output Quantity",
+      cell: ({ row }) => {
+        const outputQuantity = row.original.outputQuantity ?? row.original.servingSize;
+        if (!outputQuantity) return <span className="text-muted-foreground">—</span>;
+        return `${outputQuantity} ${row.original.unit || "unit"}`;
+      },
     },
     {
       accessorKey: "preparationTime",
@@ -102,10 +106,10 @@ export default function RecipesContent() {
     const recipesToCopy = type === 'selected' ? data : data;
     
     const csv = [
-      ['Name', 'Serving Size', 'Prep Time', 'Cook Time', 'Status'].join(','),
+      ['Name', 'Output Quantity', 'Prep Time', 'Cook Time', 'Status'].join(','),
       ...recipesToCopy.map(recipe => [
         recipe.name,
-        recipe.servingSize || '',
+        recipe.outputQuantity ?? recipe.servingSize ?? '',
         recipe.preparationTime || '',
         recipe.cookingTime || '',
         recipe.isActive ? 'Active' : 'Inactive',
@@ -120,10 +124,10 @@ export default function RecipesContent() {
     const recipesToExport = type === 'selected' ? data : data;
     
     const csv = [
-      ['Name', 'Serving Size', 'Prep Time', 'Cook Time', 'Status'].join(','),
+      ['Name', 'Output Quantity', 'Prep Time', 'Cook Time', 'Status'].join(','),
       ...recipesToExport.map(recipe => [
         recipe.name,
-        recipe.servingSize || '',
+        recipe.outputQuantity ?? recipe.servingSize ?? '',
         recipe.preparationTime || '',
         recipe.cookingTime || '',
         recipe.isActive ? 'Active' : 'Inactive',
@@ -223,7 +227,7 @@ export default function RecipesContent() {
           onBulkExport={handleBulkExport}
           filterColumns={[
             { value: "name", label: "Name" },
-            { value: "servingSize", label: "Serving Size" },
+            { value: "outputQuantity", label: "Output Quantity" },
             { value: "preparationTime", label: "Preparation Time" },
             { value: "cookingTime", label: "Cooking Time" },
             { value: "createdAt", label: "Created" },
@@ -231,7 +235,7 @@ export default function RecipesContent() {
           ]}
           sortColumns={[
             { value: "name", label: "Name", type: "character varying" },
-            { value: "servingSize", label: "Serving Size", type: "integer" },
+            { value: "outputQuantity", label: "Output Quantity", type: "numeric" },
             { value: "preparationTime", label: "Preparation Time", type: "numeric" },
             { value: "cookingTime", label: "Cooking Time", type: "numeric" },
             { value: "createdAt", label: "Created", type: "timestamp" },

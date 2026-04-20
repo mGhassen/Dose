@@ -92,6 +92,72 @@ export async function POST(
     const gross = round2(body.hoursWorked * body.hourlyRate);
     const tax = round2(gross * (taxRatePercent / 100));
     const net = round2(gross - tax);
+    const defaultDate = body.startDate;
+
+    const { data: personnel } = await supabase
+      .from('personnel')
+      .select('first_name, last_name')
+      .eq('id', id)
+      .maybeSingle();
+    const personName = personnel
+      ? `${personnel.first_name} ${personnel.last_name}`
+      : `Personnel #${id}`;
+    const expenseName = `Contractor hours — ${personName} (${body.startDate} -> ${body.endDate})`;
+
+    const { data: expenseRow, error: expenseErr } = await supabase
+      .from('expenses')
+      .insert({
+        name: expenseName,
+        category: 'personnel',
+        expense_type: 'expense',
+        expense_date: defaultDate,
+        start_date: defaultDate,
+        description: body.notes ?? null,
+        amount: gross,
+        subtotal: gross,
+        total_tax: tax,
+        total_discount: 0,
+        is_active: true,
+      })
+      .select('id')
+      .single();
+    if (expenseErr || !expenseRow?.id) {
+      throw new Error(expenseErr?.message ?? 'Failed to create contractor expense');
+    }
+
+    const { error: lineErr } = await supabase.from('expense_line_items').insert({
+      expense_id: expenseRow.id,
+      item_id: null,
+      quantity: body.hoursWorked,
+      unit_id: null,
+      unit_price: body.hourlyRate,
+      unit_cost: null,
+      tax_rate_percent: taxRatePercent,
+      tax_amount: tax,
+      line_total: gross,
+      sort_order: 0,
+    });
+    if (lineErr) {
+      await supabase.from('expenses').delete().eq('id', expenseRow.id);
+      throw new Error(lineErr.message);
+    }
+
+    const { error: entryErr } = await supabase.from('entries').insert({
+      direction: 'output',
+      entry_type: 'expense',
+      name: expenseName,
+      amount: gross,
+      description: body.notes ?? null,
+      category: 'personnel',
+      entry_date: defaultDate,
+      due_date: defaultDate,
+      reference_id: expenseRow.id,
+      is_active: true,
+    });
+    if (entryErr) {
+      await supabase.from('expenses').delete().eq('id', expenseRow.id);
+      throw new Error(entryErr.message);
+    }
 
     const { data, error } = await supabase
       .from('personnel_hour_entries')
@@ -107,12 +173,17 @@ export async function POST(
         amount_gross: gross,
         amount_tax: tax,
         amount_net: net,
+        expense_id: expenseRow.id,
         notes: body.notes ?? null,
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      await supabase.from('entries').delete().eq('entry_type', 'expense').eq('reference_id', expenseRow.id);
+      await supabase.from('expenses').delete().eq('id', expenseRow.id);
+      throw error;
+    }
     return NextResponse.json(transformHourEntry(data), { status: 201 });
   } catch (error: any) {
     console.error('Error creating personnel hour entry:', error);

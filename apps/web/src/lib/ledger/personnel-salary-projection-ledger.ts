@@ -2,8 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PaymentSliceInput } from '@/shared/zod-schemas';
 import { replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
 
-export const PERSONNEL_SALARY_PAYMENT_ENTRY_TYPE = 'personnel_salary_payment' as const;
-
 export function personnelSalaryProjectionExpenseDescription(projectionId: number): string {
   return `personnel_salary_projection:${projectionId}`;
 }
@@ -73,25 +71,26 @@ function buildSlices(row: PersonnelSalaryProjectionRow): PaymentSliceInput[] {
 
 export async function removePersonnelSalaryProjectionLedger(
   supabase: SupabaseClient,
-  personnelId: number,
+  _personnelId: number,
   projectionId: number
 ): Promise<{ error: string | null }> {
   const desc = personnelSalaryProjectionExpenseDescription(projectionId);
-
-  const { error: expErr } = await supabase.from('expenses').delete().eq('description', desc);
-  if (expErr) return { error: expErr.message };
-
-  const { data: ent } = await supabase
-    .from('entries')
+  const { data: exp } = await supabase
+    .from('expenses')
     .select('id')
-    .eq('reference_id', personnelId)
-    .eq('schedule_entry_id', projectionId)
-    .eq('entry_type', PERSONNEL_SALARY_PAYMENT_ENTRY_TYPE)
+    .eq('description', desc)
     .maybeSingle();
 
-  if (ent?.id) {
-    const { error: delErr } = await supabase.from('entries').delete().eq('id', ent.id);
-    if (delErr) return { error: delErr.message };
+  if (exp?.id) {
+    const { error: delEntryErr } = await supabase
+      .from('entries')
+      .delete()
+      .eq('entry_type', 'expense')
+      .eq('reference_id', exp.id);
+    if (delEntryErr) return { error: delEntryErr.message };
+
+    const { error: expErr } = await supabase.from('expenses').delete().eq('id', exp.id);
+    if (expErr) return { error: expErr.message };
   }
 
   return { error: null };
@@ -138,70 +137,13 @@ export async function syncPersonnelSalaryProjectionLedger(
   const firstDate = slices[0].paymentDate.split('T')[0] || slices[0].paymentDate;
   const expenseDate = firstDate.slice(0, 10);
   const desc = personnelSalaryProjectionExpenseDescription(projectionId);
-
-  let entryId: number | null = null;
-  const { data: foundEntry, error: findErr } = await supabase
-    .from('entries')
-    .select('id')
-    .eq('reference_id', personnelId)
-    .eq('schedule_entry_id', projectionId)
-    .eq('entry_type', PERSONNEL_SALARY_PAYMENT_ENTRY_TYPE)
-    .maybeSingle();
-
-  if (findErr) return { error: findErr.message };
-  entryId = foundEntry?.id ?? null;
-
-  if (!entryId) {
-    const { data: inserted, error: insErr } = await supabase
-      .from('entries')
-      .insert({
-        direction: 'output',
-        entry_type: PERSONNEL_SALARY_PAYMENT_ENTRY_TYPE,
-        name: entryName,
-        amount: totalAmount,
-        description: row.notes || `Salary payments for ${row.month}`,
-        category: 'personnel',
-        entry_date: expenseDate,
-        due_date: expenseDate,
-        reference_id: personnelId,
-        schedule_entry_id: projectionId,
-        is_active: person.is_active !== false,
-      })
-      .select('id')
-      .single();
-
-    if (insErr || !inserted?.id) {
-      return { error: insErr?.message ?? 'Failed to create personnel salary ledger entry' };
-    }
-    entryId = inserted.id;
-  } else {
-    const { error: updErr } = await supabase
-      .from('entries')
-      .update({
-        name: entryName,
-        amount: totalAmount,
-        description: row.notes || `Salary payments for ${row.month}`,
-        entry_date: expenseDate,
-        due_date: expenseDate,
-      })
-      .eq('id', entryId);
-
-    if (updErr) return { error: updErr.message };
-  }
-
-  if (entryId == null) {
-    return { error: 'Missing ledger entry id for personnel salary' };
-  }
-
-  const payRes = await replacePaymentsForEntry(supabase, entryId, slices);
-  if (payRes.error) return payRes;
-
   const { data: existingExp } = await supabase
     .from('expenses')
     .select('id')
     .eq('description', desc)
     .maybeSingle();
 
+  let expenseId: number | null = existingExp?.id ?? null;
   const expensePayload = {
     name: entryName,
     category: 'personnel',
@@ -246,6 +188,7 @@ export async function syncPersonnelSalaryProjectionLedger(
     if (expIns || !expRow?.id) {
       return { error: expIns?.message ?? 'Failed to create personnel salary expense' };
     }
+    expenseId = expRow.id;
 
     const { error: liErr } = await supabase.from('expense_line_items').insert({
       expense_id: expRow.id,
@@ -261,6 +204,62 @@ export async function syncPersonnelSalaryProjectionLedger(
     });
     if (liErr) return { error: liErr.message };
   }
+
+  if (expenseId == null) {
+    return { error: 'Missing salary expense id' };
+  }
+
+  let entryId: number | null = null;
+  const { data: foundExpenseEntry, error: findErr } = await supabase
+    .from('entries')
+    .select('id')
+    .eq('entry_type', 'expense')
+    .eq('reference_id', expenseId)
+    .maybeSingle();
+  if (findErr) return { error: findErr.message };
+  entryId = foundExpenseEntry?.id ?? null;
+
+  if (!entryId) {
+    const { data: inserted, error: insErr } = await supabase
+      .from('entries')
+      .insert({
+        direction: 'output',
+        entry_type: 'expense',
+        name: entryName,
+        amount: totalAmount,
+        description: row.notes || `Salary payments for ${row.month}`,
+        category: 'personnel',
+        entry_date: expenseDate,
+        due_date: expenseDate,
+        reference_id: expenseId,
+        schedule_entry_id: projectionId,
+        is_active: person.is_active !== false,
+      })
+      .select('id')
+      .single();
+    if (insErr || !inserted?.id) {
+      return { error: insErr?.message ?? 'Failed to create salary expense entry' };
+    }
+    entryId = inserted.id;
+  } else {
+    const { error: updErr } = await supabase
+      .from('entries')
+      .update({
+        name: entryName,
+        amount: totalAmount,
+        description: row.notes || `Salary payments for ${row.month}`,
+        category: 'personnel',
+        entry_date: expenseDate,
+        due_date: expenseDate,
+        schedule_entry_id: projectionId,
+      })
+      .eq('id', entryId);
+    if (updErr) return { error: updErr.message };
+  }
+
+  if (entryId == null) return { error: 'Missing salary expense entry id' };
+  const payRes = await replacePaymentsForEntry(supabase, entryId, slices);
+  if (payRes.error) return payRes;
 
   return { error: null };
 }

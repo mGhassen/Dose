@@ -82,6 +82,33 @@ export async function PUT(
     const body = parsed.data as UpdateStockMovementData;
     
     const supabase = supabaseServer();
+    const { data: existing, error: existingError } = await supabase
+      .from("stock_movements")
+      .select("id, item_id, movement_type, quantity, unit, unit_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (existingError) throw existingError;
+    if (!existing) {
+      return NextResponse.json({ error: "Stock movement not found" }, { status: 404 });
+    }
+
+    const stockAffectingChange =
+      (body.itemId !== undefined && body.itemId !== existing.item_id) ||
+      (body.movementType !== undefined && body.movementType !== existing.movement_type) ||
+      (body.quantity !== undefined && Number(body.quantity) !== Number(existing.quantity)) ||
+      (body.unit !== undefined && body.unit !== existing.unit) ||
+      (body.unitId !== undefined && body.unitId !== existing.unit_id);
+
+    if (stockAffectingChange) {
+      return NextResponse.json(
+        {
+          error:
+            "Editing movement quantity/type/item/unit is not supported yet because it can desync stock levels. Delete and recreate the movement instead.",
+        },
+        { status: 400 }
+      );
+    }
+
     const { data, error } = await supabase
       .from('stock_movements')
       .update(transformToSnakeCase(body))

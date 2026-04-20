@@ -4,16 +4,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import { getItemCostAsOf } from '@/lib/items/price-resolve';
+import {
+  convertQuantityWithContext,
+  convertUnitPriceWithContext,
+  logUnitConversionWarning,
+} from "@/lib/units/convert";
+import { loadUnitConversionContext } from "@/lib/units/context";
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = supabaseServer();
+    const conversionContext = await loadUnitConversionContext(supabase);
     
     const { data: stockLevels, error: stockError } = await supabase
       .from('stock_levels')
       .select(`
         *,
-        item:items(id, name)
+        item:items(id, name, unit_id)
       `)
       .gt('quantity', 0);
 
@@ -29,17 +36,39 @@ export async function GET(request: NextRequest) {
         {
           const { data: orderItems } = await supabase
             .from('supplier_order_items')
-            .select('unit_price, quantity')
+            .select('unit_price, quantity, unit_id')
             .eq('item_id', itemId)
             .gte('created_at', threeMonthsAgo.toISOString())
             .limit(10);
 
           if (orderItems && orderItems.length > 0) {
-            const totalValue = orderItems.reduce(
-              (sum, item) => sum + parseFloat(item.unit_price) * parseFloat(item.quantity),
-              0
-            );
-            const totalQuantity = orderItems.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
+            const stockUnitId = (sl.unit_id as number | null | undefined) ?? (sl.item?.unit_id as number | null | undefined) ?? null;
+            let totalValue = 0;
+            let totalQuantity = 0;
+            for (const item of orderItems) {
+              const orderQuantity = parseFloat(item.quantity);
+              const orderUnitId = item.unit_id as number | null;
+              const quantityResult = convertQuantityWithContext(
+                orderQuantity,
+                orderUnitId,
+                stockUnitId,
+                conversionContext
+              );
+              if (quantityResult.warning) {
+                logUnitConversionWarning("inventory-valuation:order-quantity", quantityResult.warning);
+              }
+              const priceResult = convertUnitPriceWithContext(
+                parseFloat(item.unit_price),
+                orderUnitId,
+                stockUnitId,
+                conversionContext
+              );
+              if (priceResult.warning) {
+                logUnitConversionWarning("inventory-valuation:order-price", priceResult.warning);
+              }
+              totalValue += quantityResult.quantity * priceResult.unitPrice;
+              totalQuantity += quantityResult.quantity;
+            }
             avgUnitPrice = totalQuantity > 0 ? totalValue / totalQuantity : 0;
           }
           if (avgUnitPrice === 0) {

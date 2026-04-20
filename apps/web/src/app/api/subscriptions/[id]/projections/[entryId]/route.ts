@@ -27,6 +27,78 @@ function transformProjectionEntry(row: any) {
   };
 }
 
+async function ensureExpenseLedgerPayment(
+  supabase: ReturnType<typeof supabaseServer>,
+  expense: {
+    id: number;
+    name?: string | null;
+    amount: number;
+    description?: string | null;
+    category?: string | null;
+    vendor?: string | null;
+    supplier_id?: number | null;
+    expense_date?: string | null;
+    is_active?: boolean | null;
+  },
+  payment: { amount: number; paymentDate: string; notes?: string | null }
+) {
+  let entryId: number | null = null;
+  const { data: existingEntry } = await supabase
+    .from('entries')
+    .select('id')
+    .eq('entry_type', 'expense')
+    .eq('reference_id', expense.id)
+    .maybeSingle();
+  entryId = existingEntry?.id ?? null;
+
+  if (entryId == null) {
+    const { data: createdEntry, error: createEntryError } = await supabase
+      .from('entries')
+      .insert({
+        direction: 'output',
+        entry_type: 'expense',
+        name: expense.name ?? 'Subscription expense',
+        amount: expense.amount,
+        description: expense.description ?? null,
+        category: expense.category ?? null,
+        vendor: expense.vendor ?? null,
+        supplier_id: expense.supplier_id ?? null,
+        entry_date: expense.expense_date ?? payment.paymentDate,
+        reference_id: expense.id,
+        is_active: expense.is_active ?? true,
+      })
+      .select('id')
+      .single();
+    if (createEntryError || !createdEntry?.id) {
+      console.error('Error creating expense entry for subscription payment:', createEntryError);
+      return;
+    }
+    entryId = createdEntry.id;
+  }
+
+  const paymentDate = payment.paymentDate.split('T')[0] || payment.paymentDate;
+  const { data: dupPayment } = await supabase
+    .from('payments')
+    .select('id')
+    .eq('entry_id', entryId)
+    .eq('payment_date', paymentDate)
+    .eq('amount', payment.amount)
+    .maybeSingle();
+  if (dupPayment) return;
+
+  const { error: paymentError } = await supabase.from('payments').insert({
+    entry_id: entryId,
+    payment_date: paymentDate,
+    amount: payment.amount,
+    is_paid: true,
+    paid_date: paymentDate,
+    notes: payment.notes ?? null,
+  });
+  if (paymentError) {
+    console.error('Error creating payment for subscription expense:', paymentError);
+  }
+}
+
 function transformToSnakeCase(data: UpdateSubscriptionProjectionEntryData): any {
   const result: any = {};
   if ('amount' in data && data.amount !== undefined) result.amount = data.amount;
@@ -169,7 +241,19 @@ export async function PUT(
                 .maybeSingle();
 
               if (existingMonthExpense) {
-                // Expense already exists for this month; skip duplicate insert (e.g. partial payments).
+                const paidAmount = body.actualAmount ?? parseFloat(existingEntry.amount);
+                const { data: existingExpense } = await supabase
+                  .from('expenses')
+                  .select('id, name, amount, description, category, vendor, supplier_id, expense_date, is_active')
+                  .eq('id', existingMonthExpense.id)
+                  .single();
+                if (existingExpense) {
+                  await ensureExpenseLedgerPayment(supabase, existingExpense, {
+                    amount: paidAmount,
+                    paymentDate: expenseDate,
+                    notes: body.notes || null,
+                  });
+                }
               } else {
               const paidAmount = body.actualAmount ?? parseFloat(existingEntry.amount); // TTC
               const dateStr = expenseDate;
@@ -236,6 +320,11 @@ export async function PUT(
                   tax_amount: taxAmount,
                   line_total: subTotal,
                   sort_order: 0,
+                });
+                await ensureExpenseLedgerPayment(supabase, expenseRow, {
+                  amount,
+                  paymentDate: expenseDate,
+                  notes: body.notes || null,
                 });
                 if (subscriptionData.item_id != null) {
                   const { upsertCost } = await import('@/lib/items/price-history-upsert');

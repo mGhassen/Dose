@@ -38,7 +38,7 @@ export async function POST(
         name: recipeData.name,
         description: recipeData.description || `Produced from recipe: ${recipeData.name}`,
         category: recipeData.category,
-        unit: recipeData.unit || 'serving',
+        unit: recipeData.unit || "unit",
         unit_id: recipeData.unit_id,
         produced_from_recipe_id: Number(recipeId),
         item_types: ['product'],

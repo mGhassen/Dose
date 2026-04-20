@@ -234,7 +234,7 @@ export function ContractorHoursPanel({ personnel }: Props) {
           category: "personnel",
         },
       });
-      toast.success(entry.isPaid ? "Marked unpaid" : "Marked paid and expense created");
+      toast.success(entry.isPaid ? "Payments cleared" : "Payment recorded");
     } catch (error: any) {
       toast.error(error?.message || "Failed to update paid status");
     }
@@ -365,12 +365,12 @@ export function ContractorHoursPanel({ personnel }: Props) {
                           {entry.isPaid ? (
                             <>
                               <Undo2 className="mr-2 h-4 w-4" />
-                              Mark unpaid
+                              Clear payments
                             </>
                           ) : (
                             <>
                               <Check className="mr-2 h-4 w-4" />
-                              Mark paid (create expense)
+                              Add payment
                             </>
                           )}
                         </DropdownMenuItem>

@@ -138,7 +138,10 @@ export default function ItemsContent() {
       header: "Selling price",
       cell: ({ row }) => {
         if ("instructions" in row.original && (row.original as { instructions?: string }).instructions != null) {
-          return row.original.servingSize ? `${row.original.servingSize} servings` : <span className="text-muted-foreground">—</span>;
+          const outputQuantity = row.original.outputQuantity ?? row.original.servingSize;
+          return outputQuantity
+            ? `${outputQuantity} ${row.original.unit || "unit"}`
+            : <span className="text-muted-foreground">—</span>;
         }
         return row.original.unitPrice != null ? formatCurrency(row.original.unitPrice) : <span className="text-muted-foreground">—</span>;
       },

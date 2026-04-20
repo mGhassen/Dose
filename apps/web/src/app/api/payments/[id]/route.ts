@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Payment, UpdatePaymentData } from '../route';
 import { parseRequestBody, updatePaymentSchema } from '@/shared/zod-schemas';
-import { personnelSalaryProjectionExpenseDescription } from '@/lib/ledger/personnel-salary-projection-ledger';
 
 async function getPaymentBankTxId(
   supabase: ReturnType<typeof supabaseServer>,
@@ -177,25 +176,9 @@ export async function DELETE(
 
     const { data: entry } = await supabase
       .from('entries')
-      .select('id, reference_id, entry_type, schedule_entry_id')
+      .select('id, reference_id, entry_type')
       .eq('id', payment.entry_id)
       .single();
-
-    if (
-      entry?.entry_type === 'personnel_salary_payment' &&
-      entry.schedule_entry_id != null
-    ) {
-      const { count } = await supabase
-        .from('payments')
-        .select('id', { count: 'exact', head: true })
-        .eq('entry_id', payment.entry_id);
-      if (count === 1) {
-        await supabase
-          .from('expenses')
-          .delete()
-          .eq('description', personnelSalaryProjectionExpenseDescription(Number(entry.schedule_entry_id)));
-      }
-    }
 
     if (entry?.entry_type === 'subscription_payment' && entry.reference_id != null && payment.payment_date) {
       const { count } = await supabase

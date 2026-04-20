@@ -36,6 +36,10 @@ import {
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import {
+  buildUnitConversionContext,
+  convertQuantityWithContext,
+} from "@/lib/units/convert";
 
 interface RecipeDetailPageProps {
   params: Promise<{ id: string }>;
@@ -67,6 +71,19 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const { data: allItemsResponse } = useItems({ limit: 1000 });
   const allItems = allItemsResponse?.data ?? [];
   const { data: itemCategories = [] } = useItemCategories();
+  const unitConversionContext = useMemo(
+    () =>
+      buildUnitConversionContext(
+        units.map((u) => ({
+          id: u.id,
+          factorToBase: u.factorToBase,
+          dimension: u.dimension,
+          baseUnitId: u.baseUnitId,
+          symbol: u.symbol,
+        }))
+      ),
+    [units]
+  );
   
   // Fetch stock levels for all recipe items when dialog is open
   const recipeItemIds = recipe?.items?.map(ri => ri.itemId?.toString()).filter(Boolean) ||
@@ -90,6 +107,22 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     
     return map;
   }, [allStockLevelsResponse?.data]);
+
+  const modifierUnitById = useMemo(() => {
+    const map = new Map<number, string>();
+    const modifierQuantities = recipe?.modifierQuantities ?? [];
+    for (const q of modifierQuantities) {
+      const unitLabel =
+        q.unit?.trim() ||
+        (q.unitId != null
+          ? (units.find((u) => u.id === q.unitId)?.symbol ??
+            units.find((u) => u.id === q.unitId)?.name ??
+            "")
+          : "");
+      if (unitLabel) map.set(q.modifierId, unitLabel);
+    }
+    return map;
+  }, [recipe?.modifierQuantities, units]);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -98,7 +131,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     categoryId: null as number | null,
     unit: "",
     unitId: null as number | null,
-    servingSize: "",
+    outputQuantity: "",
     preparationTime: "",
     cookingTime: "",
     instructions: "",
@@ -121,7 +154,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
         categoryId: null,
         unit: recipe.unit || "",
         unitId: recipe.unitId ?? null,
-        servingSize: recipe.servingSize?.toString() || "",
+        outputQuantity: (recipe.outputQuantity ?? recipe.servingSize)?.toString() || "",
         preparationTime: recipe.preparationTime?.toString() || "",
         cookingTime: recipe.cookingTime?.toString() || "",
         instructions: recipe.instructions || "",
@@ -197,7 +230,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           category: formData.category || undefined,
           unit: formData.unit || undefined,
           unitId: formData.unitId ?? undefined,
-          servingSize: formData.servingSize ? parseInt(formData.servingSize) : undefined,
+          outputQuantity: formData.outputQuantity ? parseFloat(formData.outputQuantity) : undefined,
           preparationTime: formData.preparationTime ? parseInt(formData.preparationTime) : undefined,
           cookingTime: formData.cookingTime ? parseInt(formData.cookingTime) : undefined,
           instructions: formData.instructions || undefined,
@@ -268,21 +301,34 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   // Check if we have enough stock for all ingredients
   const stockAvailability = useMemo(() => {
     if (!recipe || !produceQuantity || parseFloat(produceQuantity) <= 0) {
-      return { canProduce: false, issues: [] };
+      return { canProduce: false, issues: [], warnings: [] as string[] };
     }
     
-    const multiplier = parseFloat(produceQuantity) / (recipe.servingSize || 1);
+    const multiplier = parseFloat(produceQuantity) / ((recipe.outputQuantity ?? recipe.servingSize) || 1);
     const issues: Array<{ itemId: number; itemName: string; required: number; available: number; unit: string }> = [];
+    const warnings: string[] = [];
     
     const recipeItems = recipe.items || (recipe as { ingredients?: unknown[] }).ingredients || [];
     for (const ri of recipeItems) {
       const itemId = ri.itemId || (ri as any).ingredientId;
       if (!itemId) continue;
       
-      const requiredQuantity = ri.quantity * multiplier;
+      const sourceUnitId = ri.unitId ?? (ri as any).unit_id ?? null;
       const availableQuantity = stockLevelMap.get(itemId) || 0;
       const item = ri.item || (ri as any).ingredient;
+      const targetUnitId = item?.unitId ?? item?.unit_id ?? sourceUnitId;
+      const conversionResult = convertQuantityWithContext(
+        ri.quantity * multiplier,
+        sourceUnitId,
+        targetUnitId,
+        unitConversionContext
+      );
+      const requiredQuantity = conversionResult.quantity;
+      if (conversionResult.warning) {
+        warnings.push(`${item?.name || `Item ${itemId}`}: ${conversionResult.warning.detail}`);
+      }
       const itemName = item?.name || `Item ${itemId}`;
+      const comparisonUnit = item?.unit || ri.unit;
       
       if (availableQuantity < requiredQuantity) {
         issues.push({
@@ -290,7 +336,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
           itemName,
           required: requiredQuantity,
           available: availableQuantity,
-          unit: ri.unit,
+          unit: comparisonUnit,
         });
       }
     }
@@ -298,8 +344,9 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     return {
       canProduce: issues.length === 0,
       issues,
+      warnings,
     };
-  }, [recipe, produceQuantity, stockLevelMap]);
+  }, [recipe, produceQuantity, stockLevelMap, unitConversionContext]);
 
   if (isLoading || !resolvedParams) {
     return (
@@ -429,14 +476,15 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="servingSize">Serving Size</Label>
+                        <Label htmlFor="outputQuantity">Output Quantity</Label>
                         <div className="flex gap-2">
                           <Input
-                            id="servingSize"
+                            id="outputQuantity"
                             type="number"
-                            min={1}
-                            value={formData.servingSize}
-                            onChange={(e) => handleInputChange('servingSize', e.target.value)}
+                            min={0.000001}
+                            step="0.01"
+                            value={formData.outputQuantity}
+                            onChange={(e) => handleInputChange('outputQuantity', e.target.value)}
                             className="w-24"
                           />
                           <UnifiedSelector
@@ -644,10 +692,10 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Serving Size</label>
+                    <label className="text-sm font-medium text-muted-foreground">Output Quantity</label>
                     <p className="text-base mt-1">
-                      {recipe.servingSize
-                        ? `${recipe.servingSize} ${recipe.unit || 'serving'}${recipe.servingSize !== 1 ? 's' : ''}`
+                      {(recipe.outputQuantity ?? recipe.servingSize)
+                        ? `${recipe.outputQuantity ?? recipe.servingSize} ${recipe.unit || 'unit'}`
                         : "—"}
                     </p>
                   </div>
@@ -774,9 +822,9 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                                   ) : (
                                     <>{formatCurrency(costData.totalCost)} total</>
                                   )}
-                                  {costData.servingSize > 1 && (
+                                  {costData.outputQuantity > 1 && (
                                     <span className="text-sm text-muted-foreground ml-2">
-                                      ({formatCurrency(costData.costPerServing)} per serving)
+                                      ({formatCurrency(costData.costPerOutputUnit)} per {recipe.unit || "unit"})
                                     </span>
                                   )}
                                 </>
@@ -808,23 +856,49 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                                 </span>
                               )}
                             </div>
-                            <div className="ml-3 space-y-0.5">
+                            <div className="ml-3 space-y-1">
                               {ml.options.length === 0 ? (
                                 <div className="text-xs text-muted-foreground">No modifiers included</div>
                               ) : (
                                 ml.options.map((o) => (
-                                  <div key={o.modifierId} className="flex justify-between text-xs">
-                                    <Link
-                                      href={o.supplyItemId ? `/items/${o.supplyItemId}` : "#"}
-                                      className="text-muted-foreground hover:underline"
-                                    >
-                                      {o.modifierName || `Modifier #${o.modifierId}`}
-                                      {o.supplyItemName ? ` · ${o.supplyItemName}` : ""}
-                                      {o.quantity > 0 ? ` · ${o.quantity}` : ""}
-                                    </Link>
-                                    <span className={o.hasPrice ? "" : "text-muted-foreground italic"}>
-                                      {o.hasPrice ? formatCurrency(o.totalCost) : "—"}
-                                    </span>
+                                  <div
+                                    key={o.modifierId}
+                                    className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded border bg-background/70 px-2 py-1.5 text-xs"
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="truncate font-medium">
+                                        {o.modifierName || `Modifier #${o.modifierId}`}
+                                      </div>
+                                      <div className="truncate text-muted-foreground">
+                                        {o.supplyItemId ? (
+                                          <Link
+                                            href={`/items/${o.supplyItemId}`}
+                                            className="hover:underline"
+                                          >
+                                            {o.supplyItemName || `Item #${o.supplyItemId}`}
+                                          </Link>
+                                        ) : (
+                                          "No stock item"
+                                        )}
+                                        {o.quantity > 0 && (
+                                          <>
+                                            {" · "}
+                                            {o.quantity}
+                                            {modifierUnitById.get(o.modifierId) ? ` ${modifierUnitById.get(o.modifierId)}` : ""}
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className={o.hasPrice ? "font-medium" : "text-muted-foreground italic"}>
+                                        {o.hasPrice ? formatCurrency(o.totalCost) : "—"}
+                                      </div>
+                                      {o.hasPrice && (
+                                        <div className="text-[10px] text-muted-foreground">
+                                          {formatCurrency(o.unitPrice)}/unit
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 ))
                               )}
@@ -833,40 +907,48 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                         ))}
                       </div>
                     )}
-                    <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                    <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
                       {(recipe.items || (recipe as { ingredients?: unknown[] }).ingredients || []).map((ri: any, index: number) => {
                         const itemId = ri.itemId || ri.ingredientId;
                         const item = ri.item || ri.ingredient;
 const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingredientId) === itemId) ||
                                         (costData as { items?: { itemId?: number }[] })?.items?.find((ci: any) => ci.itemId === itemId);
                         return (
-                          <div key={index} className="p-4 border rounded-lg bg-card">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
+                          <div key={index} className="rounded-md border bg-card/70 px-3 py-2">
+                            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-medium">
                                   {itemId ? (
                                     <Link
                                       href={`/items/${itemId}`}
-                                      className="font-medium text-primary hover:underline"
+                                      className="text-primary hover:underline"
                                     >
                                       {item?.name || `Item ${itemId}`}
                                     </Link>
                                   ) : (
-                                    <span className="font-medium">{item?.name || `Item ${itemId}`}</span>
+                                    <span>{item?.name || `Item ${itemId}`}</span>
                                   )}
                                 </div>
-                                <div className="text-sm text-muted-foreground mb-2">
+                                <div className="text-xs text-muted-foreground">
                                   {ri.quantity} {ri.unit}
+                                  {costItem && (costItem as { hasPrice?: boolean }).hasPrice && (
+                                    <>
+                                      {" · "}
+                                      {formatCurrency((costItem as { unitPrice?: number }).unitPrice ?? 0)}/{ri.unit}
+                                    </>
+                                  )}
                                 </div>
-                                {costItem && (costItem as { hasPrice?: boolean }).hasPrice && (
-                                  <div className="text-sm text-muted-foreground">
-                                    {formatCurrency((costItem as { unitPrice?: number }).unitPrice ?? 0)}/{ri.unit} • {formatCurrency((costItem as { totalCost?: number }).totalCost ?? 0)} total
-                                  </div>
-                                )}
-                                {costItem && !(costItem as { hasPrice?: boolean }).hasPrice && (
-                                  <div className="text-xs text-muted-foreground">
-                                    No price data available
-                                  </div>
+                              </div>
+                              <div className="text-right text-xs">
+                                {costItem && (costItem as { hasPrice?: boolean }).hasPrice ? (
+                                  <>
+                                    <div className="font-medium">
+                                      {formatCurrency((costItem as { totalCost?: number }).totalCost ?? 0)}
+                                    </div>
+                                    <div className="text-muted-foreground">total</div>
+                                  </>
+                                ) : (
+                                  <div className="text-muted-foreground">No price</div>
                                 )}
                               </div>
                             </div>
@@ -902,19 +984,19 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity (servings) *</Label>
+              <Label htmlFor="quantity">Quantity to produce *</Label>
               <Input
                 id="quantity"
                 type="number"
-                min="1"
-                step="1"
+                min="0.000001"
+                step="0.01"
                 value={produceQuantity}
                 onChange={(e) => setProduceQuantity(e.target.value)}
                 placeholder="1"
                 required
               />
               <p className="text-xs text-muted-foreground">
-                Recipe serving size: {recipe?.servingSize || 1}
+                Recipe output quantity: {recipe?.outputQuantity ?? recipe?.servingSize ?? 1} {recipe?.unit || "unit"}
               </p>
             </div>
             <div className="space-y-2">
@@ -968,10 +1050,21 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
                 <Label className="text-sm font-semibold">Items to be deducted:</Label>
                 <div className="mt-2 space-y-2">
                   {(recipe.items || (recipe as { ingredients?: unknown[] }).ingredients || []).map((ri: any, idx: number) => {
-                    const multiplier = (parseFloat(produceQuantity) || 0) / (recipe?.servingSize || 1);
-                    const quantityToDeduct = ri.quantity * multiplier;
+                    const multiplier =
+                      (parseFloat(produceQuantity) || 0) /
+                      ((recipe?.outputQuantity ?? recipe?.servingSize) || 1);
                     const item = ri.item || ri.ingredient;
                     const itemId = ri.itemId || ri.ingredientId;
+                    const sourceUnitId = ri.unitId ?? ri.unit_id ?? null;
+                    const targetUnitId = item?.unitId ?? item?.unit_id ?? sourceUnitId;
+                    const quantityResult = convertQuantityWithContext(
+                      ri.quantity * multiplier,
+                      sourceUnitId,
+                      targetUnitId,
+                      unitConversionContext
+                    );
+                    const quantityToDeduct = quantityResult.quantity;
+                    const displayUnit = item?.unit || ri.unit;
                     const availableStock = itemId ? (stockLevelMap.get(itemId) || 0) : 0;
                     const hasEnough = availableStock >= quantityToDeduct;
                     const isOutOfStock = availableStock === 0;
@@ -1000,16 +1093,21 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
                         </div>
                         <div className="mt-1 ml-6 space-y-1">
                           <div className="text-xs">
-                            Required: <span className="font-medium">{quantityToDeduct.toFixed(2)} {ri.unit}</span>
+                            Required: <span className="font-medium">{quantityToDeduct.toFixed(2)} {displayUnit}</span>
                           </div>
                           <div className={`text-xs ${hasEnough ? 'text-muted-foreground' : 'text-destructive font-medium'}`}>
-                            Available: {availableStock.toFixed(2)} {ri.unit}
+                            Available: {availableStock.toFixed(2)} {displayUnit}
                             {!hasEnough && (
                               <span className="ml-2">
                                 ({isOutOfStock ? 'Out of stock' : `Need ${(quantityToDeduct - availableStock).toFixed(2)} more`})
                               </span>
                             )}
                           </div>
+                          {quantityResult.warning && (
+                            <div className="text-xs text-amber-700 dark:text-amber-400">
+                              Conversion warning: {quantityResult.warning.detail}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -1026,6 +1124,15 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
                         <div key={idx}>
                           • {issue.itemName}: Need {issue.required.toFixed(2)} {issue.unit}, but only {issue.available.toFixed(2)} {issue.unit} available
                         </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {stockAvailability.warnings.length > 0 && (
+                  <div className="mt-3 p-3 bg-amber-100/70 border border-amber-300 rounded-lg dark:bg-amber-900/30 dark:border-amber-800">
+                    <div className="text-xs text-amber-800 dark:text-amber-200 space-y-1">
+                      {stockAvailability.warnings.map((warning, idx) => (
+                        <div key={idx}>- {warning}</div>
                       ))}
                     </div>
                   </div>

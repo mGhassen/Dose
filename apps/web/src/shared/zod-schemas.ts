@@ -730,6 +730,7 @@ export const markPersonnelHourEntryPaidSchema = z.object({
   isPaid: z.boolean(),
   paidDate: z.string().optional(),
   category: z.string().optional(),
+  amount: z.number().positive().optional(),
 });
 export type MarkPersonnelHourEntryPaidInput = z.infer<typeof markPersonnelHourEntryPaidSchema>;
 
@@ -933,6 +934,7 @@ export const createRecipeSchema = z.object({
   unit: z.string().nullish(),
   unitId: z.number().nullish(),
   category: z.string().trim().min(1, "Category is required"),
+  outputQuantity: z.number().nullish(),
   servingSize: z.number().nullish(),
   preparationTime: z.number().nullish(),
   cookingTime: z.number().nullish(),

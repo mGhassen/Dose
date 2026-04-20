@@ -62,6 +62,48 @@ WHERE v.type = 'unit' AND v.payload->>'symbol' = 'g'
   AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'mg')
 LIMIT 1;
 INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
+SELECT 'Microgram', 'unit', 0.000001, NULL, NULL, NULL, NULL, true,
+  jsonb_build_object('symbol','mcg','dimension','mass','base_unit_id', v.id)
+FROM variables v
+WHERE v.type = 'unit' AND v.payload->>'symbol' = 'g'
+  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'mcg')
+LIMIT 1;
+INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
+SELECT 'Centigram', 'unit', 0.01, NULL, NULL, NULL, NULL, true,
+  jsonb_build_object('symbol','cg','dimension','mass','base_unit_id', v.id)
+FROM variables v
+WHERE v.type = 'unit' AND v.payload->>'symbol' = 'g'
+  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'cg')
+LIMIT 1;
+INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
+SELECT 'Decigram', 'unit', 0.1, NULL, NULL, NULL, NULL, true,
+  jsonb_build_object('symbol','dg','dimension','mass','base_unit_id', v.id)
+FROM variables v
+WHERE v.type = 'unit' AND v.payload->>'symbol' = 'g'
+  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'dg')
+LIMIT 1;
+INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
+SELECT 'Decagram', 'unit', 10, NULL, NULL, NULL, NULL, true,
+  jsonb_build_object('symbol','dag','dimension','mass','base_unit_id', v.id)
+FROM variables v
+WHERE v.type = 'unit' AND v.payload->>'symbol' = 'g'
+  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'dag')
+LIMIT 1;
+INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
+SELECT 'Hectogram', 'unit', 100, NULL, NULL, NULL, NULL, true,
+  jsonb_build_object('symbol','hg','dimension','mass','base_unit_id', v.id)
+FROM variables v
+WHERE v.type = 'unit' AND v.payload->>'symbol' = 'g'
+  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'hg')
+LIMIT 1;
+INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
+SELECT 'Tonne', 'unit', 1000000, NULL, NULL, NULL, NULL, true,
+  jsonb_build_object('symbol','t','dimension','mass','base_unit_id', v.id)
+FROM variables v
+WHERE v.type = 'unit' AND v.payload->>'symbol' = 'g'
+  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 't')
+LIMIT 1;
+INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
 SELECT 'Milliliter', 'unit', 0.001, NULL, NULL, NULL, NULL, true,
   jsonb_build_object('symbol','mL','dimension','volume','base_unit_id', v.id)
 FROM variables v
@@ -69,46 +111,53 @@ WHERE v.type = 'unit' AND v.payload->>'symbol' = 'L'
   AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'mL')
 LIMIT 1;
 INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
+SELECT 'Microliter', 'unit', 0.000001, NULL, NULL, NULL, NULL, true,
+  jsonb_build_object('symbol','uL','dimension','volume','base_unit_id', v.id)
+FROM variables v
+WHERE v.type = 'unit' AND v.payload->>'symbol' = 'L'
+  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'uL')
+LIMIT 1;
+INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
+SELECT 'Centiliter', 'unit', 0.01, NULL, NULL, NULL, NULL, true,
+  jsonb_build_object('symbol','cL','dimension','volume','base_unit_id', v.id)
+FROM variables v
+WHERE v.type = 'unit' AND v.payload->>'symbol' = 'L'
+  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'cL')
+LIMIT 1;
+INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
+SELECT 'Deciliter', 'unit', 0.1, NULL, NULL, NULL, NULL, true,
+  jsonb_build_object('symbol','dL','dimension','volume','base_unit_id', v.id)
+FROM variables v
+WHERE v.type = 'unit' AND v.payload->>'symbol' = 'L'
+  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'dL')
+LIMIT 1;
+INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
+SELECT 'Teaspoon', 'unit', 0.005, NULL, NULL, NULL, NULL, true,
+  jsonb_build_object('symbol','tsp','dimension','volume','base_unit_id', v.id)
+FROM variables v
+WHERE v.type = 'unit' AND v.payload->>'symbol' = 'L'
+  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'tsp')
+LIMIT 1;
+INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
+SELECT 'Tablespoon', 'unit', 0.015, NULL, NULL, NULL, NULL, true,
+  jsonb_build_object('symbol','tbsp','dimension','volume','base_unit_id', v.id)
+FROM variables v
+WHERE v.type = 'unit' AND v.payload->>'symbol' = 'L'
+  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'tbsp')
+LIMIT 1;
+INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
+SELECT 'Cup', 'unit', 0.25, NULL, NULL, NULL, NULL, true,
+  jsonb_build_object('symbol','cup','dimension','volume','base_unit_id', v.id)
+FROM variables v
+WHERE v.type = 'unit' AND v.payload->>'symbol' = 'L'
+  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'cup')
+LIMIT 1;
+INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
 SELECT 'Piece', 'unit', 1, NULL, NULL, NULL, NULL, true,
   jsonb_build_object('symbol','piece','dimension','count','base_unit_id', v.id)
 FROM variables v
 WHERE v.type = 'unit' AND v.payload->>'symbol' = 'unit'
   AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'piece')
-LIMIT 1;
-INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
-SELECT 'Box', 'unit', 1, NULL, NULL, NULL, NULL, true,
-  jsonb_build_object('symbol','box','dimension','count','base_unit_id', v.id)
-FROM variables v
-WHERE v.type = 'unit' AND v.payload->>'symbol' = 'unit'
-  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'box')
-LIMIT 1;
-INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
-SELECT 'Can', 'unit', 1, NULL, NULL, NULL, NULL, true,
-  jsonb_build_object('symbol','can','dimension','count','base_unit_id', v.id)
-FROM variables v
-WHERE v.type = 'unit' AND v.payload->>'symbol' = 'unit'
-  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'can')
-LIMIT 1;
-INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
-SELECT 'Bottle', 'unit', 1, NULL, NULL, NULL, NULL, true,
-  jsonb_build_object('symbol','bottle','dimension','count','base_unit_id', v.id)
-FROM variables v
-WHERE v.type = 'unit' AND v.payload->>'symbol' = 'unit'
-  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'bottle')
-LIMIT 1;
-INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
-SELECT 'Pack', 'unit', 1, NULL, NULL, NULL, NULL, true,
-  jsonb_build_object('symbol','pack','dimension','count','base_unit_id', v.id)
-FROM variables v
-WHERE v.type = 'unit' AND v.payload->>'symbol' = 'unit'
-  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'pack')
-LIMIT 1;
-INSERT INTO variables (name, type, value, unit, effective_date, end_date, description, is_active, payload)
-SELECT 'Bag', 'unit', 1, NULL, NULL, NULL, NULL, true,
-  jsonb_build_object('symbol','bag','dimension','count','base_unit_id', v.id)
-FROM variables v
-WHERE v.type = 'unit' AND v.payload->>'symbol' = 'unit'
-  AND NOT EXISTS (SELECT 1 FROM variables WHERE type = 'unit' AND payload->>'symbol' = 'bag')
 LIMIT 1;
 
 -- ============================================================================

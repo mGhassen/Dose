@@ -3,15 +3,22 @@ import { StockMovementType, StockMovementReferenceType } from "@kit/types";
 import { getItemStock } from "@/lib/stock/get-item-stock";
 import { produceRecipe } from "@/lib/stock/produce-recipe";
 import { ensureRecipeForProduceOnSaleProduct } from "@/lib/recipes/ensure-recipe-for-produce-on-sale-product";
+import {
+  convertQuantityWithContext,
+  logUnitConversionWarning,
+} from "@/lib/units/convert";
+import { loadUnitConversionContext } from "@/lib/units/context";
 
 export type SaleStockLine = {
   itemId?: number;
   quantity: number;
+  unitId?: number;
 };
 
 export type PreloadedItem = {
   id: number;
   unit_id: number | null;
+  unit?: string | null;
   produced_from_recipe_id: number | null;
   affects_stock: boolean | null;
   produce_on_sale: boolean | null;
@@ -77,6 +84,7 @@ export async function replaceSaleStockMovements(
   const { saleId, movementDate, lines, preload } = params;
   const saleInstant = resolveSaleMovementInstant(movementDate);
   const productionInstant = instantOneMinuteBefore(saleInstant);
+  const conversionContext = await loadUnitConversionContext(supabase);
 
   const { error: delErr } = await supabase
     .from("stock_movements")
@@ -106,7 +114,7 @@ export async function replaceSaleStockMovements(
   };
   const directOutRows: MovementRow[] = [];
   const recipeLines: { line: SaleStockLine; recipe: PreloadedRecipe }[] = [];
-  const recipeBackedProductLines: { line: SaleStockLine; item: PreloadedItem }[] = [];
+  const recipeBackedProductLines: { line: SaleStockLine; item: PreloadedItem; recipe: PreloadedRecipe }[] = [];
 
   for (const l of lines) {
     if (!l.itemId || l.quantity <= 0) continue;
@@ -121,7 +129,7 @@ export async function replaceSaleStockMovements(
       const [itemResult, recipeResult] = await Promise.all([
         supabase
           .from("items")
-          .select("id, unit_id, produced_from_recipe_id, affects_stock, produce_on_sale")
+          .select("id, unit_id, unit, produced_from_recipe_id, affects_stock, produce_on_sale")
           .eq("id", l.itemId)
           .maybeSingle(),
         supabase.from("recipes").select("id, unit_id").eq("id", l.itemId).maybeSingle(),
@@ -150,7 +158,7 @@ export async function replaceSaleStockMovements(
         }
         const { data: refreshed, error: refErr } = await supabase
           .from("items")
-          .select("id, unit_id, produced_from_recipe_id, affects_stock, produce_on_sale")
+          .select("id, unit_id, unit, produced_from_recipe_id, affects_stock, produce_on_sale")
           .eq("id", item.id)
           .single();
         if (refErr || !refreshed) {
@@ -169,15 +177,30 @@ export async function replaceSaleStockMovements(
           await rollback();
           return { ok: false, message: resolved.message };
         }
-        recipeBackedProductLines.push({ line: l, item: effectiveItem });
+        recipeBackedProductLines.push({ line: l, item: effectiveItem, recipe: resolved.recipe });
         continue;
+      }
+
+      let quantityInItemUnit = l.quantity;
+      const sourceUnitId = l.unitId ?? effectiveItem.unit_id ?? null;
+      if (effectiveItem.unit_id != null && sourceUnitId != null) {
+        const quantityResult = convertQuantityWithContext(
+          l.quantity,
+          sourceUnitId,
+          effectiveItem.unit_id,
+          conversionContext
+        );
+        quantityInItemUnit = quantityResult.quantity;
+        if (quantityResult.warning) {
+          logUnitConversionWarning("replace-sale-stock-movements:direct-out", quantityResult.warning);
+        }
       }
 
       directOutRows.push({
         item_id: effectiveItem.id,
         movement_type: StockMovementType.OUT,
-        quantity: l.quantity,
-        unit: "unit",
+        quantity: quantityInItemUnit,
+        unit: effectiveItem.unit ?? "unit",
         unit_id: effectiveItem.unit_id ?? null,
         reference_type: StockMovementReferenceType.SALE,
         reference_id: saleId,
@@ -197,12 +220,39 @@ export async function replaceSaleStockMovements(
     }
   }
 
-  for (const { line: l, item } of recipeBackedProductLines) {
+  for (const { line: l, item, recipe } of recipeBackedProductLines) {
     const recipeId = item.produced_from_recipe_id!;
+    let requiredOutInItemUnit = l.quantity;
+    const lineUnitId = l.unitId ?? item.unit_id ?? null;
+    if (item.unit_id != null && lineUnitId != null) {
+      const quantityResult = convertQuantityWithContext(
+        l.quantity,
+        lineUnitId,
+        item.unit_id,
+        conversionContext
+      );
+      requiredOutInItemUnit = quantityResult.quantity;
+      if (quantityResult.warning) {
+        logUnitConversionWarning("replace-sale-stock-movements:recipe-backed-out", quantityResult.warning);
+      }
+    }
     const stock = await getItemStock(supabase, item.id, null);
-    if (stock < l.quantity) {
+    if (stock < requiredOutInItemUnit) {
+      let produceQuantity = requiredOutInItemUnit - stock;
+      if (recipe.unit_id != null && item.unit_id != null) {
+        const produceQuantityResult = convertQuantityWithContext(
+          produceQuantity,
+          item.unit_id,
+          recipe.unit_id,
+          conversionContext
+        );
+        produceQuantity = produceQuantityResult.quantity;
+        if (produceQuantityResult.warning) {
+          logUnitConversionWarning("replace-sale-stock-movements:recipe-production", produceQuantityResult.warning);
+        }
+      }
       const pr = await produceRecipe(supabase, String(recipeId), {
-        quantity: l.quantity - stock,
+        quantity: produceQuantity,
         location: null,
         notes: `Sale #${saleId}`,
         producedItemId: item.id,
@@ -216,8 +266,8 @@ export async function replaceSaleStockMovements(
     const { error: recipeMoveErr } = await supabase.from("stock_movements").insert({
       item_id: item.id,
       movement_type: StockMovementType.OUT,
-      quantity: l.quantity,
-      unit: "unit",
+      quantity: requiredOutInItemUnit,
+      unit: item.unit ?? "unit",
       unit_id: item.unit_id ?? null,
       reference_type: StockMovementReferenceType.SALE,
       reference_id: saleId,
@@ -233,7 +283,7 @@ export async function replaceSaleStockMovements(
   for (const { line: l, recipe } of recipeLines) {
     const { data: producedItem, error: producedErr } = await supabase
       .from("items")
-      .select("id, unit_id")
+      .select("id, unit_id, unit")
       .eq("produced_from_recipe_id", l.itemId!)
       .maybeSingle();
     if (producedErr) {
@@ -242,33 +292,101 @@ export async function replaceSaleStockMovements(
     }
     let producedItemId: number;
     let producedItemUnitId: number | null;
+    let producedItemUnit: string | null = producedItem?.unit ?? null;
     if (!producedItem) {
+      let produceQuantity = l.quantity;
+      if (l.unitId != null && recipe.unit_id != null) {
+        const produceQuantityResult = convertQuantityWithContext(
+          l.quantity,
+          l.unitId,
+          recipe.unit_id,
+          conversionContext
+        );
+        produceQuantity = produceQuantityResult.quantity;
+        if (produceQuantityResult.warning) {
+          logUnitConversionWarning("replace-sale-stock-movements:recipe-line-production", produceQuantityResult.warning);
+        }
+      }
       const result = await produceRecipe(supabase, String(l.itemId), {
-        quantity: l.quantity,
+        quantity: produceQuantity,
         location: null,
         notes: `Sale #${saleId}`,
         movementDate: productionInstant,
       });
       producedItemId = result.producedItemId;
-      producedItemUnitId = recipe.unit_id ?? null;
+      const { data: createdProducedItem, error: producedReloadErr } = await supabase
+        .from("items")
+        .select("id, unit_id, unit")
+        .eq("id", producedItemId)
+        .single();
+      if (producedReloadErr || !createdProducedItem) {
+        await rollback();
+        return {
+          ok: false,
+          message: producedReloadErr?.message ?? "Failed to load produced item after recipe production",
+        };
+      }
+      producedItemUnitId = createdProducedItem.unit_id ?? null;
+      producedItemUnit = createdProducedItem.unit ?? null;
     } else {
       producedItemId = producedItem.id;
       producedItemUnitId = producedItem.unit_id ?? null;
+      let requiredOutInItemUnit = l.quantity;
+      const lineUnitId = l.unitId ?? producedItem.unit_id ?? null;
+      if (lineUnitId != null && producedItem.unit_id != null) {
+        const quantityResult = convertQuantityWithContext(
+          l.quantity,
+          lineUnitId,
+          producedItem.unit_id,
+          conversionContext
+        );
+        requiredOutInItemUnit = quantityResult.quantity;
+        if (quantityResult.warning) {
+          logUnitConversionWarning("replace-sale-stock-movements:recipe-line-out", quantityResult.warning);
+        }
+      }
       const stock = await getItemStock(supabase, producedItem.id, null);
-      if (stock < l.quantity) {
+      if (stock < requiredOutInItemUnit) {
+        let produceQuantity = requiredOutInItemUnit - stock;
+        if (producedItem.unit_id != null && recipe.unit_id != null) {
+          const produceQuantityResult = convertQuantityWithContext(
+            produceQuantity,
+            producedItem.unit_id,
+            recipe.unit_id,
+            conversionContext
+          );
+          produceQuantity = produceQuantityResult.quantity;
+          if (produceQuantityResult.warning) {
+            logUnitConversionWarning("replace-sale-stock-movements:recipe-line-replenish", produceQuantityResult.warning);
+          }
+        }
         await produceRecipe(supabase, String(l.itemId), {
-          quantity: l.quantity - stock,
+          quantity: produceQuantity,
           location: null,
           notes: `Sale #${saleId}`,
           movementDate: productionInstant,
         });
       }
     }
+    let outQuantity = l.quantity;
+    const outUnitId = l.unitId ?? producedItemUnitId ?? null;
+    if (outUnitId != null && producedItemUnitId != null) {
+      const quantityResult = convertQuantityWithContext(
+        l.quantity,
+        outUnitId,
+        producedItemUnitId,
+        conversionContext
+      );
+      outQuantity = quantityResult.quantity;
+      if (quantityResult.warning) {
+        logUnitConversionWarning("replace-sale-stock-movements:recipe-out-insert", quantityResult.warning);
+      }
+    }
     const { error: recipeMoveErr } = await supabase.from("stock_movements").insert({
       item_id: producedItemId,
       movement_type: StockMovementType.OUT,
-      quantity: l.quantity,
-      unit: "unit",
+      quantity: outQuantity,
+      unit: producedItemUnit ?? "unit",
       unit_id: producedItemUnitId,
       reference_type: StockMovementReferenceType.SALE,
       reference_id: saleId,

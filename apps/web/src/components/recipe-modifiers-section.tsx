@@ -49,7 +49,7 @@ export function RecipeModifiersSection({ producedItemId, rows, onChange }: Props
   if (!producedItemId) {
     return (
       <div className="rounded-md border border-dashed bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
-        Select a produced item to configure its modifier quantities (e.g. Milk amount per serving).
+        Select a produced item to configure its modifier quantities (e.g. milk amount per output unit).
       </div>
     );
   }
@@ -188,11 +188,6 @@ function ListCard({
             {list.selectionType && (
               <Badge variant="outline" className="text-xs">
                 {list.selectionType}
-              </Badge>
-            )}
-            {(list.minSelected != null || list.maxSelected != null) && (
-              <Badge variant="outline" className="text-xs">
-                {list.minSelected ?? 0}–{list.maxSelected ?? "∞"}
               </Badge>
             )}
           </div>

@@ -104,12 +104,6 @@ export function useCreatePayment() {
             queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId] });
           }
 
-          if (entry.entryType === 'personnel_salary_payment') {
-            queryClient.invalidateQueries({
-              queryKey: ['personnel', entry.referenceId.toString(), 'salary-projections'],
-            });
-          }
-
           if (entry.entryType === 'expense') {
             queryClient.invalidateQueries({ queryKey: ['expenses', entry.referenceId.toString()] });
           }
@@ -174,12 +168,6 @@ export function useDeletePayment() {
               const subscriptionId = entry.referenceId.toString();
               queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId, 'projections'] });
               queryClient.invalidateQueries({ queryKey: ['subscriptions', subscriptionId] });
-            }
-
-            if (entry.entryType === 'personnel_salary_payment') {
-              queryClient.invalidateQueries({
-                queryKey: ['personnel', entry.referenceId.toString(), 'salary-projections'],
-              });
             }
 
             if (entry.entryType === 'expense') {

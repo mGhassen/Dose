@@ -365,6 +365,7 @@ export async function PUT(
           itemId: r.item_id ?? undefined,
           subscriptionId: r.subscription_id ?? undefined,
           quantity: parseFloat(r.quantity) || 0,
+          unitId: r.unit_id ?? undefined,
         })),
         movementDate: data.expense_date,
       });

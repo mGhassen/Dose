@@ -40,7 +40,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: `Recipe produced successfully. ${body.quantity} ${recipeData?.unit || 'serving'}(s) of ${recipeData?.name} added to stock.`,
+      message: `Recipe produced successfully. ${body.quantity} ${recipeData?.unit || "unit"} of ${recipeData?.name} added to stock.`,
       producedItem: {
         id: producedItem?.id,
         name: producedItem?.name,

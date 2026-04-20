@@ -132,6 +132,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('expenses')
       .select('*')
+      .order('expense_date', { ascending: false })
       .order('created_at', { ascending: false });
 
     if (startDate && endDate) {

@@ -43,8 +43,9 @@ export async function ensureRecipeForProduceOnSaleProduct(
       description:
         (item.description as string | null) ??
         `Auto-created production recipe for ${item.name}. Add ingredients to recipe_items.`,
-      unit: "serving",
+      unit: "unit",
       unit_id: item.unit_id ?? null,
+      output_quantity: 1,
       serving_size: 1,
       is_active: true,
       item_type: "recipe",

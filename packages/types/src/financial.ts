@@ -1126,6 +1126,7 @@ export interface Item {
   producibleEstimate?: number | null;
   /** Square catalog: parent row for a product with variations (not a sellable SKU). */
   isCatalogParent?: boolean;
+  outputQuantity?: number;
   servingSize?: number;
   preparationTime?: number;
   cookingTime?: number;
@@ -1201,6 +1202,7 @@ export interface Recipe {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  outputQuantity?: number;
   servingSize?: number;
   preparationTime?: number;
   cookingTime?: number;
@@ -1300,6 +1302,7 @@ export interface CreateRecipeData {
   unit?: string;
   unitId?: number;
   category?: string;
+  outputQuantity?: number;
   servingSize?: number;
   preparationTime?: number;
   cookingTime?: number;

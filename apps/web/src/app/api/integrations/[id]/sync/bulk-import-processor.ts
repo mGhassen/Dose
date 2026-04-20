@@ -115,13 +115,15 @@ function transformRecipeInsert(data: CreateRecipeInput): Record<string, unknown>
     producedItemId: data.producedItemId,
     producedItemIds: data.producedItemIds ?? undefined,
   });
+  const outputQuantity = data.outputQuantity ?? data.servingSize;
   const row: Record<string, unknown> = {
     name: data.name,
     description: data.description,
-    unit: data.unit || "serving",
+    unit: data.unit || "unit",
     category: data.category,
     item_type: "recipe",
-    serving_size: data.servingSize,
+    output_quantity: outputQuantity,
+    serving_size: outputQuantity,
     preparation_time: data.preparationTime,
     cooking_time: data.cookingTime,
     instructions: data.instructions,

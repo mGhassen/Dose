@@ -15,6 +15,7 @@ import {
 } from '@/lib/recipes/modifier-quantities';
 
 function transformRecipe(row: any): Recipe {
+  const outputQuantity = row.output_quantity ?? row.serving_size;
   return {
     id: row.id,
     name: row.name,
@@ -22,7 +23,8 @@ function transformRecipe(row: any): Recipe {
     unit: row.unit,
     unitId: row.unit_id,
     category: row.category,
-    servingSize: row.serving_size,
+    outputQuantity,
+    servingSize: outputQuantity,
     preparationTime: row.preparation_time,
     cookingTime: row.cooking_time,
     instructions: row.instructions,
@@ -34,13 +36,15 @@ function transformRecipe(row: any): Recipe {
 }
 
 function transformToSnakeCase(data: CreateRecipeData): any {
+  const outputQuantity = data.outputQuantity ?? data.servingSize;
   const result: any = {
     name: data.name,
     description: data.description,
-    unit: data.unit || 'serving',
+    unit: data.unit || "unit",
     category: data.category,
     item_type: 'recipe',
-    serving_size: data.servingSize,
+    output_quantity: outputQuantity,
+    serving_size: outputQuantity,
     preparation_time: data.preparationTime,
     cooking_time: data.cookingTime,
     instructions: data.instructions,

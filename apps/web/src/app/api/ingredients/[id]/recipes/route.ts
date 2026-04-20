@@ -14,7 +14,7 @@ export async function GET(
     // Get recipes that use this ingredient
     const { data: recipeIngredients, error } = await supabase
       .from('recipe_ingredients')
-      .select('recipe_id, quantity, unit, notes, recipe:recipes(id, name, description, serving_size, is_active)')
+      .select('recipe_id, quantity, unit, notes, recipe:recipes(id, name, description, output_quantity, serving_size, is_active)')
       .eq('ingredient_id', id)
       .order('recipe_id', { ascending: true });
 

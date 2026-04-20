@@ -88,7 +88,14 @@ async function paymentBankTxMap(
 async function ensureLoanPaymentExpense(
   supabase: ReturnType<typeof supabaseServer>,
   entryId: number,
-  paymentDate: string
+  payment: {
+    amount: number;
+    paymentDate: string;
+    paidDate?: string;
+    paymentMethod?: string;
+    notes?: string;
+    isPaid?: boolean;
+  }
 ): Promise<void> {
   try {
     const { data: entry } = await supabase
@@ -113,33 +120,79 @@ async function ensureLoanPaymentExpense(
 
     const { data: existing } = await supabase
       .from('expenses')
-      .select('id')
+      .select('id, name, amount, description, category, vendor, supplier_id, expense_date, is_active')
       .eq('loan_id', loanId)
       .eq('expense_type', 'loan')
       .eq('expense_date', expenseDate)
       .maybeSingle();
-    if (existing) return;
 
-    const { data: loan } = await supabase
-      .from('loans')
-      .select('name')
-      .eq('id', loanId)
-      .single();
+    let expenseRow = existing;
+    if (!expenseRow) {
+      const { data: loan } = await supabase
+        .from('loans')
+        .select('name')
+        .eq('id', loanId)
+        .single();
 
-    const amount = parseFloat(schedule.total_payment);
-    await supabase.from('expenses').insert({
-      name: `${loan?.name ?? 'Loan'} - Payment Month ${schedule.month}`,
-      category: 'loan_repayment',
-      expense_type: 'loan',
-      amount,
-      subtotal: amount,
-      total_tax: 0,
-      total_discount: 0,
-      loan_id: loanId,
-      expense_date: expenseDate,
-      start_date: expenseDate,
-      description: entry.description ?? null,
-      is_active: true,
+      const amount = parseFloat(schedule.total_payment);
+      const { data: insertedExpense } = await supabase.from('expenses').insert({
+        name: `${loan?.name ?? 'Loan'} - Payment Month ${schedule.month}`,
+        category: 'loan_repayment',
+        expense_type: 'loan',
+        amount,
+        subtotal: amount,
+        total_tax: 0,
+        total_discount: 0,
+        loan_id: loanId,
+        expense_date: expenseDate,
+        start_date: expenseDate,
+        description: entry.description ?? null,
+        is_active: true,
+      }).select('id, name, amount, description, category, vendor, supplier_id, expense_date, is_active').single();
+      expenseRow = insertedExpense;
+    }
+
+    if (!expenseRow || payment.isPaid === false) return;
+
+    const { data: expenseEntry } = await supabase
+      .from('entries')
+      .select('id')
+      .eq('entry_type', 'expense')
+      .eq('reference_id', expenseRow.id)
+      .maybeSingle();
+
+    let expenseEntryId = expenseEntry?.id ?? null;
+    if (expenseEntryId == null) {
+      const { data: createdExpenseEntry } = await supabase
+        .from('entries')
+        .insert({
+          direction: 'output',
+          entry_type: 'expense',
+          name: expenseRow.name ?? `Loan payment ${schedule.month}`,
+          amount: Number(expenseRow.amount),
+          description: expenseRow.description ?? null,
+          category: expenseRow.category ?? 'loan_repayment',
+          vendor: expenseRow.vendor ?? null,
+          supplier_id: expenseRow.supplier_id ?? null,
+          entry_date: expenseRow.expense_date ?? payment.paymentDate,
+          reference_id: expenseRow.id,
+          is_active: expenseRow.is_active ?? true,
+        })
+        .select('id')
+        .single();
+      expenseEntryId = createdExpenseEntry?.id ?? null;
+    }
+
+    if (expenseEntryId == null) return;
+    const paidDate = payment.paidDate ?? payment.paymentDate;
+    await supabase.from('payments').insert({
+      entry_id: expenseEntryId,
+      payment_date: payment.paymentDate,
+      amount: payment.amount,
+      is_paid: true,
+      paid_date: paidDate,
+      payment_method: payment.paymentMethod ?? null,
+      notes: payment.notes ?? null,
     });
   } catch (err) {
     console.error('Failed to ensure loan payment expense:', err);
@@ -149,7 +202,14 @@ async function ensureLoanPaymentExpense(
 async function ensureLeasingPaymentExpense(
   supabase: ReturnType<typeof supabaseServer>,
   entryId: number,
-  paymentDate: string
+  payment: {
+    amount: number;
+    paymentDate: string;
+    paidDate?: string;
+    paymentMethod?: string;
+    notes?: string;
+    isPaid?: boolean;
+  }
 ): Promise<void> {
   try {
     const { data: entry } = await supabase
@@ -174,33 +234,79 @@ async function ensureLeasingPaymentExpense(
 
     const { data: existing } = await supabase
       .from('expenses')
-      .select('id')
+      .select('id, name, amount, description, category, vendor, supplier_id, expense_date, is_active')
       .eq('leasing_id', leasingId)
       .eq('expense_type', 'leasing')
       .eq('expense_date', expenseDate)
       .maybeSingle();
-    if (existing) return;
 
-    const { data: leasing } = await supabase
-      .from('leasing_payments')
-      .select('name')
-      .eq('id', leasingId)
-      .single();
+    let expenseRow = existing;
+    if (!expenseRow) {
+      const { data: leasing } = await supabase
+        .from('leasing_payments')
+        .select('name')
+        .eq('id', leasingId)
+        .single();
 
-    const amount = parseFloat(timeline.amount);
-    await supabase.from('expenses').insert({
-      name: `${leasing?.name ?? 'Leasing'} - Payment ${timeline.month}`,
-      category: 'leasing',
-      expense_type: 'leasing',
-      amount,
-      subtotal: amount,
-      total_tax: 0,
-      total_discount: 0,
-      leasing_id: leasingId,
-      expense_date: expenseDate,
-      start_date: expenseDate,
-      description: entry.description ?? null,
-      is_active: true,
+      const amount = parseFloat(timeline.amount);
+      const { data: insertedExpense } = await supabase.from('expenses').insert({
+        name: `${leasing?.name ?? 'Leasing'} - Payment ${timeline.month}`,
+        category: 'leasing',
+        expense_type: 'leasing',
+        amount,
+        subtotal: amount,
+        total_tax: 0,
+        total_discount: 0,
+        leasing_id: leasingId,
+        expense_date: expenseDate,
+        start_date: expenseDate,
+        description: entry.description ?? null,
+        is_active: true,
+      }).select('id, name, amount, description, category, vendor, supplier_id, expense_date, is_active').single();
+      expenseRow = insertedExpense;
+    }
+
+    if (!expenseRow || payment.isPaid === false) return;
+
+    const { data: expenseEntry } = await supabase
+      .from('entries')
+      .select('id')
+      .eq('entry_type', 'expense')
+      .eq('reference_id', expenseRow.id)
+      .maybeSingle();
+
+    let expenseEntryId = expenseEntry?.id ?? null;
+    if (expenseEntryId == null) {
+      const { data: createdExpenseEntry } = await supabase
+        .from('entries')
+        .insert({
+          direction: 'output',
+          entry_type: 'expense',
+          name: expenseRow.name ?? `Leasing payment ${timeline.month}`,
+          amount: Number(expenseRow.amount),
+          description: expenseRow.description ?? null,
+          category: expenseRow.category ?? 'leasing',
+          vendor: expenseRow.vendor ?? null,
+          supplier_id: expenseRow.supplier_id ?? null,
+          entry_date: expenseRow.expense_date ?? payment.paymentDate,
+          reference_id: expenseRow.id,
+          is_active: expenseRow.is_active ?? true,
+        })
+        .select('id')
+        .single();
+      expenseEntryId = createdExpenseEntry?.id ?? null;
+    }
+
+    if (expenseEntryId == null) return;
+    const paidDate = payment.paidDate ?? payment.paymentDate;
+    await supabase.from('payments').insert({
+      entry_id: expenseEntryId,
+      payment_date: payment.paymentDate,
+      amount: payment.amount,
+      is_paid: true,
+      paid_date: paidDate,
+      payment_method: payment.paymentMethod ?? null,
+      notes: payment.notes ?? null,
     });
   } catch (err) {
     console.error('Failed to ensure leasing payment expense:', err);
@@ -403,8 +509,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await ensureLoanPaymentExpense(supabase, entryId, body.paymentDate);
-    await ensureLeasingPaymentExpense(supabase, entryId, body.paymentDate);
+    await ensureLoanPaymentExpense(supabase, entryId, {
+      amount: body.amount,
+      paymentDate: body.paymentDate,
+      paidDate: body.paidDate,
+      paymentMethod: body.paymentMethod,
+      notes: body.notes,
+      isPaid: body.isPaid,
+    });
+    await ensureLeasingPaymentExpense(supabase, entryId, {
+      amount: body.amount,
+      paymentDate: body.paymentDate,
+      paidDate: body.paidDate,
+      paymentMethod: body.paymentMethod,
+      notes: body.notes,
+      isPaid: body.isPaid,
+    });
 
     return NextResponse.json(
       transformPayment(data, body.bankTransactionId ?? null),

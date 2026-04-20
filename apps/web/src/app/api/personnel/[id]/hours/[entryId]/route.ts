@@ -122,11 +122,54 @@ export async function PUT(
 
     if (error) throw error;
 
-    if (existing.expense_id && existing.is_paid) {
+    if (existing.expense_id) {
+      const { data: personnel } = await supabase
+        .from('personnel')
+        .select('first_name, last_name')
+        .eq('id', id)
+        .maybeSingle();
+      const personName = personnel
+        ? `${personnel.first_name} ${personnel.last_name}`
+        : `Personnel #${id}`;
+      const expenseName = `Contractor hours — ${personName} (${update.start_date} -> ${update.end_date})`;
+
       await supabase
         .from('expenses')
-        .update({ amount: gross, subtotal: gross, total_tax: tax })
+        .update({
+          name: expenseName,
+          category: 'personnel',
+          amount: gross,
+          subtotal: gross,
+          total_tax: tax,
+          expense_date: update.start_date,
+          start_date: update.start_date,
+          description: update.notes ?? null,
+        })
         .eq('id', existing.expense_id);
+
+      await supabase
+        .from('expense_line_items')
+        .update({
+          quantity: hoursWorked,
+          unit_price: hourlyRate,
+          tax_rate_percent: taxRatePercent,
+          tax_amount: tax,
+          line_total: gross,
+        })
+        .eq('expense_id', existing.expense_id);
+
+      await supabase
+        .from('entries')
+        .update({
+          name: expenseName,
+          amount: gross,
+          description: update.notes ?? null,
+          category: 'personnel',
+          entry_date: update.start_date,
+          due_date: update.start_date,
+        })
+        .eq('entry_type', 'expense')
+        .eq('reference_id', existing.expense_id);
     }
 
     return NextResponse.json(transformHourEntry(data));

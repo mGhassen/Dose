@@ -1,6 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { StockMovementType, StockMovementReferenceType } from '@kit/types';
-import { convertQuantity, buildFactorMap } from '@/lib/units/convert';
+import {
+  convertQuantityWithContext,
+  logUnitConversionWarning,
+} from "@/lib/units/convert";
+import { loadUnitConversionContext } from "@/lib/units/context";
 
 export interface ProduceRecipeOptions {
   quantity: number;
@@ -28,10 +32,7 @@ export async function produceRecipe(
     producedItemName,
   } = options;
   const movementDate = movementDateOpt ?? new Date().toISOString();
-
-  const { data: unitVariables } = await supabase.from('variables').select('id, value').eq('type', 'unit');
-  const factorMap = buildFactorMap((unitVariables || []).map((u: any) => ({ id: u.id, factorToBase: parseFloat(u.value ?? 1) })));
-  const getFactor = (unitId: number) => factorMap.get(unitId);
+  const conversionContext = await loadUnitConversionContext(supabase);
 
   const { data: recipeData, error: recipeError } = await supabase
     .from('recipes')
@@ -46,8 +47,8 @@ export async function produceRecipe(
 
   const recipeItems = recipeData.items ?? [];
 
-  const servingSize = recipeData.serving_size || 1;
-  const multiplier = quantity / servingSize;
+  const outputQuantity = Number(recipeData.output_quantity ?? recipeData.serving_size) || 1;
+  const multiplier = quantity / outputQuantity;
 
   // IMPORTANT: only base ingredients (recipe_items) are deducted here.
   // Per-modifier quantities (recipe_modifier_quantities) are resolved at SALE time,
@@ -61,8 +62,20 @@ export async function produceRecipe(
     let quantityToDeduct = recipeItem.quantity * multiplier;
     const recipeUnitId = recipeItem.unit_id;
     const itemUnitId = item.unit_id;
-    if (recipeUnitId != null && itemUnitId != null && getFactor(recipeUnitId) != null && getFactor(itemUnitId) != null) {
-      quantityToDeduct = convertQuantity(quantityToDeduct, recipeUnitId, itemUnitId, (id) => getFactor(id));
+    if (recipeUnitId != null && itemUnitId != null) {
+      const quantityResult = convertQuantityWithContext(
+        quantityToDeduct,
+        recipeUnitId,
+        itemUnitId,
+        conversionContext
+      );
+      quantityToDeduct = quantityResult.quantity;
+      if (quantityResult.warning) {
+        logUnitConversionWarning(
+          "produce-recipe:ingredient-deduction",
+          quantityResult.warning
+        );
+      }
     }
 
     const movementUnit = item.unit || recipeItem.unit;
@@ -76,7 +89,7 @@ export async function produceRecipe(
       reference_id: Number(recipeId),
       location,
       movement_date: movementDate,
-      notes: `Used in recipe: ${recipeData.name} (${quantity} servings)${notes ? ` - ${notes}` : ''}`,
+      notes: `Used in recipe: ${recipeData.name} (${quantity} ${recipeData.unit || "units"})${notes ? ` - ${notes}` : ''}`,
     });
 
     if (movementError) throw movementError;
@@ -127,7 +140,7 @@ export async function produceRecipe(
         name,
         description: recipeData.description || `Produced from recipe: ${recipeData.name}`,
         category: recipeData.category,
-        unit: recipeData.unit || 'serving',
+        unit: recipeData.unit || "unit",
         unit_id: recipeData.unit_id,
         produced_from_recipe_id: Number(recipeId),
         item_types: ['product'],
@@ -143,12 +156,29 @@ export async function produceRecipe(
 
   if (!producedItem) throw new Error('Produced item not found');
 
+  let quantityToAdd = quantity;
+  if (recipeData.unit_id != null && producedItem.unit_id != null) {
+    const quantityResult = convertQuantityWithContext(
+      quantity,
+      recipeData.unit_id,
+      producedItem.unit_id,
+      conversionContext
+    );
+    quantityToAdd = quantityResult.quantity;
+    if (quantityResult.warning) {
+      logUnitConversionWarning(
+        "produce-recipe:produced-item",
+        quantityResult.warning
+      );
+    }
+  }
+
   const { error: inMovementError } = await supabase.from('stock_movements').insert({
     item_id: producedItem.id,
     movement_type: StockMovementType.IN,
-    quantity,
-    unit: recipeData.unit || 'serving',
-    unit_id: recipeData.unit_id,
+    quantity: quantityToAdd,
+    unit: producedItem.unit || recipeData.unit || "unit",
+    unit_id: producedItem.unit_id ?? recipeData.unit_id,
     reference_type: StockMovementReferenceType.RECIPE,
     reference_id: Number(recipeId),
     location,

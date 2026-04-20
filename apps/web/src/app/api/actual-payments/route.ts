@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import { replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
 
 export interface ActualPayment {
   id: number;
@@ -202,18 +203,47 @@ export async function POST(request: NextRequest) {
             line_total: subTotal,
             sort_order: 0,
           });
-        if (subscription.item_id != null) {
-          const { upsertCost } = await import('@/lib/items/price-history-upsert');
-          const costUnit =
-            taxRule.taxInclusive === true ? amount : subTotal;
-          await upsertCost(
-            supabase,
-            subscription.item_id,
-            body.paymentDate.split('T')[0] || body.paymentDate,
-            costUnit,
-            taxRule.taxInclusive === true
-          );
-        }
+          const { data: entryRow, error: entryError } = await supabase
+            .from('entries')
+            .insert({
+              direction: 'output',
+              entry_type: 'expense',
+              name: String(expenseRow.name || subscription.name || 'Subscription payment'),
+              amount,
+              description: expenseRow.description ?? null,
+              category: expenseRow.category ?? subscription.category ?? null,
+              vendor: expenseRow.vendor ?? subscription.vendor ?? null,
+              supplier_id: expenseRow.supplier_id ?? subscription.supplier_id ?? null,
+              entry_date: body.paymentDate,
+              reference_id: expenseRow.id,
+              is_active: true,
+            })
+            .select('id')
+            .single();
+
+          if (entryError) {
+            console.error('Error creating entry for subscription payment expense:', entryError);
+          } else if (entryRow?.id && (body.isPaid ?? true)) {
+            const paymentDate = (body.paidDate || body.paymentDate).split('T')[0] || body.paymentDate;
+            const { error: payErr } = await replacePaymentsForEntry(supabase, entryRow.id, [
+              { amount, paymentDate, notes: body.notes },
+            ]);
+            if (payErr) {
+              console.error('Error creating payment for subscription payment expense:', payErr);
+            }
+          }
+          if (subscription.item_id != null) {
+            const { upsertCost } = await import('@/lib/items/price-history-upsert');
+            const costUnit =
+              taxRule.taxInclusive === true ? amount : subTotal;
+            await upsertCost(
+              supabase,
+              subscription.item_id,
+              body.paymentDate.split('T')[0] || body.paymentDate,
+              costUnit,
+              taxRule.taxInclusive === true
+            );
+          }
         } else if (expenseError) {
           console.error('Error creating expense for subscription payment:', expenseError);
         }

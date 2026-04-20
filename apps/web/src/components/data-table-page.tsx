@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, ReactNode } from "react";
 import { Button } from "@kit/ui/button";
+import { Switch } from "@kit/ui/switch";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -412,6 +413,50 @@ export default function DataTablePage<T>({
   };
 
   useEffect(() => {
+    const applySortRules = (items: T[]): T[] => {
+      if (sortRules.length === 0) return items;
+      return [...items].sort((a: any, b: any) => {
+        for (const rule of sortRules) {
+          if (!rule.column) continue;
+
+          let aValue = a[rule.column];
+          let bValue = b[rule.column];
+
+          if (rule.column.includes('.')) {
+            const keys = rule.column.split('.');
+            aValue = keys.reduce((obj, key) => obj?.[key], a);
+            bValue = keys.reduce((obj, key) => obj?.[key], b);
+          }
+
+          if (
+            rule.column === 'created_at' ||
+            rule.column === 'updated_at' ||
+            rule.column === 'reported_at' ||
+            rule.column === 'expenseDate' ||
+            rule.column === 'expense_date' ||
+            rule.column === 'entryDate' ||
+            rule.column === 'entry_date'
+          ) {
+            aValue = new Date(aValue).getTime();
+            bValue = new Date(bValue).getTime();
+          }
+
+          if (aValue == null && bValue == null) continue;
+          if (aValue == null) return rule.direction === "asc" ? 1 : -1;
+          if (bValue == null) return rule.direction === "asc" ? -1 : 1;
+
+          if (typeof aValue === 'string' && typeof bValue === 'string') {
+            aValue = aValue.toLowerCase();
+            bValue = bValue.toLowerCase();
+          }
+
+          if (aValue < bValue) return rule.direction === "asc" ? -1 : 1;
+          if (aValue > bValue) return rule.direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    };
+
     // For server-side pagination, apply client-side filtering on the server-paginated data
     // (Backend doesn't support filtering yet, so we filter the already-paginated results)
     if (pagination) {
@@ -453,8 +498,8 @@ export default function DataTablePage<T>({
           filtered = filtered.filter((item: any) => applySingleFilter(item, filter));
         });
       }
-      
-      setFilteredData(filtered);
+
+      setFilteredData(applySortRules(filtered));
       return;
     }
 
@@ -506,42 +551,7 @@ export default function DataTablePage<T>({
       filtered = filtered.filter((item: any) => applySingleFilter(item, filter));
     });
 
-    if (sortRules.length > 0) {
-      filtered = [...filtered].sort((a: any, b: any) => {
-        for (const rule of sortRules) {
-          if (!rule.column) continue;
-          
-          let aValue = a[rule.column];
-          let bValue = b[rule.column];
-          
-          if (rule.column.includes('.')) {
-            const keys = rule.column.split('.');
-            aValue = keys.reduce((obj, key) => obj?.[key], a);
-            bValue = keys.reduce((obj, key) => obj?.[key], b);
-          }
-          
-          if (rule.column === 'created_at' || rule.column === 'updated_at' || rule.column === 'reported_at') {
-            aValue = new Date(aValue).getTime();
-            bValue = new Date(bValue).getTime();
-          }
-          
-          if (aValue == null && bValue == null) continue;
-          if (aValue == null) return rule.direction === "asc" ? 1 : -1;
-          if (bValue == null) return rule.direction === "asc" ? -1 : 1;
-          
-          if (typeof aValue === 'string' && typeof bValue === 'string') {
-            aValue = aValue.toLowerCase();
-            bValue = bValue.toLowerCase();
-          }
-          
-          if (aValue < bValue) return rule.direction === "asc" ? -1 : 1;
-          if (aValue > bValue) return rule.direction === "asc" ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-
-    setFilteredData(filtered);
+    setFilteredData(applySortRules(filtered));
   }, [data, searchTerm, sortRules, appliedFilters, searchFields, unifiedFilters, pagination]);
 
   useEffect(() => {
@@ -1044,22 +1054,15 @@ export default function DataTablePage<T>({
                                 <span className="text-sm text-muted-foreground">
                                   {rule.direction === "asc" ? tDataTable('sorting.ascending') : tDataTable('sorting.descending')}
                                 </span>
-                                <button
-                                  onClick={() => {
+                                <Switch
+                                  checked={rule.direction === "asc"}
+                                  onCheckedChange={(checked) => {
                                     const newRules = [...sortRules];
-                                    newRules[index].direction = rule.direction === "asc" ? "desc" : "asc";
+                                    newRules[index].direction = checked ? "asc" : "desc";
                                     setSortRules(newRules);
                                   }}
-                                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                                    rule.direction === "asc" ? "bg-primary" : "bg-muted"
-                                  }`}
-                                >
-                                  <span
-                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                                      rule.direction === "asc" ? "translate-x-5" : "translate-x-1"
-                                    }`}
-                                  />
-                                </button>
+                                  aria-label={`Toggle sort direction for ${sortColumns.find((c) => c.value === rule.column)?.label ?? rule.column}`}
+                                />
                               </div>
                               
                               <Button

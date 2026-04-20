@@ -216,7 +216,7 @@ export function useMarkPersonnelHourEntryPaid() {
     }: {
       personnelId: string;
       entryId: string;
-      data: { isPaid: boolean; paidDate?: string; category?: string };
+      data: { isPaid: boolean; paidDate?: string; category?: string; amount?: number };
     }) => personnelApi.markHourEntryPaid(personnelId, entryId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['personnel', variables.personnelId, 'hour-entries'] });

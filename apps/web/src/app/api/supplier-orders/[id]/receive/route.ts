@@ -6,6 +6,12 @@ import { supabaseServer } from '@kit/lib/supabase';
 import { ExpenseCategory, SupplierOrderStatus, StockMovementType, StockMovementReferenceType } from '@kit/types';
 import { getItemTotalStock } from '@/lib/stock/get-item-stock';
 import { getItemCostAsOf } from '@/lib/items/price-resolve';
+import {
+  convertQuantityWithContext,
+  convertUnitPriceWithContext,
+  logUnitConversionWarning,
+} from "@/lib/units/convert";
+import { loadUnitConversionContext } from "@/lib/units/context";
 
 interface ReceiveOrderData {
   actualDeliveryDate?: string;
@@ -28,6 +34,7 @@ export async function POST(
     if (!parsed.success) return parsed.response;
     const body = parsed.data as ReceiveOrderData;
     const supabase = supabaseServer();
+    const conversionContext = await loadUnitConversionContext(supabase);
     
     // Get order and items
     const { data: orderData, error: orderError } = await supabase
@@ -216,13 +223,57 @@ export async function POST(
       await createExpense(itemsToUse);
     }
 
+    const uniqueItemIds = [...new Set(orderData.items.map((item: any) => item.item_id).filter((v: unknown) => typeof v === "number"))] as number[];
+    const itemUnitMap = new Map<number, { unitId: number | null; unit: string | null }>();
+    if (uniqueItemIds.length > 0) {
+      const { data: itemRows, error: itemError } = await supabase
+        .from("items")
+        .select("id, unit_id, unit")
+        .in("id", uniqueItemIds);
+      if (itemError) throw itemError;
+      for (const row of itemRows || []) {
+        itemUnitMap.set(row.id, { unitId: row.unit_id ?? null, unit: row.unit ?? null });
+      }
+    }
+
     for (const receiveItem of body.items) {
       const orderItem = orderData.items.find((item: any) => item.id === receiveItem.itemId);
       if (!orderItem) continue;
 
       const itemId = orderItem.item_id;
       const receivedQty = parseFloat(String(receiveItem.receivedQuantity)) || 0;
-      const unitPrice = parseFloat(String(orderItem.unit_price)) || 0;
+      const unitPriceInOrderUnit = parseFloat(String(orderItem.unit_price)) || 0;
+      const orderUnitId = orderItem.unit_id ?? null;
+      const itemUnit = itemUnitMap.get(itemId);
+      const itemUnitId = itemUnit?.unitId ?? null;
+
+      let receivedQtyInItemUnit = receivedQty;
+      if (orderUnitId != null && itemUnitId != null) {
+        const quantityResult = convertQuantityWithContext(
+          receivedQty,
+          orderUnitId,
+          itemUnitId,
+          conversionContext
+        );
+        receivedQtyInItemUnit = quantityResult.quantity;
+        if (quantityResult.warning) {
+          logUnitConversionWarning("supplier-order-receive:received-quantity", quantityResult.warning);
+        }
+      }
+
+      let unitPriceInItemUnit = unitPriceInOrderUnit;
+      if (orderUnitId != null && itemUnitId != null) {
+        const priceResult = convertUnitPriceWithContext(
+          unitPriceInOrderUnit,
+          orderUnitId,
+          itemUnitId,
+          conversionContext
+        );
+        unitPriceInItemUnit = priceResult.unitPrice;
+        if (priceResult.warning) {
+          logUnitConversionWarning("supplier-order-receive:unit-price", priceResult.warning);
+        }
+      }
 
       const currentStock = await getItemTotalStock(supabase, itemId);
       const costResult = await getItemCostAsOf(supabase, itemId, effectiveDate);
@@ -240,8 +291,9 @@ export async function POST(
         .insert({
           item_id: orderItem.item_id,
           movement_type: StockMovementType.IN,
-          quantity: receiveItem.receivedQuantity,
-          unit: orderItem.unit,
+          quantity: receivedQtyInItemUnit,
+          unit: itemUnit?.unit ?? orderItem.unit,
+          unit_id: itemUnitId ?? orderUnitId,
           reference_type: StockMovementReferenceType.SUPPLIER_ORDER,
           reference_id: referenceId,
           location: receiveItem.location || null,
@@ -251,12 +303,12 @@ export async function POST(
 
       if (movementError) throw movementError;
 
-      if (receivedQty > 0) {
-        const totalQty = currentStock + receivedQty;
+      if (receivedQtyInItemUnit > 0) {
+        const totalQty = currentStock + receivedQtyInItemUnit;
         const newAvg =
           totalQty > 0
-            ? (currentStock * currentCost + receivedQty * unitPrice) / totalQty
-            : unitPrice;
+            ? (currentStock * currentCost + receivedQtyInItemUnit * unitPriceInItemUnit) / totalQty
+            : unitPriceInItemUnit;
 
         let taxInclusive = false;
         try {

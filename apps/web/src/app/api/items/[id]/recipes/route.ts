@@ -14,7 +14,7 @@ export async function GET(
     // Get recipes that use this item
     const { data: recipeItems, error } = await supabase
       .from('recipe_items')
-      .select('recipe_id, quantity, unit, notes, recipe:recipes(id, name, description, serving_size, is_active)')
+      .select('recipe_id, quantity, unit, notes, recipe:recipes(id, name, description, output_quantity, serving_size, is_active)')
       .eq('item_id', id)
       .order('recipe_id', { ascending: true });
 

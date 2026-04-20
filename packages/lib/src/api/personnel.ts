@@ -40,7 +40,7 @@ export const personnelApi = {
   markHourEntryPaid: (
     id: string,
     entryId: string,
-    data: { isPaid: boolean; paidDate?: string; category?: string }
+    data: { isPaid: boolean; paidDate?: string; category?: string; amount?: number }
   ) =>
     apiRequest<{ id: number; isPaid: boolean; paidDate?: string; expenseId?: number | null }>(
       'POST',

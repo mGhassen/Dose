@@ -39,7 +39,7 @@ function CreateRecipeForm() {
     description: "",
     category: "",
     categoryId: null as number | null,
-    servingSize: "",
+    outputQuantity: "",
     unitId: null as number | null,
     unit: "",
     producedItemId: null as number | null,
@@ -99,7 +99,7 @@ function CreateRecipeForm() {
         name: formData.name,
         description: formData.description || undefined,
         category: formData.category || undefined,
-        servingSize: formData.servingSize ? parseInt(formData.servingSize, 10) : undefined,
+        outputQuantity: formData.outputQuantity ? parseFloat(formData.outputQuantity) : undefined,
         unitId: formData.unitId ?? undefined,
         unit: formData.unit || undefined,
         producedItemId: formData.producedItemId ?? undefined,
@@ -221,15 +221,16 @@ function CreateRecipeForm() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="servingSize">Serving Size</Label>
+                        <Label htmlFor="outputQuantity">Output Quantity</Label>
                         <div className="flex gap-2">
                           <Input
-                            id="servingSize"
+                            id="outputQuantity"
                             type="number"
-                            min={1}
-                            value={formData.servingSize}
-                            onChange={(e) => handleInputChange("servingSize", e.target.value)}
-                            placeholder="4"
+                            min={0.000001}
+                            step="0.01"
+                            value={formData.outputQuantity}
+                            onChange={(e) => handleInputChange("outputQuantity", e.target.value)}
+                            placeholder="250"
                             className="w-24"
                           />
                           <UnifiedSelector

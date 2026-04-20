@@ -66,6 +66,12 @@ import { useDateFormat } from "@kit/hooks/use-date-format";
 import { DatePicker } from "@kit/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@kit/ui/dialog";
 import { InputGroupAttached } from "@/components/input-group";
+import {
+  Tooltip as UiTooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@kit/ui/tooltip";
 
 interface ItemDetailPageProps {
   params: Promise<{ id: string }>;
@@ -2237,11 +2243,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                                   )}
                                 </div>
                               </div>
-                              {(list.minSelected != null || list.maxSelected != null) && (
-                                <p className="text-xs text-muted-foreground">
-                                  Select {list.minSelected ?? 0}–{list.maxSelected ?? "∞"}
-                                </p>
-                              )}
                               {(() => {
                                 const usages = catalogInfo?.modifierListUsageByRecipe?.[list.id] ?? [];
                                 if (usages.length === 0) return null;
@@ -2269,7 +2270,25 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                                     key={m.id}
                                     className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 last:border-0 pb-1.5 last:pb-0"
                                   >
-                                    <span>
+                                    <span className="inline-flex items-center gap-2">
+                                      {m.supplyItemId != null && (
+                                        <TooltipProvider>
+                                          <UiTooltip>
+                                            <TooltipTrigger asChild>
+                                              <span className="inline-flex items-center">
+                                                <Checkbox
+                                                  checked={m.supplyItemAffectsStock}
+                                                  onCheckedChange={(checked) =>
+                                                    toggleModifierAffectsStock(m.supplyItemId!, checked === true)
+                                                  }
+                                                  aria-label="Affects stock"
+                                                />
+                                              </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Affects stock</TooltipContent>
+                                          </UiTooltip>
+                                        </TooltipProvider>
+                                      )}
                                       {m.name || "—"}
                                       {m.supplyItemId != null && (
                                         <span className="text-muted-foreground text-xs ml-2">
@@ -2284,17 +2303,6 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                                       )}
                                     </span>
                                     <div className="flex items-center gap-3">
-                                      {m.supplyItemId != null && (
-                                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-                                          <Switch
-                                            checked={m.supplyItemAffectsStock}
-                                            onCheckedChange={(checked) =>
-                                              toggleModifierAffectsStock(m.supplyItemId!, checked)
-                                            }
-                                          />
-                                          <span>Affects stock</span>
-                                        </label>
-                                      )}
                                       <span className="text-muted-foreground tabular-nums text-xs">
                                         {m.priceAmountCents != null
                                           ? formatCurrency(m.priceAmountCents / 100)

@@ -5,8 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
-import { buildFactorMap } from '@/lib/units/convert';
-import { resolveItemUnitCost, type GetFactor } from '@/lib/items/resolve-cost';
+import { resolveItemUnitCost } from "@/lib/items/resolve-cost";
+import { loadUnitConversionContext } from "@/lib/units/context";
 
 export async function GET(
   request: NextRequest,
@@ -15,18 +15,7 @@ export async function GET(
   try {
     const { id } = await params;
     const supabase = supabaseServer();
-
-    const { data: unitVariables } = await supabase
-      .from('variables')
-      .select('id, value')
-      .eq('type', 'unit');
-    const factorMap = buildFactorMap(
-      (unitVariables || []).map((u: { id: number; value: string }) => ({
-        id: u.id,
-        factorToBase: parseFloat(u.value ?? '1'),
-      }))
-    );
-    const getFactor: GetFactor = (unitId: number) => factorMap.get(unitId);
+    const conversionContext = await loadUnitConversionContext(supabase);
 
     const { data: recipeData, error: recipeError } = await supabase
       .from('recipes')
@@ -39,7 +28,7 @@ export async function GET(
       return NextResponse.json({ error: 'Recipe not found' }, { status: 404 });
     }
 
-    const servingSize = recipeData.serving_size || 1;
+    const outputQuantity = Number(recipeData.output_quantity ?? recipeData.serving_size) || 1;
 
     // Recipes may reference their own produced item via a modifier. Guard recursion
     // by seeding the "seen" set with the current recipe id.
@@ -60,7 +49,7 @@ export async function GET(
           supabase,
           itemId,
           ri.unit_id ?? null,
-          getFactor,
+          conversionContext,
           seen
         );
         return {
@@ -161,7 +150,7 @@ export async function GET(
           supabase,
           mod.item_id,
           recipeUnitId,
-          getFactor,
+          conversionContext,
           seen
         );
         unitPrice = resolved.unitPrice;
@@ -214,8 +203,10 @@ export async function GET(
       totalCost: totalCostDefault,
       totalCostMin,
       totalCostMax,
-      costPerServing: servingSize > 0 ? totalCostDefault / servingSize : totalCostDefault,
-      servingSize,
+      costPerOutputUnit: outputQuantity > 0 ? totalCostDefault / outputQuantity : totalCostDefault,
+      outputQuantity,
+      costPerServing: outputQuantity > 0 ? totalCostDefault / outputQuantity : totalCostDefault,
+      servingSize: outputQuantity,
       baseCost,
       ingredients: itemCosts,
       items: itemCosts,

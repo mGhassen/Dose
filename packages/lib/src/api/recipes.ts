@@ -24,6 +24,8 @@ export const recipesApi = {
       totalCost: number;
       totalCostMin: number;
       totalCostMax: number;
+      costPerOutputUnit: number;
+      outputQuantity: number;
       costPerServing: number;
       servingSize: number;
       baseCost: number;

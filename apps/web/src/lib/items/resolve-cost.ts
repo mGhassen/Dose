@@ -3,7 +3,7 @@
  *
  * Order of resolution:
  *  1. If the item is `produced_from_recipe_id`-linked AND that recipe can be fully priced,
- *     return the recipe's per-unit cost (sum of ingredient costs divided by serving_size,
+ *     return the recipe's per-unit cost (sum of ingredient costs divided by output_quantity,
  *     converted into the requested target unit). Recursion is guarded by `seenRecipeIds`.
  *  2. Otherwise, fall back to recent `supplier_order_items` (last 3 months).
  *  3. Otherwise, fall back to `item_cost_history` via `getItemCostAsOf`.
@@ -13,10 +13,13 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { convertQuantity } from '@/lib/units/convert';
+import {
+  convertQuantityWithContext,
+  convertUnitPriceWithContext,
+  logUnitConversionWarning,
+  type UnitConversionContext,
+} from "@/lib/units/convert";
 import { getItemCostAsOf } from '@/lib/items/price-resolve';
-
-export type GetFactor = (unitId: number) => number | undefined;
 
 export interface ResolvedItemCost {
   unitPrice: number;
@@ -44,13 +47,13 @@ async function loadItem(
 }
 
 /**
- * Compute the per-serving-unit cost of a recipe: sum(recipe_items cost) / serving_size.
+ * Compute the per-output-unit cost of a recipe: sum(recipe_items cost) / output_quantity.
  * Returns null if any ingredient is missing a price (recipe is "not fully priced").
  */
 async function computeRecipeUnitCost(
   supabase: SupabaseClient,
   recipeId: number,
-  getFactor: GetFactor,
+  conversionContext: UnitConversionContext,
   seenRecipeIds: Set<number>
 ): Promise<{ unitCostInRecipeUnit: number; recipeUnitId: number | null } | null> {
   if (seenRecipeIds.has(recipeId)) return null;
@@ -59,13 +62,13 @@ async function computeRecipeUnitCost(
 
   const { data: recipe } = await supabase
     .from('recipes')
-    .select('id, serving_size, unit_id, items:recipe_items(*, item:items(*))')
+    .select('id, output_quantity, serving_size, unit_id, items:recipe_items(*, item:items(*))')
     .eq('id', recipeId)
     .maybeSingle();
 
   if (!recipe || !recipe.items || recipe.items.length === 0) return null;
 
-  const servingSize = Number(recipe.serving_size) || 1;
+  const outputQuantity = Number(recipe.output_quantity ?? recipe.serving_size) || 1;
   let total = 0;
 
   for (const ri of recipe.items) {
@@ -75,7 +78,7 @@ async function computeRecipeUnitCost(
       supabase,
       itemId,
       ri.unit_id ?? null,
-      getFactor,
+      conversionContext,
       nextSeen
     );
     if (!resolved.hasPrice) return null;
@@ -83,7 +86,7 @@ async function computeRecipeUnitCost(
   }
 
   return {
-    unitCostInRecipeUnit: total / servingSize,
+    unitCostInRecipeUnit: total / outputQuantity,
     recipeUnitId: recipe.unit_id ?? null,
   };
 }
@@ -96,7 +99,7 @@ export async function resolveItemUnitCost(
   supabase: SupabaseClient,
   itemId: number,
   targetUnitId: number | null,
-  getFactor: GetFactor,
+  conversionContext: UnitConversionContext,
   seenRecipeIds: Set<number> = new Set()
 ): Promise<ResolvedItemCost> {
   const item = await loadItem(supabase, itemId);
@@ -106,19 +109,23 @@ export async function resolveItemUnitCost(
     const recipeCost = await computeRecipeUnitCost(
       supabase,
       item.produced_from_recipe_id,
-      getFactor,
+      conversionContext,
       seenRecipeIds
     );
     if (recipeCost) {
       const { unitCostInRecipeUnit, recipeUnitId } = recipeCost;
       let unitPrice = unitCostInRecipeUnit;
-      if (
-        targetUnitId != null &&
-        recipeUnitId != null &&
-        getFactor(targetUnitId) != null &&
-        getFactor(recipeUnitId) != null
-      ) {
-        unitPrice = unitCostInRecipeUnit * (getFactor(recipeUnitId)! / getFactor(targetUnitId)!);
+      if (targetUnitId != null && recipeUnitId != null) {
+        const priceResult = convertUnitPriceWithContext(
+          unitCostInRecipeUnit,
+          recipeUnitId,
+          targetUnitId,
+          conversionContext
+        );
+        unitPrice = priceResult.unitPrice;
+        if (priceResult.warning) {
+          logUnitConversionWarning("resolve-item-cost:recipe", priceResult.warning);
+        }
       }
       return { unitPrice, hasPrice: unitPrice > 0, source: 'recipe' };
     }
@@ -134,20 +141,32 @@ export async function resolveItemUnitCost(
     .order('created_at', { ascending: false })
     .limit(10);
 
-  if (orderItems && orderItems.length > 0 && targetUnitId != null && getFactor(targetUnitId) != null) {
+  if (orderItems && orderItems.length > 0 && targetUnitId != null) {
     let totalValueInTargetUnit = 0;
     let totalQtyInTargetUnit = 0;
     for (const oi of orderItems) {
       const orderQty = parseFloat(oi.quantity);
       const orderUnitId = oi.unit_id as number | null;
-      const qtyInTargetUnit =
-        orderUnitId != null && getFactor(orderUnitId) != null
-          ? convertQuantity(orderQty, orderUnitId, targetUnitId, getFactor)
-          : orderQty;
-      const pricePerTargetUnit =
-        orderUnitId != null && getFactor(orderUnitId) != null
-          ? parseFloat(oi.unit_price) * (getFactor(orderUnitId)! / getFactor(targetUnitId)!)
-          : parseFloat(oi.unit_price);
+      const qtyResult = convertQuantityWithContext(
+        orderQty,
+        orderUnitId,
+        targetUnitId,
+        conversionContext
+      );
+      const qtyInTargetUnit = qtyResult.quantity;
+      if (qtyResult.warning) {
+        logUnitConversionWarning("resolve-item-cost:order-quantity", qtyResult.warning);
+      }
+      const priceResult = convertUnitPriceWithContext(
+        parseFloat(oi.unit_price),
+        orderUnitId,
+        targetUnitId,
+        conversionContext
+      );
+      const pricePerTargetUnit = priceResult.unitPrice;
+      if (priceResult.warning) {
+        logUnitConversionWarning("resolve-item-cost:order-price", priceResult.warning);
+      }
       totalValueInTargetUnit += qtyInTargetUnit * pricePerTargetUnit;
       totalQtyInTargetUnit += qtyInTargetUnit;
     }
@@ -178,13 +197,17 @@ export async function resolveItemUnitCost(
   if (hist.unitCost != null && hist.unitCost > 0) {
     let unitPrice = hist.unitCost;
     const itemUnitId = item.unit_id;
-    if (
-      targetUnitId != null &&
-      itemUnitId != null &&
-      getFactor(targetUnitId) != null &&
-      getFactor(itemUnitId) != null
-    ) {
-      unitPrice = hist.unitCost * (getFactor(itemUnitId)! / getFactor(targetUnitId)!);
+    if (targetUnitId != null && itemUnitId != null) {
+      const priceResult = convertUnitPriceWithContext(
+        hist.unitCost,
+        itemUnitId,
+        targetUnitId,
+        conversionContext
+      );
+      unitPrice = priceResult.unitPrice;
+      if (priceResult.warning) {
+        logUnitConversionWarning("resolve-item-cost:history", priceResult.warning);
+      }
     }
     return { unitPrice, hasPrice: unitPrice > 0, source: 'history' };
   }

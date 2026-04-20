@@ -11,7 +11,8 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Badge } from "@kit/ui/badge";
-import { Trash2, Package, Truck, Edit } from "lucide-react";
+import { Checkbox } from "@kit/ui/checkbox";
+import { Trash2, Package, Truck, Edit, Plus } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useSupplierOrderById, useUpdateSupplierOrder, useDeleteSupplierOrder, useReceiveSupplierOrder } from "@kit/hooks";
 import { toast } from "sonner";
@@ -29,10 +30,29 @@ import {
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { SupplierOrderEditorDrawer } from "../_components/supplier-order-editor-drawer";
 import type { SupplierOrderEditorSubmit } from "../_components/supplier-order-editor";
+import {
+  DocumentPaymentSlicesEditor,
+  defaultPaymentSliceRows,
+  rowsToPaymentSlices,
+  type DocumentPaymentSliceRow,
+} from "@/components/document-payment-slices-editor";
 
 interface SupplierOrderDetailPageProps {
   params: Promise<{ id: string }>;
 }
+
+type SupplierOrderPaymentsSummary = {
+  totalAmount: number;
+  totalPaid: number;
+  remainingAmount: number;
+  payments: Array<{
+    id: number;
+    amount: number;
+    paymentDate: string;
+    paidDate?: string | null;
+    notes?: string | null;
+  }>;
+};
 
 export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailPageProps) {
   const router = useRouter();
@@ -43,6 +63,13 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
   const [autoReceiveHandled, setAutoReceiveHandled] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [markPaidOnReceive, setMarkPaidOnReceive] = useState(false);
+  const [receivePaymentRows, setReceivePaymentRows] = useState<DocumentPaymentSliceRow[]>([]);
+  const [addPaymentDialogOpen, setAddPaymentDialogOpen] = useState(false);
+  const [addPaymentRows, setAddPaymentRows] = useState<DocumentPaymentSliceRow[]>([]);
+  const [savingOrderPayments, setSavingOrderPayments] = useState(false);
+  const [orderPayments, setOrderPayments] = useState<SupplierOrderPaymentsSummary | null>(null);
+  const [loadingOrderPayments, setLoadingOrderPayments] = useState(false);
   const { data: order, isLoading } = useSupplierOrderById(resolvedParams?.id || "");
   const updateOrder = useUpdateSupplierOrder();
   const deleteMutation = useDeleteSupplierOrder();
@@ -73,6 +100,62 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
     setReceiveDialogOpen(true);
     router.replace(`/supplier-orders/${order.id}`);
   }, [shouldAutoReceive, autoReceiveHandled, order, router]);
+
+  const loadSupplierOrderPayments = async () => {
+    if (!resolvedParams?.id) return;
+    setLoadingOrderPayments(true);
+    try {
+      const response = await fetch(`/api/supplier-orders/${resolvedParams.id}/payments`);
+      if (!response.ok) {
+        setOrderPayments(null);
+        return;
+      }
+      const data = (await response.json()) as SupplierOrderPaymentsSummary;
+      setOrderPayments(data);
+    } catch {
+      setOrderPayments(null);
+    } finally {
+      setLoadingOrderPayments(false);
+    }
+  };
+
+  const saveSupplierOrderPayments = async (rows: DocumentPaymentSliceRow[]) => {
+    if (!resolvedParams?.id) return;
+    const slices = rowsToPaymentSlices(rows);
+    if (!slices || slices.length === 0) {
+      toast.error("Each payment needs a positive amount and date");
+      return;
+    }
+    setSavingOrderPayments(true);
+    try {
+      const response = await fetch(`/api/supplier-orders/${resolvedParams.id}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentSlices: slices }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error((body as { error?: string; details?: string }).details || (body as { error?: string }).error || "Failed to save payments");
+      }
+      await loadSupplierOrderPayments();
+      toast.success("Payments saved");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to save payments");
+      throw error;
+    } finally {
+      setSavingOrderPayments(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!resolvedParams?.id || !order) return;
+    if (order.status !== SupplierOrderStatus.DELIVERED) {
+      setOrderPayments(null);
+      return;
+    }
+    loadSupplierOrderPayments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedParams?.id, order?.status]);
 
   const handleSaveEdit = async (payload: SupplierOrderEditorSubmit) => {
     if (!resolvedParams?.id) return;
@@ -122,6 +205,10 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
         return;
       }
     }
+    if (markPaidOnReceive && !rowsToPaymentSlices(receivePaymentRows)) {
+      toast.error("Each payment needs a positive amount and date");
+      return;
+    }
 
     try {
       await receiveOrder.mutateAsync({
@@ -135,12 +222,45 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
           })),
         },
       });
+      if (markPaidOnReceive) {
+        await saveSupplierOrderPayments(receivePaymentRows);
+      } else {
+        await loadSupplierOrderPayments();
+      }
       toast.success("Order received successfully! Stock movements created.");
       setReceiveDialogOpen(false);
+      setMarkPaidOnReceive(false);
     } catch (error: any) {
-      toast.error(error?.message || "Failed to receive order");
+      toast.error(error?.message || "Failed to complete order receive flow");
     }
   };
+
+  const openAddPaymentsDialog = () => {
+    const defaultDate =
+      order?.actualDeliveryDate || order?.orderDate || dateToYYYYMMDD(new Date());
+    const suggestedAmount =
+      orderPayments && orderPayments.remainingAmount > 0
+        ? orderPayments.remainingAmount
+        : order?.totalAmount || 0;
+    setAddPaymentRows(defaultPaymentSliceRows(suggestedAmount, defaultDate));
+    setAddPaymentDialogOpen(true);
+  };
+
+  const handleSaveAdditionalPayments = async () => {
+    await saveSupplierOrderPayments(addPaymentRows);
+    setAddPaymentDialogOpen(false);
+  };
+
+  useEffect(() => {
+    if (!receiveDialogOpen || !order) return;
+    const defaultDate =
+      actualDeliveryDate || order.actualDeliveryDate || order.orderDate || dateToYYYYMMDD(new Date());
+    const suggestedAmount =
+      orderPayments && orderPayments.remainingAmount > 0
+        ? orderPayments.remainingAmount
+        : order.totalAmount || 0;
+    setReceivePaymentRows(defaultPaymentSliceRows(suggestedAmount, defaultDate));
+  }, [receiveDialogOpen, order, actualDeliveryDate, orderPayments]);
 
   const getStatusBadge = (status: SupplierOrderStatus) => {
     const variants: Record<SupplierOrderStatus, "default" | "secondary" | "destructive" | "outline"> = {
@@ -195,6 +315,16 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
               <Edit className="mr-2 h-4 w-4" />
               Edit
             </Button>
+            {isDelivered && (
+              <Button
+                variant="outline"
+                onClick={openAddPaymentsDialog}
+                disabled={loadingOrderPayments || savingOrderPayments}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Payment
+              </Button>
+            )}
             {canReceive && (
               <Button
                 onClick={() => setReceiveDialogOpen(true)}
@@ -252,6 +382,25 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Total Amount</label>
                   <p className="text-2xl font-bold mt-1">{formatCurrency(order.totalAmount)}</p>
+                </div>
+              )}
+              {isDelivered && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-muted-foreground">Payments</label>
+                  {loadingOrderPayments ? (
+                    <p className="text-sm text-muted-foreground">Loading payments...</p>
+                  ) : orderPayments ? (
+                    <>
+                      <p className="text-sm">
+                        Paid {formatCurrency(orderPayments.totalPaid)} / {formatCurrency(orderPayments.totalAmount)}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Remaining {formatCurrency(orderPayments.remainingAmount)}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No expense payment yet.</p>
+                  )}
                 </div>
               )}
               {order.notes && (
@@ -328,6 +477,30 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
             </CardContent>
           </Card>
         </div>
+
+        {isDelivered && orderPayments && orderPayments.payments.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment History</CardTitle>
+              <CardDescription>
+                {orderPayments.payments.length} payment slice(s)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {orderPayments.payments.map((payment) => (
+                <div key={payment.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <span className="font-medium tabular-nums">{formatCurrency(payment.amount)}</span>
+                    <span className="text-muted-foreground"> · {formatDate(payment.paymentDate)}</span>
+                    {payment.notes ? (
+                      <p className="text-xs text-muted-foreground truncate">{payment.notes}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Receive Order Dialog */}
         <Dialog open={receiveDialogOpen} onOpenChange={setReceiveDialogOpen}>
@@ -408,21 +581,72 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
                   );
                 })}
               </div>
+
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={markPaidOnReceive}
+                    onCheckedChange={(checked) => setMarkPaidOnReceive(checked === true)}
+                  />
+                  <Label className="text-sm font-medium">Payment is done now</Label>
+                </div>
+                {markPaidOnReceive ? (
+                  <DocumentPaymentSlicesEditor
+                    total={order.totalAmount ?? 0}
+                    defaultDate={actualDeliveryDate}
+                    rows={receivePaymentRows}
+                    onRowsChange={setReceivePaymentRows}
+                  />
+                ) : null}
+              </div>
             </div>
             <DialogFooter>
               <Button
                 variant="outline"
                 onClick={() => setReceiveDialogOpen(false)}
-                disabled={receiveOrder.isPending}
+                disabled={receiveOrder.isPending || savingOrderPayments}
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleReceive}
-                disabled={receiveOrder.isPending}
+                disabled={receiveOrder.isPending || savingOrderPayments}
               >
                 <Package className="mr-2 h-4 w-4" />
-                {receiveOrder.isPending ? "Receiving..." : "Receive Order"}
+                {receiveOrder.isPending || savingOrderPayments ? "Saving..." : "Receive Order"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={addPaymentDialogOpen} onOpenChange={setAddPaymentDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add payments</DialogTitle>
+              <DialogDescription>
+                Record one or multiple payment slices for this supplier order expense.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-2">
+              <DocumentPaymentSlicesEditor
+                total={orderPayments?.totalAmount ?? order.totalAmount ?? 0}
+                defaultDate={order.actualDeliveryDate || order.orderDate || dateToYYYYMMDD(new Date())}
+                rows={addPaymentRows}
+                onRowsChange={setAddPaymentRows}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setAddPaymentDialogOpen(false)}
+                disabled={savingOrderPayments}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveAdditionalPayments}
+                disabled={savingOrderPayments}
+              >
+                {savingOrderPayments ? "Saving..." : "Save payments"}
               </Button>
             </DialogFooter>
           </DialogContent>

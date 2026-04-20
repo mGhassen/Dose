@@ -46,7 +46,7 @@ export async function estimateProducibleFromRecipeForItem(
 
   if (recipeError || !recipeData?.items?.length) return null;
 
-  const servingSize = recipeData.serving_size || 1;
+  const outputQuantity = Number(recipeData.output_quantity ?? recipeData.serving_size) || 1;
   let minPossible = Number.POSITIVE_INFINITY;
 
   for (const recipeItem of recipeData.items as Array<{
@@ -57,7 +57,7 @@ export async function estimateProducibleFromRecipeForItem(
     const ing = recipeItem.item;
     if (!ing?.id) continue;
 
-    let needPerOutputUnit = recipeItem.quantity / servingSize;
+    let needPerOutputUnit = recipeItem.quantity / outputQuantity;
     const recipeUnitId = recipeItem.unit_id;
     const itemUnitId = ing.unit_id;
     if (
