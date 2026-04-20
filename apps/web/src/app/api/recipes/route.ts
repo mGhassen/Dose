@@ -62,7 +62,9 @@ function recipeInsertRow(body: CreateRecipeData): Record<string, unknown> {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const { page, limit, offset } = getPaginationParams(searchParams);
+    const { page, limit, offset } = getPaginationParams(searchParams, {
+      maxLimit: 1000,
+    });
 
     const supabase = supabaseServer();
     
