@@ -123,6 +123,7 @@ export type SupplierOrderEditorSubmit =
 export function SupplierOrderEditor(props: {
   mode: "create" | "edit";
   initialOrder?: SupplierOrder;
+  initialSupplierId?: number;
   onCancel?: () => void;
   onSubmit: (payload: SupplierOrderEditorSubmit) => Promise<void> | void;
   submitLabel?: string;
@@ -183,6 +184,15 @@ export function SupplierOrderEditor(props: {
     if (!props.initialOrder) return;
     setState(supplierOrderStateFromOrder(props.initialOrder));
   }, [props.initialOrder]);
+
+  useEffect(() => {
+    if (props.mode !== "create") return;
+    if (!props.initialSupplierId) return;
+    setState((s) => {
+      if (s.supplierId) return s;
+      return { ...s, supplierId: props.initialSupplierId };
+    });
+  }, [props.mode, props.initialSupplierId]);
 
   // Only keep "Auto (rules)" in sync with the currently selected order date.
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AppLayout from "@/components/app-layout";
 import { useCreateSupplierOrder } from "@kit/hooks";
 import { SupplierOrderStatus } from "@kit/types";
@@ -9,7 +9,10 @@ import { SupplierOrderEditor } from "../_components/supplier-order-editor";
 
 export default function CreateSupplierOrderPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const createOrder = useCreateSupplierOrder();
+  const supplierIdParam = searchParams.get("supplierId");
+  const initialSupplierId = supplierIdParam ? Number(supplierIdParam) : null;
 
   return (
     <AppLayout>
@@ -21,6 +24,7 @@ export default function CreateSupplierOrderPage() {
 
         <SupplierOrderEditor
           mode="create"
+          initialSupplierId={Number.isFinite(initialSupplierId) && initialSupplierId && initialSupplierId > 0 ? initialSupplierId : undefined}
           onCancel={() => router.push("/supplier-orders")}
           onSubmit={async (payload) => {
             if (payload.kind !== "create") return;
