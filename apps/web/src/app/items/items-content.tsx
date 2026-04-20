@@ -15,6 +15,15 @@ const KIND_LABEL: Record<ItemKind, string> = {
   modifier: "Modifier",
   ingredient: "Ingredient",
 };
+const KIND_BADGE_CLASS: Record<ItemKind, string> = {
+  item: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
+  product:
+    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+  modifier:
+    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+  ingredient:
+    "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+};
 import { Badge } from "@kit/ui/badge";
 import { Label } from "@kit/ui/label";
 import { Switch } from "@kit/ui/switch";
@@ -55,40 +64,53 @@ export default function ItemsContent() {
       header: "Name",
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          <StatusPin active={row.original.isActive} size="sm" />
-          <div className="font-medium">
-            {row.original.name}
+          <div className="flex items-center gap-2 min-w-0">
+            <StatusPin active={row.original.isActive} size="sm" />
+            <div className="font-medium truncate">{row.original.name}</div>
           </div>
-          {"instructions" in row.original && (row.original as { instructions?: string }).instructions != null && (
-            <Badge variant="secondary" className="text-xs">Recipe</Badge>
-          )}
-          {row.original.itemTypes?.map((k) => (
-            <Badge key={k} variant="secondary" className="text-xs">{KIND_LABEL[k]}</Badge>
-          ))}
-          {row.original.isCatalogParent && (
-            <Badge variant="outline" className="text-xs">Catalog group</Badge>
-          )}
-          {row.original.groupId && row.original.isCanonical && (
-            <Badge variant="outline" className="text-xs gap-1">
-              <LinkIcon className="h-3 w-3" />
-              Group · {row.original.groupName}
-            </Badge>
-          )}
-          {row.original.groupId && !row.original.isCanonical && (
-            <Badge
-              variant="outline"
-              className="text-xs gap-1 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (row.original.canonicalItemId) {
-                  router.push(`/items/${row.original.canonicalItemId}`);
-                }
-              }}
-            >
-              <LinkIcon className="h-3 w-3" />
-              merged → {row.original.canonicalItemName}
-            </Badge>
-          )}
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+            {"instructions" in row.original &&
+              (row.original as { instructions?: string }).instructions != null && (
+                <Badge variant="secondary" className="text-xs">
+                  Recipe
+                </Badge>
+              )}
+            {row.original.itemTypes?.map((k) => (
+              <Badge
+                key={k}
+                variant="outline"
+                className={`text-xs ${KIND_BADGE_CLASS[k]}`}
+              >
+                {KIND_LABEL[k]}
+              </Badge>
+            ))}
+            {row.original.isCatalogParent && (
+              <Badge variant="outline" className="text-xs">
+                Catalog group
+              </Badge>
+            )}
+            {row.original.groupId && row.original.isCanonical && (
+              <Badge variant="outline" className="text-xs gap-1">
+                <LinkIcon className="h-3 w-3" />
+                Group · {row.original.groupName}
+              </Badge>
+            )}
+            {row.original.groupId && !row.original.isCanonical && (
+              <Badge
+                variant="outline"
+                className="text-xs gap-1 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (row.original.canonicalItemId) {
+                    router.push(`/items/${row.original.canonicalItemId}`);
+                  }
+                }}
+              >
+                <LinkIcon className="h-3 w-3" />
+                merged → {row.original.canonicalItemName}
+              </Badge>
+            )}
+          </div>
         </div>
       ),
     },
