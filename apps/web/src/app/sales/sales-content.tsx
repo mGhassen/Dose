@@ -8,6 +8,7 @@ import { useDashboardPeriod } from "@/components/dashboard-period-provider";
 import { useSales, useDeleteSale, useMetadataEnum } from "@kit/hooks";
 import type { Sale } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
+import { PaidAmountCell } from "@/components/paid-amount-cell";
 import { formatCurrency } from "@kit/lib/config";
 import { formatDateTime } from "@kit/lib/date-format";
 import { toast } from "sonner";
@@ -61,7 +62,9 @@ export default function SalesContent({ selectedSaleId }: SalesContentProps) {
     {
       accessorKey: "amount",
       header: "Amount",
-      cell: ({ row }) => formatCurrency(row.original.amount),
+      cell: ({ row }) => (
+        <PaidAmountCell amount={row.original.amount} totalPaidAmount={row.original.totalPaidAmount} />
+      ),
     },
     {
       accessorKey: "totalTax",

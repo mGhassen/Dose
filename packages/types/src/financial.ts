@@ -179,6 +179,10 @@ export interface Expense {
   amount: number;
   expenseType: ExpenseType;
   subscriptionId?: number;
+  loanId?: number;
+  leasingId?: number;
+  /** Resolved on expense detail API from hour entries or salary projection ledger. */
+  personnelId?: number;
   description?: string;
   vendor?: string;
   supplierId?: number;
@@ -188,6 +192,10 @@ export interface Expense {
   totalTax?: number;
   totalDiscount?: number;
   lineItems?: ExpenseLineItem[];
+  paymentCount?: number;
+  reconciledPaymentCount?: number;
+  /** Sum of ledger payment amounts for this expense (list/detail). */
+  totalPaidAmount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -599,6 +607,8 @@ export interface PersonnelHourEntry {
   isPaid: boolean;
   paidDate?: string;
   expenseId?: number;
+  /** Posted payments total for linked expense (contractor); may differ from amountGross when partially paid. */
+  paidAmountGross?: number;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -672,6 +682,10 @@ export interface Sale {
   subtotal?: number;
   totalTax?: number;
   totalDiscount?: number;
+  paymentCount?: number;
+  reconciledPaymentCount?: number;
+  /** Sum of ledger payment amounts for this sale (list/detail). */
+  totalPaidAmount?: number;
   createdAt: string;
   updatedAt: string;
   lineItems?: SaleLineItem[];
@@ -1703,5 +1717,13 @@ export interface BankTransactionAllocation {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /** Present when entity_type === "payment" and the payment targets a ledger entry we can resolve. */
+  linked_entry_id?: number;
+  /** Present when the linked ledger entry is an expense output entry. */
+  linked_expense_id?: number;
+  linked_expense_name?: string | null;
+  /** Present when the linked ledger entry is a sale input entry. */
+  linked_sale_id?: number;
+  linked_sale_name?: string | null;
 }
 

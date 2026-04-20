@@ -16,6 +16,7 @@ import {
   type PaymentSliceInput,
 } from '@/shared/zod-schemas';
 import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
+import { getEntryPaymentAggregates } from '@/lib/ledger/entry-payment-aggregates';
 import { toPositiveItemId } from '@/lib/merge-selector-items';
 import { hydrateExpenseLineItemItems } from '@/lib/expenses/hydrate-expense-line-item-items';
 import { replaceExpenseStockMovements } from '@/lib/expenses/replace-expense-stock-movements';
@@ -80,6 +81,9 @@ function transformExpense(row: any, lineItems?: ExpenseLineItem[]): Expense {
     amount: parseFloat(row.amount),
     expenseType: (row.expense_type || 'expense') as Expense['expenseType'],
     subscriptionId: row.subscription_id || undefined,
+    loanId: row.loan_id != null ? Number(row.loan_id) : undefined,
+    leasingId: row.leasing_id != null ? Number(row.leasing_id) : undefined,
+    personnelId: row.personnel_id != null ? Number(row.personnel_id) : undefined,
     description: row.description,
     vendor: row.vendor,
     supplierId: row.supplier_id || undefined,
@@ -88,6 +92,10 @@ function transformExpense(row: any, lineItems?: ExpenseLineItem[]): Expense {
     subtotal: row.subtotal != null ? parseFloat(row.subtotal) : undefined,
     totalTax: row.total_tax != null ? parseFloat(row.total_tax) : undefined,
     totalDiscount: row.total_discount != null ? parseFloat(row.total_discount) : undefined,
+    paymentCount: row.payment_count != null ? Number(row.payment_count) : undefined,
+    reconciledPaymentCount:
+      row.reconciled_payment_count != null ? Number(row.reconciled_payment_count) : undefined,
+    totalPaidAmount: row.total_paid_amount != null ? Number(row.total_paid_amount) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -178,7 +186,26 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
     if (countError) throw countError;
 
-    const expenses: Expense[] = (data || []).map((row) => transformExpense(row));
+    const rows = data || [];
+    const paymentAggregates = await getEntryPaymentAggregates(
+      supabase,
+      "expense",
+      rows.map((row) => Number((row as { id: number }).id))
+    );
+    const expenses: Expense[] = rows.map((row) => {
+      const rowId = Number((row as { id: number }).id);
+      const agg = paymentAggregates.get(rowId) ?? {
+        paymentCount: 0,
+        reconciledPaymentCount: 0,
+        totalPaidAmount: 0,
+      };
+      return transformExpense({
+        ...row,
+        payment_count: agg.paymentCount,
+        reconciled_payment_count: agg.reconciledPaymentCount,
+        total_paid_amount: agg.totalPaidAmount,
+      });
+    });
     const total = count || 0;
     
     const response: PaginatedResponse<Expense> = createPaginatedResponse(

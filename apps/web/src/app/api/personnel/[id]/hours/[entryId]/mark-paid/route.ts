@@ -4,6 +4,7 @@ import {
   parseRequestBody,
   markPersonnelHourEntryPaidSchema,
 } from '@/shared/zod-schemas';
+import { reconcileContractorHourEntryPayments } from '@/lib/personnel/contractor-hour-payments';
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; entryId: string }> }
@@ -51,14 +52,14 @@ export async function POST(
 
     if (!body.isPaid) {
       await supabase.from('payments').delete().eq('entry_id', ledgerEntry.id);
+      await reconcileContractorHourEntryPayments(supabase, entryId);
       const { data: updated, error: updErr } = await supabase
         .from('personnel_hour_entries')
-        .update({ is_paid: false, paid_date: null })
-        .eq('id', entryId)
         .select()
+        .eq('id', entryId)
         .single();
       if (updErr) throw updErr;
-      return NextResponse.json({ id: updated.id, isPaid: false, expenseId });
+      return NextResponse.json({ id: updated.id, isPaid: updated.is_paid, expenseId });
     }
 
     const { data: currentPayments } = await supabase
@@ -95,17 +96,11 @@ export async function POST(
     });
     if (payErr) throw payErr;
 
-    const updatedPaid = Math.round((alreadyPaid + paymentAmount) * 100) / 100;
-    const isFullyPaid = updatedPaid >= gross - 0.01;
-
+    await reconcileContractorHourEntryPayments(supabase, entryId);
     const { data: updated, error: updErr } = await supabase
       .from('personnel_hour_entries')
-      .update({
-        is_paid: isFullyPaid,
-        paid_date: isFullyPaid ? paidDate : null,
-      })
-      .eq('id', entryId)
       .select()
+      .eq('id', entryId)
       .single();
     if (updErr) throw updErr;
 

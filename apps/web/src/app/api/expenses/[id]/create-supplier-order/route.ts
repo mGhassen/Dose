@@ -54,13 +54,7 @@ export async function POST(
         (parseFloat(String(r.quantity)) || 0) > 0
     );
 
-    if (usableLines.length === 0) {
-      return NextResponse.json(
-        { error: 'Expense has no line items with items and positive quantities' },
-        { status: 400 }
-      );
-    }
-
+    const hasItemLines = usableLines.length > 0;
     const expenseDate: string = expense.expense_date;
 
     const { data: orderRow, error: orderError } = await supabase
@@ -69,8 +63,8 @@ export async function POST(
         supplier_id: expense.supplier_id,
         order_date: expenseDate,
         expected_delivery_date: expenseDate,
-        actual_delivery_date: expenseDate,
-        status: SupplierOrderStatus.DELIVERED,
+        actual_delivery_date: hasItemLines ? expenseDate : null,
+        status: hasItemLines ? SupplierOrderStatus.DELIVERED : SupplierOrderStatus.PENDING,
         notes: expense.description ?? null,
         total_amount: expense.amount,
       })
@@ -80,35 +74,39 @@ export async function POST(
     if (orderError) throw orderError;
     if (!orderRow) throw new Error('Failed to create supplier order');
 
-    const orderItemsPayload = usableLines.map((r: any) => {
-      const qty = parseFloat(String(r.quantity)) || 0;
-      const unitPrice = parseFloat(String(r.unit_price)) || 0;
-      const lineTotal = parseFloat(String(r.line_total)) || qty * unitPrice;
-      const taxAmount = r.tax_amount != null ? parseFloat(String(r.tax_amount)) : null;
-      const taxRate = r.tax_rate_percent != null ? parseFloat(String(r.tax_rate_percent)) : null;
-      return {
-        order_id: orderRow.id,
-        item_id: r.item_id,
-        quantity: qty,
-        unit: 'unit',
-        unit_id: r.unit_id ?? null,
-        unit_price: unitPrice,
-        total_price: lineTotal,
-        received_quantity: qty,
-        tax_rate_percent: taxRate,
-        tax_amount: taxAmount,
-        notes: null,
-      };
-    });
+    let insertedOrderItems: any[] = [];
+    if (hasItemLines) {
+      const orderItemsPayload = usableLines.map((r: any) => {
+        const qty = parseFloat(String(r.quantity)) || 0;
+        const unitPrice = parseFloat(String(r.unit_price)) || 0;
+        const lineTotal = parseFloat(String(r.line_total)) || qty * unitPrice;
+        const taxAmount = r.tax_amount != null ? parseFloat(String(r.tax_amount)) : null;
+        const taxRate = r.tax_rate_percent != null ? parseFloat(String(r.tax_rate_percent)) : null;
+        return {
+          order_id: orderRow.id,
+          item_id: r.item_id,
+          quantity: qty,
+          unit: 'unit',
+          unit_id: r.unit_id ?? null,
+          unit_price: unitPrice,
+          total_price: lineTotal,
+          received_quantity: qty,
+          tax_rate_percent: taxRate,
+          tax_amount: taxAmount,
+          notes: null,
+        };
+      });
 
-    const { data: insertedOrderItems, error: orderItemsError } = await supabase
-      .from('supplier_order_items')
-      .insert(orderItemsPayload)
-      .select();
+      const { data: inserted, error: orderItemsError } = await supabase
+        .from('supplier_order_items')
+        .insert(orderItemsPayload)
+        .select();
 
-    if (orderItemsError) {
-      await supabase.from('supplier_orders').delete().eq('id', orderRow.id);
-      throw orderItemsError;
+      if (orderItemsError) {
+        await supabase.from('supplier_orders').delete().eq('id', orderRow.id);
+        throw orderItemsError;
+      }
+      insertedOrderItems = inserted ?? [];
     }
 
     const { error: deleteMovementsError } = await supabase

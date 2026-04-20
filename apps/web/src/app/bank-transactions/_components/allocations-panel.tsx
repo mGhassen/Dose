@@ -1,20 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
-  useSplitBankTransaction,
+  useReconcileBankTransaction,
   useDeleteBankTransactionAllocation,
 } from "@kit/hooks";
 import type { BankTransaction } from "@kit/lib";
 import type { BankTransactionAllocation } from "@kit/types";
 import { Button } from "@kit/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@kit/ui/alert";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
-import { ChevronDown, Plus, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { DraftRow } from "./draft-row";
 import { SuggestionsPanel } from "./suggestions";
@@ -42,6 +44,7 @@ const ALL_KINDS: DraftKind[] = [
 
 export function AllocationsPanel({ tx, transactionId }: Props) {
   const allocations = tx.allocations ?? [];
+  const fullyReconciled = !!tx.fully_reconciled;
   const isCredit = Number(tx.amount) > 0;
   const bankAmount = Number(tx.amount) || 0;
   const allocatedSum = Number(tx.allocated_total ?? 0);
@@ -54,6 +57,10 @@ export function AllocationsPanel({ tx, transactionId }: Props) {
     setDrafts([]);
   }, [tx.id]);
 
+  useEffect(() => {
+    if (fullyReconciled) setDrafts([]);
+  }, [fullyReconciled]);
+
   const draftSum = useMemo(
     () =>
       drafts.reduce((s, d) => {
@@ -65,8 +72,29 @@ export function AllocationsPanel({ tx, transactionId }: Props) {
   const leftoverAfterDrafts = Math.round((remainingOnServer - draftSum) * 100) / 100;
   const balanced = Math.abs(leftoverAfterDrafts) < 0.01;
 
-  const splitMutation = useSplitBankTransaction();
+  const reconcileMutation = useReconcileBankTransaction();
   const deleteAlloc = useDeleteBankTransactionAllocation();
+
+  const reconciledExpenseIds = useMemo(() => {
+    if (!fullyReconciled) return [];
+    const ids = new Set<number>();
+    const labelRe = /^expense\s+#(\d+)\b/i;
+    for (const a of allocations) {
+      if (a.entity_type === "expense") {
+        ids.add(a.entity_id);
+        continue;
+      }
+      if (a.entity_type === "payment" && a.linked_expense_id != null) {
+        ids.add(a.linked_expense_id);
+        continue;
+      }
+      if (a.entity_type === "payment" && a.label) {
+        const m = String(a.label).match(labelRe);
+        if (m) ids.add(Number(m[1]));
+      }
+    }
+    return Array.from(ids).sort((a, b) => a - b);
+  }, [allocations, fullyReconciled]);
 
   const addDraft = (seed: Partial<DraftLine> & { kind: DraftKind }) => {
     localIdRef.current += 1;
@@ -108,7 +136,7 @@ export function AllocationsPanel({ tx, transactionId }: Props) {
       .map((d) => draftToSplitLine(d))
       .filter((l): l is NonNullable<typeof l> => l != null);
     if (lines.length === 0) return;
-    splitMutation.mutate(
+    reconcileMutation.mutate(
       { id: transactionId, body: { lines } },
       {
         onSuccess: () => {
@@ -146,6 +174,31 @@ export function AllocationsPanel({ tx, transactionId }: Props) {
 
   return (
     <div className="space-y-3">
+      {fullyReconciled ? (
+        <Alert variant="success">
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertTitle>Fully reconciled</AlertTitle>
+          <AlertDescription>
+            This bank transaction is fully matched. Remove an allocation if you need to change it.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {fullyReconciled && reconciledExpenseIds.length > 0 ? (
+        <div className="text-sm">
+          <p className="text-xs font-medium uppercase text-muted-foreground">
+            {reconciledExpenseIds.length === 1 ? "Expense" : "Expenses"}
+          </p>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+            {reconciledExpenseIds.map((id) => (
+              <Link key={id} className="text-primary hover:underline" href={`/expenses/${id}`}>
+                Expense #{id}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <AllocationsSummary
         bankAmount={bankAmount}
         allocatedSum={allocatedSum}
@@ -172,16 +225,18 @@ export function AllocationsPanel({ tx, transactionId }: Props) {
         </div>
       ) : null}
 
-      <SuggestionsPanel
-        tx={tx}
-        excludedExpenseIds={usedExpenseIds}
-        excludedSaleIds={usedSaleIds}
-        excludedEntryIds={usedEntryIds}
-        remaining={leftoverAfterDrafts}
-        addDraft={addDraft}
-      />
+      {!fullyReconciled ? (
+        <SuggestionsPanel
+          tx={tx}
+          excludedExpenseIds={usedExpenseIds}
+          excludedSaleIds={usedSaleIds}
+          excludedEntryIds={usedEntryIds}
+          remaining={leftoverAfterDrafts}
+          addDraft={addDraft}
+        />
+      ) : null}
 
-      {drafts.length > 0 ? (
+      {!fullyReconciled && drafts.length > 0 ? (
         <div className="space-y-2">
           {drafts.map((d) => (
             <DraftRow
@@ -201,7 +256,7 @@ export function AllocationsPanel({ tx, transactionId }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" disabled={fullyReconciled}>
               <Plus className="mr-1 h-4 w-4" /> Add allocation
               <ChevronDown className="ml-1 h-4 w-4" />
             </Button>
@@ -222,13 +277,14 @@ export function AllocationsPanel({ tx, transactionId }: Props) {
           size="sm"
           onClick={handleSave}
           disabled={
-            splitMutation.isPending ||
+            fullyReconciled ||
+            reconcileMutation.isPending ||
             drafts.length === 0 ||
             drafts.some((d) => !draftIsReady(d)) ||
             leftoverAfterDrafts < -0.01
           }
         >
-          {splitMutation.isPending
+          {reconcileMutation.isPending
             ? "Saving…"
             : balanced
             ? `Save ${drafts.length} allocation${drafts.length > 1 ? "s" : ""} (balanced)`
@@ -308,15 +364,51 @@ function ExistingAllocationRow({
   disabled?: boolean;
 }) {
   const { entity_type, entity_id, amount, label, notes } = allocation;
+  const entityHref =
+    entity_type === "expense"
+      ? `/expenses/${entity_id}`
+      : entity_type === "sale"
+        ? `/sales/${entity_id}`
+        : null;
+  const linkedExpenseId = allocation.linked_expense_id;
+  const linkedSaleId = allocation.linked_sale_id;
   return (
     <div className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
       <div className="min-w-0 flex-1">
         <p className="truncate">
           <span className="font-medium">{entity_type}</span>{" "}
-          <span className="text-muted-foreground">#{entity_id}</span>
+          {entityHref ? (
+            <Link className="text-primary hover:underline" href={entityHref}>
+              #{entity_id}
+            </Link>
+          ) : (
+            <span className="text-muted-foreground">#{entity_id}</span>
+          )}
           {label ? <span className="text-muted-foreground"> · {label}</span> : null}
           {notes ? <span className="text-muted-foreground"> · {notes}</span> : null}
         </p>
+        {entity_type === "payment" && linkedExpenseId != null ? (
+          <p className="truncate text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">expense</span>{" "}
+            <Link className="text-primary hover:underline" href={`/expenses/${linkedExpenseId}`}>
+              #{linkedExpenseId}
+            </Link>
+            {allocation.linked_expense_name ? (
+              <span className="text-muted-foreground"> · {allocation.linked_expense_name}</span>
+            ) : null}
+          </p>
+        ) : null}
+        {entity_type === "payment" && linkedSaleId != null ? (
+          <p className="truncate text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">sale</span>{" "}
+            <Link className="text-primary hover:underline" href={`/sales/${linkedSaleId}`}>
+              #{linkedSaleId}
+            </Link>
+            {allocation.linked_sale_name ? (
+              <span className="text-muted-foreground"> · {allocation.linked_sale_name}</span>
+            ) : null}
+          </p>
+        ) : null}
       </div>
       <span className="w-24 shrink-0 text-right font-mono tabular-nums">
         {Number(amount).toFixed(2)}

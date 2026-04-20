@@ -8,7 +8,7 @@ import { useExpenses, useDeleteExpense, useSubscriptions, useInventorySuppliers,
 import Link from "next/link";
 import type { Expense } from "@kit/types";
 import { Badge } from "@kit/ui/badge";
-import { formatCurrency } from "@kit/lib/config";
+import { PaidAmountCell } from "@/components/paid-amount-cell";
 import { formatDate } from "@kit/lib/date-format";
 import { toast } from "sonner";
 import { useDashboardPeriod } from "@/components/dashboard-period-provider";
@@ -16,6 +16,29 @@ import { useDashboardPeriod } from "@/components/dashboard-period-provider";
 interface ExpensesContentProps {
   selectedExpenseId?: number;
 }
+
+type ExpenseReconciliationStatus = "reconciled" | "partial" | "unreconciled";
+
+function getExpenseReconciliationStatus(expense: Expense): ExpenseReconciliationStatus {
+  const paymentCount = expense.paymentCount ?? 0;
+  const reconciledPaymentCount = expense.reconciledPaymentCount ?? 0;
+
+  if (paymentCount > 0 && reconciledPaymentCount === paymentCount) return "reconciled";
+  if (reconciledPaymentCount > 0) return "partial";
+  return "unreconciled";
+}
+
+const reconciliationStatusDotClass: Record<ExpenseReconciliationStatus, string> = {
+  reconciled: "bg-green-500",
+  partial: "bg-yellow-500",
+  unreconciled: "bg-red-500",
+};
+
+const reconciliationStatusLabel: Record<ExpenseReconciliationStatus, string> = {
+  reconciled: "Fully reconciled",
+  partial: "Partially reconciled",
+  unreconciled: "Not reconciled",
+};
 
 export default function ExpensesContent({ selectedExpenseId }: ExpensesContentProps) {
   const router = useRouter();
@@ -67,9 +90,19 @@ export default function ExpensesContent({ selectedExpenseId }: ExpensesContentPr
     {
       accessorKey: "name",
       header: "Name",
-      cell: ({ row }) => (
-        <div className="font-medium">{row.original.name}</div>
-      ),
+      cell: ({ row }) => {
+        const status = getExpenseReconciliationStatus(row.original);
+        return (
+          <div className="flex items-center gap-2 font-medium">
+            <span
+              className={`inline-block h-2.5 w-2.5 rounded-full ${reconciliationStatusDotClass[status]}`}
+              title={reconciliationStatusLabel[status]}
+              aria-label={reconciliationStatusLabel[status]}
+            />
+            <span>{row.original.name}</span>
+          </div>
+        );
+      },
     },
     {
       accessorKey: "category",
@@ -83,7 +116,9 @@ export default function ExpensesContent({ selectedExpenseId }: ExpensesContentPr
     {
       accessorKey: "amount",
       header: "Amount",
-      cell: ({ row }) => formatCurrency(row.original.amount),
+      cell: ({ row }) => (
+        <PaidAmountCell amount={row.original.amount} totalPaidAmount={row.original.totalPaidAmount} />
+      ),
     },
     {
       accessorKey: "subscriptionId",

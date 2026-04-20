@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { Payment, UpdatePaymentData } from '../route';
 import { parseRequestBody, updatePaymentSchema } from '@/shared/zod-schemas';
+import { reconcileContractorHourEntriesForLedgerEntryId } from '@/lib/personnel/contractor-hour-payments';
 
 async function getPaymentBankTxId(
   supabase: ReturnType<typeof supabaseServer>,
@@ -144,6 +145,8 @@ export async function PUT(
       }
     }
 
+    await reconcileContractorHourEntriesForLedgerEntryId(supabase, Number(data.entry_id));
+
     return NextResponse.json(transformPayment(data, nextBankId));
   } catch (error: any) {
     console.error('Error updating payment:', error);
@@ -167,6 +170,7 @@ export async function DELETE(
       .select('id, entry_id, payment_date')
       .eq('id', id)
       .single();
+    const ledgerEntryIdForReconcile = payment?.entry_id != null ? Number(payment.entry_id) : null;
     if (fetchError || !payment) {
       if (fetchError?.code === 'PGRST116') {
         return new NextResponse(null, { status: 204 });
@@ -196,6 +200,10 @@ export async function DELETE(
 
     const { error } = await supabase.from('payments').delete().eq('id', id);
     if (error) throw error;
+
+    if (ledgerEntryIdForReconcile != null) {
+      await reconcileContractorHourEntriesForLedgerEntryId(supabase, ledgerEntryIdForReconcile);
+    }
 
     return new NextResponse(null, { status: 204 });
   } catch (error: any) {

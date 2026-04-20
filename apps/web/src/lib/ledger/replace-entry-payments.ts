@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PaymentSliceInput } from '@/shared/zod-schemas';
+import { reconcileContractorHourEntriesForLedgerEntryId } from '@/lib/personnel/contractor-hour-payments';
 
 export function paymentSlicesSumMatchesTotal(
   slices: Pick<PaymentSliceInput, 'amount'>[],
@@ -72,5 +73,6 @@ export async function replacePaymentsForEntry(
       if (allocErr) return { error: allocErr.message };
     }
   }
+  await reconcileContractorHourEntriesForLedgerEntryId(supabase, entryId);
   return { error: null };
 }

@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { parseRequestBody, createPaymentSchema, type CreatePaymentInput } from '@/shared/zod-schemas';
+import { reconcileContractorHourEntriesForLedgerEntryId } from '@/lib/personnel/contractor-hour-payments';
+import { ensureExpenseLedgerEntryForExpenseId } from '@/lib/ledger/ensure-expense-ledger-entry';
 
 export interface Payment {
   id: number;
@@ -154,35 +156,9 @@ async function ensureLoanPaymentExpense(
 
     if (!expenseRow || payment.isPaid === false) return;
 
-    const { data: expenseEntry } = await supabase
-      .from('entries')
-      .select('id')
-      .eq('entry_type', 'expense')
-      .eq('reference_id', expenseRow.id)
-      .maybeSingle();
-
-    let expenseEntryId = expenseEntry?.id ?? null;
-    if (expenseEntryId == null) {
-      const { data: createdExpenseEntry } = await supabase
-        .from('entries')
-        .insert({
-          direction: 'output',
-          entry_type: 'expense',
-          name: expenseRow.name ?? `Loan payment ${schedule.month}`,
-          amount: Number(expenseRow.amount),
-          description: expenseRow.description ?? null,
-          category: expenseRow.category ?? 'loan_repayment',
-          vendor: expenseRow.vendor ?? null,
-          supplier_id: expenseRow.supplier_id ?? null,
-          entry_date: expenseRow.expense_date ?? payment.paymentDate,
-          reference_id: expenseRow.id,
-          is_active: expenseRow.is_active ?? true,
-        })
-        .select('id')
-        .single();
-      expenseEntryId = createdExpenseEntry?.id ?? null;
-    }
-
+    const expenseEntryId = await ensureExpenseLedgerEntryForExpenseId(supabase, expenseRow.id, {
+      fallbackEntryDate: payment.paymentDate,
+    });
     if (expenseEntryId == null) return;
     const paidDate = payment.paidDate ?? payment.paymentDate;
     await supabase.from('payments').insert({
@@ -268,35 +244,9 @@ async function ensureLeasingPaymentExpense(
 
     if (!expenseRow || payment.isPaid === false) return;
 
-    const { data: expenseEntry } = await supabase
-      .from('entries')
-      .select('id')
-      .eq('entry_type', 'expense')
-      .eq('reference_id', expenseRow.id)
-      .maybeSingle();
-
-    let expenseEntryId = expenseEntry?.id ?? null;
-    if (expenseEntryId == null) {
-      const { data: createdExpenseEntry } = await supabase
-        .from('entries')
-        .insert({
-          direction: 'output',
-          entry_type: 'expense',
-          name: expenseRow.name ?? `Leasing payment ${timeline.month}`,
-          amount: Number(expenseRow.amount),
-          description: expenseRow.description ?? null,
-          category: expenseRow.category ?? 'leasing',
-          vendor: expenseRow.vendor ?? null,
-          supplier_id: expenseRow.supplier_id ?? null,
-          entry_date: expenseRow.expense_date ?? payment.paymentDate,
-          reference_id: expenseRow.id,
-          is_active: expenseRow.is_active ?? true,
-        })
-        .select('id')
-        .single();
-      expenseEntryId = createdExpenseEntry?.id ?? null;
-    }
-
+    const expenseEntryId = await ensureExpenseLedgerEntryForExpenseId(supabase, expenseRow.id, {
+      fallbackEntryDate: payment.paymentDate,
+    });
     if (expenseEntryId == null) return;
     const paidDate = payment.paidDate ?? payment.paymentDate;
     await supabase.from('payments').insert({
@@ -452,10 +402,20 @@ export async function POST(request: NextRequest) {
 
     let entryId = body.entryId;
     if (entryId == null && body.entryType != null && body.referenceId != null) {
-      const resolved = await resolveDocumentEntryId(supabase, body.entryType, body.referenceId);
+      const resolved =
+        body.entryType === 'expense'
+          ? await ensureExpenseLedgerEntryForExpenseId(supabase, body.referenceId, {
+              fallbackEntryDate: body.paymentDate,
+            })
+          : await resolveDocumentEntryId(supabase, body.entryType, body.referenceId);
       if (resolved == null) {
         return NextResponse.json(
-          { error: `No ledger entry found for ${body.entryType} ${body.referenceId}` },
+          {
+            error:
+              body.entryType === 'expense'
+                ? `Expense not found: ${body.referenceId}`
+                : `No ledger entry found for ${body.entryType} ${body.referenceId}`,
+          },
           { status: 404 }
         );
       }
@@ -525,6 +485,8 @@ export async function POST(request: NextRequest) {
       notes: body.notes,
       isPaid: body.isPaid,
     });
+
+    await reconcileContractorHourEntriesForLedgerEntryId(supabase, entryId);
 
     return NextResponse.json(
       transformPayment(data, body.bankTransactionId ?? null),

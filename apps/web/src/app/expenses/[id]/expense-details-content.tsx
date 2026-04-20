@@ -35,6 +35,9 @@ import {
   Link2Off,
   ShoppingCart,
   ExternalLink,
+  Landmark,
+  Building2,
+  Users,
 } from "lucide-react";
 import { DatePicker } from "@kit/ui/date-picker";
 import { SupplierFormDialog } from "@/components/supplier-form-dialog";
@@ -56,6 +59,9 @@ import {
   useSupplierOrders,
   useSupplierOrderById,
   useCreateSupplierOrderFromExpense,
+  useLoanById,
+  useLeasingById,
+  usePersonnelById,
 } from "@kit/hooks";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -103,6 +109,29 @@ function DetailRow({
   );
 }
 
+type ExpenseReconciliationStatus = "reconciled" | "partial" | "unreconciled";
+
+function getExpenseReconciliationStatus(
+  paymentCount: number,
+  reconciledPaymentCount: number
+): ExpenseReconciliationStatus {
+  if (paymentCount > 0 && reconciledPaymentCount === paymentCount) return "reconciled";
+  if (reconciledPaymentCount > 0) return "partial";
+  return "unreconciled";
+}
+
+const reconciliationStatusDotClass: Record<ExpenseReconciliationStatus, string> = {
+  reconciled: "bg-green-500",
+  partial: "bg-yellow-500",
+  unreconciled: "bg-red-500",
+};
+
+const reconciliationStatusLabel: Record<ExpenseReconciliationStatus, string> = {
+  reconciled: "Fully reconciled",
+  partial: "Partially reconciled",
+  unreconciled: "Not reconciled",
+};
+
 export interface ExpenseDetailContentProps {
   expenseId: string;
   initialEditMode?: boolean;
@@ -127,6 +156,12 @@ export function ExpenseDetailContent({
   const [isUnlinkDialogOpen, setIsUnlinkDialogOpen] = useState(false);
   const [isCreateOrderDialogOpen, setIsCreateOrderDialogOpen] = useState(false);
   const { data: expense, isLoading, isError, error } = useExpenseById(expenseId);
+  const loanIdStr = expense?.loanId != null ? String(expense.loanId) : "";
+  const leasingIdStr = expense?.leasingId != null ? String(expense.leasingId) : "";
+  const personnelIdStr = expense?.personnelId != null ? String(expense.personnelId) : "";
+  const { data: relatedLoan } = useLoanById(loanIdStr);
+  const { data: relatedLeasing } = useLeasingById(leasingIdStr);
+  const { data: relatedPersonnel } = usePersonnelById(personnelIdStr);
   const { data: paymentsPage, isLoading: paymentsLoading } = usePayments({
     entryType: "expense",
     referenceId: expenseId,
@@ -826,6 +861,10 @@ export function ExpenseDetailContent({
       ? subscriptions.find((s: { id: number }) => s.id === expense.subscriptionId)?.name
       : null;
   const effectiveTaxRateView = defaultTaxRate;
+  const reconciliationStatus = getExpenseReconciliationStatus(
+    expense.paymentCount ?? 0,
+    expense.reconciledPaymentCount ?? 0
+  );
   const hasLinkedOrder = expense.supplierOrderId != null;
   const hasUsableLinesForOrder =
     (expense.lineItems || []).some(
@@ -834,14 +873,12 @@ export function ExpenseDetailContent({
         li.subscriptionId == null &&
         (li.quantity ?? 0) > 0
     );
-  const canCreateOrder = !hasLinkedOrder && expense.supplierId != null && hasUsableLinesForOrder;
+  const canCreateOrder = !hasLinkedOrder && expense.supplierId != null;
   const createOrderBlockedReason = hasLinkedOrder
     ? "Already linked to a supplier order"
     : expense.supplierId == null
       ? "Pick a vendor first"
-      : !hasUsableLinesForOrder
-        ? "Expense has no line items with items"
-        : null;
+      : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -979,7 +1016,14 @@ export function ExpenseDetailContent({
 
           <div className="space-y-0">
             <DetailRow icon={Receipt} label="Name">
-              {expense.name}
+              <span className="inline-flex items-center gap-2">
+                <span
+                  className={`inline-block h-2.5 w-2.5 rounded-full ${reconciliationStatusDotClass[reconciliationStatus]}`}
+                  title={reconciliationStatusLabel[reconciliationStatus]}
+                  aria-label={reconciliationStatusLabel[reconciliationStatus]}
+                />
+                <span>{expense.name}</span>
+              </span>
             </DetailRow>
             <Separator />
             <DetailRow icon={Tag} label="Category">
@@ -1014,8 +1058,10 @@ export function ExpenseDetailContent({
                           id: number;
                           itemId?: number;
                           item_id?: number;
+                          subscriptionId?: number;
+                          subscription_id?: number;
                           item?: { id?: number; name?: string } | { id?: number; name?: string }[];
-                          subscription?: { name?: string };
+                          subscription?: { id?: number; name?: string };
                           quantity: number;
                           unitPrice: number;
                           lineTotal: number;
@@ -1024,11 +1070,17 @@ export function ExpenseDetailContent({
                         const rawItem = line.item;
                         const emb = Array.isArray(rawItem) ? rawItem[0] : rawItem;
                         const itemId = line.itemId ?? line.item_id ?? emb?.id;
+                        const subscriptionLineId =
+                          line.subscriptionId ??
+                          line.subscription_id ??
+                          line.subscription?.id ??
+                          undefined;
                         const itemLabel =
                           emb?.name?.trim() ??
                           line.subscription?.name?.trim() ??
                           (itemId != null ? `Item #${itemId}` : "—");
-                        const isItemLink = itemId != null && !line.subscription;
+                        const isItemLink = itemId != null && subscriptionLineId == null;
+                        const isSubscriptionLink = subscriptionLineId != null;
 
                         return (
                           <tr key={line.id} className="border-b last:border-0">
@@ -1039,6 +1091,14 @@ export function ExpenseDetailContent({
                                   className="group inline-flex items-center gap-1 text-primary hover:underline"
                                 >
                                   {itemLabel}
+                                  <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                                </Link>
+                              ) : isSubscriptionLink ? (
+                                <Link
+                                  href={`/subscriptions/${subscriptionLineId}`}
+                                  className="group inline-flex items-center gap-1 text-primary hover:underline"
+                                >
+                                  {itemLabel || `Subscription #${subscriptionLineId}`}
                                   <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
                                 </Link>
                               ) : (
@@ -1078,21 +1138,68 @@ export function ExpenseDetailContent({
             <DetailRow icon={Calendar} label="Expense date">
               {formatDate(expense.expenseDate)}
             </DetailRow>
+            {expense.subscriptionId != null && (
+              <>
+                <Separator />
+                <DetailRow icon={Package} label="Subscription">
+                  <Link
+                    href={`/subscriptions/${expense.subscriptionId}`}
+                    className="group inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    {subscriptionName ?? `Subscription #${expense.subscriptionId}`}
+                    <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                  </Link>
+                </DetailRow>
+              </>
+            )}
             <Separator />
-            <DetailRow icon={Package} label="Subscription">
-              {expense.subscriptionId && subscriptionName ? (
-                <Link
-                  href={`/subscriptions/${expense.subscriptionId}`}
-                  className="group inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  {subscriptionName}
-                  <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
-                </Link>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              )}
-            </DetailRow>
-            <Separator />
+            {expense.loanId != null && (
+              <>
+                <DetailRow icon={Landmark} label="Loan">
+                  <Link
+                    href={`/loans/${expense.loanId}`}
+                    className="group inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    {relatedLoan?.name?.trim() ||
+                      relatedLoan?.loanNumber?.trim() ||
+                      `Loan #${expense.loanId}`}
+                    <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                  </Link>
+                </DetailRow>
+                <Separator />
+              </>
+            )}
+            {expense.leasingId != null && (
+              <>
+                <DetailRow icon={Building2} label="Leasing">
+                  <Link
+                    href={`/leasing/${expense.leasingId}/timeline`}
+                    className="group inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    {relatedLeasing?.name?.trim() || `Lease #${expense.leasingId}`}
+                    <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                  </Link>
+                </DetailRow>
+                <Separator />
+              </>
+            )}
+            {expense.personnelId != null && (
+              <>
+                <DetailRow icon={Users} label="Personnel">
+                  <Link
+                    href={`/personnel/${expense.personnelId}`}
+                    className="group inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    {relatedPersonnel
+                      ? `${relatedPersonnel.firstName ?? ""} ${relatedPersonnel.lastName ?? ""}`.trim() ||
+                        `Person #${expense.personnelId}`
+                      : `Person #${expense.personnelId}`}
+                    <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                  </Link>
+                </DetailRow>
+                <Separator />
+              </>
+            )}
             <DetailRow icon={Package} label="Vendor">
               {expense.supplierId && suppliers.length ? (
                 (() => {
@@ -1351,7 +1458,11 @@ export function ExpenseDetailContent({
         onOpenChange={setIsCreateOrderDialogOpen}
         onConfirm={handleCreateSupplierOrder}
         title="Create supplier order"
-        description="A delivered supplier order will be created from this expense's line items. Stock movements will re-anchor to the new order."
+        description={
+          hasUsableLinesForOrder
+            ? "A delivered supplier order will be created from this expense's line items. Stock movements will re-anchor to the new order."
+            : "No inventory lines on this expense will be copied. A pending supplier order is created for this vendor—open it to add lines and receive stock there."
+        }
         confirmText="Create"
         cancelText="Cancel"
         isPending={createOrderFromExpense.isPending}

@@ -6,6 +6,7 @@ import type { Expense, UpdateExpenseData, ExpenseLineItem } from '@kit/types';
 import { parseRequestBody, updateExpenseSchema, type PaymentSliceInput } from '@/shared/zod-schemas';
 import { toPositiveItemId } from '@/lib/merge-selector-items';
 import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
+import { getEntryPaymentAggregates } from '@/lib/ledger/entry-payment-aggregates';
 import { hydrateExpenseLineItemItems } from '@/lib/expenses/hydrate-expense-line-item-items';
 import { replaceExpenseStockMovements } from '@/lib/expenses/replace-expense-stock-movements';
 import {
@@ -45,6 +46,9 @@ function transformExpense(row: any, lineItems?: ExpenseLineItem[]): Expense {
     amount: parseFloat(row.amount),
     expenseType: (row.expense_type || 'expense') as Expense['expenseType'],
     subscriptionId: row.subscription_id || undefined,
+    loanId: row.loan_id != null ? Number(row.loan_id) : undefined,
+    leasingId: row.leasing_id != null ? Number(row.leasing_id) : undefined,
+    personnelId: row.personnel_id != null ? Number(row.personnel_id) : undefined,
     description: row.description,
     vendor: row.vendor,
     supplierId: row.supplier_id || undefined,
@@ -53,6 +57,10 @@ function transformExpense(row: any, lineItems?: ExpenseLineItem[]): Expense {
     subtotal: row.subtotal != null ? parseFloat(row.subtotal) : undefined,
     totalTax: row.total_tax != null ? parseFloat(row.total_tax) : undefined,
     totalDiscount: row.total_discount != null ? parseFloat(row.total_discount) : undefined,
+    paymentCount: row.payment_count != null ? Number(row.payment_count) : undefined,
+    reconciledPaymentCount:
+      row.reconciled_payment_count != null ? Number(row.reconciled_payment_count) : undefined,
+    totalPaidAmount: row.total_paid_amount != null ? Number(row.total_paid_amount) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -279,7 +287,48 @@ export async function GET(
       .order('sort_order', { ascending: true });
 
     const lineItems = await hydrateExpenseLineItemItems(supabase, (lineRows || []).map(transformLineItem));
-    return NextResponse.json(transformExpense(expenseRow, lineItems));
+    const paymentAggregates = await getEntryPaymentAggregates(supabase, "expense", [Number(id)]);
+    const agg = paymentAggregates.get(Number(id)) ?? {
+      paymentCount: 0,
+      reconciledPaymentCount: 0,
+      totalPaidAmount: 0,
+    };
+
+    let resolvedPersonnelId: number | undefined;
+    const { data: hourEntryForExpense } = await supabase
+      .from("personnel_hour_entries")
+      .select("personnel_id")
+      .eq("expense_id", id)
+      .maybeSingle();
+    if (hourEntryForExpense?.personnel_id != null) {
+      resolvedPersonnelId = Number(hourEntryForExpense.personnel_id);
+    } else {
+      const desc = expenseRow.description;
+      if (typeof desc === "string" && desc.startsWith("personnel_salary_projection:")) {
+        const projId = Number(desc.slice("personnel_salary_projection:".length));
+        if (!Number.isNaN(projId) && projId > 0) {
+          const { data: projRow } = await supabase
+            .from("personnel_salary_projections")
+            .select("personnel_id")
+            .eq("id", projId)
+            .maybeSingle();
+          if (projRow?.personnel_id != null) resolvedPersonnelId = Number(projRow.personnel_id);
+        }
+      }
+    }
+
+    return NextResponse.json(
+      transformExpense(
+        {
+          ...expenseRow,
+          ...(resolvedPersonnelId != null ? { personnel_id: resolvedPersonnelId } : {}),
+          payment_count: agg.paymentCount,
+          reconciled_payment_count: agg.reconciledPaymentCount,
+          total_paid_amount: agg.totalPaidAmount,
+        },
+        lineItems
+      )
+    );
   } catch (error: any) {
     console.error('Error fetching expense:', error);
     return NextResponse.json(

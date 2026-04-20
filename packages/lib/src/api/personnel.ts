@@ -47,5 +47,10 @@ export const personnelApi = {
       `/api/personnel/${id}/hours/${entryId}/mark-paid`,
       data
     ),
+  reconcileHourEntryPayments: (id: string, entryId: string) =>
+    apiRequest<{ paidTotal: number; gross: number; isPaid: boolean; paidDate: string | null }>(
+      'POST',
+      `/api/personnel/${id}/hours/${entryId}/reconcile-payments`
+    ),
 };
 

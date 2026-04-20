@@ -171,6 +171,8 @@ export function useCreatePersonnelHourEntry() {
     }) => personnelApi.createHourEntry(personnelId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['personnel', variables.personnelId, 'hour-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['entries'] });
     },
   });
 }

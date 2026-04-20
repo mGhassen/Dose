@@ -355,10 +355,50 @@ async function processLine(
         throw Object.assign(new Error('Ledger entry for this expense not found'), { status: 404 });
       }
 
+      const entryAmount = parseFloat(String((entry as { amount: string | number }).amount));
+      const { data: existingPay } = await supabase
+        .from('payments')
+        .select('amount')
+        .eq('entry_id', (entry as { id: number }).id);
+      const paid = (existingPay ?? []).reduce(
+        (s, p) => s + parseFloat(String((p as { amount: string | number }).amount)),
+        0
+      );
+      const unpaid = Math.max(0, entryAmount - paid);
+
+      // If the expense is already fully paid on the ledger, reconciling the bank tx should not
+      // invent another payment. Allocate directly to the expense row (same model as legacy inline
+      // bank tx reconciliation).
+      if (unpaid <= 0.02) {
+        const alloc = await insertAllocation(
+          supabase,
+          bankTx,
+          'expense',
+          exp.id,
+          line.amount,
+          `expense #${exp.id}`,
+          line.notes ?? null
+        );
+        return { kind: 'link_expense', allocationId: alloc.id, primaryEntityId: exp.id };
+      }
+
+      const payAbs = Math.min(unpaid, Math.abs(line.amount));
+      if (payAbs + 0.0001 < Math.abs(line.amount)) {
+        throw Object.assign(
+          new Error(
+            `Cannot pay more than remaining expense balance (remaining ${unpaid.toFixed(2)}, requested ${Math.abs(
+              line.amount
+            ).toFixed(2)})`
+          ),
+          { status: 400 }
+        );
+      }
+
+      const signedPay = Math.sign(line.amount) * payAbs;
       const paymentId = await bookPaymentForEntry(
         supabase,
         entry,
-        Math.abs(line.amount),
+        payAbs,
         txDate,
         line.notes ?? null,
         created
@@ -369,7 +409,7 @@ async function processLine(
         bankTx,
         'payment',
         paymentId,
-        line.amount,
+        signedPay,
         `expense #${exp.id}`,
         line.notes ?? null
       );

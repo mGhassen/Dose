@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import { parseRequestBody, createPersonnelHourEntrySchema } from '@/shared/zod-schemas';
+import { sumPaymentsByExpenseIds } from '@/lib/personnel/contractor-hour-payments';
 
-function transformHourEntry(row: any) {
+function transformHourEntry(row: any, paidAmountGross?: number) {
   return {
     id: row.id,
     personnelId: row.personnel_id,
@@ -19,6 +20,7 @@ function transformHourEntry(row: any) {
     isPaid: row.is_paid,
     paidDate: row.paid_date ?? undefined,
     expenseId: row.expense_id ?? undefined,
+    paidAmountGross: paidAmountGross !== undefined ? paidAmountGross : undefined,
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -55,7 +57,20 @@ export async function GET(
       throw error;
     }
 
-    return NextResponse.json((data || []).map(transformHourEntry));
+    const rows = data || [];
+    const expenseIds = rows
+      .map((r: any) => r.expense_id)
+      .filter((x: any) => x != null)
+      .map((x: any) => Number(x));
+    const paidByExpense = await sumPaymentsByExpenseIds(supabase, expenseIds);
+
+    return NextResponse.json(
+      rows.map((r: any) => {
+        const eid = r.expense_id != null ? Number(r.expense_id) : null;
+        const paid = eid != null ? paidByExpense.get(eid) ?? 0 : 0;
+        return transformHourEntry(r, eid != null ? paid : undefined);
+      })
+    );
   } catch (error: any) {
     console.error('Error fetching personnel hour entries:', error);
     return NextResponse.json(
@@ -184,7 +199,7 @@ export async function POST(
       await supabase.from('expenses').delete().eq('id', expenseRow.id);
       throw error;
     }
-    return NextResponse.json(transformHourEntry(data), { status: 201 });
+    return NextResponse.json(transformHourEntry(data, 0), { status: 201 });
   } catch (error: any) {
     console.error('Error creating personnel hour entry:', error);
     return NextResponse.json(

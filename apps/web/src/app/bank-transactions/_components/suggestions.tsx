@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Button } from "@kit/ui/button";
 import { useSales, useExpenses, useEntries } from "@kit/hooks";
-import type { BankTransaction } from "@kit/lib";
+import type { BankTransaction, Entry } from "@kit/lib";
 import {
   filterReconciliationCandidates,
   scoreReconciliationCandidate,
@@ -43,6 +43,7 @@ export function SuggestionsPanel({
   addDraft,
 }: Props) {
   const isCredit = Number(tx.amount) > 0;
+  const bankSign = Math.sign(Number(tx.amount)) || 1;
   const { startDate, endDate } = useMemo(() => dateRangeAround(tx.execution_date), [tx.execution_date]);
 
   const { data: salesRes } = useSales({ startDate, endDate, limit: 200 });
@@ -84,11 +85,51 @@ export function SuggestionsPanel({
     return sortReconciliationCandidates("entry", tx, filtered).slice(0, 3);
   }, [entryRows, tx]);
 
+  const unpaidByExpenseId = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const e of entriesRes?.data ?? []) {
+      const row = e as Entry;
+      if (row.direction !== "output" || row.entryType !== "expense") continue;
+      if (row.referenceId == null) continue;
+      const paid = (row.payments ?? []).reduce((s, p) => s + Number(p.amount), 0);
+      const open = Math.max(0, Number(row.amount) - paid);
+      map.set(row.referenceId, open);
+    }
+    return map;
+  }, [entriesRes?.data]);
+
+  const unpaidBySaleId = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const e of entriesRes?.data ?? []) {
+      const row = e as Entry;
+      if (row.direction !== "input" || row.entryType !== "sale") continue;
+      if (row.referenceId == null) continue;
+      const paid = (row.payments ?? []).reduce((s, p) => s + Number(p.amount), 0);
+      const open = Math.max(0, Number(row.amount) - paid);
+      map.set(row.referenceId, open);
+    }
+    return map;
+  }, [entriesRes?.data]);
+
   if (ranked.length === 0 && rankedEntries.length === 0) {
     return null;
   }
 
   const remainingStr = remaining.toFixed(2);
+  const remainingAbs = Math.abs(Number(remainingStr));
+
+  const suggestedLinkAmountStr = (entityId: number, kind: "expense" | "sale") => {
+    const open = Math.max(
+      0,
+      kind === "expense" ? unpaidByExpenseId.get(entityId) ?? 0 : unpaidBySaleId.get(entityId) ?? 0
+    );
+    // If the entity is already fully paid on the ledger, "link" is a pure bank reconciliation
+    // allocation (no new payment). In that case, default to the bank remaining.
+    const capped = open <= 0.02 ? remainingAbs : Math.min(remainingAbs, open);
+    const signed = bankSign * capped;
+    // Keep a stable string for tiny floats
+    return (Math.round(signed * 100) / 100).toFixed(2);
+  };
 
   return (
     <div className="rounded-lg border bg-background p-3 space-y-2">
@@ -107,6 +148,10 @@ export function SuggestionsPanel({
             : `Expense #${c.id} · ${((c as { name?: string }).name ?? "—").slice(0, 34)} · ${
                 (c as { expenseDate?: string }).expenseDate ?? "—"
               } · ${amt.toFixed(2)}`;
+          const linkAmtStr = suggestedLinkAmountStr(c.id, isCredit ? "sale" : "expense");
+          const linkAmtNum = parseFloat(linkAmtStr);
+          const canLink = Number.isFinite(linkAmtNum) && Math.abs(linkAmtNum) > 0.0001;
+
           return (
             <div
               key={`${primaryKind}-${c.id}`}
@@ -120,23 +165,24 @@ export function SuggestionsPanel({
                 size="sm"
                 variant="outline"
                 className="h-7 shrink-0 text-xs"
+                disabled={!canLink}
                 onClick={() =>
                   addDraft(
                     isCredit
                       ? {
                           kind: "link_sale",
                           saleId: c.id,
-                          amount: remainingStr,
+                          amount: linkAmtStr,
                         }
                       : {
                           kind: "link_expense",
                           expenseId: c.id,
-                          amount: remainingStr,
+                          amount: linkAmtStr,
                         }
                   )
                 }
               >
-                Link for {remainingStr}
+                {canLink ? `Link for ${linkAmtStr}` : "Fully paid"}
               </Button>
             </div>
           );

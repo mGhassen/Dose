@@ -10,6 +10,7 @@ import { lineTaxAmount, netUnitPriceFromInclusive, unitPriceExclToIncl } from '@
 import { parseRequestBody, updateSaleTransactionSchema } from '@/shared/zod-schemas';
 import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
 import { replaceSaleStockMovements } from '@/lib/sales/replace-sale-stock-movements';
+import { getEntryPaymentAggregates } from '@/lib/ledger/entry-payment-aggregates';
 
 function transformSale(row: any): Sale {
   const subtotal = row.subtotal != null ? parseFloat(row.subtotal) : 0;
@@ -25,6 +26,10 @@ function transformSale(row: any): Sale {
     subtotal: row.subtotal != null ? parseFloat(row.subtotal) : undefined,
     totalTax: row.total_tax != null ? parseFloat(row.total_tax) : undefined,
     totalDiscount: row.total_discount != null ? parseFloat(row.total_discount) : undefined,
+    paymentCount: row.payment_count != null ? Number(row.payment_count) : undefined,
+    reconciledPaymentCount:
+      row.reconciled_payment_count != null ? Number(row.reconciled_payment_count) : undefined,
+    totalPaidAmount: row.total_paid_amount != null ? Number(row.total_paid_amount) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -85,7 +90,18 @@ export async function GET(
       throw error;
     }
 
-    const sale = transformSale(data);
+    const paymentAggregates = await getEntryPaymentAggregates(supabase, "sale", [Number(id)]);
+    const agg = paymentAggregates.get(Number(id)) ?? {
+      paymentCount: 0,
+      reconciledPaymentCount: 0,
+      totalPaidAmount: 0,
+    };
+    const sale = transformSale({
+      ...data,
+      payment_count: agg.paymentCount,
+      reconciled_payment_count: agg.reconciledPaymentCount,
+      total_paid_amount: agg.totalPaidAmount,
+    });
 
     const { data: lineItemsData } = await supabase
       .from('sale_line_items')

@@ -100,7 +100,7 @@ export interface BankTransactionAllocatePaymentResponse {
   allocation: BankTransactionAllocation;
 }
 
-/** Individual line in a /split batch request. */
+/** Individual line in a POST /api/bank-transactions/:id/reconcile batch request. */
 export type BankTransactionSplitLine =
   | {
       kind: 'balance_movement';
@@ -149,23 +149,6 @@ export interface BankTransactionSplitResponse {
   allocations: BankTransactionAllocation[];
 }
 
-async function splitBankTransactionRequest(
-  id: string,
-  body: BankTransactionSplitPayload
-): Promise<BankTransactionSplitResponse> {
-  const endpoint = `/api/bank-transactions/${id}/split`;
-  const fallbackEndpoint = `/api/bank-transactions/${id}`;
-  try {
-    return await apiRequest<BankTransactionSplitResponse>('POST', endpoint, body);
-  } catch (error) {
-    // Fallback to the base transaction POST route when /split is not registered.
-    if ((error as { status?: number })?.status === 404) {
-      return apiRequest<BankTransactionSplitResponse>('POST', fallbackEndpoint, body);
-    }
-    throw error;
-  }
-}
-
 export const bankTransactionsApi = {
   getAll: (params?: PaginationParams & {
     integration_id?: string;
@@ -196,7 +179,8 @@ export const bankTransactionsApi = {
     return apiRequest<PaginatedResponse<BankTransaction>>('GET', `/api/bank-transactions${query ? `?${query}` : ''}`);
   },
   getById: (id: string) => apiRequest<BankTransaction>('GET', `/api/bank-transactions/${id}`),
-  split: (id: string, body: BankTransactionSplitPayload) => splitBankTransactionRequest(id, body),
+  reconcile: (id: string, body: BankTransactionSplitPayload) =>
+    apiRequest<BankTransactionSplitResponse>('POST', `/api/bank-transactions/${id}/reconcile`, body),
   deleteAllocation: (id: string, allocationId: number) =>
     apiRequest<BankTransaction>('DELETE', `/api/bank-transactions/${id}/allocations/${allocationId}`),
   createExpenseFromTransaction: (id: string, body: BankTransactionCreateExpensePayload) =>

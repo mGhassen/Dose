@@ -51,11 +51,11 @@ function invalidateAllBankTxRelated(
   queryClient.invalidateQueries({ queryKey: ['supplier-orders'] });
 }
 
-export function useSplitBankTransaction() {
+export function useReconcileBankTransaction() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: BankTransactionSplitPayload }) =>
-      bankTransactionsApi.split(id, body),
+      bankTransactionsApi.reconcile(id, body),
     onSuccess: (_, variables) => invalidateAllBankTxRelated(queryClient, variables.id),
   });
 }

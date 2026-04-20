@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import { ensureExpenseLedgerEntryForExpenseId } from '@/lib/ledger/ensure-expense-ledger-entry';
 
 function transformProjectionEntry(row: any) {
   return {
@@ -272,7 +273,9 @@ export async function POST(
             .eq('expense_date', expenseDate)
             .maybeSingle();
 
-          if (!existingExpense) {
+          if (existingExpense) {
+            await ensureExpenseLedgerEntryForExpenseId(supabase, existingExpense.id);
+          } else {
             const { data: expenseRow, error: expenseErr } = await supabase
               .from('expenses')
               .insert({
@@ -319,6 +322,7 @@ export async function POST(
                   taxRule.taxInclusive === true
                 );
               }
+              await ensureExpenseLedgerEntryForExpenseId(supabase, expenseRow.id);
             }
           }
         }
