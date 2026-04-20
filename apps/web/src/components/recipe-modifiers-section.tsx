@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@kit/ui/button";
 import { Input } from "@kit/ui/input";
@@ -29,6 +29,22 @@ interface Props {
 export function RecipeModifiersSection({ producedItemId, rows, onChange }: Props) {
   const { modifierLists, isLoading } = useItemModifierLists(producedItemId);
   const { data: units = [] } = useUnits();
+  const allowedModifierIds = useMemo(
+    () => new Set(modifierLists.flatMap((list) => list.modifiers.map((m) => m.id))),
+    [modifierLists]
+  );
+
+  useEffect(() => {
+    if (!producedItemId) {
+      if (rows.length > 0) onChange([]);
+      return;
+    }
+    if (isLoading) return;
+    const filtered = rows.filter((r) => allowedModifierIds.has(r.modifierId));
+    if (filtered.length !== rows.length) {
+      onChange(filtered);
+    }
+  }, [allowedModifierIds, isLoading, onChange, producedItemId, rows]);
 
   if (!producedItemId) {
     return (

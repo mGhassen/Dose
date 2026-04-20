@@ -85,10 +85,26 @@ export async function allowedModifierIdsForProducedItemIds(
   const ids = [...new Set(producedItemIds.filter((id) => typeof id === 'number' && id > 0))];
   if (ids.length === 0) return new Set();
 
+  // Keep server validation aligned with item catalog behavior:
+  // when an item is a variant, modifier lists are sourced from its parent item.
+  const { data: variationRows } = await supabase
+    .from('item_variations')
+    .select('variant_item_id, parent_item_id')
+    .in('variant_item_id', ids);
+  const parentByVariant = new Map<number, number>();
+  for (const row of variationRows || []) {
+    const variantId = (row as { variant_item_id?: number }).variant_item_id;
+    const parentId = (row as { parent_item_id?: number }).parent_item_id;
+    if (typeof variantId === 'number' && typeof parentId === 'number' && parentId > 0) {
+      parentByVariant.set(variantId, parentId);
+    }
+  }
+  const sourceItemIds = [...new Set(ids.map((id) => parentByVariant.get(id) ?? id))];
+
   const { data: modListLinks } = await supabase
     .from('item_modifier_list_links')
     .select('modifier_list_id')
-    .in('item_id', ids);
+    .in('item_id', sourceItemIds);
   const listIds = Array.from(
     new Set((modListLinks || []).map((r: { modifier_list_id: number }) => r.modifier_list_id))
   );
