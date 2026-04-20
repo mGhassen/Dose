@@ -123,6 +123,55 @@ export async function syncPersonnelSalaryProjectionLedger(
     return { error: 'Personnel salary payment amounts must be positive when marked paid' };
   }
 
+  const netLineAmount = netPaid
+    ? round2(num(row.actual_net_amount) || num(row.net_salary))
+    : 0;
+  const taxLineAmount = taxesPaid
+    ? round2(num(row.actual_taxes_amount) || round2(num(row.social_taxes) + num(row.employer_taxes)))
+    : 0;
+
+  function buildSalaryLines(expenseId: number): Record<string, unknown>[] {
+    const lines: Record<string, unknown>[] = [];
+    let sort = 0;
+    if (netPaid && netLineAmount > 0) {
+      lines.push({
+        expense_id: expenseId,
+        item_id: null,
+        subscription_id: null,
+        personnel_id: personnelId,
+        personnel_salary_projection_id: projectionId,
+        line_kind: 'salary_net',
+        quantity: 1,
+        unit_id: null,
+        unit_price: netLineAmount,
+        unit_cost: null,
+        tax_rate_percent: 0,
+        tax_amount: 0,
+        line_total: netLineAmount,
+        sort_order: sort++,
+      });
+    }
+    if (taxesPaid && taxLineAmount > 0) {
+      lines.push({
+        expense_id: expenseId,
+        item_id: null,
+        subscription_id: null,
+        personnel_id: personnelId,
+        personnel_salary_projection_id: projectionId,
+        line_kind: 'payroll_taxes',
+        quantity: 1,
+        unit_id: null,
+        unit_price: taxLineAmount,
+        unit_cost: null,
+        tax_rate_percent: 0,
+        tax_amount: 0,
+        line_total: taxLineAmount,
+        sort_order: sort++,
+      });
+    }
+    return lines;
+  }
+
   const { data: person, error: pErr } = await supabase
     .from('personnel')
     .select('first_name, last_name, is_active')
@@ -165,19 +214,11 @@ export async function syncPersonnelSalaryProjectionLedger(
     const { error: liDel } = await supabase.from('expense_line_items').delete().eq('expense_id', existingExp.id);
     if (liDel) return { error: liDel.message };
 
-    const { error: liIns } = await supabase.from('expense_line_items').insert({
-      expense_id: existingExp.id,
-      item_id: null,
-      quantity: 1,
-      unit_id: null,
-      unit_price: totalAmount,
-      unit_cost: null,
-      tax_rate_percent: 0,
-      tax_amount: 0,
-      line_total: totalAmount,
-      sort_order: 0,
-    });
-    if (liIns) return { error: liIns.message };
+    const salaryLines = buildSalaryLines(existingExp.id);
+    if (salaryLines.length > 0) {
+      const { error: liIns } = await supabase.from('expense_line_items').insert(salaryLines);
+      if (liIns) return { error: liIns.message };
+    }
   } else {
     const { data: expRow, error: expIns } = await supabase
       .from('expenses')
@@ -190,19 +231,11 @@ export async function syncPersonnelSalaryProjectionLedger(
     }
     expenseId = expRow.id;
 
-    const { error: liErr } = await supabase.from('expense_line_items').insert({
-      expense_id: expRow.id,
-      item_id: null,
-      quantity: 1,
-      unit_id: null,
-      unit_price: totalAmount,
-      unit_cost: null,
-      tax_rate_percent: 0,
-      tax_amount: 0,
-      line_total: totalAmount,
-      sort_order: 0,
-    });
-    if (liErr) return { error: liErr.message };
+    const salaryLines = buildSalaryLines(expRow.id);
+    if (salaryLines.length > 0) {
+      const { error: liErr } = await supabase.from('expense_line_items').insert(salaryLines);
+      if (liErr) return { error: liErr.message };
+    }
   }
 
   if (expenseId == null) {

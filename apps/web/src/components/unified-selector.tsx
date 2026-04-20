@@ -262,11 +262,13 @@ export function UnifiedSelector({
     const description = item.description || '';
     
     return (
-      <div className="flex items-center justify-between gap-3 w-full px-3 py-3">
+      <div
+        className="flex items-center justify-between gap-3 w-full px-3 py-3"
+        title={typeof item.id !== 'undefined' ? `ID ${item.id}` : undefined}
+      >
         <div className="flex flex-col flex-1 min-w-0 gap-1">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm">{displayName}</span>
-            <span className="text-xs text-muted-foreground font-mono">#{item.id}</span>
           </div>
           {description && (
             <span className="text-xs text-muted-foreground leading-relaxed">
@@ -304,9 +306,9 @@ export function UnifiedSelector({
           className="mt-0.5"
         />
         <div className="flex flex-col items-start text-left flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" title={typeof item.id !== 'undefined' ? `ID ${item.id}` : undefined}>
             <span className="font-medium leading-tight">
-              #{item.id} - {name}
+              {name}
             </span>
             {item.code && item.name && (
               <span className="text-xs text-muted-foreground font-mono">

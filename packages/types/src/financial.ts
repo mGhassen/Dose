@@ -153,11 +153,29 @@ export interface UpdateVendorData extends Partial<CreateVendorData> {}
 
 export type ExpenseType = 'expense' | 'subscription' | 'leasing' | 'loan' | 'personnel' | 'other';
 
+/** What the expense line represents when not a catalog item (matches DB line_kind). */
+export type ExpenseLineKind =
+  | 'salary_net'
+  | 'payroll_taxes'
+  | 'contractor_hours'
+  | 'loan_payment'
+  | 'leasing_payment';
+
 export interface ExpenseLineItem {
   id: number;
   expenseId: number;
   itemId?: number;
   subscriptionId?: number;
+  loanId?: number;
+  loanScheduleId?: number;
+  leasingId?: number;
+  leasingTimelineEntryId?: number;
+  personnelId?: number;
+  personnelHourEntryId?: number;
+  personnelSalaryProjectionId?: number;
+  lineKind?: ExpenseLineKind;
+  /** Server-resolved label when there is no catalog item (subscription / loan / payroll / etc.). */
+  displayLabel?: string;
   quantity: number;
   unitId?: number;
   unitPrice: number;
@@ -1448,6 +1466,8 @@ export interface SupplierOrder {
   updatedAt: string;
   // Populated fields
   supplier?: Supplier;
+  /** Set on list responses when line items are not hydrated. */
+  itemCount?: number;
   items?: SupplierOrderItem[];
 }
 

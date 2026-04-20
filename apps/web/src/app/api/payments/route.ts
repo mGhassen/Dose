@@ -87,6 +87,70 @@ async function paymentBankTxMap(
   return map;
 }
 
+async function ensureLoanExpenseLine(
+  supabase: ReturnType<typeof supabaseServer>,
+  expenseId: number,
+  loanId: number,
+  schedule: { id: number },
+  amount: number
+): Promise<void> {
+  const { count, error: cErr } = await supabase
+    .from('expense_line_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('expense_id', expenseId);
+  if (cErr) throw cErr;
+  if ((count ?? 0) > 0) return;
+  const { error } = await supabase.from('expense_line_items').insert({
+    expense_id: expenseId,
+    item_id: null,
+    subscription_id: null,
+    loan_id: loanId,
+    loan_schedule_id: schedule.id,
+    quantity: 1,
+    unit_id: null,
+    unit_price: amount,
+    unit_cost: null,
+    tax_rate_percent: 0,
+    tax_amount: 0,
+    line_total: amount,
+    sort_order: 0,
+    line_kind: 'loan_payment',
+  });
+  if (error) throw error;
+}
+
+async function ensureLeasingExpenseLine(
+  supabase: ReturnType<typeof supabaseServer>,
+  expenseId: number,
+  leasingId: number,
+  timeline: { id: number },
+  amount: number
+): Promise<void> {
+  const { count, error: cErr } = await supabase
+    .from('expense_line_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('expense_id', expenseId);
+  if (cErr) throw cErr;
+  if ((count ?? 0) > 0) return;
+  const { error } = await supabase.from('expense_line_items').insert({
+    expense_id: expenseId,
+    item_id: null,
+    subscription_id: null,
+    leasing_id: leasingId,
+    leasing_timeline_entry_id: timeline.id,
+    quantity: 1,
+    unit_id: null,
+    unit_price: amount,
+    unit_cost: null,
+    tax_rate_percent: 0,
+    tax_amount: 0,
+    line_total: amount,
+    sort_order: 0,
+    line_kind: 'leasing_payment',
+  });
+  if (error) throw error;
+}
+
 async function ensureLoanPaymentExpense(
   supabase: ReturnType<typeof supabaseServer>,
   entryId: number,
@@ -154,7 +218,12 @@ async function ensureLoanPaymentExpense(
       expenseRow = insertedExpense;
     }
 
-    if (!expenseRow || payment.isPaid === false) return;
+    if (!expenseRow) return;
+
+    const lineAmount = parseFloat(schedule.total_payment);
+    await ensureLoanExpenseLine(supabase, expenseRow.id, loanId, { id: schedule.id }, lineAmount);
+
+    if (payment.isPaid === false) return;
 
     const expenseEntryId = await ensureExpenseLedgerEntryForExpenseId(supabase, expenseRow.id, {
       fallbackEntryDate: payment.paymentDate,
@@ -242,7 +311,12 @@ async function ensureLeasingPaymentExpense(
       expenseRow = insertedExpense;
     }
 
-    if (!expenseRow || payment.isPaid === false) return;
+    if (!expenseRow) return;
+
+    const lineAmount = parseFloat(timeline.amount);
+    await ensureLeasingExpenseLine(supabase, expenseRow.id, leasingId, { id: timeline.id }, lineAmount);
+
+    if (payment.isPaid === false) return;
 
     const expenseEntryId = await ensureExpenseLedgerEntryForExpenseId(supabase, expenseRow.id, {
       fallbackEntryDate: payment.paymentDate,

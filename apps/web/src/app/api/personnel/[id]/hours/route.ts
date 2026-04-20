@@ -199,6 +199,16 @@ export async function POST(
       await supabase.from('expenses').delete().eq('id', expenseRow.id);
       throw error;
     }
+
+    await supabase
+      .from('expense_line_items')
+      .update({
+        personnel_id: Number(id),
+        personnel_hour_entry_id: data.id,
+        line_kind: 'contractor_hours',
+      })
+      .eq('expense_id', expenseRow.id);
+
     return NextResponse.json(transformHourEntry(data, 0), { status: 201 });
   } catch (error: any) {
     console.error('Error creating personnel hour entry:', error);

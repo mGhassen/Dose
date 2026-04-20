@@ -434,7 +434,7 @@ export default function SupplierDetailPage({ params }: SupplierDetailPageProps) 
                                     <Badge variant={getStatusBadge(order.status)} className="text-xs">
                                       {order.status.replace('_', ' ').toUpperCase()}
                                     </Badge>
-                                    <span>• {order.items?.length || 0} items</span>
+                                    <span>• {order.itemCount ?? order.items?.length ?? 0} items</span>
                                   </div>
                                 </div>
                               </div>

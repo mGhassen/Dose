@@ -198,17 +198,29 @@ export async function POST(
       });
     }
 
-    const updateData: any = {
-      status: SupplierOrderStatus.DELIVERED,
-      actual_delivery_date: effectiveDate,
-    };
-
-    const { error: updateError } = await supabase
-      .from('supplier_orders')
-      .update(updateData)
-      .eq('id', id);
-
-    if (updateError) throw updateError;
+    const orderLines = orderData.items || [];
+    const orderLineIds = new Set(orderLines.map((it: { id: number }) => Number(it.id)));
+    for (const row of body.items) {
+      if (!orderLineIds.has(row.itemId)) {
+        return NextResponse.json(
+          {
+            error: 'Invalid order line',
+            details:
+              'Order lines changed after this page loaded (e.g. after saving the order). Refresh and receive again.',
+          },
+          { status: 400 }
+        );
+      }
+    }
+    if (body.items.length !== orderLines.length) {
+      return NextResponse.json(
+        {
+          error: 'Invalid receive payload',
+          details: 'Include exactly one entry per order line.',
+        },
+        { status: 400 }
+      );
+    }
 
     if (!existingExpenseId) {
       const receivedQtyByOrderItemId = new Map(
@@ -224,17 +236,22 @@ export async function POST(
     }
 
     const uniqueItemIds = [...new Set(orderData.items.map((item: any) => item.item_id).filter((v: unknown) => typeof v === "number"))] as number[];
-    const itemUnitMap = new Map<number, { unitId: number | null; unit: string | null }>();
+    const itemUnitMap = new Map<number, { unitId: number | null }>();
     if (uniqueItemIds.length > 0) {
       const { data: itemRows, error: itemError } = await supabase
         .from("items")
-        .select("id, unit_id, unit")
+        .select("id, unit_id")
         .in("id", uniqueItemIds);
       if (itemError) throw itemError;
       for (const row of itemRows || []) {
-        itemUnitMap.set(row.id, { unitId: row.unit_id ?? null, unit: row.unit ?? null });
+        itemUnitMap.set(row.id, { unitId: row.unit_id ?? null });
       }
     }
+
+    const unitSymbolForMovement = (unitId: number | null): string | undefined => {
+      if (unitId == null) return undefined;
+      return conversionContext.symbolMap.get(unitId) ?? `unit#${unitId}`;
+    };
 
     for (const receiveItem of body.items) {
       const orderItem = orderData.items.find((item: any) => item.id === receiveItem.itemId);
@@ -246,6 +263,8 @@ export async function POST(
       const orderUnitId = orderItem.unit_id ?? null;
       const itemUnit = itemUnitMap.get(itemId);
       const itemUnitId = itemUnit?.unitId ?? null;
+      const orderLineUnitText =
+        typeof orderItem.unit === "string" && orderItem.unit.trim() ? orderItem.unit.trim() : "";
 
       let receivedQtyInItemUnit = receivedQty;
       if (orderUnitId != null && itemUnitId != null) {
@@ -292,7 +311,10 @@ export async function POST(
           item_id: orderItem.item_id,
           movement_type: StockMovementType.IN,
           quantity: receivedQtyInItemUnit,
-          unit: itemUnit?.unit ?? orderItem.unit,
+          unit:
+            unitSymbolForMovement(itemUnitId) ??
+            unitSymbolForMovement(orderUnitId) ??
+            orderLineUnitText,
           unit_id: itemUnitId ?? orderUnitId,
           reference_type: StockMovementReferenceType.SUPPLIER_ORDER,
           reference_id: referenceId,
@@ -334,7 +356,16 @@ export async function POST(
       }
     }
 
-    // Get updated order
+    const { error: finalizeOrderError } = await supabase
+      .from('supplier_orders')
+      .update({
+        status: SupplierOrderStatus.DELIVERED,
+        actual_delivery_date: effectiveDate,
+      })
+      .eq('id', id);
+
+    if (finalizeOrderError) throw finalizeOrderError;
+
     const { data: updatedOrder, error: fetchError } = await supabase
       .from('supplier_orders')
       .select('*, items:supplier_order_items(*)')

@@ -12,7 +12,8 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { ItemCategorySelector } from "@/components/item-category-selector";
 import { CreateItemMultiStepDialog } from "@/components/create-item-multistep-dialog";
 import { RecipeModifiersSection, type RecipeModifierRowInput } from "@/components/recipe-modifiers-section";
-import { Save, X, Plus, Trash2 } from "lucide-react";
+import { RecipeIngredientsEditor } from "@/components/recipe-ingredients-editor";
+import { Save, X } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useCreateRecipe, useItems, useUnits, useItemById } from "@kit/hooks";
 import { toast } from "sonner";
@@ -143,30 +144,6 @@ function CreateRecipeForm() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const addItem = () => {
-    setItems([...items, { itemId: 0, quantity: 0, unit: "", unitId: undefined }]);
-  };
-
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
-
-  const updateItem = (index: number, field: string, value: unknown) => {
-    const updated = [...items];
-    const row = updated[index];
-
-    if (field === "itemId" && value) {
-      const selectedItem = itemsResponse?.data?.find((i) => i.id === parseInt(String(value), 10));
-      if (selectedItem) {
-        row.unit = selectedItem.unit || "";
-        row.unitId = selectedItem.unitId;
-      }
-    }
-
-    updated[index] = { ...row, [field]: value };
-    setItems(updated);
-  };
-
   return (
     <AppLayout>
       <div className="min-h-0 flex-1 overflow-auto">
@@ -226,8 +203,8 @@ function CreateRecipeForm() {
                           <Input
                             id="outputQuantity"
                             type="number"
-                            min={0.000001}
-                            step="0.01"
+                            min={0}
+                            step="any"
                             value={formData.outputQuantity}
                             onChange={(e) => handleInputChange("outputQuantity", e.target.value)}
                             placeholder="250"
@@ -321,82 +298,16 @@ function CreateRecipeForm() {
                   </div>
 
                   <div className="space-y-6">
-                    <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base font-semibold">Ingredients</Label>
-                      <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Ingredient
-                      </Button>
-                    </div>
-
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                      {items.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
-                          <p>No items added yet</p>
-                          <p className="text-sm mt-1">Click &quot;Add Item&quot; to get started</p>
-                        </div>
-                      ) : (
-                        items.map((row, index) => (
-                          <div key={index} className="space-y-3 p-4 border rounded-lg bg-card">
-                            <div className="space-y-2">
-                              <UnifiedSelector
-                                label="Item"
-                                type="item"
-                                items={itemsResponse?.data ?? []}
-                                selectedId={row.itemId || undefined}
-                                onSelect={(sel) =>
-                                  updateItem(index, "itemId", sel.id === 0 ? 0 : Number(sel.id))
-                                }
-                                onCreateNew={() => {
-                                  setCreateItemTargetIndex(index);
-                                  setCreateItemDialogOpen(true);
-                                }}
-                                placeholder="Select item"
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-2">
-                                <Label>Quantity</Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={row.quantity || ""}
-                                  onChange={(e) =>
-                                    updateItem(index, "quantity", parseFloat(e.target.value) || 0)
-                                  }
-                                  placeholder="0"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Unit</Label>
-                                <UnifiedSelector
-                                  type="unit"
-                                  items={units.map((u) => ({ ...u, name: u.name || u.symbol || String(u.id) }))}
-                                  selectedId={row.unitId ?? undefined}
-                                  onSelect={(sel) => {
-                                    const u = units.find((x) => x.id === sel.id);
-                                    const next = [...items];
-                                    next[index] = { ...next[index], unitId: u?.id, unit: u?.symbol ?? "" };
-                                    setItems(next);
-                                  }}
-                                  placeholder="Unit"
-                                  manageLink={{ href: "/variables", text: "Variables" }}
-                                  getDisplayName={(x) => (x as { symbol?: string }).symbol ?? x.name ?? String(x.id)}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex justify-end">
-                              <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Remove
-                              </Button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                    </div>
+                    <RecipeIngredientsEditor
+                      rows={items}
+                      onChange={setItems}
+                      selectorItems={itemsResponse?.data ?? []}
+                      units={units}
+                      onRequestCreateItem={(rowIndex) => {
+                        setCreateItemTargetIndex(rowIndex);
+                        setCreateItemDialogOpen(true);
+                      }}
+                    />
 
                     <div className="space-y-3">
                       <div>

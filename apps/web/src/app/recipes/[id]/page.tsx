@@ -13,13 +13,14 @@ import { UnifiedSelector } from "@/components/unified-selector";
 import { ItemCategorySelector } from "@/components/item-category-selector";
 import { CreateItemMultiStepDialog } from "@/components/create-item-multistep-dialog";
 import { RecipeModifiersSection, type RecipeModifierRowInput } from "@/components/recipe-modifiers-section";
+import { RecipeIngredientsEditor } from "@/components/recipe-ingredients-editor";
 import { StatusPin } from "@/components/status-pin";
-import { Save, X, Trash2, Plus, ChefHat, MoreVertical, Edit2, AlertTriangle, CheckCircle, Package, Link2 } from "lucide-react";
+import { Save, X, Trash2, ChefHat, MoreVertical, Edit2, AlertTriangle, CheckCircle, Package, Link2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
 import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useCreateProducedItem, useItems, useUnits, useProduceRecipe, useRecipeCost, useStockLevels, useItemCategories } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
-import { formatCurrency } from "@kit/lib/config";
+import { formatCurrency, formatCurrencyPerUnit } from "@kit/lib/config";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ import {
   DropdownMenuTrigger,
 } from "@kit/ui/dropdown-menu";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { InputGroupAttached } from "@/components/input-group";
 import {
   buildUnitConversionContext,
   convertQuantityWithContext,
@@ -123,7 +125,18 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     }
     return map;
   }, [recipe?.modifierQuantities, units]);
-  
+
+  const recipeOutputUnitLabel = useMemo(() => {
+    const u = recipe?.unit?.trim();
+    if (u) return u;
+    if (recipe?.unitId != null) {
+      const row = units.find((x) => x.id === recipe.unitId);
+      const fromId = row?.symbol?.trim() || row?.name?.trim();
+      if (fromId) return fromId;
+    }
+    return "unit";
+  }, [recipe?.unit, recipe?.unitId, units]);
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -271,31 +284,6 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const addItem = () => {
-    setItems([...items, { itemId: 0, quantity: 0, unit: "", unitId: undefined }]);
-  };
-
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
-
-  const updateItem = (index: number, field: string, value: any) => {
-    const updated = [...items];
-    const item = updated[index];
-    
-    // Auto-fill unit when item is selected
-    if (field === 'itemId' && value) {
-      const selectedItem = itemsResponse?.data?.find(i => i.id === parseInt(value));
-      if (selectedItem) {
-        item.unit = selectedItem.unit || '';
-        item.unitId = selectedItem.unitId;
-      }
-    }
-    
-    updated[index] = { ...item, [field]: value };
-    setItems(updated);
   };
 
   // Check if we have enough stock for all ingredients
@@ -481,8 +469,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                           <Input
                             id="outputQuantity"
                             type="number"
-                            min={0.000001}
-                            step="0.01"
+                            min={0}
+                            step="any"
                             value={formData.outputQuantity}
                             onChange={(e) => handleInputChange('outputQuantity', e.target.value)}
                             className="w-24"
@@ -566,82 +554,16 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
 
                   {/* Right Column: Items + Modifiers */}
                   <div className="space-y-6">
-                    <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base font-semibold">Ingredients</Label>
-                      <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Ingredient
-                      </Button>
-                    </div>
-
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                      {items.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
-                          <p>No items added yet</p>
-                          <p className="text-sm mt-1">Click "Add Item" to get started</p>
-                        </div>
-                      ) : (
-                        items.map((item, index) => (
-                          <div key={index} className="space-y-3 p-4 border rounded-lg bg-card">
-                            <div className="space-y-2">
-                              <UnifiedSelector
-                                label="Item"
-                                type="item"
-                                items={itemsResponse?.data ?? []}
-                                selectedId={item.itemId || undefined}
-                                onSelect={(sel) => updateItem(index, 'itemId', sel.id === 0 ? 0 : Number(sel.id))}
-                                onCreateNew={() => {
-                                  setCreateItemTargetIndex(index);
-                                  setCreateItemDialogOpen(true);
-                                }}
-                                placeholder="Select item"
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-2">
-                                <Label>Quantity</Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={item.quantity || ""}
-                                  onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Unit</Label>
-                                <UnifiedSelector
-                                  type="unit"
-                                  items={units.map(u => ({ ...u, name: u.name || u.symbol || String(u.id) }))}
-                                  selectedId={item.unitId ?? undefined}
-                                  onSelect={(sel) => {
-                                    const u = units.find(x => x.id === sel.id);
-                                    const updated = [...items];
-                                    updated[index] = { ...updated[index], unitId: u?.id, unit: u?.symbol ?? '' };
-                                    setItems(updated);
-                                  }}
-                                  placeholder="Unit"
-                                  manageLink={{ href: '/variables', text: 'Variables' }}
-                                  getDisplayName={(x) => (x as any).symbol ?? x.name ?? String(x.id)}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex justify-end">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeItem(index)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Remove
-                              </Button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                    </div>
+                    <RecipeIngredientsEditor
+                      rows={items}
+                      onChange={setItems}
+                      selectorItems={itemsResponse?.data ?? []}
+                      units={units}
+                      onRequestCreateItem={(rowIndex) => {
+                        setCreateItemTargetIndex(rowIndex);
+                        setCreateItemDialogOpen(true);
+                      }}
+                    />
 
                     <div className="space-y-3">
                       <div>
@@ -799,9 +721,9 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
 
                 {/* Right Column: Items Section */}
                 {((recipe.items || (recipe as { ingredients?: unknown[] }).ingredients) && (recipe.items?.length || (recipe as { ingredients?: unknown[] }).ingredients?.length || 0) > 0) && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold">Items</h3>
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <h3 className="text-base font-semibold tracking-tight">Ingredients</h3>
                       {costData && (() => {
                         const hasModRange =
                           Array.isArray(costData.modifierLists) &&
@@ -824,7 +746,8 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                                   )}
                                   {costData.outputQuantity > 1 && (
                                     <span className="text-sm text-muted-foreground ml-2">
-                                      ({formatCurrency(costData.costPerOutputUnit)} per {recipe.unit || "unit"})
+                                      ({formatCurrencyPerUnit(costData.costPerOutputUnit)} per{" "}
+                                      {recipe.unit || "unit"})
                                     </span>
                                   )}
                                 </>
@@ -860,7 +783,10 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                               {ml.options.length === 0 ? (
                                 <div className="text-xs text-muted-foreground">No modifiers included</div>
                               ) : (
-                                ml.options.map((o) => (
+                                ml.options.map((o) => {
+                                  const displayUnit =
+                                    o.unitLabel?.trim() || modifierUnitById.get(o.modifierId) || "";
+                                  return (
                                   <div
                                     key={o.modifierId}
                                     className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded border bg-background/70 px-2 py-1.5 text-xs"
@@ -884,7 +810,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                                           <>
                                             {" · "}
                                             {o.quantity}
-                                            {modifierUnitById.get(o.modifierId) ? ` ${modifierUnitById.get(o.modifierId)}` : ""}
+                                            {displayUnit ? ` ${displayUnit}` : ""}
                                           </>
                                         )}
                                       </div>
@@ -894,67 +820,101 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                                         {o.hasPrice ? formatCurrency(o.totalCost) : "—"}
                                       </div>
                                       {o.hasPrice && (
-                                        <div className="text-[10px] text-muted-foreground">
-                                          {formatCurrency(o.unitPrice)}/unit
+                                        <div className="text-[10px] text-muted-foreground tabular-nums">
+                                          {formatCurrencyPerUnit(o.unitPrice)}/{displayUnit || "unit"}
                                         </div>
                                       )}
                                     </div>
                                   </div>
-                                ))
+                                  );
+                                })
                               )}
                             </div>
                           </div>
                         ))}
                       </div>
                     )}
-                    <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
-                      {(recipe.items || (recipe as { ingredients?: unknown[] }).ingredients || []).map((ri: any, index: number) => {
-                        const itemId = ri.itemId || ri.ingredientId;
-                        const item = ri.item || ri.ingredient;
-const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingredientId) === itemId) ||
-                                        (costData as { items?: { itemId?: number }[] })?.items?.find((ci: any) => ci.itemId === itemId);
-                        return (
-                          <div key={index} className="rounded-md border bg-card/70 px-3 py-2">
-                            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-medium">
-                                  {itemId ? (
-                                    <Link
-                                      href={`/items/${itemId}`}
-                                      className="text-primary hover:underline"
-                                    >
-                                      {item?.name || `Item ${itemId}`}
-                                    </Link>
+                    <div className="overflow-x-auto rounded-lg border border-border">
+                      <table className="w-full text-sm caption-bottom">
+                        <thead>
+                          <tr className="border-b bg-muted/50 text-left text-xs font-medium text-muted-foreground">
+                            <th className="px-3 py-2 font-medium">Ingredient</th>
+                            <th className="px-2 py-2 text-right font-medium tabular-nums whitespace-nowrap w-[1%]">
+                              Qty
+                            </th>
+                            <th className="hidden sm:table-cell px-2 py-2 text-right font-medium tabular-nums whitespace-nowrap w-[1%]">
+                              Rate
+                            </th>
+                            <th className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap w-[1%]">
+                              Line
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(recipe.items || (recipe as { ingredients?: unknown[] }).ingredients || []).map((ri: any, index: number) => {
+                            const itemId = ri.itemId || ri.ingredientId;
+                            const item = ri.item || ri.ingredient;
+                            const costItem =
+                              costData?.ingredients?.find(
+                                (ci: any) => (ci.itemId || ci.ingredientId) === itemId
+                              ) ||
+                              (costData as { items?: { itemId?: number }[] })?.items?.find(
+                                (ci: any) => ci.itemId === itemId
+                              );
+                            const hasPrice = costItem && (costItem as { hasPrice?: boolean }).hasPrice;
+                            const unitPrice = (costItem as { unitPrice?: number })?.unitPrice ?? 0;
+                            const totalCost = (costItem as { totalCost?: number })?.totalCost ?? 0;
+                            return (
+                              <tr key={index} className="border-b border-border/60 last:border-0">
+                                <td className="max-w-0 px-3 py-2 align-top">
+                                  <div className="min-w-0">
+                                    {itemId ? (
+                                      <Link
+                                        href={`/items/${itemId}`}
+                                        className="font-medium text-primary hover:underline"
+                                      >
+                                        {item?.name || `Item ${itemId}`}
+                                      </Link>
+                                    ) : (
+                                      <span className="font-medium">{item?.name || `Item ${itemId}`}</span>
+                                    )}
+                                    {ri.notes ? (
+                                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{ri.notes}</p>
+                                    ) : null}
+                                  </div>
+                                </td>
+                                <td className="px-2 py-2 text-right tabular-nums text-muted-foreground whitespace-nowrap align-top">
+                                  {ri.quantity}
+                                  {ri.unit ? ` ${ri.unit}` : ""}
+                                </td>
+                                <td className="hidden sm:table-cell px-2 py-2 text-right tabular-nums align-top whitespace-nowrap">
+                                  {hasPrice ? (
+                                    <span className="text-muted-foreground">
+                                      {formatCurrencyPerUnit(unitPrice)}
+                                      <span className="text-[11px] opacity-80">/{ri.unit || "unit"}</span>
+                                    </span>
                                   ) : (
-                                    <span>{item?.name || `Item ${itemId}`}</span>
+                                    <span className="text-muted-foreground">—</span>
                                   )}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {ri.quantity} {ri.unit}
-                                  {costItem && (costItem as { hasPrice?: boolean }).hasPrice && (
-                                    <>
-                                      {" · "}
-                                      {formatCurrency((costItem as { unitPrice?: number }).unitPrice ?? 0)}/{ri.unit}
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="text-right text-xs">
-                                {costItem && (costItem as { hasPrice?: boolean }).hasPrice ? (
-                                  <>
-                                    <div className="font-medium">
-                                      {formatCurrency((costItem as { totalCost?: number }).totalCost ?? 0)}
+                                </td>
+                                <td className="px-3 py-2 text-right align-top whitespace-nowrap">
+                                  {hasPrice ? (
+                                    <div className="flex flex-col items-end gap-0.5">
+                                      <span className="font-medium tabular-nums">{formatCurrency(totalCost)}</span>
+                                      <span className="sm:hidden text-[11px] leading-tight text-muted-foreground tabular-nums">
+                                        {formatCurrencyPerUnit(unitPrice)}
+                                        <span className="opacity-80">/{ri.unit || "unit"}</span>
+                                      </span>
                                     </div>
-                                    <div className="text-muted-foreground">total</div>
-                                  </>
-                                ) : (
-                                  <div className="text-muted-foreground">No price</div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">No price</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 )}
@@ -985,18 +945,30 @@ const costItem = costData?.ingredients?.find((ci: any) => (ci.itemId || ci.ingre
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="quantity">Quantity to produce *</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="0.000001"
-                step="0.01"
-                value={produceQuantity}
-                onChange={(e) => setProduceQuantity(e.target.value)}
-                placeholder="1"
-                required
+              <InputGroupAttached
+                addonStyle="default"
+                input={
+                  <Input
+                    id="quantity"
+                    type="number"
+                    min="0.000001"
+                    step="0.01"
+                    value={produceQuantity}
+                    onChange={(e) => setProduceQuantity(e.target.value)}
+                    placeholder="1"
+                    required
+                    className="border-0 rounded-none h-full"
+                  />
+                }
+                addon={
+                  <span className="text-muted-foreground text-sm tabular-nums px-2">
+                    {recipeOutputUnitLabel}
+                  </span>
+                }
               />
               <p className="text-xs text-muted-foreground">
-                Recipe output quantity: {recipe?.outputQuantity ?? recipe?.servingSize ?? 1} {recipe?.unit || "unit"}
+                Recipe output quantity: {recipe?.outputQuantity ?? recipe?.servingSize ?? 1}{" "}
+                {recipeOutputUnitLabel}
               </p>
             </div>
             <div className="space-y-2">

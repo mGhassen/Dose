@@ -8,6 +8,12 @@ import { getPaginationParams, createPaginatedResponse } from '@kit/types';
 import { lineTaxAmount } from '@/lib/transaction-tax';
 
 function transformSupplierOrder(row: any): SupplierOrder {
+  const embedded = row.supplier_order_items;
+  let itemCount: number | undefined;
+  if (Array.isArray(embedded) && embedded.length > 0 && embedded[0]?.count != null) {
+    const raw = embedded[0].count;
+    itemCount = typeof raw === "number" ? raw : Number(raw);
+  }
   return {
     id: row.id,
     supplierId: row.supplier_id,
@@ -20,6 +26,7 @@ function transformSupplierOrder(row: any): SupplierOrder {
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    ...(itemCount !== undefined && !Number.isNaN(itemCount) ? { itemCount } : {}),
   };
 }
 
@@ -49,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     let dataQuery = supabase
       .from('supplier_orders')
-      .select('*')
+      .select('*, supplier_order_items(count)')
       .order('created_at', { ascending: false });
 
     if (supplierId) {

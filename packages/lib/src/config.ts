@@ -72,6 +72,23 @@ export const formatCurrency = (amount: number | string): string => {
   return `${formattedNumber} ${CURRENCY.symbol}`;
 };
 
+/** Per-unit costs (e.g. /g, /kg): `formatCurrency` uses 2 decimals and rounds tiny values to 0.00. */
+export const formatCurrencyPerUnit = (amount: number | string): string => {
+  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(numAmount)) return `0,00 ${CURRENCY.symbol}`;
+
+  const locale = getFormattingLocale();
+  const abs = Math.abs(numAmount);
+  const maxFractionDigits = abs > 0 && abs < 0.01 ? 6 : 2;
+
+  const formattedNumber = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: maxFractionDigits,
+  }).format(numAmount);
+
+  return `${formattedNumber} ${CURRENCY.symbol}`;
+};
+
 export const formatNumber = (amount: number | string): string => {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
   if (isNaN(numAmount)) return '0.00';

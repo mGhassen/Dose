@@ -131,7 +131,7 @@ export function SupplierOrderEditor(props: {
 }) {
   const [numericDrafts, setNumericDrafts] = useState<Record<string, string>>({});
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
-  const { data: itemsResponse } = useItems({ limit: 1000 });
+  const { data: itemsResponse, isPending: itemsQueryPending } = useItems({ limit: 1000 });
   const { data: unitsResponse } = useUnits();
   const { data: transactionTaxVariables = [] } = useVariablesByType("transaction_tax");
   const suppliers = suppliersResponse?.data ?? [];
@@ -196,7 +196,7 @@ export function SupplierOrderEditor(props: {
   useEffect(() => {
     if (!props.initialOrder) return;
     setState(supplierOrderStateFromOrder(props.initialOrder));
-  }, [props.initialOrder]);
+  }, [props.initialOrder?.id, props.initialOrder?.updatedAt]);
 
   useEffect(() => {
     if (props.mode !== "create") return;
@@ -215,6 +215,7 @@ export function SupplierOrderEditor(props: {
       .map((it, idx) => ({ it, idx }))
       .filter(({ it }) => it.taxVariableId === "auto" && !!it.itemId);
     if (autoItems.length === 0) return;
+    if (itemsQueryPending) return;
 
     Promise.all(
       autoItems.map(({ it, idx }) => {
@@ -251,7 +252,7 @@ export function SupplierOrderEditor(props: {
         return changed ? { ...s, items: next } : s;
       });
     });
-  }, [state.orderDate, autoTaxSignature, allItems]);
+  }, [state.orderDate, autoTaxSignature, allItems, itemsQueryPending]);
 
   const totals = useMemo(() => {
     let sub = 0;
@@ -666,28 +667,25 @@ export function SupplierOrderEditor(props: {
                                   return;
                                 }
                                 if (sel.id === "auto") {
-                                  taxRulesApi
-                                    .resolve({
-                                      context: "expense",
-                                      date: state.orderDate || undefined,
-                                      itemId: it.itemId || undefined,
-                                      itemCategory: allItems.find((x: any) => x.id === it.itemId)?.category?.name ?? undefined,
-                                    })
-                                    .then((r) => {
-                                      updateItem(idx, {
-                                        taxVariableId: "auto",
-                                        taxRatePercent: r.rate,
-                                        taxInclusive: r.taxInclusive ?? false,
-                                      });
-                                    })
-                                    .catch(() => {});
+                                  updateItem(idx, {
+                                    taxVariableId: "auto",
+                                    taxRatePercent: undefined,
+                                    taxInclusive: undefined,
+                                  });
                                   return;
                                 }
                                 const v = sel as any;
                                 const rate = typeof v?.value === "number" ? v.value : parseFloat(String(v?.value ?? "0")) || 0;
                                 const calc = (v?.payload as any)?.calculationType;
+                                const rawId = v?.id;
+                                const variableId =
+                                  typeof rawId === "number"
+                                    ? rawId
+                                    : typeof rawId === "string" && rawId !== "auto" && Number.isFinite(Number(rawId))
+                                      ? Number(rawId)
+                                      : undefined;
                                 updateItem(idx, {
-                                  taxVariableId: typeof v.id === "number" ? v.id : undefined,
+                                  taxVariableId: variableId,
                                   taxRatePercent: rate,
                                   taxInclusive: calc === "inclusive",
                                 });

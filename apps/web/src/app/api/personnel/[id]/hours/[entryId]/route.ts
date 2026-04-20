@@ -155,6 +155,9 @@ export async function PUT(
           tax_rate_percent: taxRatePercent,
           tax_amount: tax,
           line_total: gross,
+          personnel_id: Number(id),
+          personnel_hour_entry_id: Number(entryId),
+          line_kind: 'contractor_hours',
         })
         .eq('expense_id', existing.expense_id);
 

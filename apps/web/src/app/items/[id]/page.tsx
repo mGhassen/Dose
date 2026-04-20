@@ -1561,25 +1561,23 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                     </p>
                   </div>
 
-                  {!item.producedFromRecipeId && (
-                    <div className="space-y-1 pt-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="produceOnSale"
-                          checked={formData.produceOnSale}
-                          onCheckedChange={(checked) => handleInputChange("produceOnSale", checked)}
-                        />
-                        <Label htmlFor="produceOnSale" className="cursor-pointer">
-                          Produced on sale
-                        </Label>
-                      </div>
-                      <p className="text-xs text-muted-foreground ml-6">
-                        When on, we create a production recipe linked to this SKU (if needed) so sales run
-                        through recipe production (ingredient OUT + finished IN, then sale OUT). Add ingredients to
-                        that recipe to deduct stock. Ignored when a recipe is already linked.
-                      </p>
+                  <div className="space-y-1 pt-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="produceOnSale"
+                        checked={formData.produceOnSale}
+                        onCheckedChange={(checked) => handleInputChange("produceOnSale", checked)}
+                      />
+                      <Label htmlFor="produceOnSale" className="cursor-pointer">
+                        Produced on sale
+                      </Label>
                     </div>
-                  )}
+                    <p className="text-xs text-muted-foreground ml-6">
+                      When on and no production recipe is linked yet, we create/link one so sales run through
+                      recipe production (ingredients OUT, finished IN, then sale OUT). If a recipe is already
+                      linked, sales already use it; this still records produce-on-sale for catalog and defaults.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Description */}

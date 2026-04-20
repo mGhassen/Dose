@@ -7,7 +7,12 @@ import DataTablePage from "@/components/data-table-page";
 import { useItems, useDeleteItem, useInventorySuppliers } from "@kit/hooks";
 import type { Item, ItemKind } from "@kit/types";
 import MergeItemsDialog from "@/app/items/_components/merge-items-dialog";
-import { Link as LinkIcon } from "lucide-react";
+import { Link as LinkIcon, Package, PackageX, ChefHat } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@kit/ui/tooltip";
 
 const KIND_LABEL: Record<ItemKind, string> = {
   item: "Item",
@@ -66,6 +71,36 @@ export default function ItemsContent() {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <StatusPin active={row.original.isActive} size="sm" />
+            <div className="flex shrink-0 items-center gap-0.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex cursor-default">
+                    {row.original.affectsStock !== false ? (
+                      <Package className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                    ) : (
+                      <PackageX className="h-3.5 w-3.5 text-muted-foreground opacity-70" aria-hidden />
+                    )}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  {row.original.affectsStock !== false
+                    ? "Affects stock (deduct on sale)"
+                    : "Does not affect stock"}
+                </TooltipContent>
+              </Tooltip>
+              {row.original.produceOnSale === true && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex cursor-default text-amber-600 dark:text-amber-400">
+                      <ChefHat className="h-3.5 w-3.5" aria-hidden />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    Produced on sale
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
             <div className="font-medium truncate">{row.original.name}</div>
           </div>
           <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
@@ -92,7 +127,7 @@ export default function ItemsContent() {
             {row.original.groupId && row.original.isCanonical && (
               <Badge variant="outline" className="text-xs gap-1">
                 <LinkIcon className="h-3 w-3" />
-                Group · {row.original.groupName}
+                  {row.original.groupName}
               </Badge>
             )}
             {row.original.groupId && !row.original.isCanonical && (

@@ -202,12 +202,28 @@ export function ExpenseDetailContent({
   const createOrderFromExpense = useCreateSupplierOrderFromExpense();
   const { data: itemsResponse } = useItems({ limit: 2500 });
   const itemsBase = itemsResponse?.data ?? [];
+  const itemNameById = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const it of itemsBase) {
+      const n = it.name?.trim();
+      if (n) m.set(Number(it.id), n);
+    }
+    return m;
+  }, [itemsBase]);
   const selectorItems = useMemo(
     () => mergeSelectorItemsWithLineEmbeds<Item>(itemsBase, expense?.lineItems),
     [itemsBase, expense?.lineItems]
   );
   const { data: unitsData } = useUnits();
   const unitItems = (unitsData || []).map((u) => ({ id: u.id, name: `${u.symbol} (${u.name})` }));
+  const unitSymbolById = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const u of unitsData ?? []) {
+      const sym = (u.symbol ?? "").trim() || (u.name ?? "").trim();
+      if (sym) m.set(Number(u.id), sym);
+    }
+    return m;
+  }, [unitsData]);
   const { data: categoryValues = [] } = useMetadataEnum("ExpenseCategory");
   const categoryLabels: Record<string, string> = Object.fromEntries(
     categoryValues.map((ev) => [ev.name, ev.label ?? ev.name])
@@ -1060,9 +1076,15 @@ export function ExpenseDetailContent({
                           item_id?: number;
                           subscriptionId?: number;
                           subscription_id?: number;
-                          item?: { id?: number; name?: string } | { id?: number; name?: string }[];
+                          loanId?: number;
+                          leasingId?: number;
+                          personnelId?: number;
+                          displayLabel?: string;
+                          item?: { id?: number; name?: string; unit?: string } | { id?: number; name?: string; unit?: string }[];
                           subscription?: { id?: number; name?: string };
                           quantity: number;
+                          unitId?: number;
+                          unit_id?: number;
                           unitPrice: number;
                           lineTotal: number;
                         }
@@ -1075,12 +1097,36 @@ export function ExpenseDetailContent({
                           line.subscription_id ??
                           line.subscription?.id ??
                           undefined;
+                        const loanLineId = line.loanId;
+                        const leasingLineId = line.leasingId;
+                        const personnelLineId = line.personnelId;
+                        const nameFromCatalog =
+                          itemId != null ? itemNameById.get(Number(itemId))?.trim() : undefined;
                         const itemLabel =
+                          line.displayLabel?.trim() ??
                           emb?.name?.trim() ??
+                          nameFromCatalog ??
                           line.subscription?.name?.trim() ??
                           (itemId != null ? `Item #${itemId}` : "—");
                         const isItemLink = itemId != null && subscriptionLineId == null;
                         const isSubscriptionLink = subscriptionLineId != null;
+                        const isLoanLink = loanLineId != null && !isItemLink && !isSubscriptionLink;
+                        const isLeasingLink = leasingLineId != null && !isLoanLink && !isItemLink && !isSubscriptionLink;
+                        const isPersonnelLink =
+                          personnelLineId != null &&
+                          !isLeasingLink &&
+                          !isLoanLink &&
+                          !isItemLink &&
+                          !isSubscriptionLink;
+
+                        const lineUnitId = line.unitId ?? line.unit_id;
+                        const fromLineUnit =
+                          lineUnitId != null ? unitSymbolById.get(Number(lineUnitId))?.trim() : "";
+                        const itemUnit =
+                          emb && typeof emb === "object" && "unit" in emb
+                            ? String((emb as { unit?: string }).unit ?? "").trim()
+                            : "";
+                        const qtyUnitLabel = fromLineUnit || itemUnit;
 
                         return (
                           <tr key={line.id} className="border-b last:border-0">
@@ -1101,11 +1147,42 @@ export function ExpenseDetailContent({
                                   {itemLabel || `Subscription #${subscriptionLineId}`}
                                   <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
                                 </Link>
+                              ) : isLoanLink ? (
+                                <Link
+                                  href={`/loans/${loanLineId}`}
+                                  className="group inline-flex items-center gap-1 text-primary hover:underline"
+                                >
+                                  {itemLabel || `Loan #${loanLineId}`}
+                                  <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                                </Link>
+                              ) : isLeasingLink ? (
+                                <Link
+                                  href={`/leasing/${leasingLineId}`}
+                                  className="group inline-flex items-center gap-1 text-primary hover:underline"
+                                >
+                                  {itemLabel || `Leasing #${leasingLineId}`}
+                                  <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                                </Link>
+                              ) : isPersonnelLink ? (
+                                <Link
+                                  href={`/personnel/${personnelLineId}`}
+                                  className="group inline-flex items-center gap-1 text-primary hover:underline"
+                                >
+                                  {itemLabel}
+                                  <ChevronRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                                </Link>
                               ) : (
                                 itemLabel
                               )}
                             </td>
-                            <td className="p-2 text-right tabular-nums">{line.quantity}</td>
+                            <td className="p-2 text-right tabular-nums">
+                              <span className="inline-flex items-baseline justify-end gap-x-1">
+                                <span>{line.quantity}</span>
+                                {qtyUnitLabel ? (
+                                  <span className="text-muted-foreground font-normal">{qtyUnitLabel}</span>
+                                ) : null}
+                              </span>
+                            </td>
                             <td className="p-2 text-right tabular-nums">{formatCurrency(line.unitPrice)}</td>
                             <td className="p-2 text-right tabular-nums">{formatCurrency(line.lineTotal)}</td>
                           </tr>

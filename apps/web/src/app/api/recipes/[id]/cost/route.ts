@@ -112,6 +112,9 @@ export async function GET(
       hasPrice: boolean;
       priceSource: 'recipe' | 'order' | 'history' | 'none';
       enabled: boolean;
+      /** Unit the unitPrice is expressed in (recipe row unit, else supply item native unit). */
+      unitId: number | null;
+      unitLabel: string;
     };
 
     const rowsByList = new Map<
@@ -141,6 +144,12 @@ export async function GET(
 
       const recipeQty = typeof row.quantity === 'string' ? parseFloat(row.quantity) : row.quantity;
       const recipeUnitId = row.unit_id ?? null;
+      const itemUnitId = mod.item?.unit_id ?? null;
+      const pricingUnitId = recipeUnitId ?? itemUnitId ?? null;
+      const unitLabel =
+        pricingUnitId != null
+          ? conversionContext.symbolMap.get(pricingUnitId)?.trim() || `unit#${pricingUnitId}`
+          : 'unit';
 
       let unitPrice = 0;
       let hasPrice = false;
@@ -169,6 +178,8 @@ export async function GET(
         hasPrice,
         priceSource: source,
         enabled: true,
+        unitId: pricingUnitId,
+        unitLabel,
       });
     }
 

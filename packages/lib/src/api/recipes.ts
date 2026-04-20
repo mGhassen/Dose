@@ -46,6 +46,8 @@ export const recipesApi = {
           hasPrice: boolean;
           priceSource: 'recipe' | 'order' | 'history' | 'none';
           enabled: boolean;
+          unitId: number | null;
+          unitLabel: string;
         }>;
         minCost: number;
         maxCost: number;

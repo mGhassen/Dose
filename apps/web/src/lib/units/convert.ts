@@ -190,6 +190,28 @@ export function convertUnitPriceWithContext(
   };
 }
 
+/**
+ * Same as {@link convertUnitPriceWithContext}, but if dimension/base checks block conversion,
+ * falls back to factor ratio: price per `to` = price per `from` × (toFactor / fromFactor).
+ */
+export function convertUnitPriceWithContextOrFactorFallback(
+  unitPrice: number,
+  fromUnitId: number | null | undefined,
+  toUnitId: number | null | undefined,
+  context: UnitConversionContext
+): UnitPriceConversionResult {
+  const primary = convertUnitPriceWithContext(unitPrice, fromUnitId, toUnitId, context);
+  if (primary.converted) return primary;
+  if (fromUnitId == null || toUnitId == null || fromUnitId === toUnitId) return primary;
+  const fromF = context.factorMap.get(fromUnitId);
+  const toF = context.factorMap.get(toUnitId);
+  if (fromF == null || toF == null || fromF === 0) return primary;
+  return {
+    unitPrice: (unitPrice * toF) / fromF,
+    converted: true,
+  };
+}
+
 export function logUnitConversionWarning(scope: string, warning: UnitConversionWarning): void {
   console.warn(`[${scope}] ${warning.detail}`);
 }

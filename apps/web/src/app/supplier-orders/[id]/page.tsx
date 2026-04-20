@@ -12,8 +12,18 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Badge } from "@kit/ui/badge";
 import { Checkbox } from "@kit/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@kit/ui/table";
 import { Trash2, Package, Truck, Edit, Plus } from "lucide-react";
 import AppLayout from "@/components/app-layout";
+import { useQueryClient } from "@tanstack/react-query";
+import { supplierOrdersApi } from "@kit/lib";
 import { useSupplierOrderById, useUpdateSupplierOrder, useDeleteSupplierOrder, useReceiveSupplierOrder } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
@@ -70,6 +80,7 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
   const [savingOrderPayments, setSavingOrderPayments] = useState(false);
   const [orderPayments, setOrderPayments] = useState<SupplierOrderPaymentsSummary | null>(null);
   const [loadingOrderPayments, setLoadingOrderPayments] = useState(false);
+  const queryClient = useQueryClient();
   const { data: order, isLoading } = useSupplierOrderById(resolvedParams?.id || "");
   const updateOrder = useUpdateSupplierOrder();
   const deleteMutation = useDeleteSupplierOrder();
@@ -173,6 +184,19 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
       setEditOpen(false);
 
       if (wantsDeliver) {
+        const fresh = await queryClient.fetchQuery({
+          queryKey: ["supplier-orders", resolvedParams.id],
+          queryFn: () => supplierOrdersApi.getById(resolvedParams.id),
+        });
+        if (fresh?.items?.length) {
+          setReceiveItems(
+            fresh.items.map((item) => ({
+              itemId: item.id,
+              receivedQuantity: item.receivedQuantity || item.quantity,
+              location: "",
+            }))
+          );
+        }
         toast.info("Confirm received quantities to mark as delivered");
         setReceiveDialogOpen(true);
       } else {
@@ -417,60 +441,117 @@ export default function SupplierOrderDetailPage({ params }: SupplierOrderDetailP
               <CardTitle>Order Items</CardTitle>
               <CardDescription>{order.items?.length || 0} item(s)</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {order.items && order.items.length > 0 ? (
-                <div className="space-y-3">
-                  {order.items.map((item) => {
-                    const isFullyReceived = item.receivedQuantity && item.receivedQuantity >= item.quantity;
-                    const isPartiallyReceived = item.receivedQuantity && item.receivedQuantity > 0 && item.receivedQuantity < item.quantity;
-                    
-                    return (
-                      <div key={item.id} className="p-3 border rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="font-medium">
-                              {(item.itemId ?? (item as { ingredientId?: number }).ingredientId) ? (
-                                <Link
-                                  href={`/items/${item.itemId ?? (item as { ingredientId?: number }).ingredientId}`}
-                                  className="text-primary hover:underline"
-                                >
-                                  {item.item?.name || (item as { ingredient?: { name?: string } }).ingredient?.name || `Item #${item.itemId ?? (item as { ingredientId?: number }).ingredientId}`}
-                                </Link>
-                              ) : (
-                                item.item?.name || (item as { ingredient?: { name?: string } }).ingredient?.name || `Item #${item.itemId ?? (item as { ingredientId?: number }).ingredientId}`
-                              )}
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="h-9 pl-4 pr-2 text-xs font-medium text-muted-foreground">
+                        Item
+                      </TableHead>
+                      <TableHead className="h-9 w-[1%] whitespace-nowrap px-2 text-right text-xs font-medium text-muted-foreground">
+                        Ordered
+                      </TableHead>
+                      <TableHead className="h-9 w-[1%] whitespace-nowrap px-2 text-right text-xs font-medium text-muted-foreground">
+                        Received
+                      </TableHead>
+                      <TableHead className="h-9 w-[1%] whitespace-nowrap px-2 text-right text-xs font-medium text-muted-foreground">
+                        Unit
+                      </TableHead>
+                      <TableHead className="h-9 w-[1%] whitespace-nowrap pr-4 pl-2 text-right text-xs font-medium text-muted-foreground">
+                        Line
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {order.items.map((item) => {
+                      const isFullyReceived =
+                        item.receivedQuantity != null && item.receivedQuantity >= item.quantity;
+                      const isPartiallyReceived =
+                        item.receivedQuantity != null &&
+                        item.receivedQuantity > 0 &&
+                        item.receivedQuantity < item.quantity;
+                      const lineTotal = item.totalPrice + (item.taxAmount ?? 0);
+                      const itemId = item.itemId ?? (item as { ingredientId?: number }).ingredientId;
+                      const itemName =
+                        item.item?.name ||
+                        (item as { ingredient?: { name?: string } }).ingredient?.name ||
+                        `Item #${itemId}`;
+
+                      return (
+                        <TableRow key={item.id} className="text-sm">
+                          <TableCell className="max-w-[min(280px,45vw)] py-2 pl-4 pr-2 align-top">
+                            <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                              <span className="min-w-0 truncate font-medium">
+                                {itemId ? (
+                                  <Link
+                                    href={`/items/${itemId}`}
+                                    className="text-primary hover:underline"
+                                  >
+                                    {itemName}
+                                  </Link>
+                                ) : (
+                                  itemName
+                                )}
+                              </span>
+                              <span className="flex shrink-0 gap-1">
+                                {isFullyReceived ? (
+                                  <Badge variant="default" className="text-[10px] leading-none">
+                                    Received
+                                  </Badge>
+                                ) : null}
+                                {isPartiallyReceived ? (
+                                  <Badge variant="outline" className="text-[10px] leading-none">
+                                    Partial
+                                  </Badge>
+                                ) : null}
+                              </span>
                             </div>
-                            <div className="text-sm text-muted-foreground mt-1">
-                              Ordered: {item.quantity} {item.unit}
-                            </div>
-                            {item.receivedQuantity !== undefined && (
-                              <div className={`text-sm mt-1 ${isFullyReceived ? 'text-green-600' : isPartiallyReceived ? 'text-orange-600' : 'text-muted-foreground'}`}>
-                                Received: {item.receivedQuantity} {item.unit}
-                                {isPartiallyReceived && ` (${((item.receivedQuantity / item.quantity) * 100).toFixed(0)}%)`}
-                              </div>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap py-2 px-2 text-right tabular-nums text-muted-foreground">
+                            {item.quantity} <span className="text-xs">{item.unit}</span>
+                          </TableCell>
+                          <TableCell
+                            className={`whitespace-nowrap py-2 px-2 text-right tabular-nums ${
+                              isFullyReceived
+                                ? "text-green-600"
+                                : isPartiallyReceived
+                                  ? "text-orange-600"
+                                  : "text-muted-foreground"
+                            }`}
+                          >
+                            {item.receivedQuantity != null ? (
+                              <>
+                                {item.receivedQuantity}{" "}
+                                <span className="text-xs">{item.unit}</span>
+                                {isPartiallyReceived ? (
+                                  <span className="ml-1 text-[10px] opacity-80">
+                                    ({((item.receivedQuantity! / item.quantity) * 100).toFixed(0)}%)
+                                  </span>
+                                ) : null}
+                              </>
+                            ) : (
+                              "—"
                             )}
-                            <div className="text-sm text-muted-foreground mt-1">
-                              Unit price: {formatCurrency(item.unitPrice)}
-                              {item.taxRatePercent != null && item.taxRatePercent > 0 && (
-                                <> • Tax {item.taxRatePercent}%: {formatCurrency(item.taxAmount ?? 0)}</>
-                              )}
-                              {" • "}
-                              Total: {formatCurrency(item.totalPrice + (item.taxAmount ?? 0))}
-                            </div>
-                          </div>
-                          {isFullyReceived && (
-                            <Badge variant="default" className="ml-2">Received</Badge>
-                          )}
-                          {isPartiallyReceived && (
-                            <Badge variant="outline" className="ml-2">Partial</Badge>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap py-2 px-2 text-right align-top tabular-nums">
+                            <div>{formatCurrency(item.unitPrice)}</div>
+                            {item.taxRatePercent != null && item.taxRatePercent > 0 ? (
+                              <div className="text-[11px] leading-tight text-muted-foreground">
+                                +{item.taxRatePercent}% tax · {formatCurrency(item.taxAmount ?? 0)}
+                              </div>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap py-2 pr-4 pl-2 text-right font-medium tabular-nums">
+                            {formatCurrency(lineTotal)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               ) : (
-                <div className="text-sm text-muted-foreground text-center py-4">
+                <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                   No items in this order
                 </div>
               )}

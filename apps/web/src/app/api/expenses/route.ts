@@ -18,7 +18,7 @@ import {
 import { paymentSlicesSumMatchesTotal, replacePaymentsForEntry } from '@/lib/ledger/replace-entry-payments';
 import { getEntryPaymentAggregates } from '@/lib/ledger/entry-payment-aggregates';
 import { toPositiveItemId } from '@/lib/merge-selector-items';
-import { hydrateExpenseLineItemItems } from '@/lib/expenses/hydrate-expense-line-item-items';
+import { hydrateExpenseLineItems } from '@/lib/expenses/hydrate-expense-line-item-items';
 import { replaceExpenseStockMovements } from '@/lib/expenses/replace-expense-stock-movements';
 import {
   expenseCategoryNameIsActive,
@@ -53,11 +53,30 @@ function transformLineItem(row: any): ExpenseLineItem {
   const subscription = row.subscription;
   const rawItem = row.item;
   const item = Array.isArray(rawItem) ? rawItem[0] ?? undefined : rawItem;
+  const lk = row.line_kind;
   return {
     id: row.id,
     expenseId: row.expense_id,
     itemId: toPositiveItemId(row.item_id),
     subscriptionId: row.subscription_id ?? undefined,
+    loanId: row.loan_id != null ? Number(row.loan_id) : undefined,
+    loanScheduleId: row.loan_schedule_id != null ? Number(row.loan_schedule_id) : undefined,
+    leasingId: row.leasing_id != null ? Number(row.leasing_id) : undefined,
+    leasingTimelineEntryId:
+      row.leasing_timeline_entry_id != null ? Number(row.leasing_timeline_entry_id) : undefined,
+    personnelId: row.personnel_id != null ? Number(row.personnel_id) : undefined,
+    personnelHourEntryId:
+      row.personnel_hour_entry_id != null ? Number(row.personnel_hour_entry_id) : undefined,
+    personnelSalaryProjectionId:
+      row.personnel_salary_projection_id != null ? Number(row.personnel_salary_projection_id) : undefined,
+    lineKind:
+      lk === 'salary_net' ||
+      lk === 'payroll_taxes' ||
+      lk === 'contractor_hours' ||
+      lk === 'loan_payment' ||
+      lk === 'leasing_payment'
+        ? lk
+        : undefined,
     quantity: parseFloat(row.quantity),
     unitId: row.unit_id ?? undefined,
     unitPrice: parseFloat(row.unit_price),
@@ -424,7 +443,7 @@ export async function POST(request: NextRequest) {
         .select('*, subscription:subscriptions(id, name)')
         .eq('expense_id', expenseRow.id)
         .order('sort_order', { ascending: true });
-      const lineItems = await hydrateExpenseLineItemItems(supabase, (lineRows || []).map(transformLineItem));
+      const lineItems = await hydrateExpenseLineItems(supabase, (lineRows || []).map(transformLineItem));
       return NextResponse.json(transformExpense(expenseRow, lineItems), { status: 201 });
     }
 
@@ -470,7 +489,7 @@ export async function POST(request: NextRequest) {
       .select('*, subscription:subscriptions(id, name)')
       .eq('expense_id', data.id)
       .order('sort_order', { ascending: true });
-    const lineItems = await hydrateExpenseLineItemItems(supabase, (lineRows || []).map(transformLineItem));
+    const lineItems = await hydrateExpenseLineItems(supabase, (lineRows || []).map(transformLineItem));
     return NextResponse.json(transformExpense(data, lineItems), { status: 201 });
   } catch (error: any) {
     console.error('Error creating expense:', error);

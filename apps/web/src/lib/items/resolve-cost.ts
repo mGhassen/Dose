@@ -10,12 +10,15 @@
  *
  * The returned `unitPrice` is expressed in the requested `targetUnitId`. If that unit is
  * null (or no factor available), the returned price is in the item's native unit.
+ *
+ * If `itemId` belongs to a merged group, pricing uses the group's canonical item.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   convertQuantityWithContext,
   convertUnitPriceWithContext,
+  convertUnitPriceWithContextOrFactorFallback,
   logUnitConversionWarning,
   type UnitConversionContext,
 } from "@/lib/units/convert";
@@ -44,6 +47,25 @@ async function loadItem(
     .eq('id', itemId)
     .maybeSingle();
   return (data as ItemRow | null) ?? null;
+}
+
+/** Merged items share an `item_groups` row; cost/recipe links follow the canonical item. */
+async function resolveCanonicalItemIdForCost(
+  supabase: SupabaseClient,
+  itemId: number
+): Promise<number> {
+  const { data } = await supabase
+    .from('items')
+    .select('group_id')
+    .eq('id', itemId)
+    .maybeSingle();
+  if (!data?.group_id) return itemId;
+  const { data: group } = await supabase
+    .from('item_groups')
+    .select('canonical_item_id')
+    .eq('id', data.group_id)
+    .maybeSingle();
+  return group?.canonical_item_id ?? itemId;
 }
 
 /**
@@ -102,8 +124,13 @@ export async function resolveItemUnitCost(
   conversionContext: UnitConversionContext,
   seenRecipeIds: Set<number> = new Set()
 ): Promise<ResolvedItemCost> {
-  const item = await loadItem(supabase, itemId);
+  const effectiveItemId = await resolveCanonicalItemIdForCost(supabase, itemId);
+  const item = await loadItem(supabase, effectiveItemId);
   if (!item) return { unitPrice: 0, hasPrice: false, source: 'none' };
+
+  const requesterItem = itemId === effectiveItemId ? item : await loadItem(supabase, itemId);
+  const effectiveTargetUnitId =
+    targetUnitId ?? requesterItem?.unit_id ?? null;
 
   if (item.produced_from_recipe_id && !seenRecipeIds.has(item.produced_from_recipe_id)) {
     const recipeCost = await computeRecipeUnitCost(
@@ -115,11 +142,12 @@ export async function resolveItemUnitCost(
     if (recipeCost) {
       const { unitCostInRecipeUnit, recipeUnitId } = recipeCost;
       let unitPrice = unitCostInRecipeUnit;
-      if (targetUnitId != null && recipeUnitId != null) {
-        const priceResult = convertUnitPriceWithContext(
+      const sourceUnitId = recipeUnitId ?? item.unit_id ?? null;
+      if (effectiveTargetUnitId != null && sourceUnitId != null) {
+        const priceResult = convertUnitPriceWithContextOrFactorFallback(
           unitCostInRecipeUnit,
-          recipeUnitId,
-          targetUnitId,
+          sourceUnitId,
+          effectiveTargetUnitId,
           conversionContext
         );
         unitPrice = priceResult.unitPrice;
@@ -136,48 +164,49 @@ export async function resolveItemUnitCost(
   const { data: orderItems } = await supabase
     .from('supplier_order_items')
     .select('unit_price, unit, quantity, unit_id')
-    .eq('item_id', itemId)
+    .eq('item_id', effectiveItemId)
     .gte('created_at', threeMonthsAgo.toISOString())
     .order('created_at', { ascending: false })
     .limit(10);
 
-  if (orderItems && orderItems.length > 0 && targetUnitId != null) {
-    let totalValueInTargetUnit = 0;
-    let totalQtyInTargetUnit = 0;
-    for (const oi of orderItems) {
-      const orderQty = parseFloat(oi.quantity);
-      const orderUnitId = oi.unit_id as number | null;
-      const qtyResult = convertQuantityWithContext(
-        orderQty,
-        orderUnitId,
-        targetUnitId,
-        conversionContext
-      );
-      const qtyInTargetUnit = qtyResult.quantity;
-      if (qtyResult.warning) {
-        logUnitConversionWarning("resolve-item-cost:order-quantity", qtyResult.warning);
+  if (orderItems && orderItems.length > 0) {
+    if (effectiveTargetUnitId != null) {
+      let totalValueInTargetUnit = 0;
+      let totalQtyInTargetUnit = 0;
+      for (const oi of orderItems) {
+        const orderQty = parseFloat(oi.quantity);
+        const orderUnitId = (oi.unit_id as number | null) ?? item.unit_id ?? null;
+        const qtyResult = convertQuantityWithContext(
+          orderQty,
+          orderUnitId,
+          effectiveTargetUnitId,
+          conversionContext
+        );
+        const qtyInTargetUnit = qtyResult.quantity;
+        if (qtyResult.warning) {
+          logUnitConversionWarning("resolve-item-cost:order-quantity", qtyResult.warning);
+        }
+        const priceResult = convertUnitPriceWithContextOrFactorFallback(
+          parseFloat(oi.unit_price),
+          orderUnitId,
+          effectiveTargetUnitId,
+          conversionContext
+        );
+        const pricePerTargetUnit = priceResult.unitPrice;
+        if (priceResult.warning) {
+          logUnitConversionWarning("resolve-item-cost:order-price", priceResult.warning);
+        }
+        totalValueInTargetUnit += qtyInTargetUnit * pricePerTargetUnit;
+        totalQtyInTargetUnit += qtyInTargetUnit;
       }
-      const priceResult = convertUnitPriceWithContext(
-        parseFloat(oi.unit_price),
-        orderUnitId,
-        targetUnitId,
-        conversionContext
-      );
-      const pricePerTargetUnit = priceResult.unitPrice;
-      if (priceResult.warning) {
-        logUnitConversionWarning("resolve-item-cost:order-price", priceResult.warning);
+      if (totalQtyInTargetUnit > 0) {
+        return {
+          unitPrice: totalValueInTargetUnit / totalQtyInTargetUnit,
+          hasPrice: true,
+          source: 'order',
+        };
       }
-      totalValueInTargetUnit += qtyInTargetUnit * pricePerTargetUnit;
-      totalQtyInTargetUnit += qtyInTargetUnit;
     }
-    if (totalQtyInTargetUnit > 0) {
-      return {
-        unitPrice: totalValueInTargetUnit / totalQtyInTargetUnit,
-        hasPrice: true,
-        source: 'order',
-      };
-    }
-  } else if (orderItems && orderItems.length > 0) {
     const totalValue = orderItems.reduce(
       (sum: number, r: { unit_price: string; quantity: string }) =>
         sum + parseFloat(r.unit_price) * parseFloat(r.quantity),
@@ -193,15 +222,15 @@ export async function resolveItemUnitCost(
   }
 
   const todayStr = new Date().toISOString().split('T')[0];
-  const hist = await getItemCostAsOf(supabase, itemId, todayStr);
+  const hist = await getItemCostAsOf(supabase, effectiveItemId, todayStr);
   if (hist.unitCost != null && hist.unitCost > 0) {
     let unitPrice = hist.unitCost;
     const itemUnitId = item.unit_id;
-    if (targetUnitId != null && itemUnitId != null) {
-      const priceResult = convertUnitPriceWithContext(
+    if (effectiveTargetUnitId != null && itemUnitId != null) {
+      const priceResult = convertUnitPriceWithContextOrFactorFallback(
         hist.unitCost,
         itemUnitId,
-        targetUnitId,
+        effectiveTargetUnitId,
         conversionContext
       );
       unitPrice = priceResult.unitPrice;
