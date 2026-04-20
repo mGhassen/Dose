@@ -10,12 +10,13 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { UnifiedSelector } from "@/components/unified-selector";
+import { ItemCategorySelector } from "@/components/item-category-selector";
 import { CreateItemMultiStepDialog } from "@/components/create-item-multistep-dialog";
 import { RecipeModifiersSection, type RecipeModifierRowInput } from "@/components/recipe-modifiers-section";
 import { StatusPin } from "@/components/status-pin";
 import { Save, X, Trash2, Plus, ChefHat, MoreVertical, Edit2, AlertTriangle, CheckCircle, Package, Link2 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
-import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useCreateProducedItem, useItems, useUnits, useProduceRecipe, useRecipeCost, useStockLevels } from "@kit/hooks";
+import { useRecipeById, useUpdateRecipe, useDeleteRecipe, useCreateProducedItem, useItems, useUnits, useProduceRecipe, useRecipeCost, useStockLevels, useItemCategories } from "@kit/hooks";
 import { toast } from "sonner";
 import { formatDate } from "@kit/lib/date-format";
 import { formatCurrency } from "@kit/lib/config";
@@ -65,6 +66,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const [createItemTargetIndex, setCreateItemTargetIndex] = useState<number | null>(null);
   const { data: allItemsResponse } = useItems({ limit: 1000 });
   const allItems = allItemsResponse?.data ?? [];
+  const { data: itemCategories = [] } = useItemCategories();
   
   // Fetch stock levels for all recipe items when dialog is open
   const recipeItemIds = recipe?.items?.map(ri => ri.itemId?.toString()).filter(Boolean) ||
@@ -93,6 +95,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     name: "",
     description: "",
     category: "",
+    categoryId: null as number | null,
     unit: "",
     unitId: null as number | null,
     servingSize: "",
@@ -115,6 +118,7 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
         name: recipe.name,
         description: recipe.description || "",
         category: recipe.category || "",
+        categoryId: null,
         unit: recipe.unit || "",
         unitId: recipe.unitId ?? null,
         servingSize: recipe.servingSize?.toString() || "",
@@ -149,11 +153,36 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     }
   }, [recipe]);
 
+  useEffect(() => {
+    if (formData.categoryId != null) return;
+    const category = formData.category.trim();
+    if (!category) return;
+    const matched = itemCategories.find(
+      (itemCategory) =>
+        itemCategory.label.toLowerCase() === category.toLowerCase() ||
+        itemCategory.name.toLowerCase() === category.toLowerCase()
+    );
+    if (!matched) return;
+    setFormData((prev) =>
+      prev.categoryId != null
+        ? prev
+        : {
+            ...prev,
+            categoryId: matched.id,
+            category: matched.label,
+          }
+    );
+  }, [formData.category, formData.categoryId, itemCategories]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name) {
       toast.error("Please fill in the recipe name");
+      return;
+    }
+    if (formData.categoryId == null || !formData.category.trim()) {
+      toast.error("Please select the item category");
       return;
     }
 
@@ -382,12 +411,19 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="category">Category</Label>
-                      <Input
+                      <ItemCategorySelector
                         id="category"
-                        value={formData.category}
-                        onChange={(e) => handleInputChange('category', e.target.value)}
-                        placeholder="e.g., Beverages, Food"
+                        label="Item Category *"
+                        required
+                        selectedId={formData.categoryId}
+                        onSelect={(cat) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            categoryId: cat?.id ?? null,
+                            category: cat?.label ?? "",
+                          }))
+                        }
+                        placeholder="Select item category"
                       />
                     </div>
 

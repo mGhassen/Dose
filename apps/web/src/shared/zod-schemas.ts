@@ -932,7 +932,7 @@ export const createRecipeSchema = z.object({
   description: z.string().nullish(),
   unit: z.string().nullish(),
   unitId: z.number().nullish(),
-  category: z.string().nullish(),
+  category: z.string().trim().min(1, "Category is required"),
   servingSize: z.number().nullish(),
   preparationTime: z.number().nullish(),
   cookingTime: z.number().nullish(),

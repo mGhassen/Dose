@@ -9,6 +9,7 @@ import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
 import { UnifiedSelector } from "@/components/unified-selector";
+import { ItemCategorySelector } from "@/components/item-category-selector";
 import { CreateItemMultiStepDialog } from "@/components/create-item-multistep-dialog";
 import { RecipeModifiersSection, type RecipeModifierRowInput } from "@/components/recipe-modifiers-section";
 import { Save, X, Plus, Trash2 } from "lucide-react";
@@ -37,6 +38,7 @@ function CreateRecipeForm() {
     name: "",
     description: "",
     category: "",
+    categoryId: null as number | null,
     servingSize: "",
     unitId: null as number | null,
     unit: "",
@@ -69,6 +71,7 @@ function CreateRecipeForm() {
       name: prev.name.trim() ? prev.name : producedItemRow.name,
       description: prev.description.trim() ? prev.description : producedItemRow.description ?? "",
       category: prev.category.trim() ? prev.category : producedItemRow.category?.label ?? producedItemRow.category?.name ?? "",
+      categoryId: prev.categoryId ?? producedItemRow.category?.id ?? null,
       unit: prev.unit.trim() ? prev.unit : producedItemRow.unit ?? "",
       unitId: prev.unitId ?? producedItemRow.unitId ?? null,
     }));
@@ -84,6 +87,10 @@ function CreateRecipeForm() {
 
     if (!formData.name) {
       toast.error("Please fill in the recipe name");
+      return;
+    }
+    if (formData.categoryId == null || !formData.category.trim()) {
+      toast.error("Please select the item category");
       return;
     }
 
@@ -192,6 +199,23 @@ function CreateRecipeForm() {
                         onChange={(e) => handleInputChange("name", e.target.value)}
                         placeholder="Recipe name"
                         required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <ItemCategorySelector
+                        id="category"
+                        label="Item Category *"
+                        required
+                        selectedId={formData.categoryId}
+                        onSelect={(cat) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            categoryId: cat?.id ?? null,
+                            category: cat?.label ?? "",
+                          }));
+                        }}
+                        placeholder="Select item category"
                       />
                     </div>
 
