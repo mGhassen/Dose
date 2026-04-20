@@ -539,7 +539,7 @@ export function SupplierOrderEditor(props: {
                               required
                               type="item"
                               items={allItems
-                                .filter((i) => i.isActive && i.itemTypes?.includes("item"))
+                                .filter((i) => i.isActive && !i.isCatalogParent)
                                 .map((item) => ({ ...item, id: item.id, name: `${item.name} (${item.unit})` }))}
                               selectedId={it.itemId || undefined}
                               onSelect={(sel) => updateItem(idx, { itemId: sel.id === 0 ? 0 : Number(sel.id) })}
