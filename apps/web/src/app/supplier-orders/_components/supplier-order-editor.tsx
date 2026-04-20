@@ -129,6 +129,7 @@ export function SupplierOrderEditor(props: {
   submitLabel?: string;
   className?: string;
 }) {
+  const [numericDrafts, setNumericDrafts] = useState<Record<string, string>>({});
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const { data: itemsResponse } = useItems({ limit: 1000 });
   const { data: unitsResponse } = useUnits();
@@ -142,6 +143,18 @@ export function SupplierOrderEditor(props: {
   const [createItemOpen, setCreateItemOpen] = useState(false);
   const [createItemTargetIdx, setCreateItemTargetIdx] = useState<number | null>(null);
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
+  const parseDecimalInput = (rawValue: string) => {
+    const normalized = rawValue.replace(",", ".").trim();
+    if (!normalized) return 0;
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const numericDraftKey = (idx: number, field: "quantity" | "unitPrice") => `${idx}:${field}`;
+  const getNumericInputValue = (idx: number, field: "quantity" | "unitPrice", numericValue: number) => {
+    const key = numericDraftKey(idx, field);
+    if (Object.prototype.hasOwnProperty.call(numericDrafts, key)) return numericDrafts[key];
+    return numericValue === 0 ? "" : String(numericValue);
+  };
 
   const [state, setState] = useState<OrderEditorState>(() => {
     if (props.initialOrder) return supplierOrderStateFromOrder(props.initialOrder);
@@ -187,10 +200,11 @@ export function SupplierOrderEditor(props: {
 
   useEffect(() => {
     if (props.mode !== "create") return;
-    if (!props.initialSupplierId) return;
+    const initialSupplierId = props.initialSupplierId;
+    if (!initialSupplierId) return;
     setState((s) => {
       if (s.supplierId) return s;
-      return { ...s, supplierId: props.initialSupplierId };
+      return { ...s, supplierId: initialSupplierId };
     });
   }, [props.mode, props.initialSupplierId]);
 
@@ -342,6 +356,23 @@ export function SupplierOrderEditor(props: {
         })
         .catch(() => {});
     }
+  };
+  const handleNumericInputChange = (idx: number, field: "quantity" | "unitPrice", rawValue: string) => {
+    const key = numericDraftKey(idx, field);
+    setNumericDrafts((prev) => ({ ...prev, [key]: rawValue }));
+    const patch = { [field]: parseDecimalInput(rawValue) } as Partial<OrderEditorItem>;
+    updateItem(idx, patch);
+  };
+  const handleNumericInputBlur = (idx: number, field: "quantity" | "unitPrice", rawValue: string) => {
+    const key = numericDraftKey(idx, field);
+    const patch = { [field]: parseDecimalInput(rawValue) } as Partial<OrderEditorItem>;
+    updateItem(idx, patch);
+    setNumericDrafts((prev) => {
+      if (!Object.prototype.hasOwnProperty.call(prev, key)) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   };
 
   const submit = async () => {
@@ -567,8 +598,9 @@ export function SupplierOrderEditor(props: {
                               step="0.01"
                               min="0"
                               className="text-right tabular-nums h-10"
-                              value={it.quantity || ""}
-                              onChange={(e) => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
+                              value={getNumericInputValue(idx, "quantity", it.quantity)}
+                              onChange={(e) => handleNumericInputChange(idx, "quantity", e.target.value)}
+                              onBlur={(e) => handleNumericInputBlur(idx, "quantity", e.target.value)}
                               placeholder="0"
                             />
                           </div>
@@ -594,14 +626,22 @@ export function SupplierOrderEditor(props: {
                           </div>
 
                           <div>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              className="text-right tabular-nums h-10"
-                              value={it.unitPrice || ""}
-                              onChange={(e) => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })}
-                              placeholder="0"
+                            <InputGroupAttached
+                              addonStyle="default"
+                              input={
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  min="0"
+                                  lang="fr-FR"
+                                  className="text-right tabular-nums"
+                                  value={getNumericInputValue(idx, "unitPrice", it.unitPrice)}
+                                  onChange={(e) => handleNumericInputChange(idx, "unitPrice", e.target.value)}
+                                  onBlur={(e) => handleNumericInputBlur(idx, "unitPrice", e.target.value)}
+                                  placeholder="0"
+                                />
+                              }
+                              addon={<span className="text-muted-foreground text-xs">€</span>}
                             />
                           </div>
 
