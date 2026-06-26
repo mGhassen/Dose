@@ -119,11 +119,17 @@ export async function POST(request: NextRequest) {
     const accountStatus = (account.status || 'active').toLowerCase();
 
     if (accountStatus === 'pending') {
-      return NextResponse.json({ redirectTo: '/auth/waiting-approval' });
+      return NextResponse.json({
+        redirectTo: '/auth/waiting-approval',
+        email: account.email,
+      });
     }
 
     if (accountStatus === 'suspended' || accountStatus === 'archived') {
-      return NextResponse.json({ redirectTo: '/auth/account-status' });
+      return NextResponse.json({
+        redirectTo: '/auth/account-status',
+        email: account.email,
+      });
     }
 
     return NextResponse.json({ redirectTo: '/auth/oauth-success', success: true });

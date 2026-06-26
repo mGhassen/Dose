@@ -5,23 +5,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@kit/
 import { Clock, ArrowLeft, RefreshCw, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useToast } from "@kit/hooks";
 import { useAuth } from "@kit/hooks";
 
 export default function WaitingApprovalPage() {
   const { checkAccountStatus } = useAuth();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<string>("pending");
   const { toast } = useToast();
 
   useEffect(() => {
-    // Get email from localStorage
-    const emailFromStorage = localStorage.getItem('account_status_email');
-    if (emailFromStorage) {
+    const emailFromUrl = searchParams.get("email");
+    const emailFromStorage = localStorage.getItem("account_status_email");
+
+    if (emailFromUrl) {
+      setEmail(emailFromUrl);
+      localStorage.setItem("account_status_email", emailFromUrl);
+    } else if (emailFromStorage) {
       setEmail(emailFromStorage);
     }
-  }, []);
+  }, [searchParams]);
 
   const handleCheckStatus = async () => {
     if (!email) {
@@ -38,16 +43,13 @@ export default function WaitingApprovalPage() {
       const data = await checkAccountStatus(email);
       
       if (data.success) {
-        setStatus(data.status || "archived");
-        
-        // If user is active, redirect to login
-        if (data.status === 'active') {
+        if (data.status === "active") {
           toast({
             title: "Account Approved!",
-            description: "Your account has been approved. You can now log in.",
+            description: "Your account has been approved. You can now sign in.",
           });
           setTimeout(() => {
-            window.location.href = '/auth/login';
+            window.location.href = "/auth/login";
           }, 2000);
         }
       } else {

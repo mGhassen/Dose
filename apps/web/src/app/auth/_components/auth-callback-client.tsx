@@ -26,12 +26,22 @@ async function finishOAuthSession(
   }
 
   if (data.redirectTo === "/auth/waiting-approval") {
-    router.replace("/auth/waiting-approval");
+    if (data.email) {
+      localStorage.setItem("account_status_email", data.email);
+    }
+    const url = new URL("/auth/waiting-approval", window.location.origin);
+    if (data.email) url.searchParams.set("email", data.email);
+    router.replace(url.toString());
     return;
   }
 
   if (data.redirectTo === "/auth/account-status") {
-    router.replace("/auth/account-status");
+    if (data.email) {
+      localStorage.setItem("account_status_email", data.email);
+    }
+    const url = new URL("/auth/account-status", window.location.origin);
+    if (data.email) url.searchParams.set("email", data.email);
+    router.replace(url.toString());
     return;
   }
 
