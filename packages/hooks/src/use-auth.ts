@@ -3,7 +3,7 @@
 import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-// import { useLocale } from 'next-intl';
+import { createClient } from '@supabase/supabase-js';
 import { authApi, RegisterData, LoginCredentials, AuthResponse } from '@kit/lib/api/auth';
 import { safeLocalStorage } from '@kit/lib/localStorage';
 
@@ -722,14 +722,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         setIsLoggingIn(true);
         setLoginError(null);
-        
-        // Mock Google OAuth flow
-        const redirectUrl = `${window.location.origin}/auth/callback`;
-        
-        // Mock: Redirect to callback with mock Google auth
-        const googleAuthUrl = `${redirectUrl}?code=mock_google_code&state=mock_state`;
-        
-        window.location.href = googleAuthUrl;
+
+        const returnTo = new URLSearchParams(window.location.search).get('returnTo');
+        if (returnTo) {
+          sessionStorage.setItem('oauth_return_to', returnTo);
+        }
+
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        if (!supabaseUrl || !supabaseAnonKey) {
+          throw new Error('Supabase configuration missing');
+        }
+
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+
+        if (error) throw error;
       } catch (error: any) {
         console.error('Google login error:', error);
         setLoginError(new Error(error.message || 'Failed to initiate Google login'));
@@ -743,7 +756,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setIsLoggingIn(true);
         setLoginError(null);
         
-        // Store tokens
         safeLocalStorage.setItem('access_token', googleData.access_token);
         if (googleData.refresh_token) {
           safeLocalStorage.setItem('refresh_token', googleData.refresh_token);
@@ -752,14 +764,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
           window.__authToken = googleData.access_token;
         }
 
-        // Clear query cache to prevent data leakage from previous user
+        await fetch('/api/auth/sync-cookie', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${googleData.access_token}` },
+          credentials: 'include',
+        }).catch(() => {});
+
         clearQueryCache();
         
-        // Fetch user session to complete the login
         const user = await fetchSession(googleData.access_token);
         if (user) {
-          
           setUser(user);
+          setAuthCheckComplete(true);
         }
       } catch (error: any) {
         console.error('Google registration completion error:', error);

@@ -95,7 +95,7 @@ export const authConfig: AuthConfig = {
     required: false,
   },
   oauth: {
-    providers: [],
+    providers: ['google'],
     redirectUrl: process.env.NEXT_PUBLIC_OAUTH_REDIRECT_URL,
   },
   permissions: {

@@ -160,6 +160,9 @@ export async function GET(request: NextRequest) {
     : ['conductor'];
   
   // Transform user data to match expected format
+  const authProvider =
+    authUser.app_metadata?.provider === 'google' ? 'google' : 'email';
+
   const transformedUser = {
     id: authUser.id,
     account_id: account.id,
@@ -173,7 +176,7 @@ export async function GET(request: NextRequest) {
     isAdmin: account.is_admin || false,
     status: account.status,
     role: account.is_admin ? 'admin' as const : 'user' as const,
-    provider: 'email',
+    provider: authProvider,
     accessiblePortals
   };
   
