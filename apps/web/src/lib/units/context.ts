@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildUnitConversionContext,
   type UnitConversionContext,
@@ -16,7 +15,7 @@ type UnitVariableRow = {
 };
 
 export async function loadUnitConversionContext(
-  supabase: SupabaseClient
+  supabase: { from: (table: string) => any }
 ): Promise<UnitConversionContext> {
   const { data, error } = await supabase
     .from("variables")

@@ -1,6 +1,7 @@
 import type { supabaseServer } from '@kit/lib/supabase';
 
 type Supa = ReturnType<typeof supabaseServer>;
+type SupabaseFrom = { from: (table: string) => any };
 
 /**
  * Resolve the set of item ids that should be aggregated together for analytics/detail views.
@@ -40,7 +41,7 @@ export async function getGroupMemberIds(
 }
 
 /** For pricing/cost resolution, history and supplier data are keyed on the merged group's canonical item. */
-export async function resolveCanonicalItemIdForCost(supabase: Supa, itemId: number): Promise<number> {
+export async function resolveCanonicalItemIdForCost(supabase: SupabaseFrom, itemId: number): Promise<number> {
   const { data } = await supabase
     .from('items')
     .select('group_id')
