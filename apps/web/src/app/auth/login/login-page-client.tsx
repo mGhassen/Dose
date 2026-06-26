@@ -56,11 +56,18 @@ export function LoginPageClient({ loginImages }: LoginPageClientProps) {
     }
 
     if (errorParam) {
+      const oauthMessage = searchParams.get("message");
       switch (errorParam) {
         case "oauth_error":
-          setError(
-            "Google authentication was cancelled or failed. Please try again."
-          );
+          if (oauthMessage === "access_denied") {
+            setError(
+              "Google sign-in was denied. If you use a Google Cloud app in Testing mode, add your email as a test user, or click Allow on the consent screen."
+            );
+          } else {
+            setError(
+              "Google authentication was cancelled or failed. Please try again."
+            );
+          }
           break;
         case "no_code":
           setError(
