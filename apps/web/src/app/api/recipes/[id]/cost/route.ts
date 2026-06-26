@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import { resolveItemUnitCost } from "@/lib/items/resolve-cost";
+import { convertQuantityWithContext } from "@/lib/units/convert";
 import { loadUnitConversionContext } from "@/lib/units/context";
 
 export async function GET(
@@ -194,6 +195,21 @@ export async function GET(
           ? conversionContext.symbolMap.get(denomUnitId)?.trim() || `unit#${denomUnitId}`
           : 'unit';
 
+      let billableQty = recipeQty;
+      if (
+        recipeUnitId != null &&
+        denomUnitId != null &&
+        recipeUnitId !== denomUnitId
+      ) {
+        const q = convertQuantityWithContext(
+          recipeQty,
+          recipeUnitId,
+          denomUnitId,
+          conversionContext
+        );
+        if (q.converted) billableQty = q.quantity;
+      }
+
       group.options.push({
         modifierId: mod.id,
         modifierName: mod.name,
@@ -201,7 +217,7 @@ export async function GET(
         supplyItemName: mod.item?.name ?? null,
         quantity: recipeQty,
         unitPrice,
-        totalCost: recipeQty * unitPrice,
+        totalCost: billableQty * unitPrice,
         hasPrice,
         priceSource: source,
         enabled: true,

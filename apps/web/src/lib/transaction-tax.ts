@@ -29,6 +29,32 @@ export function getEffectiveTransactionTaxRate(
   return valid[0]?.value ?? 0;
 }
 
+/**
+ * supplier_order_items does not persist tax_inclusive; infer it from stored line math.
+ */
+export function inferTaxInclusiveFromStoredLine(line: {
+  quantity: number;
+  unitPrice: number;
+  taxRatePercent?: number;
+  taxAmount?: number;
+}): boolean {
+  const q = line.quantity;
+  const up = line.unitPrice;
+  const rate = line.taxRatePercent ?? 0;
+  const stored = line.taxAmount;
+  if (rate <= 0 || stored == null || !Number.isFinite(q) || !Number.isFinite(up) || q <= 0) {
+    return false;
+  }
+  const ex = lineTaxAmount(q, up, rate, false);
+  const inc = lineTaxAmount(q, up, rate, true);
+  const tol = 0.02;
+  const dEx = Math.abs(ex.taxAmount - stored);
+  const dIn = Math.abs(inc.taxAmount - stored);
+  if (dEx < tol && dIn >= tol) return false;
+  if (dIn < tol && dEx >= tol) return true;
+  return dIn < dEx;
+}
+
 /** When taxInclusive: unitPrice is incl. tax. Otherwise unitPrice is excl. tax. Returns lineTotalNet (excl.) and taxAmount. */
 export function lineTaxAmount(
   quantity: number,

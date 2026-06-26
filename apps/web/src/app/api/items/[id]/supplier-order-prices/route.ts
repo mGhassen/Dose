@@ -23,7 +23,12 @@ export async function GET(
         quantity,
         unit,
         created_at,
-        supplier_orders(order_date, order_number)
+        supplier_orders(
+          id,
+          order_date,
+          order_number,
+          suppliers(name)
+        )
       `)
       .in('item_id', memberIds)
       .order('created_at', { ascending: false })
@@ -32,14 +37,27 @@ export async function GET(
     if (error) throw error;
 
     const list = (rows || []).map((r: any) => {
-      const order = r.supplier_orders;
+      const raw = r.supplier_orders;
+      const order = Array.isArray(raw) ? raw[0] : raw;
+      const orderId =
+        order && typeof order === 'object' && order.id != null
+          ? Number(order.id)
+          : null;
+      const supRaw = order?.suppliers;
+      const sup = Array.isArray(supRaw) ? supRaw[0] : supRaw;
+      const supplierName =
+        sup && typeof sup === 'object' && sup.name != null
+          ? String(sup.name).trim() || null
+          : null;
       return {
         id: r.id,
         unitPrice: r.unit_price != null ? parseFloat(r.unit_price) : null,
         quantity: r.quantity != null ? parseFloat(r.quantity) : null,
         unit: r.unit ?? '',
+        orderId,
         orderDate: order?.order_date ?? null,
         orderNumber: order?.order_number ?? null,
+        supplierName,
         createdAt: r.created_at,
       };
     });

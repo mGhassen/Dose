@@ -26,7 +26,9 @@ import { formatCurrency } from "@kit/lib/config";
 import { toast } from "sonner";
 import type { CreateSupplierOrderData, SupplierOrder, SupplierOrderItem, UpdateSupplierOrderData } from "@kit/types";
 import { SupplierOrderStatus } from "@kit/types";
-import { lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
+import { inferTaxInclusiveFromStoredLine, lineTaxAmount, to2Decimals } from "@/lib/transaction-tax";
+
+const EMPTY_TRANSACTION_TAX_VARIABLES: unknown[] = [];
 
 type OrderEditorItem = {
   id?: number;
@@ -35,7 +37,7 @@ type OrderEditorItem = {
   unit: string;
   unitId?: number;
   unitPrice: number;
-  taxVariableId?: number | "auto";
+  taxVariableId?: number | "auto" | string;
   taxRatePercent?: number;
   taxInclusive?: boolean;
   notes?: string;
@@ -50,6 +52,26 @@ type OrderEditorState = {
   notes: string;
   items: OrderEditorItem[];
 };
+
+function matchTransactionTaxVariableId(
+  variables: unknown[],
+  rate: number | undefined,
+  inclusive: boolean
+): number | undefined {
+  if (rate == null || rate <= 0 || !variables.length) return undefined;
+  const matches = variables.filter((v: any) => {
+    const val = typeof v?.value === "number" ? v.value : parseFloat(String(v?.value ?? "0"));
+    if (!Number.isFinite(val) || Math.abs(val - rate) > 0.001) return false;
+    const calc = v?.payload?.calculationType;
+    const isIncl = calc === "inclusive";
+    return isIncl === inclusive;
+  });
+  if (matches.length !== 1) return undefined;
+  const raw = (matches[0] as { id?: number | string })?.id;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string" && raw !== "auto" && Number.isFinite(Number(raw))) return Number(raw);
+  return undefined;
+}
 
 export function supplierOrderStateFromOrder(order: SupplierOrder): OrderEditorState {
   return {
@@ -67,7 +89,12 @@ export function supplierOrderStateFromOrder(order: SupplierOrder): OrderEditorSt
       unitId: it.unitId ?? it.item?.unitId ?? undefined,
       unitPrice: it.unitPrice ?? 0,
       taxRatePercent: it.taxRatePercent,
-      taxInclusive: (it as SupplierOrderItem & { taxInclusive?: boolean }).taxInclusive,
+      taxInclusive: inferTaxInclusiveFromStoredLine({
+        quantity: it.quantity ?? 0,
+        unitPrice: it.unitPrice ?? 0,
+        taxRatePercent: it.taxRatePercent,
+        taxAmount: it.taxAmount,
+      }),
       notes: it.notes ?? "",
     })),
   };
@@ -133,13 +160,22 @@ export function SupplierOrderEditor(props: {
   const { data: suppliersResponse } = useInventorySuppliers({ limit: 1000 });
   const { data: itemsResponse, isPending: itemsQueryPending } = useItems({ limit: 1000 });
   const { data: unitsResponse } = useUnits();
-  const { data: transactionTaxVariables = [] } = useVariablesByType("transaction_tax");
+  const { data: transactionTaxVariablesData } = useVariablesByType("transaction_tax");
+  const transactionTaxVariables = transactionTaxVariablesData ?? EMPTY_TRANSACTION_TAX_VARIABLES;
+  const transactionTaxHydrateKey = useMemo(
+    () =>
+      (transactionTaxVariables as any[])
+        .map((v) => `${v.id}:${v.value}:${v?.payload?.calculationType ?? ""}`)
+        .join("|"),
+    [transactionTaxVariables]
+  );
   const suppliers = suppliersResponse?.data ?? [];
   const allItems = itemsResponse?.data ?? [];
   const units = unitsResponse ?? [];
 
   const defaultTaxRate = 0;
   const prefillSeq = useRef(0);
+  const hydratedLineTaxSigRef = useRef<string>("");
   const [createItemOpen, setCreateItemOpen] = useState(false);
   const [createItemTargetIdx, setCreateItemTargetIdx] = useState<number | null>(null);
   const [addSupplierOpen, setAddSupplierOpen] = useState(false);
@@ -195,8 +231,45 @@ export function SupplierOrderEditor(props: {
 
   useEffect(() => {
     if (!props.initialOrder) return;
-    setState(supplierOrderStateFromOrder(props.initialOrder));
-  }, [props.initialOrder?.id, props.initialOrder?.updatedAt]);
+    const base = supplierOrderStateFromOrder(props.initialOrder);
+    if (props.mode !== "edit") {
+      setState(base);
+      hydratedLineTaxSigRef.current = "";
+      return;
+    }
+
+    const order = props.initialOrder;
+    const sig = `${order.id}:${order.updatedAt ?? ""}:tv:${transactionTaxHydrateKey}`;
+    if (hydratedLineTaxSigRef.current === sig) return;
+    hydratedLineTaxSigRef.current = sig;
+
+    setState({
+      ...base,
+      items: base.items.map((line) => {
+        const server = order.items?.find((i) => i.id === line.id);
+        if (!server) return line;
+        const inclusive = inferTaxInclusiveFromStoredLine({
+          quantity: server.quantity ?? 0,
+          unitPrice: server.unitPrice ?? 0,
+          taxRatePercent: server.taxRatePercent,
+          taxAmount: server.taxAmount,
+        });
+        const rate = server.taxRatePercent ?? line.taxRatePercent;
+        const varId = matchTransactionTaxVariableId(transactionTaxVariables as unknown[], rate, inclusive);
+        let taxVariableId: OrderEditorItem["taxVariableId"];
+        if (rate == null || rate <= 0) taxVariableId = undefined;
+        else if (varId != null) taxVariableId = varId;
+        else taxVariableId = `snap-${server.id}`;
+
+        return {
+          ...line,
+          taxInclusive: inclusive,
+          taxRatePercent: rate,
+          taxVariableId,
+        };
+      }),
+    });
+  }, [props.mode, props.initialOrder?.id, props.initialOrder?.updatedAt, transactionTaxHydrateKey]);
 
   useEffect(() => {
     if (props.mode !== "create") return;
@@ -660,7 +733,15 @@ export function SupplierOrderEditor(props: {
                                 })),
                               ]}
                               selectedId={it.taxVariableId ?? undefined}
-                              selectedDisplayName={it.taxVariableId === "auto" ? "Auto (rules)" : undefined}
+                              selectedDisplayName={
+                                it.taxVariableId === "auto"
+                                  ? `Auto (rules)${
+                                      (it.taxRatePercent ?? 0) > 0 ? ` — ${it.taxRatePercent}%` : ""
+                                    }`
+                                  : typeof it.taxVariableId === "string" && it.taxVariableId.startsWith("snap-")
+                                    ? `${it.taxRatePercent ?? 0}% (${(it.taxInclusive ?? false) ? "incl." : "excl."})`
+                                    : undefined
+                              }
                               onSelect={(sel) => {
                                 if (sel.id === 0) {
                                   updateItem(idx, { taxVariableId: undefined, taxRatePercent: undefined });

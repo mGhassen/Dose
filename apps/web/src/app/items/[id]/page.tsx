@@ -1262,7 +1262,18 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [resolvedPrice, setResolvedPrice] = useState<{ unitPrice: number | null; unitCost: number | null; taxIncluded?: boolean; costTaxIncluded?: boolean } | null>(null);
   const [sellHistory, setSellHistory] = useState<PriceHistoryEntry[]>([]);
   const [costHistory, setCostHistory] = useState<PriceHistoryEntry[]>([]);
-  const [supplierOrderPrices, setSupplierOrderPrices] = useState<{ id: number; unitPrice: number | null; quantity: number | null; unit: string; orderDate: string | null; orderNumber: string | null }[]>([]);
+  const [supplierOrderPrices, setSupplierOrderPrices] = useState<
+    {
+      id: number;
+      unitPrice: number | null;
+      quantity: number | null;
+      unit: string;
+      orderDate: string | null;
+      orderId: number | null;
+      orderNumber: string | null;
+      supplierName: string | null;
+    }[]
+  >([]);
   const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
   const [itemTaxesList, setItemTaxesList] = useState<{ id: number; variableId: number; conditionType: string; conditionValues?: string[]; calculationType?: string; priority: number; variableName?: string; variableValue?: number }[]>([]);
   const [itemTaxesLoading, setItemTaxesLoading] = useState(false);
@@ -1513,7 +1524,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               )}
               {item.groupId && !item.isCanonical && (
                 <Badge variant="outline" className="text-xs">
-                  merged → {item.canonicalItemName}
+                  → {item.canonicalItemName}
                 </Badge>
               )}
             </div>
@@ -2085,7 +2096,23 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                                   <td className="p-3">{r.orderDate ? formatDate(r.orderDate) : '—'}</td>
                                   <td className="p-3 text-right font-medium tabular-nums">{r.unitPrice != null ? formatCurrency(r.unitPrice) : '—'}</td>
                                   <td className="p-3 text-right tabular-nums">{r.quantity != null ? `${r.quantity} ${r.unit}` : '—'}</td>
-                                  <td className="p-3 text-muted-foreground">{r.orderNumber ?? '—'}</td>
+                                  <td className="p-3">
+                                    {r.orderId != null ? (
+                                      <Link
+                                        href={`/supplier-orders/${r.orderId}`}
+                                        className="text-primary hover:underline font-medium"
+                                      >
+                                        {[
+                                          r.orderNumber?.trim() ? r.orderNumber : `#${r.orderId}`,
+                                          r.supplierName,
+                                        ]
+                                          .filter(Boolean)
+                                          .join(' · ')}
+                                      </Link>
+                                    ) : (
+                                      <span className="text-muted-foreground">—</span>
+                                    )}
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>

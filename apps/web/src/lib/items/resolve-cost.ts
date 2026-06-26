@@ -244,16 +244,20 @@ export async function resolveItemUnitCost(
     const costDenomUnitId = hist.unitId ?? item.unit_id ?? null;
     let denomOut: number | null = costDenomUnitId;
     if (effectiveTargetUnitId != null && costDenomUnitId != null) {
-      const priceResult = convertUnitPriceWithContextOrFactorFallback(
-        hist.unitCost,
-        costDenomUnitId,
-        effectiveTargetUnitId,
-        conversionContext
-      );
-      unitPrice = priceResult.unitPrice;
-      denomOut = effectiveTargetUnitId;
-      if (priceResult.warning) {
-        logUnitConversionWarning("resolve-item-cost:history", priceResult.warning);
+      if (costDenomUnitId === effectiveTargetUnitId) {
+        denomOut = effectiveTargetUnitId;
+      } else {
+        const priceResult = convertUnitPriceWithContextOrFactorFallback(
+          hist.unitCost,
+          costDenomUnitId,
+          effectiveTargetUnitId,
+          conversionContext
+        );
+        unitPrice = priceResult.unitPrice;
+        denomOut = priceResult.converted ? effectiveTargetUnitId : costDenomUnitId;
+        if (priceResult.warning) {
+          logUnitConversionWarning("resolve-item-cost:history", priceResult.warning);
+        }
       }
     }
     return {

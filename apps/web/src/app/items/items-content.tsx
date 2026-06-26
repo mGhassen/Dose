@@ -142,7 +142,7 @@ export default function ItemsContent() {
                 }}
               >
                 <LinkIcon className="h-3 w-3" />
-                merged → {row.original.canonicalItemName}
+                  → {row.original.canonicalItemName}
               </Badge>
             )}
           </div>

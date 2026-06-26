@@ -177,7 +177,7 @@ export function VariableCreateContent({ onClose, onCreated }: VariableCreateCont
                         <Input
                           id="value"
                           type="number"
-                          step="0.0001"
+                          step="any"
                           value={formData.value}
                           onChange={(e) => handleInputChange("value", e.target.value)}
                           placeholder="1"

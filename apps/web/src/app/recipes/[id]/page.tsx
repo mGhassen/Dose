@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@kit/ui/button";
@@ -9,6 +9,7 @@ import { Input } from "@kit/ui/input";
 import { Label } from "@kit/ui/label";
 import { Textarea } from "@kit/ui/textarea";
 import { Checkbox } from "@kit/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@kit/ui/radio-group";
 import { UnifiedSelector } from "@/components/unified-selector";
 import { ItemCategorySelector } from "@/components/item-category-selector";
 import { CreateItemMultiStepDialog } from "@/components/create-item-multistep-dialog";
@@ -49,6 +50,10 @@ interface RecipeDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
+function isModifierListMultiSelect(selectionType: string | null | undefined): boolean {
+  return (selectionType ?? "").toUpperCase().includes("MULTIPLE");
+}
+
 export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const router = useRouter();
   const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
@@ -65,6 +70,9 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   const { data: itemsResponse } = useItems({ limit: 1000 });
   const { data: units = [] } = useUnits();
   const { data: costData } = useRecipeCost(resolvedParams?.id || "");
+  const [modifierSelectionByListId, setModifierSelectionByListId] = useState<
+    Record<number, number[]>
+  >({});
   const updateRecipe = useUpdateRecipe();
   const deleteMutation = useDeleteRecipe();
   const createProducedItem = useCreateProducedItem();
@@ -128,6 +136,91 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
     }
     return map;
   }, [recipe?.modifierQuantities, units]);
+
+  const modifierCostSignature = useMemo(() => {
+    if (!costData?.modifierLists?.length) return null;
+    return costData.modifierLists
+      .map((ml) =>
+        [
+          ml.modifierListId,
+          ml.selectionType ?? "",
+          ...ml.options.map((o) =>
+            [o.modifierId, o.hasPrice ? String(o.totalCost) : "—"].join(":")
+          ),
+        ].join("|")
+      )
+      .join("::");
+  }, [costData?.modifierLists]);
+
+  useEffect(() => {
+    if (!costData?.modifierLists?.length || modifierCostSignature == null) return;
+    setModifierSelectionByListId(() => {
+      const next: Record<number, number[]> = {};
+      for (const ml of costData.modifierLists) {
+        if (isModifierListMultiSelect(ml.selectionType)) {
+          next[ml.modifierListId] = [];
+        } else {
+          const priced = ml.options.filter((o) => o.hasPrice);
+          if (priced.length) {
+            const minOpt = priced.reduce((a, b) => (a.totalCost <= b.totalCost ? a : b));
+            next[ml.modifierListId] = [minOpt.modifierId];
+          } else if (ml.options.length) {
+            next[ml.modifierListId] = [ml.options[0].modifierId];
+          } else {
+            next[ml.modifierListId] = [];
+          }
+        }
+      }
+      return next;
+    });
+  }, [modifierCostSignature, costData?.modifierLists]);
+
+  const modifierSelectionTotals = useMemo(() => {
+    if (!costData?.modifierLists) {
+      return { selectedModifiersTotal: 0, selectionPricingComplete: true };
+    }
+    let selectedModifiersTotal = 0;
+    let selectionPricingComplete = true;
+    for (const ml of costData.modifierLists) {
+      const ids = modifierSelectionByListId[ml.modifierListId] ?? [];
+      for (const id of ids) {
+        const opt = ml.options.find((o) => o.modifierId === id);
+        if (!opt) continue;
+        if (opt.hasPrice) selectedModifiersTotal += opt.totalCost;
+        else selectionPricingComplete = false;
+      }
+    }
+    return { selectedModifiersTotal, selectionPricingComplete };
+  }, [costData?.modifierLists, modifierSelectionByListId]);
+
+  const ingredientCostRows =
+    (costData?.ingredients as { hasPrice?: boolean }[] | undefined) ??
+    ((costData as { items?: { hasPrice?: boolean }[] })?.items ?? []);
+
+  const baseIngredientsPriced =
+    ingredientCostRows.length === 0 ||
+    ingredientCostRows.every((row) => row.hasPrice);
+
+  const canShowEstimatedCostWithSelection =
+    costData &&
+    baseIngredientsPriced &&
+    modifierSelectionTotals.selectionPricingComplete;
+
+  const estimatedTotalWithModifiers = costData
+    ? (costData.baseCost ?? 0) + modifierSelectionTotals.selectedModifiersTotal
+    : 0;
+
+  const toggleMultiModifier = useCallback(
+    (listId: number, modifierId: number, checked: boolean) => {
+      setModifierSelectionByListId((prev) => {
+        const cur = new Set(prev[listId] ?? []);
+        if (checked) cur.add(modifierId);
+        else cur.delete(modifierId);
+        return { ...prev, [listId]: Array.from(cur) };
+      });
+    },
+    []
+  );
 
   const recipeOutputUnitLabel = useMemo(() => {
     const u = recipe?.unit?.trim();
@@ -734,26 +827,59 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <h3 className="text-base font-semibold tracking-tight">Ingredients</h3>
                       {costData && (() => {
-                        const hasModRange =
+                        const hasModifierLists =
                           Array.isArray(costData.modifierLists) &&
-                          costData.modifierLists.length > 0 &&
-                          costData.totalCostMax > costData.totalCostMin;
+                          costData.modifierLists.length > 0;
+                        const hasModRange =
+                          hasModifierLists && costData.totalCostMax > costData.totalCostMin;
+                        const outQty = costData.outputQuantity ?? 1;
+                        if (hasModifierLists) {
+                          return (
+                            <div className="text-right">
+                              <div className="text-sm text-muted-foreground">Estimated cost</div>
+                              <div className="text-lg font-bold">
+                                {canShowEstimatedCostWithSelection ? (
+                                  <>
+                                    {formatCurrency(estimatedTotalWithModifiers)} total
+                                    {outQty > 1 && (
+                                      <span className="text-sm text-muted-foreground ml-2">
+                                        ({formatCurrencyPerUnit(estimatedTotalWithModifiers / outQty)} per{" "}
+                                        {recipe.unit || "unit"})
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="text-muted-foreground">Price data incomplete</span>
+                                )}
+                              </div>
+                              {canShowEstimatedCostWithSelection && (
+                                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                  <div>
+                                    Base {formatCurrency(costData.baseCost)} + selected modifiers{" "}
+                                    {formatCurrency(modifierSelectionTotals.selectedModifiersTotal)}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
                         return (
                           <div className="text-right">
                             <div className="text-sm text-muted-foreground">
-                              {hasModRange ? "Estimated Cost (starting at)" : "Estimated Cost"}
+                              {hasModRange ? "Estimated Cost (range)" : "Estimated Cost"}
                             </div>
                             <div className="text-lg font-bold">
                               {costData.hasAllPrices ? (
                                 <>
                                   {hasModRange ? (
                                     <>
-                                      {formatCurrency(costData.totalCostMin)} – {formatCurrency(costData.totalCostMax)}
+                                      {formatCurrency(costData.totalCostMin)} –{" "}
+                                      {formatCurrency(costData.totalCostMax)}
                                     </>
                                   ) : (
                                     <>{formatCurrency(costData.totalCost)} total</>
                                   )}
-                                  {costData.outputQuantity > 1 && (
+                                  {outQty > 1 && (
                                     <span className="text-sm text-muted-foreground ml-2">
                                       ({formatCurrencyPerUnit(costData.costPerOutputUnit)} per{" "}
                                       {recipe.unit || "unit"})
@@ -764,91 +890,158 @@ export default function RecipeDetailPage({ params }: RecipeDetailPageProps) {
                                 <span className="text-muted-foreground">Price data incomplete</span>
                               )}
                             </div>
-                            {costData.modifierLists && costData.modifierLists.length > 0 && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                Base {formatCurrency(costData.baseCost)} + modifiers
-                              </div>
-                            )}
                           </div>
                         );
                       })()}
                     </div>
                     {costData?.modifierLists && costData.modifierLists.length > 0 && (
                       <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-                        <div className="text-sm font-medium">Modifiers (per option)</div>
-                        {costData.modifierLists.map((ml) => (
-                          <div key={ml.modifierListId} className="text-sm">
-                            <div className="font-medium text-muted-foreground">
-                              {ml.modifierListName || `List #${ml.modifierListId}`}
-                              {ml.options.length > 0 && (
-                                <span className="ml-2 text-xs font-normal">
-                                  {ml.minCost === ml.maxCost
-                                    ? formatCurrency(ml.minCost)
-                                    : `${formatCurrency(ml.minCost)} – ${formatCurrency(ml.maxCost)}`}
-                                </span>
-                              )}
-                            </div>
-                            <div className="ml-3 space-y-1">
-                              {ml.options.length === 0 ? (
-                                <div className="text-xs text-muted-foreground">No modifiers included</div>
-                              ) : (
-                                ml.options.map((o) => {
-                                  const displayUnit =
-                                    o.unitLabel?.trim() || modifierUnitById.get(o.modifierId) || "";
-                                  return (
+                        <div className="text-sm font-medium">Modifiers</div>
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                          Select options below; the estimate above uses base ingredients plus your selection.
+                        </p>
+                        {costData.modifierLists.map((ml) => {
+                          const multi = isModifierListMultiSelect(ml.selectionType);
+                          const selectedIds = modifierSelectionByListId[ml.modifierListId] ?? [];
+                          const listSelectedTotal = selectedIds.reduce((sum, mid) => {
+                            const opt = ml.options.find((x) => x.modifierId === mid);
+                            return sum + (opt?.hasPrice ? opt.totalCost : 0);
+                          }, 0);
+                          const optionRows = (o: (typeof ml.options)[number]) => {
+                            const displayUnit =
+                              o.unitLabel?.trim() || modifierUnitById.get(o.modifierId) || "";
+                            const controlId = `mod-${ml.modifierListId}-${o.modifierId}`;
+                            const body = (
+                              <>
+                                <div className="min-w-0">
+                                  <div className="truncate font-medium">
+                                    {o.modifierName || `Modifier #${o.modifierId}`}
+                                  </div>
+                                  <div className="truncate text-muted-foreground">
+                                    {o.supplyItemId ? (
+                                      <Link
+                                        href={`/items/${o.supplyItemId}`}
+                                        className="hover:underline"
+                                      >
+                                        {o.supplyItemName || `Item #${o.supplyItemId}`}
+                                      </Link>
+                                    ) : (
+                                      "No stock item"
+                                    )}
+                                    {o.quantity > 0 && (
+                                      <>
+                                        {" · "}
+                                        {o.quantity}
+                                        {displayUnit ? ` ${displayUnit}` : ""}
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right">
                                   <div
-                                    key={o.modifierId}
-                                    className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded border bg-background/70 px-2 py-1.5 text-xs"
+                                    className={
+                                      o.hasPrice ? "font-medium" : "text-muted-foreground italic"
+                                    }
                                   >
-                                    <div className="min-w-0">
-                                      <div className="truncate font-medium">
-                                        {o.modifierName || `Modifier #${o.modifierId}`}
+                                    {o.hasPrice ? formatCurrency(o.totalCost) : "—"}
+                                  </div>
+                                  {o.hasPrice && (
+                                    <div className="text-[10px] text-muted-foreground tabular-nums space-y-0.5">
+                                      <div>
+                                        {formatCurrencyPerUnit(o.unitPrice)}/{displayUnit || "unit"}
                                       </div>
-                                      <div className="truncate text-muted-foreground">
-                                        {o.supplyItemId ? (
-                                          <Link
-                                            href={`/items/${o.supplyItemId}`}
-                                            className="hover:underline"
-                                          >
-                                            {o.supplyItemName || `Item #${o.supplyItemId}`}
-                                          </Link>
-                                        ) : (
-                                          "No stock item"
-                                        )}
-                                        {o.quantity > 0 && (
-                                          <>
-                                            {" · "}
-                                            {o.quantity}
-                                            {displayUnit ? ` ${displayUnit}` : ""}
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className={o.hasPrice ? "font-medium" : "text-muted-foreground italic"}>
-                                        {o.hasPrice ? formatCurrency(o.totalCost) : "—"}
-                                      </div>
-                                      {o.hasPrice && (
-                                        <div className="text-[10px] text-muted-foreground tabular-nums space-y-0.5">
-                                          <div>
-                                            {formatCurrencyPerUnit(o.unitPrice)}/{displayUnit || "unit"}
-                                          </div>
-                                          {o.costQuote != null && (
-                                            <div className="opacity-90">
-                                              {formatCurrency(o.costQuote.amount)} / {o.costQuote.basisQuantity}{" "}
-                                              {o.costQuote.unitLabel}
-                                            </div>
-                                          )}
+                                      {o.costQuote != null && (
+                                        <div className="opacity-90">
+                                          {formatCurrency(o.costQuote.amount)} / {o.costQuote.basisQuantity}{" "}
+                                          {o.costQuote.unitLabel}
                                         </div>
                                       )}
                                     </div>
-                                  </div>
-                                  );
-                                })
+                                  )}
+                                </div>
+                              </>
+                            );
+                            if (multi) {
+                              return (
+                                <div
+                                  key={o.modifierId}
+                                  className="flex items-start gap-2 rounded border bg-background/70 px-2 py-1.5 text-xs"
+                                >
+                                  <Checkbox
+                                    id={controlId}
+                                    className="mt-0.5 shrink-0"
+                                    checked={selectedIds.includes(o.modifierId)}
+                                    onCheckedChange={(c) =>
+                                      toggleMultiModifier(ml.modifierListId, o.modifierId, c === true)
+                                    }
+                                  />
+                                  <Label
+                                    htmlFor={controlId}
+                                    className="grid flex-1 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-start gap-2"
+                                  >
+                                    {body}
+                                  </Label>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div
+                                key={o.modifierId}
+                                className="flex items-start gap-2 rounded border bg-background/70 px-2 py-1.5 text-xs"
+                              >
+                                <RadioGroupItem
+                                  value={String(o.modifierId)}
+                                  id={controlId}
+                                  className="mt-0.5 shrink-0"
+                                />
+                                <Label
+                                  htmlFor={controlId}
+                                  className="grid flex-1 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-start gap-2"
+                                >
+                                  {body}
+                                </Label>
+                              </div>
+                            );
+                          };
+                          return (
+                            <div key={ml.modifierListId} className="text-sm">
+                              <div className="font-medium text-muted-foreground flex flex-wrap items-baseline gap-x-2 gap-y-0">
+                                <span>{ml.modifierListName || `List #${ml.modifierListId}`}</span>
+                                {ml.selectionType ? (
+                                  <span className="text-[10px] font-normal uppercase tracking-wide opacity-70">
+                                    {multi ? "multi" : "one"}
+                                  </span>
+                                ) : null}
+                                {ml.options.length > 0 && (
+                                  <span className="text-xs font-normal tabular-nums">
+                                    {formatCurrency(listSelectedTotal)} selected
+                                  </span>
+                                )}
+                              </div>
+                              {ml.options.length === 0 ? (
+                                <div className="text-xs text-muted-foreground ml-1 mt-1">
+                                  No modifiers included
+                                </div>
+                              ) : multi ? (
+                                <div className="ml-1 mt-1 space-y-1">{ml.options.map(optionRows)}</div>
+                              ) : (
+                                <RadioGroup
+                                  value={String(selectedIds[0] ?? "")}
+                                  onValueChange={(v) => {
+                                    if (!v) return;
+                                    setModifierSelectionByListId((prev) => ({
+                                      ...prev,
+                                      [ml.modifierListId]: [parseInt(v, 10)],
+                                    }));
+                                  }}
+                                  className="ml-1 mt-1 space-y-1"
+                                >
+                                  {ml.options.map(optionRows)}
+                                </RadioGroup>
                               )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                     <div className="overflow-x-auto rounded-lg border border-border">
