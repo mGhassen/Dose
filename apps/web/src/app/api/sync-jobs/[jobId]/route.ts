@@ -78,11 +78,19 @@ export async function GET(
       steps || []
     );
 
+    const { data: successors } = await supabase
+      .from('sync_jobs')
+      .select('id, status, recovery_action')
+      .eq('parent_job_id', jobId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
     return NextResponse.json({
       ...job,
       errors: errors || [],
       steps: steps || [],
       recovery,
+      successors: successors || [],
     });
   } catch (error: any) {
     console.error('Error fetching sync job:', error);

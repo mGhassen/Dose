@@ -17,14 +17,29 @@ import {
   type MissingCatalogHint,
 } from '@/app/api/integrations/[id]/sync/recover-missing-catalog';
 import { getDefaultUnitVariableId } from '@/app/api/integrations/[id]/sync/square-measurement-unit';
+import {
+  deleteStagingForJob,
+  resolveStagingJobId,
+} from '@/lib/sync-job-recovery';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 /** PostgREST/Supabase cap at 1000 rows per query; use that so pagination matches reality. */
 const STAGING_CHUNK_SIZE = 1000;
 
+type CronJob = {
+  id: number;
+  integration_id: number;
+  sync_type: string;
+  status: string;
+  bulk_review_status: string | null;
+  bulk_review_payload: unknown;
+  parent_job_id: number | null;
+  recovery_action: string | null;
+};
+
 async function isJobAborted(supabase: ReturnType<typeof supabaseServer>, jobId: number): Promise<boolean> {
   const { data } = await supabase.from('sync_jobs').select('status').eq('id', jobId).maybeSingle();
-  return !data || data.status === 'cancelled' || data.status === 'failed';
+  return !data || data.status === 'cancelled' || data.status === 'failed' || data.status === 'stopped';
 }
 
 function isAuthorized(request: NextRequest): boolean {
@@ -52,29 +67,25 @@ export async function POST(request: NextRequest) {
 async function runProcessor(specificJobId?: number) {
   const supabase = supabaseServer();
 
-  let jobs: {
-    id: number;
-    integration_id: number;
-    sync_type: string;
-    status: string;
-    bulk_review_status: string | null;
-    bulk_review_payload: unknown;
-  }[];
+  const jobSelect =
+    'id, integration_id, sync_type, status, bulk_review_status, bulk_review_payload, parent_job_id, recovery_action';
+
+  let jobs: CronJob[];
   if (specificJobId) {
     const { data, error } = await supabase
       .from('sync_jobs')
-      .select('id, integration_id, sync_type, status, bulk_review_status, bulk_review_payload')
+      .select(jobSelect)
       .eq('id', specificJobId)
       .in('status', ['pending', 'processing']);
     if (error) {
       console.error('[process-sync-jobs] Failed to fetch job:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    jobs = data || [];
+    jobs = (data || []) as CronJob[];
   } else {
     const { data, error } = await supabase
       .from('sync_jobs')
-      .select('id, integration_id, sync_type, status, bulk_review_status, bulk_review_payload')
+      .select(jobSelect)
       .in('status', ['pending', 'processing'])
       .order('created_at', { ascending: true })
       .limit(5);
@@ -82,7 +93,7 @@ async function runProcessor(specificJobId?: number) {
       console.error('[process-sync-jobs] Failed to fetch jobs:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    jobs = data || [];
+    jobs = (data || []) as CronJob[];
   }
 
   for (const job of jobs) {
@@ -106,12 +117,47 @@ async function runProcessor(specificJobId?: number) {
         .eq('id', job.id);
       continue;
     }
+
+    if (job.recovery_action === 'discard_staging' && job.parent_job_id) {
+      if (job.status === 'pending') {
+        await supabase
+          .from('sync_jobs')
+          .update({ status: 'processing', started_at: new Date().toISOString() })
+          .eq('id', job.id);
+      }
+      try {
+        await deleteStagingForJob(supabase, job.parent_job_id, integration.integration_type);
+        const completedAt = new Date().toISOString();
+        await supabase
+          .from('sync_jobs')
+          .update({
+            status: 'completed',
+            completed_at: completedAt,
+            error_message: null,
+            stats: { staging_discarded_from_job: job.parent_job_id },
+          })
+          .eq('id', job.id);
+      } catch (e: any) {
+        await supabase
+          .from('sync_jobs')
+          .update({
+            status: 'failed',
+            completed_at: new Date().toISOString(),
+            error_message: e?.message || 'Discard staging failed',
+          })
+          .eq('id', job.id);
+      }
+      continue;
+    }
+
     if (
       integration.integration_type === 'csv_bulk' &&
       job.bulk_review_status !== 'ready'
     ) {
       continue;
     }
+
+    const stagingJobId = resolveStagingJobId(job);
 
     if (job.status === 'pending') {
       const { error: updateErr } = await supabase
@@ -129,7 +175,7 @@ async function runProcessor(specificJobId?: number) {
       const { data: bulkRows, error: bulkErr } = await supabase
         .from('sync_pennylane_data')
         .select('data_type, source_id, payload')
-        .eq('job_id', job.id);
+        .eq('job_id', stagingJobId);
       if (bulkErr) {
         await supabase
           .from('sync_jobs')
@@ -189,7 +235,7 @@ async function runProcessor(specificJobId?: number) {
       const { data: pennylaneRows, error: plErr } = await supabase
         .from('sync_pennylane_data')
         .select('data_type, source_id, payload')
-        .eq('job_id', job.id);
+        .eq('job_id', stagingJobId);
       if (plErr) {
         await supabase
           .from('sync_jobs')
@@ -247,7 +293,7 @@ async function runProcessor(specificJobId?: number) {
     const { count: stagedTotal, error: stagedErr } = await supabase
       .from('sync_square_data')
       .select('*', { count: 'exact', head: true })
-      .eq('job_id', job.id);
+      .eq('job_id', stagingJobId);
     if (stagedErr) {
       await supabase
         .from('sync_jobs')
@@ -269,7 +315,7 @@ async function runProcessor(specificJobId?: number) {
     const { count, error: countErr } = await supabase
       .from('sync_square_data')
       .select('*', { count: 'exact', head: true })
-      .eq('job_id', job.id)
+      .eq('job_id', stagingJobId)
       .is('processed_at', null);
     if (countErr) {
       await supabase
@@ -309,7 +355,7 @@ async function runProcessor(specificJobId?: number) {
         const { data: chunkRows, error: chunkErr } = await supabase
           .from('sync_square_data')
           .select('id, data_type, source_id, payload')
-          .eq('job_id', job.id)
+          .eq('job_id', stagingJobId)
           .is('processed_at', null)
           .order('id', { ascending: true })
           .limit(STAGING_CHUNK_SIZE);

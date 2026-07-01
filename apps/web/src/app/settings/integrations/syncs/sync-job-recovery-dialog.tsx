@@ -32,14 +32,14 @@ type ActionOption = {
   destructive?: boolean;
 };
 
-function buildOptions(recovery: SyncJobRecoveryState): ActionOption[] {
+function buildOptions(jobId: number, recovery: SyncJobRecoveryState): ActionOption[] {
   const opts: ActionOption[] = [];
 
   if (recovery.recovery_phase === "review") {
     opts.push({
       value: "resume",
       label: "Continue review",
-      description: "Open the review page to finish editing and apply the import.",
+      description: `Stop job #${jobId} and open the review page to finish editing.`,
     });
   } else {
     opts.push({
@@ -47,8 +47,8 @@ function buildOptions(recovery: SyncJobRecoveryState): ActionOption[] {
       label: "Continue from where it stopped",
       description:
         recovery.recovery_phase === "fetch"
-          ? "Resume fetching from the source. Already-staged rows are kept."
-          : "Re-queue processing. Already-imported records are skipped.",
+          ? `Stop job #${jobId} and start a new job to resume fetch. Staging stays on #${jobId}.`
+          : `Stop job #${jobId} and start a new job to resume processing.`,
     });
   }
 
@@ -56,15 +56,15 @@ function buildOptions(recovery: SyncJobRecoveryState): ActionOption[] {
     opts.push({
       value: "process_staged",
       label: "Process staged data now",
-      description: "Skip remaining fetch and import what is already staged.",
+      description: `Stop job #${jobId} and start a new job to import staged data from #${jobId}.`,
     });
   }
 
   if (recovery.available_actions.includes("discard_staging")) {
     opts.push({
       value: "discard_staging",
-      label: "Discard staged data for this job",
-      description: "Remove staging rows only. Records already imported stay in the app.",
+      label: "Discard staged data",
+      description: `Stop job #${jobId} and start a new job to remove staging rows from #${jobId}. Imported records stay in the app.`,
       destructive: true,
     });
   }
@@ -72,8 +72,8 @@ function buildOptions(recovery: SyncJobRecoveryState): ActionOption[] {
   if (recovery.available_actions.includes("cancel")) {
     opts.push({
       value: "cancel",
-      label: "Cancel this job",
-      description: "Stop the job. Imported data is not removed.",
+      label: "Cancel this job only",
+      description: `Mark job #${jobId} as cancelled. No new job is created. Staging is kept on #${jobId}.`,
       destructive: true,
     });
   }
@@ -85,7 +85,7 @@ export function SyncJobRecoveryDialog({ open, onOpenChange, jobId, recovery }: P
   const router = useRouter();
   const { toast } = useToast();
   const recoverSyncJob = useRecoverSyncJob();
-  const options = buildOptions(recovery);
+  const options = buildOptions(jobId, recovery);
   const [selected, setSelected] = useState<SyncJobRecoveryAction>(options[0]?.value ?? "resume");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -191,13 +191,13 @@ export function SyncJobRecoveryDialog({ open, onOpenChange, jobId, recovery }: P
       <ConfirmationDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title={selected === "cancel" ? "Cancel job?" : "Discard staging data?"}
+        title={selected === "cancel" ? "Cancel job?" : "Stop and discard staging?"}
         description={
           selected === "cancel"
-            ? "The job will be marked cancelled. Data already imported into the app will not be removed."
-            : "Staging rows for this job will be deleted. Records already imported stay in the app."
+            ? `Job #${jobId} will be marked cancelled. No successor job is created.`
+            : `Job #${jobId} will be stopped and a new job will remove its staging rows. Imported app data is not removed.`
         }
-        confirmText={selected === "cancel" ? "Cancel job" : "Discard staging"}
+        confirmText={selected === "cancel" ? "Cancel job" : "Stop and discard"}
         variant="destructive"
         isPending={recoverSyncJob.isPending}
         onConfirm={() => {

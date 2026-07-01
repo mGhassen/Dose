@@ -6,24 +6,53 @@ import {
   fireProcessSyncJob,
   getJobRecoveryState,
   type RecoveryAction,
+  type RecoveryActionKind,
 } from '@/lib/sync-job-recovery';
-import {
-  completeStagingAndQueueProcess,
-  runStagingForJob,
-} from '@/app/api/integrations/[id]/sync/sync-staging';
+import { runStagingForJob } from '@/app/api/integrations/[id]/sync/sync-staging';
+import { stagingOptionsFromStats, statsToPeriod } from '@/lib/sync-period-utils';
 
 const VALID_ACTIONS: RecoveryAction[] = ['resume', 'process_staged', 'discard_staging', 'cancel'];
 
-async function deleteStagingForJob(
+const RUNNING_STATUSES = ['staging', 'pending', 'processing'];
+
+async function stopJob(supabase: ReturnType<typeof supabaseServer>, jobId: number): Promise<void> {
+  await supabase
+    .from('sync_jobs')
+    .update({
+      status: 'stopped',
+      completed_at: new Date().toISOString(),
+      error_message: 'Stopped by user for recovery',
+    })
+    .eq('id', jobId);
+}
+
+async function createSuccessorJob(
   supabase: ReturnType<typeof supabaseServer>,
-  jobId: number,
-  integrationType: string
-): Promise<void> {
-  if (integrationType === 'square') {
-    await supabase.from('sync_square_data').delete().eq('job_id', jobId);
-  } else {
-    await supabase.from('sync_pennylane_data').delete().eq('job_id', jobId);
+  parentJob: {
+    id: number;
+    integration_id: number;
+    sync_type: string;
+    stats?: Record<string, unknown> | null;
+  },
+  recoveryAction: RecoveryActionKind,
+  status: string
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('sync_jobs')
+    .insert({
+      integration_id: parentJob.integration_id,
+      sync_type: parentJob.sync_type,
+      status,
+      parent_job_id: parentJob.id,
+      recovery_action: recoveryAction,
+      stats: parentJob.stats || {},
+    })
+    .select('id')
+    .single();
+  if (error || !data) {
+    throw new Error(error?.message || 'Failed to create successor job');
   }
+  return data.id as number;
 }
 
 export async function POST(
@@ -49,7 +78,8 @@ export async function POST(
       created_at: string;
       started_at?: string | null;
       bulk_review_status?: string | null;
-      stats?: Record<string, number>;
+      stats?: Record<string, unknown>;
+      parent_job_id?: number | null;
     };
     const integration = access.integration;
 
@@ -99,63 +129,67 @@ export async function POST(
 
       return NextResponse.json({
         job_id: numericJobId,
+        stopped_job_id: null,
+        successor_job_id: null,
         action,
         message: 'Job cancelled.',
       });
     }
 
-    if (action === 'discard_staging') {
-      await deleteStagingForJob(supabase, numericJobId, integration.integration_type);
-      await supabase
-        .from('sync_jobs')
-        .update({
-          status: 'failed',
-          completed_at: new Date().toISOString(),
-          error_message: 'Staging data discarded by user',
-        })
-        .eq('id', numericJobId);
-      await supabase
-        .from('integrations')
-        .update({ last_sync_status: null, last_sync_error: null })
-        .eq('id', integrationId)
-        .eq('last_sync_status', 'in_progress');
+    const phase = detectRecoveryPhase(job, integration);
 
+    if (!RUNNING_STATUSES.includes(job.status)) {
+      return NextResponse.json({ error: 'Only running jobs can be stopped for recovery' }, { status: 400 });
+    }
+
+    if (action === 'process_staged' && phase !== 'fetch') {
+      return NextResponse.json(
+        { error: 'process_staged is only available while job is in staging fetch phase' },
+        { status: 400 }
+      );
+    }
+
+    await stopJob(supabase, numericJobId);
+    await supabase
+      .from('integrations')
+      .update({ last_sync_status: null, last_sync_error: null })
+      .eq('id', integrationId)
+      .eq('last_sync_status', 'in_progress');
+
+    if (action === 'discard_staging') {
+      const successorId = await createSuccessorJob(supabase, job, 'discard_staging', 'processing');
+      fireProcessSyncJob(origin, successorId);
       return NextResponse.json({
         job_id: numericJobId,
+        stopped_job_id: numericJobId,
+        successor_job_id: successorId,
         action,
-        message: 'Staging data discarded. Imported records were not changed.',
+        redirect: `/settings/integrations/syncs/${successorId}`,
+        message: `Job #${numericJobId} stopped. Job #${successorId} will remove staging data.`,
       });
     }
 
     if (action === 'process_staged') {
-      if (job.status !== 'staging') {
-        return NextResponse.json(
-          { error: 'process_staged is only available while job is in staging' },
-          { status: 400 }
-        );
-      }
-      await completeStagingAndQueueProcess(
-        supabase,
-        integrationId,
-        numericJobId,
-        (job.stats || {}),
-        origin
-      );
+      const successorId = await createSuccessorJob(supabase, job, 'process_staged', 'pending');
+      fireProcessSyncJob(origin, successorId);
       return NextResponse.json({
         job_id: numericJobId,
+        stopped_job_id: numericJobId,
+        successor_job_id: successorId,
         action,
-        message: 'Processing started with staged data.',
+        redirect: `/settings/integrations/syncs/${successorId}`,
+        message: `Job #${numericJobId} stopped. Job #${successorId} will import staged data.`,
       });
     }
-
-    const phase = detectRecoveryPhase(job, integration);
 
     if (phase === 'review' && recovery.review_redirect) {
       return NextResponse.json({
         job_id: numericJobId,
+        stopped_job_id: numericJobId,
+        successor_job_id: null,
         action,
         redirect: recovery.review_redirect,
-        message: 'Continue on the review page.',
+        message: 'Job stopped. Continue on the review page.',
       });
     }
 
@@ -169,36 +203,46 @@ export async function POST(
         return NextResponse.json({ error: 'Integration not found' }, { status: 404 });
       }
 
+      const period = statsToPeriod(job.stats);
+      const stagingOptions = stagingOptionsFromStats(job.stats);
+
+      const successorId = await createSuccessorJob(supabase, job, 'resume_fetch', 'staging');
+
       after(async () => {
         const supabaseBg = supabaseServer();
         await runStagingForJob(
           supabaseBg,
           fullIntegration,
-          numericJobId,
+          successorId,
           job.sync_type,
-          origin
+          origin,
+          period,
+          numericJobId,
+          stagingOptions,
+          job.stats as Record<string, unknown>
         );
       });
 
       return NextResponse.json({
         job_id: numericJobId,
+        stopped_job_id: numericJobId,
+        successor_job_id: successorId,
         action,
-        message: 'Fetch resumed in background.',
+        redirect: `/settings/integrations/syncs/${successorId}`,
+        message: `Job #${numericJobId} stopped. Job #${successorId} will resume fetch.`,
       });
     }
 
     if (phase === 'process') {
-      if (job.status === 'processing') {
-        await supabase
-          .from('sync_jobs')
-          .update({ status: 'pending', started_at: null })
-          .eq('id', numericJobId);
-      }
-      fireProcessSyncJob(origin, numericJobId);
+      const successorId = await createSuccessorJob(supabase, job, 'process_staged', 'pending');
+      fireProcessSyncJob(origin, successorId);
       return NextResponse.json({
         job_id: numericJobId,
+        stopped_job_id: numericJobId,
+        successor_job_id: successorId,
         action,
-        message: 'Processing re-queued.',
+        redirect: `/settings/integrations/syncs/${successorId}`,
+        message: `Job #${numericJobId} stopped. Job #${successorId} will resume processing.`,
       });
     }
 

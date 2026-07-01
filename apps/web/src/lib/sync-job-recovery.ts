@@ -4,6 +4,7 @@ export const STUCK_THRESHOLD_MS = 10 * 60 * 1000;
 
 export type RecoveryPhase = 'fetch' | 'review' | 'process' | 'terminal';
 export type RecoveryAction = 'resume' | 'process_staged' | 'discard_staging' | 'cancel';
+export type RecoveryActionKind = 'resume_fetch' | 'process_staged' | 'discard_staging';
 
 export type StagingCounts = {
   staged_rows: number;
@@ -37,6 +38,8 @@ type JobRow = {
   started_at?: string | null;
   completed_at?: string | null;
   bulk_review_status?: string | null;
+  parent_job_id?: number | null;
+  recovery_action?: string | null;
 };
 
 type IntegrationRow = {
@@ -51,6 +54,10 @@ type StepRow = {
   created_at?: string;
 };
 
+export function resolveStagingJobId(job: { id: number; parent_job_id?: number | null }): number {
+  return job.parent_job_id ?? job.id;
+}
+
 function isOlderThan(iso: string | null | undefined, ms: number): boolean {
   if (!iso) return false;
   return Date.now() - new Date(iso).getTime() > ms;
@@ -60,6 +67,10 @@ export function detectRecoveryPhase(
   job: JobRow,
   integration: IntegrationRow
 ): RecoveryPhase {
+  if (job.status === 'stopped' || job.status === 'cancelled' || job.status === 'completed' || job.status === 'failed') {
+    return 'terminal';
+  }
+
   const bulkStatus = job.bulk_review_status ?? 'none';
   if (
     integration.integration_type === 'csv_bulk' &&
@@ -107,12 +118,7 @@ export function getAvailableActions(
   staging: StagingCounts,
   jobStatus: string
 ): RecoveryAction[] {
-  if (phase === 'terminal') {
-    if (jobStatus === 'failed' || jobStatus === 'completed' || jobStatus === 'cancelled') {
-      return [];
-    }
-    return [];
-  }
+  if (phase === 'terminal') return [];
 
   const actions: RecoveryAction[] = ['resume', 'cancel'];
 
@@ -128,6 +134,10 @@ export function getAvailableActions(
     return ['resume', 'cancel'];
   }
 
+  if (jobStatus === 'stopped') {
+    return [];
+  }
+
   return actions;
 }
 
@@ -140,24 +150,25 @@ export function getPhaseLabel(phase: RecoveryPhase, jobStatus: string): string {
     case 'process':
       return jobStatus === 'processing' ? 'Phase 2 — Processing' : 'Phase 2 — Pending';
     default:
+      if (jobStatus === 'stopped') return 'Stopped';
       return 'Completed';
   }
 }
 
 export async function fetchStagingCounts(
   supabase: SupabaseClient,
-  jobId: number,
+  stagingJobId: number,
   integrationType: string
 ): Promise<StagingCounts> {
   if (integrationType === 'square') {
     const { count: stagedTotal } = await supabase
       .from('sync_square_data')
       .select('*', { count: 'exact', head: true })
-      .eq('job_id', jobId);
+      .eq('job_id', stagingJobId);
     const { count: unprocessed } = await supabase
       .from('sync_square_data')
       .select('*', { count: 'exact', head: true })
-      .eq('job_id', jobId)
+      .eq('job_id', stagingJobId)
       .is('processed_at', null);
     const staged = stagedTotal ?? 0;
     const unprocessedRows = unprocessed ?? 0;
@@ -171,13 +182,25 @@ export async function fetchStagingCounts(
   const { count } = await supabase
     .from('sync_pennylane_data')
     .select('*', { count: 'exact', head: true })
-    .eq('job_id', jobId);
+    .eq('job_id', stagingJobId);
   const staged = count ?? 0;
   return {
     staged_rows: staged,
     unprocessed_rows: staged,
     processed_rows: 0,
   };
+}
+
+export async function deleteStagingForJob(
+  supabase: SupabaseClient,
+  stagingJobId: number,
+  integrationType: string
+): Promise<void> {
+  if (integrationType === 'square') {
+    await supabase.from('sync_square_data').delete().eq('job_id', stagingJobId);
+  } else {
+    await supabase.from('sync_pennylane_data').delete().eq('job_id', stagingJobId);
+  }
 }
 
 export function pickLastStep(steps: StepRow[]): LastStepInfo {
@@ -224,7 +247,8 @@ export async function getJobRecoveryState(
   integration: IntegrationRow,
   steps: StepRow[]
 ): Promise<JobRecoveryState> {
-  const staging = await fetchStagingCounts(supabase, job.id, integration.integration_type);
+  const stagingJobId = resolveStagingJobId(job);
+  const staging = await fetchStagingCounts(supabase, stagingJobId, integration.integration_type);
   return buildJobRecoveryState(job, integration, staging, steps);
 }
 

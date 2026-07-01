@@ -1,11 +1,17 @@
 // Integration Sync Route – Phase 1 only: fetch from Square, write to staging, create job, return 202
 
 import { after, NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { supabaseServer } from '@kit/lib/supabase';
 import {
   type FullSyncPeriod,
   runStagingForJob,
 } from '@/app/api/integrations/[id]/sync/sync-staging';
+import {
+  getMonthlyRangesForSyncPeriod,
+  periodToStats,
+  stagingOptionsFromStats,
+} from '@/lib/sync-period-utils';
 
 async function getIntegrationAndVerifyAccess(
   supabase: any,
@@ -36,6 +42,39 @@ async function getIntegrationAndVerifyAccess(
   return { integration, error: null };
 }
 
+function buildJobStats(
+  base: Record<string, unknown>,
+  period?: FullSyncPeriod
+): Record<string, unknown> {
+  const stats: Record<string, unknown> = { ...base };
+  if (period) {
+    stats.sync_period = periodToStats(period);
+  }
+  return stats;
+}
+
+async function createSyncJob(
+  supabase: any,
+  integrationId: number,
+  syncType: string,
+  stats: Record<string, unknown>
+): Promise<{ id: number } | { error: string }> {
+  const { data, error } = await supabase
+    .from('sync_jobs')
+    .insert({
+      integration_id: integrationId,
+      sync_type: syncType,
+      status: 'staging',
+      stats,
+    })
+    .select('id')
+    .single();
+  if (error || !data) {
+    return { error: error?.message || 'Failed to create sync job' };
+  }
+  return { id: data.id as number };
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -47,6 +86,7 @@ export async function POST(
     );
     if (!parsed.success) return parsed.response;
     const syncType = parsed.data.sync_type || 'full';
+    const fragmentByMonth = parsed.data.fragment_by_month === true;
     const period: FullSyncPeriod | undefined = parsed.data.period_mode
       ? {
           mode: parsed.data.period_mode,
@@ -99,30 +139,9 @@ export async function POST(
       );
     }
 
-    const { data: jobRow, error: jobErr } = await supabase
-      .from('sync_jobs')
-      .insert({
-        integration_id: integration.id,
-        sync_type: syncType,
-        /** Until Square/Pennylane staging finishes, cron must not process (would import 0 rows). */
-        status: 'staging',
-        stats: {},
-      })
-      .select('id')
-      .single();
-    if (jobErr) {
-      console.error('[Sync] Failed to create sync job:', jobErr);
-      return NextResponse.json(
-        { error: 'Failed to create sync job', details: jobErr.message },
-        { status: 500 }
-      );
-    }
-    const jobId = jobRow.id;
-
     const isPennylane = integration.integration_type === 'pennylane';
     const effectiveSyncType = isPennylane ? (syncType === 'full' ? 'transactions' : syncType) : syncType;
     if (isPennylane && effectiveSyncType !== 'transactions') {
-      await supabase.from('sync_jobs').delete().eq('id', jobId);
       return NextResponse.json(
         { error: 'Pennylane sync only supports sync_type: "transactions" or "full"' },
         { status: 400 }
@@ -130,14 +149,137 @@ export async function POST(
     }
 
     const origin = request.nextUrl.origin;
+    const monthlyRanges =
+      syncType === 'full' && !isPennylane
+        ? getMonthlyRangesForSyncPeriod(integration, period)
+        : [];
+
+    if (
+      fragmentByMonth &&
+      syncType === 'full' &&
+      !isPennylane &&
+      monthlyRanges.length > 1
+    ) {
+      const batchId = randomUUID();
+      const jobIds: number[] = [];
+
+      const catalogStats = buildJobStats(
+        { batch_id: batchId, batch_role: 'catalog' },
+        undefined
+      );
+      const catalogJob = await createSyncJob(supabase, integration.id, 'catalog', catalogStats);
+      if ('error' in catalogJob) {
+        return NextResponse.json({ error: catalogJob.error }, { status: 500 });
+      }
+      jobIds.push(catalogJob.id);
+
+      for (let i = 0; i < monthlyRanges.length; i++) {
+        const range = monthlyRanges[i];
+        const monthPeriod: FullSyncPeriod = {
+          mode: 'custom',
+          startAt: range.startAt,
+          endAt: range.endAt,
+        };
+        const dataStats = buildJobStats(
+          {
+            batch_id: batchId,
+            batch_role: 'data',
+            batch_index: i,
+            batch_total: monthlyRanges.length,
+            month_label: range.monthLabel,
+            include_catalog: false,
+            include_locations: false,
+          },
+          monthPeriod
+        );
+        const dataJob = await createSyncJob(supabase, integration.id, 'full', dataStats);
+        if ('error' in dataJob) {
+          return NextResponse.json({ error: dataJob.error }, { status: 500 });
+        }
+        jobIds.push(dataJob.id);
+      }
+
+      after(async () => {
+        const supabaseBg = supabaseServer();
+        await runStagingForJob(
+          supabaseBg,
+          integration,
+          catalogJob.id,
+          'catalog',
+          origin,
+          undefined,
+          undefined,
+          {},
+          catalogStats
+        );
+        for (let i = 0; i < monthlyRanges.length; i++) {
+          const range = monthlyRanges[i];
+          const dataJobId = jobIds[i + 1];
+          const monthPeriod: FullSyncPeriod = {
+            mode: 'custom',
+            startAt: range.startAt,
+            endAt: range.endAt,
+          };
+          const dataStats = buildJobStats(
+            {
+              batch_id: batchId,
+              batch_role: 'data',
+              batch_index: i,
+              batch_total: monthlyRanges.length,
+              month_label: range.monthLabel,
+              include_catalog: false,
+              include_locations: false,
+            },
+            monthPeriod
+          );
+          await runStagingForJob(
+            supabaseBg,
+            integration,
+            dataJobId,
+            'full',
+            origin,
+            monthPeriod,
+            undefined,
+            stagingOptionsFromStats(dataStats),
+            dataStats
+          );
+        }
+      });
+
+      return NextResponse.json(
+        {
+          job_id: jobIds[0],
+          job_ids: jobIds,
+          batch_id: batchId,
+          message: `Started batch of ${jobIds.length} jobs (1 catalog + ${monthlyRanges.length} monthly data jobs).`,
+        },
+        { status: 202 }
+      );
+    }
+
+    const singleStats = buildJobStats({}, period);
+    const singleJob = await createSyncJob(supabase, integration.id, syncType, singleStats);
+    if ('error' in singleJob) {
+      return NextResponse.json({ error: singleJob.error }, { status: 500 });
+    }
 
     after(async () => {
       const supabaseBg = supabaseServer();
-      await runStagingForJob(supabaseBg, integration, jobId, syncType, origin, period);
+      await runStagingForJob(
+        supabaseBg,
+        integration,
+        singleJob.id,
+        syncType,
+        origin,
+        period,
+        undefined,
+        stagingOptionsFromStats(singleStats),
+        singleStats
+      );
     });
 
     return NextResponse.json(
-      { job_id: jobId, message: 'Sync started. Processing in background.' },
+      { job_id: singleJob.id, message: 'Sync started. Processing in background.' },
       { status: 202 }
     );
   } catch (error: any) {

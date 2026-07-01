@@ -216,6 +216,7 @@ export function SyncJobDetailClient() {
   }
 
   if (isError || (!isLoading && !job)) {
+    const errorDetail = error instanceof Error ? error.message : null;
     return (
       <AppLayout>
         <div className="space-y-4 p-4 md:p-6">
@@ -228,7 +229,7 @@ export function SyncJobDetailClient() {
           <Card>
             <CardContent className="pt-6">
               <p className="text-center text-muted-foreground">
-                Job not found or you don't have access to it.
+                {errorDetail || "Job not found or you don't have access to it."}
               </p>
               <Button variant="link" asChild className="mt-2 w-full justify-center">
                 <Link href="/settings/integrations/syncs">View all syncs</Link>
@@ -284,6 +285,14 @@ export function SyncJobDetailClient() {
         </Badge>
       );
     }
+    if (job.status === 'stopped') {
+      return (
+        <Badge variant="secondary" className="gap-1.5">
+          <Clock className="h-3.5 w-3" />
+          Stopped
+        </Badge>
+      );
+    }
     return (
       <Badge variant="secondary" className="gap-1.5">
         <Loader2 className="h-3.5 w-3 animate-spin" />
@@ -319,6 +328,29 @@ export function SyncJobDetailClient() {
                   </Button>
                 )}
             </div>
+            {job.parent_job_id && (
+              <p className="text-sm text-muted-foreground">
+                Continues{' '}
+                <Link href={`/settings/integrations/syncs/${job.parent_job_id}`} className="underline">
+                  job #{job.parent_job_id}
+                </Link>
+                {job.recovery_action ? ` (${job.recovery_action.replace(/_/g, ' ')})` : ''}
+              </p>
+            )}
+            {job.successors && job.successors.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Successor:{' '}
+                {job.successors.map((s, i) => (
+                  <span key={s.id}>
+                    {i > 0 ? ', ' : ''}
+                    <Link href={`/settings/integrations/syncs/${s.id}`} className="underline">
+                      job #{s.id}
+                    </Link>
+                    {s.recovery_action ? ` (${s.recovery_action.replace(/_/g, ' ')})` : ''}
+                  </span>
+                ))}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {showRecovery && (

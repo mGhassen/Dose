@@ -18,6 +18,7 @@ import type {
   PaginatedResponse,
   PaginationParams,
   BulkImportPreviewResponse,
+  RecoverSyncJobResponse,
 } from '@kit/types';
 
 export const integrationsApi = {
@@ -56,16 +57,20 @@ export const integrationsApi = {
   sync: (
     id: string,
     syncType?: 'orders' | 'payments' | 'catalog' | 'locations' | 'transactions' | 'full',
-    period?: { mode: 'last_sync' | 'custom' | 'all'; startAt?: string; endAt?: string }
+    options?: {
+      period?: { mode: 'last_sync' | 'custom' | 'all'; startAt?: string; endAt?: string };
+      fragmentByMonth?: boolean;
+    }
   ) =>
     apiRequest<SyncStartResponse>(
       'POST',
       `/api/integrations/${id}/sync`,
       {
         sync_type: syncType || 'full',
-        period_mode: period?.mode,
-        start_at: period?.startAt,
-        end_at: period?.endAt,
+        period_mode: options?.period?.mode,
+        start_at: options?.period?.startAt,
+        end_at: options?.period?.endAt,
+        fragment_by_month: options?.fragmentByMonth,
       },
       undefined,
       { timeout: 120000 }
@@ -122,14 +127,20 @@ export const integrationsApi = {
   getSyncJobs: (integrationId: string) =>
     apiRequest<SyncJob[]>('GET', `/api/integrations/${integrationId}/sync`),
   getSyncJob: (jobId: number) =>
-    apiRequest<SyncJobWithErrors>('GET', `/api/sync-jobs/${jobId}`),
+    apiRequest<SyncJobWithErrors>('GET', `/api/sync-jobs/${jobId}`, undefined, undefined, { timeout: 30000 }),
   retrySyncJob: (jobId: number) =>
     apiRequest<{ job_id: number; message: string }>('POST', `/api/sync-jobs/${jobId}/retry`),
   recoverSyncJob: (jobId: number, action: 'resume' | 'process_staged' | 'discard_staging' | 'cancel') =>
-    apiRequest<{ job_id: number; action: string; message: string; redirect?: string }>(
+    apiRequest<RecoverSyncJobResponse>(
       'POST',
       `/api/sync-jobs/${jobId}/recover`,
       { action }
+    ),
+  recoverSyncBatch: (batchId: string, action: 'cancel_all' | 'retry_failed') =>
+    apiRequest<{ batch_id: string; action: string; results: { job_id: number; action: string; message: string }[]; message: string }>(
+      'POST',
+      '/api/sync-jobs/batch/recover',
+      { batch_id: batchId, action }
     ),
   getBulkImportPreview: (jobId: number, params?: { limit?: number; offset?: number }) => {
     const searchParams = new URLSearchParams();

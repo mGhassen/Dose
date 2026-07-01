@@ -624,6 +624,8 @@ export type SyncJobRecoveryAction = 'resume' | 'process_staged' | 'discard_stagi
 
 export type SyncJobRecoveryPhase = 'fetch' | 'review' | 'process' | 'terminal';
 
+export type SyncJobRecoveryKind = 'resume_fetch' | 'process_staged' | 'discard_staging';
+
 export interface SyncJobRecoveryState {
   recovery_phase: SyncJobRecoveryPhase;
   is_stuck: boolean;
@@ -647,7 +649,7 @@ export interface SyncJob {
   id: number;
   integration_id: number;
   sync_type: string;
-  status: 'staging' | 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  status: 'staging' | 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'stopped';
   created_at: string;
   started_at?: string;
   completed_at?: string;
@@ -656,6 +658,23 @@ export interface SyncJob {
   source_file_path?: string | null;
   bulk_review_status?: 'none' | 'needs_review' | 'ready' | 'complete' | 'cancelled';
   bulk_review_payload?: Record<string, unknown>;
+  parent_job_id?: number | null;
+  recovery_action?: SyncJobRecoveryKind | null;
+}
+
+export interface SyncJobSuccessor {
+  id: number;
+  status: string;
+  recovery_action?: SyncJobRecoveryKind | null;
+}
+
+export interface RecoverSyncJobResponse {
+  job_id: number;
+  stopped_job_id: number | null;
+  successor_job_id: number | null;
+  action: string;
+  message: string;
+  redirect?: string;
 }
 
 export interface BulkImportTemplateColumn {
@@ -722,9 +741,10 @@ export interface SyncJobWithErrors extends SyncJob {
   errors?: Array<{ data_type: string; source_id: string; error_message: string }>;
   steps?: SyncJobStep[];
   recovery?: SyncJobRecoveryState;
+  successors?: SyncJobSuccessor[];
 }
 
 export type SyncStartResponse =
-  | { job_id: number; message?: string }
+  | { job_id: number; job_ids?: number[]; batch_id?: string; message?: string }
   | { job_id: number; status: 'failed'; error_message?: string };
 

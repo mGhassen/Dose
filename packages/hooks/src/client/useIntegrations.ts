@@ -156,16 +156,18 @@ export function useSyncIntegration() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ id, syncType, period }: {
+    mutationFn: ({ id, syncType, period, fragmentByMonth }: {
       id: string;
       syncType?: 'orders' | 'payments' | 'catalog' | 'locations' | 'transactions' | 'full';
       period?: { mode: 'last_sync' | 'custom' | 'all'; startAt?: string; endAt?: string };
+      fragmentByMonth?: boolean;
     }) =>
-      integrationsApi.sync(id, syncType, period),
+      integrationsApi.sync(id, syncType, { period, fragmentByMonth }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['integrations'] });
       queryClient.invalidateQueries({ queryKey: ['integrations', variables.id] });
       queryClient.invalidateQueries({ queryKey: ['integrations', variables.id, 'sync', 'jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', 'all'] });
     },
   });
 }
@@ -256,6 +258,23 @@ export function useRecoverSyncJob() {
     }) => integrationsApi.recoverSyncJob(jobId, action),
     onSuccess: (_, { jobId }) => {
       queryClient.invalidateQueries({ queryKey: ['sync-jobs', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['integrations'] });
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', 'all'] });
+    },
+  });
+}
+
+export function useRecoverSyncBatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      batchId,
+      action,
+    }: {
+      batchId: string;
+      action: 'cancel_all' | 'retry_failed';
+    }) => integrationsApi.recoverSyncBatch(batchId, action),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['integrations'] });
       queryClient.invalidateQueries({ queryKey: ['sync-jobs', 'all'] });
     },

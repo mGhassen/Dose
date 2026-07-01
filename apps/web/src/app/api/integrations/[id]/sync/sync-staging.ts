@@ -1,10 +1,17 @@
 import {
+  type FullSyncPeriod,
+  type SquareStagingOptions,
+  resolveFullSyncRange,
+} from '@/lib/sync-period-utils';
+import {
   BUSINESS_TIMEZONE_EUROPE_PARIS,
   endOfZonedCalendarDay,
   getDatePartsInTimeZone,
   getMonthlyZonedRanges,
   startOfZonedYearJanFirstUtc,
 } from '@kit/lib/date-format';
+
+export type { FullSyncPeriod } from '@/lib/sync-period-utils';
 
 const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
 const SQUARE_API_BASE = SQUARE_USE_SANDBOX
@@ -13,31 +20,6 @@ const SQUARE_API_BASE = SQUARE_USE_SANDBOX
 
 const SYNC_TZ = BUSINESS_TIMEZONE_EUROPE_PARIS;
 const PENNYLANE_API_BASE = 'https://app.pennylane.com/api/external/v2';
-
-export type FullSyncPeriod = {
-  mode: 'last_sync' | 'custom' | 'all';
-  startAt?: string;
-  endAt?: string;
-};
-
-function resolveFullSyncRange(
-  integration: { last_sync_at?: string | null },
-  period: FullSyncPeriod | undefined
-): { start: Date; end: Date } {
-  const now = new Date();
-  const defaultEnd = endOfZonedCalendarDay(now, SYNC_TZ);
-  const LOOKBACK_YEARS = 7;
-  const mode = period?.mode ?? 'all';
-
-  if (mode === 'custom' && period?.startAt && period?.endAt) {
-    return { start: new Date(period.startAt), end: new Date(period.endAt) };
-  }
-  if (mode === 'last_sync' && integration.last_sync_at) {
-    return { start: new Date(integration.last_sync_at), end: defaultEnd };
-  }
-  const { y } = getDatePartsInTimeZone(now, SYNC_TZ);
-  return { start: startOfZonedYearJanFirstUtc(y - LOOKBACK_YEARS, SYNC_TZ), end: defaultEnd };
-}
 
 async function getNextStepSequence(supabase: { from: (t: string) => any }, jobId: number): Promise<number> {
   const { data } = await supabase
@@ -53,10 +35,13 @@ async function getNextStepSequence(supabase: { from: (t: string) => any }, jobId
 export async function fetchAndStageSquare(
   supabase: any,
   integration: any,
-  jobId: number,
+  auditJobId: number,
   syncType: string,
-  period?: FullSyncPeriod
+  period?: FullSyncPeriod,
+  stagingJobId: number = auditJobId,
+  stagingOptions: SquareStagingOptions = {}
 ): Promise<{ error?: string; stats?: Record<string, number> }> {
+  const includeCatalog = stagingOptions.includeCatalog !== false;
   const accessToken = integration.access_token;
   if (!accessToken) {
     return { error: 'Access token not found. Please reconnect the integration.' };
@@ -71,7 +56,7 @@ export async function fetchAndStageSquare(
     orders_fetched: 0,
     payments_fetched: 0,
   };
-  let sequence = await getNextStepSequence(supabase, jobId) - 1;
+  let sequence = await getNextStepSequence(supabase, auditJobId) - 1;
   const insertStep = async (
     name: string,
     status: 'pending' | 'running' | 'done' | 'failed',
@@ -79,7 +64,7 @@ export async function fetchAndStageSquare(
   ) => {
     sequence += 1;
     const { error } = await supabase.from('sync_job_steps').insert({
-      job_id: jobId,
+      job_id: auditJobId,
       sequence,
       name,
       status,
@@ -88,7 +73,7 @@ export async function fetchAndStageSquare(
     if (error) throw new Error(`sync_job_steps: ${error.message}`);
   };
 
-  if (syncType === 'catalog' || syncType === 'full') {
+  if (includeCatalog && (syncType === 'catalog' || syncType === 'full')) {
     const catalogTypes = [
       'ITEM',
       'ITEM_VARIATION',
@@ -124,7 +109,7 @@ export async function fetchAndStageSquare(
       catalogCursor = catalogData.cursor || null;
       if (objects.length > 0) {
         const rows = objects.map((obj: any) => ({
-          job_id: jobId,
+          job_id: stagingJobId,
           data_type: 'catalog_object',
           source_id: obj.id || '',
           payload: obj,
@@ -218,7 +203,7 @@ export async function fetchAndStageSquare(
         ordersCursor = ordersData.cursor || null;
         if (orders.length > 0) {
           const rows = orders.map((order: any) => ({
-            job_id: jobId,
+            job_id: stagingJobId,
             data_type: 'order',
             source_id: order.id || '',
             payload: order,
@@ -290,7 +275,7 @@ export async function fetchAndStageSquare(
         paymentsCursor = payData.cursor || null;
         if (payments.length > 0) {
           const rows = payments.map((payment: any) => ({
-            job_id: jobId,
+            job_id: stagingJobId,
             data_type: 'payment',
             source_id: payment.id || '',
             payload: payment,
@@ -324,15 +309,16 @@ export async function fetchAndStageSquare(
 export async function fetchAndStagePennylane(
   supabase: any,
   integration: any,
-  jobId: number,
-  _syncType: string
+  auditJobId: number,
+  _syncType: string,
+  stagingJobId: number = auditJobId
 ): Promise<{ error?: string; stats?: Record<string, number> }> {
   const accessToken = integration.access_token;
   if (!accessToken) {
     return { error: 'Access token not found. Please reconnect the integration.' };
   }
   const stats: Record<string, number> = { transactions_fetched: 0 };
-  let sequence = await getNextStepSequence(supabase, jobId) - 1;
+  let sequence = await getNextStepSequence(supabase, auditJobId) - 1;
   const insertStep = async (
     name: string,
     status: 'pending' | 'running' | 'done' | 'failed',
@@ -340,7 +326,7 @@ export async function fetchAndStagePennylane(
   ) => {
     sequence += 1;
     const { error } = await supabase.from('sync_job_steps').insert({
-      job_id: jobId,
+      job_id: auditJobId,
       sequence,
       name,
       status,
@@ -377,7 +363,7 @@ export async function fetchAndStagePennylane(
     }
 
     const rows = transactions.map((tx: any) => ({
-      job_id: jobId,
+      job_id: stagingJobId,
       data_type: 'transaction',
       source_id: String(tx.id ?? tx.uuid ?? ''),
       payload: tx,
@@ -399,14 +385,16 @@ export async function completeStagingAndQueueProcess(
   supabase: any,
   integrationId: number,
   jobId: number,
-  stats: Record<string, number>,
-  origin: string
+  stats: Record<string, unknown>,
+  origin: string,
+  preserveStats?: Record<string, unknown>
 ): Promise<void> {
+  const mergedStats = { ...preserveStats, ...stats };
   await supabase
     .from('sync_jobs')
     .update({
       status: 'pending',
-      stats,
+      stats: mergedStats,
     })
     .eq('id', jobId);
 
@@ -427,15 +415,27 @@ export async function runStagingForJob(
   jobId: number,
   syncType: string,
   origin: string,
-  period?: FullSyncPeriod
+  period?: FullSyncPeriod,
+  stagingJobId?: number,
+  stagingOptions?: SquareStagingOptions,
+  jobStats?: Record<string, unknown>
 ): Promise<{ error?: string }> {
   const isPennylane = integration.integration_type === 'pennylane';
   const effectiveSyncType = isPennylane ? (syncType === 'full' ? 'transactions' : syncType) : syncType;
+  const targetStagingJobId = stagingJobId ?? jobId;
 
   try {
     const result = isPennylane
-      ? await fetchAndStagePennylane(supabase, integration, jobId, effectiveSyncType)
-      : await fetchAndStageSquare(supabase, integration, jobId, syncType, period);
+      ? await fetchAndStagePennylane(supabase, integration, jobId, effectiveSyncType, targetStagingJobId)
+      : await fetchAndStageSquare(
+          supabase,
+          integration,
+          jobId,
+          syncType,
+          period,
+          targetStagingJobId,
+          stagingOptions
+        );
 
     if (result.error) {
       await supabase
@@ -449,7 +449,14 @@ export async function runStagingForJob(
       return { error: result.error };
     }
 
-    await completeStagingAndQueueProcess(supabase, integration.id, jobId, result.stats || {}, origin);
+    await completeStagingAndQueueProcess(
+      supabase,
+      integration.id,
+      jobId,
+      result.stats || {},
+      origin,
+      jobStats
+    );
     return {};
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

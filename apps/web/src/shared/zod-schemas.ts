@@ -1029,6 +1029,7 @@ export const syncBodySchema = z.object({
   period_mode: syncPeriodModeEnum.optional(),
   start_at: z.string().datetime().optional(),
   end_at: z.string().datetime().optional(),
+  fragment_by_month: z.boolean().optional(),
 });
 export const importCsvSchema = z.object({
   import_type: z.string().min(1),

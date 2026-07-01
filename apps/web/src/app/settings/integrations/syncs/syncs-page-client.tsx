@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import AppLayout from '@/components/app-layout';
@@ -27,9 +27,10 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  Clock,
   Activity,
 } from 'lucide-react';
-import { useAllSyncJobs, useIntegrations } from '@kit/hooks';
+import { useAllSyncJobs, useIntegrations, useRecoverSyncBatch, useToast } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
 
 function formatDuration(startedAt?: string | null, completedAt?: string | null): string {
@@ -51,25 +52,217 @@ function phaseLabel(status: string): string {
     case 'completed': return 'Phase 2: done';
     case 'failed': return 'Phase 2: done';
     case 'cancelled': return 'Cancelled';
+    case 'stopped': return 'Stopped';
     default: return status;
   }
 }
 
-function statsSummary(stats?: Record<string, number> | null): string {
+function statsSummary(stats?: Record<string, unknown> | null): string {
   if (!stats || typeof stats !== 'object') return '—';
   const parts: string[] = [];
-  if (stats.items_imported) parts.push(`${stats.items_imported} items`);
-  if (stats.orders_imported) parts.push(`${stats.orders_imported} orders`);
-  if (stats.payments_imported) parts.push(`${stats.payments_imported} payments`);
-  const failed = (stats.items_failed || 0) + (stats.orders_failed || 0) + (stats.payments_failed || 0);
+  const n = (k: string) => (typeof stats[k] === 'number' ? (stats[k] as number) : 0);
+  if (n('items_imported')) parts.push(`${n('items_imported')} items`);
+  if (n('orders_imported')) parts.push(`${n('orders_imported')} orders`);
+  if (n('payments_imported')) parts.push(`${n('payments_imported')} payments`);
+  const failed = n('items_failed') + n('orders_failed') + n('payments_failed');
   if (failed > 0) parts.push(`${failed} failed`);
   return parts.length ? parts.join(', ') : '—';
+}
+
+function batchBadge(stats?: Record<string, unknown> | null): string | null {
+  if (!stats?.batch_id) return null;
+  const role = stats.batch_role as string | undefined;
+  const month = stats.month_label as string | undefined;
+  if (role === 'catalog') return 'Batch · Catalog';
+  if (month) return `Batch · ${month}`;
+  return 'Batch';
+}
+
+type JobRow = {
+  id: number;
+  integration_name?: string;
+  integration_type?: string;
+  sync_type?: string;
+  status: string;
+  created_at?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  stats?: Record<string, unknown> | null;
+  error_message?: string | null;
+  recovery_action?: string | null;
+  parent_job_id?: number | null;
+};
+
+type BatchGroup = {
+  batchId: string;
+  jobs: JobRow[];
+};
+
+function groupJobsByBatch(jobs: JobRow[]): { batches: BatchGroup[]; standalone: JobRow[] } {
+  const batchMap = new Map<string, JobRow[]>();
+  const standalone: JobRow[] = [];
+
+  for (const job of jobs) {
+    const batchId = job.stats?.batch_id as string | undefined;
+    if (batchId) {
+      const list = batchMap.get(batchId) ?? [];
+      list.push(job);
+      batchMap.set(batchId, list);
+    } else {
+      standalone.push(job);
+    }
+  }
+
+  const batches = Array.from(batchMap.entries()).map(([batchId, batchJobs]) => ({
+    batchId,
+    jobs: batchJobs.sort((a, b) => {
+      const ai = (a.stats?.batch_index as number | undefined) ?? 0;
+      const bi = (b.stats?.batch_index as number | undefined) ?? 0;
+      if (a.stats?.batch_role === 'catalog') return -1;
+      if (b.stats?.batch_role === 'catalog') return 1;
+      return ai - bi;
+    }),
+  }));
+
+  return { batches, standalone };
+}
+
+function JobTableRow({ job, router }: { job: JobRow; router: ReturnType<typeof useRouter> }) {
+  const badge = batchBadge(job.stats);
+  return (
+    <TableRow
+      key={job.id}
+      role="button"
+      className="cursor-pointer hover:bg-muted/50"
+      onClick={() => router.push(`/settings/integrations/syncs/${job.id}`)}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          router.push(`/settings/integrations/syncs/${job.id}`);
+        }
+      }}
+    >
+      <TableCell>
+        <span className="font-medium">{job.integration_name || job.integration_type || '—'}</span>
+        {job.integration_type && (
+          <Badge variant="outline" className="ml-2 text-xs">{job.integration_type}</Badge>
+        )}
+      </TableCell>
+      <TableCell>{job.id}</TableCell>
+      <TableCell>
+        <span>{job.sync_type || '—'}</span>
+        {badge && (
+          <Badge variant="secondary" className="ml-2 text-xs">{badge}</Badge>
+        )}
+        {job.recovery_action && (
+          <Badge variant="outline" className="ml-2 text-xs">
+            {job.recovery_action.replace(/_/g, ' ')}
+          </Badge>
+        )}
+        {job.parent_job_id && (
+          <span className="block text-xs text-muted-foreground mt-0.5">
+            from #{job.parent_job_id}
+          </span>
+        )}
+      </TableCell>
+      <TableCell>
+        <Badge variant="secondary" className="text-xs">{phaseLabel(job.status)}</Badge>
+      </TableCell>
+      <TableCell>
+        {job.status === 'completed' && <CheckCircle2 className="h-4 w-4 text-green-500 inline mr-1" />}
+        {job.status === 'failed' && <XCircle className="h-4 w-4 text-destructive inline mr-1" />}
+        {job.status === 'cancelled' && <XCircle className="h-4 w-4 text-muted-foreground inline mr-1" />}
+        {job.status === 'stopped' && <Clock className="h-4 w-4 text-muted-foreground inline mr-1" />}
+        {(job.status === 'staging' || job.status === 'pending' || job.status === 'processing') && (
+          <Loader2 className="h-4 w-4 animate-spin text-blue-500 inline mr-1" />
+        )}
+        <Badge
+          variant={
+            job.status === 'failed' ? 'destructive' :
+            job.status === 'completed' ? 'default' : 'secondary'
+          }
+        >
+          {job.status}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-muted-foreground text-sm">
+        {job.created_at ? formatDateTime(job.created_at) : '—'}
+      </TableCell>
+      <TableCell className="text-sm">
+        {formatDuration(job.started_at, job.completed_at)}
+      </TableCell>
+      <TableCell className="text-sm max-w-[200px] truncate" title={statsSummary(job.stats)}>
+        {statsSummary(job.stats)}
+      </TableCell>
+      <TableCell className="max-w-[180px]">
+        {job.error_message ? (
+          <span className="text-destructive text-sm truncate block" title={job.error_message}>
+            {job.error_message.length > 40 ? job.error_message.slice(0, 40) + '…' : job.error_message}
+          </span>
+        ) : '—'}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function BatchHeader({
+  batch,
+  onCancelAll,
+  onRetryFailed,
+  isPending,
+}: {
+  batch: BatchGroup;
+  onCancelAll: (batchId: string) => void;
+  onRetryFailed: (batchId: string) => void;
+  isPending: boolean;
+}) {
+  const hasRunning = batch.jobs.some((j) =>
+    ['staging', 'pending', 'processing'].includes(j.status)
+  );
+  const hasRetryable = batch.jobs.some((j) => ['failed', 'stopped'].includes(j.status));
+
+  return (
+    <TableRow className="bg-muted/30 hover:bg-muted/30">
+      <TableCell colSpan={9}>
+        <div className="flex flex-wrap items-center justify-between gap-2 py-1">
+          <span className="text-sm font-medium">
+            Batch · {batch.jobs.length} jobs
+          </span>
+          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+            {hasRunning && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isPending}
+                onClick={() => onCancelAll(batch.batchId)}
+              >
+                Cancel all
+              </Button>
+            )}
+            {hasRetryable && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isPending}
+                onClick={() => onRetryFailed(batch.batchId)}
+              >
+                Retry failed
+              </Button>
+            )}
+          </div>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
 }
 
 export function SyncsPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const integrationIdParam = searchParams.get('integration_id');
+  const { toast } = useToast();
+  const recoverBatch = useRecoverSyncBatch();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [integrationFilter, setIntegrationFilter] = useState<string>('all');
   useEffect(() => {
@@ -84,11 +277,29 @@ export function SyncsPageClient() {
   const { data: jobs = [], isLoading } = useAllSyncJobs(filters);
   const { data: integrations = [] } = useIntegrations();
 
+  const { batches, standalone } = useMemo(
+    () => groupJobsByBatch(jobs as JobRow[]),
+    [jobs]
+  );
+
   const runningCount = jobs.filter(
     (j) => j.status === 'staging' || j.status === 'pending' || j.status === 'processing'
   ).length;
   const failedCount = jobs.filter((j) => j.status === 'failed').length;
   const completedCount = jobs.filter((j) => j.status === 'completed').length;
+
+  const handleBatchAction = async (batchId: string, action: 'cancel_all' | 'retry_failed') => {
+    try {
+      const result = await recoverBatch.mutateAsync({ batchId, action });
+      toast({ title: 'Batch updated', description: result.message });
+    } catch (e: unknown) {
+      toast({
+        title: 'Batch action failed',
+        description: e instanceof Error ? e.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
 
   return (
     <AppLayout>
@@ -155,6 +366,8 @@ export function SyncsPageClient() {
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="failed">Failed</SelectItem>
+              <SelectItem value="stopped">Stopped</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
           <Select value={integrationFilter} onValueChange={setIntegrationFilter}>
@@ -205,64 +418,21 @@ export function SyncsPageClient() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {jobs.map((job: any) => (
-                    <TableRow
-                      key={job.id}
-                      role="button"
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => router.push(`/settings/integrations/syncs/${job.id}`)}
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          router.push(`/settings/integrations/syncs/${job.id}`);
-                        }
-                      }}
-                    >
-                      <TableCell>
-                        <span className="font-medium">{job.integration_name || job.integration_type || '—'}</span>
-                        {job.integration_type && (
-                          <Badge variant="outline" className="ml-2 text-xs">{job.integration_type}</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{job.id}</TableCell>
-                      <TableCell>{job.sync_type || '—'}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-xs">{phaseLabel(job.status)}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {job.status === 'completed' && <CheckCircle2 className="h-4 w-4 text-green-500 inline mr-1" />}
-                        {job.status === 'failed' && <XCircle className="h-4 w-4 text-destructive inline mr-1" />}
-                        {job.status === 'cancelled' && <XCircle className="h-4 w-4 text-muted-foreground inline mr-1" />}
-                        {(job.status === 'staging' || job.status === 'pending' || job.status === 'processing') && (
-                          <Loader2 className="h-4 w-4 animate-spin text-blue-500 inline mr-1" />
-                        )}
-                        <Badge
-                          variant={
-                            job.status === 'failed' ? 'destructive' :
-                            job.status === 'completed' ? 'default' : 'secondary'
-                          }
-                        >
-                          {job.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {job.created_at ? formatDateTime(job.created_at) : '—'}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {formatDuration(job.started_at, job.completed_at)}
-                      </TableCell>
-                      <TableCell className="text-sm max-w-[200px] truncate" title={statsSummary(job.stats)}>
-                        {statsSummary(job.stats)}
-                      </TableCell>
-                      <TableCell className="max-w-[180px]">
-                        {job.error_message ? (
-                          <span className="text-destructive text-sm truncate block" title={job.error_message}>
-                            {job.error_message.length > 40 ? job.error_message.slice(0, 40) + '…' : job.error_message}
-                          </span>
-                        ) : '—'}
-                      </TableCell>
-                    </TableRow>
+                  {batches.map((batch) => (
+                    <React.Fragment key={batch.batchId}>
+                      <BatchHeader
+                        batch={batch}
+                        isPending={recoverBatch.isPending}
+                        onCancelAll={(id) => void handleBatchAction(id, 'cancel_all')}
+                        onRetryFailed={(id) => void handleBatchAction(id, 'retry_failed')}
+                      />
+                      {batch.jobs.map((job) => (
+                        <JobTableRow key={job.id} job={job} router={router} />
+                      ))}
+                    </React.Fragment>
+                  ))}
+                  {standalone.map((job) => (
+                    <JobTableRow key={job.id} job={job} router={router} />
                   ))}
                 </TableBody>
               </Table>
