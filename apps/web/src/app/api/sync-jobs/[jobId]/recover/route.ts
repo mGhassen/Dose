@@ -4,7 +4,9 @@ import { getSyncJobWithIntegrationForUser } from '@/lib/sync-job-access';
 import {
   detectRecoveryPhase,
   fireProcessSyncJob,
+  formatRecoveryActionLabel,
   getJobRecoveryState,
+  isSuccessorMigrationError,
   type RecoveryAction,
   type RecoveryActionKind,
 } from '@/lib/sync-job-recovery';
@@ -50,9 +52,28 @@ async function createSuccessorJob(
     .select('id')
     .single();
   if (error || !data) {
-    throw new Error(error?.message || 'Failed to create successor job');
+    const msg = error?.message || 'Failed to create successor job';
+    if (isSuccessorMigrationError(msg)) {
+      throw new Error(
+        'Database migration required: run sync_job_successor_fields (parent_job_id, recovery_action).'
+      );
+    }
+    throw new Error(msg);
   }
   return data.id as number;
+}
+
+function recoveryRedirect(successorId: number): string {
+  return `/settings/integrations/syncs/${successorId}`;
+}
+
+function recoveryMessage(
+  stoppedId: number,
+  successorId: number,
+  recoveryAction: RecoveryActionKind
+): string {
+  const label = formatRecoveryActionLabel(recoveryAction) ?? recoveryAction;
+  return `Job #${stoppedId} stopped. Job #${successorId} started (${label}).`;
 }
 
 export async function POST(
@@ -164,8 +185,8 @@ export async function POST(
         stopped_job_id: numericJobId,
         successor_job_id: successorId,
         action,
-        redirect: `/settings/integrations/syncs/${successorId}`,
-        message: `Job #${numericJobId} stopped. Job #${successorId} will remove staging data.`,
+        redirect: recoveryRedirect(successorId),
+        message: recoveryMessage(numericJobId, successorId, 'discard_staging'),
       });
     }
 
@@ -177,8 +198,8 @@ export async function POST(
         stopped_job_id: numericJobId,
         successor_job_id: successorId,
         action,
-        redirect: `/settings/integrations/syncs/${successorId}`,
-        message: `Job #${numericJobId} stopped. Job #${successorId} will import staged data.`,
+        redirect: recoveryRedirect(successorId),
+        message: recoveryMessage(numericJobId, successorId, 'process_staged'),
       });
     }
 
@@ -228,8 +249,8 @@ export async function POST(
         stopped_job_id: numericJobId,
         successor_job_id: successorId,
         action,
-        redirect: `/settings/integrations/syncs/${successorId}`,
-        message: `Job #${numericJobId} stopped. Job #${successorId} will resume fetch.`,
+        redirect: recoveryRedirect(successorId),
+        message: recoveryMessage(numericJobId, successorId, 'resume_fetch'),
       });
     }
 
@@ -241,8 +262,8 @@ export async function POST(
         stopped_job_id: numericJobId,
         successor_job_id: successorId,
         action,
-        redirect: `/settings/integrations/syncs/${successorId}`,
-        message: `Job #${numericJobId} stopped. Job #${successorId} will resume processing.`,
+        redirect: recoveryRedirect(successorId),
+        message: recoveryMessage(numericJobId, successorId, 'process_staged'),
       });
     }
 
@@ -252,9 +273,11 @@ export async function POST(
     );
   } catch (error: any) {
     console.error('Error recovering sync job:', error);
+    const message = error?.message || 'Failed to recover job';
+    const status = isSuccessorMigrationError(message) ? 503 : 500;
     return NextResponse.json(
-      { error: 'Failed to recover job', details: error.message },
-      { status: 500 }
+      { error: message, details: message },
+      { status }
     );
   }
 }

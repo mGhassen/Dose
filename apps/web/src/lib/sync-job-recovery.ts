@@ -1,4 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { formatRecoveryActionLabel, isBenignStopMessage, STOPPED_FOR_RECOVERY_MESSAGE } from '@kit/lib/sync-job-utils';
+
+export { formatRecoveryActionLabel, isBenignStopMessage, STOPPED_FOR_RECOVERY_MESSAGE };
 
 export const STUCK_THRESHOLD_MS = 10 * 60 * 1000;
 
@@ -56,6 +59,53 @@ type StepRow = {
 
 export function resolveStagingJobId(job: { id: number; parent_job_id?: number | null }): number {
   return job.parent_job_id ?? job.id;
+}
+
+export function isSuccessorMigrationError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    (lower.includes('parent_job_id') || lower.includes('recovery_action')) &&
+    (lower.includes('does not exist') ||
+      lower.includes('schema cache') ||
+      lower.includes('column') ||
+      lower.includes('could not find'))
+  );
+}
+
+export type SuccessorSummary = {
+  id: number;
+  status: string;
+  recovery_action?: string | null;
+};
+
+export async function enrichJobsWithLatestSuccessor<T extends { id: number }>(
+  supabase: SupabaseClient,
+  jobs: T[]
+): Promise<(T & { latest_successor?: SuccessorSummary | null })[]> {
+  if (jobs.length === 0) return [];
+  const parentIds = jobs.map((j) => j.id);
+  const { data: successors } = await supabase
+    .from('sync_jobs')
+    .select('id, status, recovery_action, parent_job_id, created_at')
+    .in('parent_job_id', parentIds)
+    .order('created_at', { ascending: false });
+
+  const latestByParent = new Map<number, SuccessorSummary>();
+  for (const row of successors ?? []) {
+    const parentId = row.parent_job_id as number;
+    if (!latestByParent.has(parentId)) {
+      latestByParent.set(parentId, {
+        id: row.id as number,
+        status: row.status as string,
+        recovery_action: row.recovery_action as string | null,
+      });
+    }
+  }
+
+  return jobs.map((job) => ({
+    ...job,
+    latest_successor: latestByParent.get(job.id) ?? null,
+  }));
 }
 
 function isOlderThan(iso: string | null | undefined, ms: number): boolean {

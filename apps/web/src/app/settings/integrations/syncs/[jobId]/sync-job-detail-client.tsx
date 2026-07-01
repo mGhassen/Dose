@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { useSyncJob, useRetrySyncJob, useBackfillSaleItems } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
+import { formatRecoveryActionLabel, isBenignStopMessage } from '@kit/lib/sync-job-utils';
 import { useToast } from '@kit/hooks';
 import type { SyncJobStep } from '@kit/types';
 import { SyncJobRecoveryDialog } from '../sync-job-recovery-dialog';
@@ -257,7 +258,15 @@ export function SyncJobDetailClient() {
     job.status === 'staging' || job.status === 'pending' || job.status === 'processing';
   const showRecovery =
     isRunning && recovery && recovery.available_actions.length > 0;
-  const hasErrors = Boolean(job.error_message || (job.errors && job.errors.length > 0));
+  const recoveryLabel = formatRecoveryActionLabel(job.recovery_action);
+  const isDiscardSuccessor = job.recovery_action === 'discard_staging';
+  const isDiscardComplete = isDiscardSuccessor && job.status === 'completed';
+  const showRetryBackfill =
+    job.status === 'failed' || (job.status === 'completed' && !isDiscardSuccessor);
+  const primarySuccessor = job.successors?.[0];
+  const hasErrors =
+    Boolean(job.error_message && !isBenignStopMessage(job.status, job.error_message)) ||
+    Boolean(job.errors && job.errors.length > 0);
   const stepProgress = stepsProgress(steps);
 
   const statusBadge = () => {
@@ -287,7 +296,7 @@ export function SyncJobDetailClient() {
     }
     if (job.status === 'stopped') {
       return (
-        <Badge variant="secondary" className="gap-1.5">
+        <Badge variant="outline" className="gap-1.5 border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/10">
           <Clock className="h-3.5 w-3" />
           Stopped
         </Badge>
@@ -319,6 +328,11 @@ export function SyncJobDetailClient() {
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-semibold tracking-tight">Job #{job.id}</h1>
               {statusBadge()}
+              {recoveryLabel && (
+                <Badge variant="outline" className="text-xs">
+                  {recoveryLabel}
+                </Badge>
+              )}
               <span className="text-muted-foreground text-sm">{job.sync_type}</span>
               {(job.bulk_review_status === 'needs_review' || job.bulk_review_status === 'ready') &&
                 job.status !== 'completed' &&
@@ -334,7 +348,7 @@ export function SyncJobDetailClient() {
                 <Link href={`/settings/integrations/syncs/${job.parent_job_id}`} className="underline">
                   job #{job.parent_job_id}
                 </Link>
-                {job.recovery_action ? ` (${job.recovery_action.replace(/_/g, ' ')})` : ''}
+                {recoveryLabel ? ` (${recoveryLabel})` : ''}
               </p>
             )}
             {job.successors && job.successors.length > 0 && (
@@ -346,7 +360,9 @@ export function SyncJobDetailClient() {
                     <Link href={`/settings/integrations/syncs/${s.id}`} className="underline">
                       job #{s.id}
                     </Link>
-                    {s.recovery_action ? ` (${s.recovery_action.replace(/_/g, ' ')})` : ''}
+                    {formatRecoveryActionLabel(s.recovery_action)
+                      ? ` (${formatRecoveryActionLabel(s.recovery_action)})`
+                      : ''}
                   </span>
                 ))}
               </p>
@@ -359,7 +375,7 @@ export function SyncJobDetailClient() {
                 Manage job
               </Button>
             )}
-            {(job.status === 'failed' || job.status === 'completed') && (
+            {showRetryBackfill && (
               <>
                 <Button
                   onClick={handleBackfill}
@@ -393,6 +409,44 @@ export function SyncJobDetailClient() {
           </div>
         </div>
 
+        {job.status === 'stopped' && (
+          <Alert className="border-amber-500/50 bg-amber-500/5">
+            <Info className="h-4 w-4 text-amber-600" />
+            <AlertDescription>
+              This job was stopped for recovery.
+              {primarySuccessor ? (
+                <>
+                  {' '}
+                  See successor{' '}
+                  <Link
+                    href={`/settings/integrations/syncs/${primarySuccessor.id}`}
+                    className="font-medium underline"
+                  >
+                    job #{primarySuccessor.id}
+                  </Link>
+                  {formatRecoveryActionLabel(primarySuccessor.recovery_action)
+                    ? ` (${formatRecoveryActionLabel(primarySuccessor.recovery_action)})`
+                    : ''}
+                  .
+                </>
+              ) : (
+                ' Check sync activity for a recovery job.'
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isDiscardComplete && (
+          <Alert className="border-emerald-500/50 bg-emerald-500/5">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <AlertDescription>
+              Staging data removed from job #
+              {(job.stats?.staging_discarded_from_job as number | undefined) ?? job.parent_job_id}.
+              Imported app data was not changed.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {recovery?.is_stuck && isRunning && (
           <Alert className="border-amber-500/50 bg-amber-500/5">
             <AlertCircle className="h-4 w-4 text-amber-600" />
@@ -411,7 +465,7 @@ export function SyncJobDetailClient() {
           />
         )}
 
-        {job.error_message && (
+        {job.error_message && !isBenignStopMessage(job.status, job.error_message) && (
           <Alert variant="destructive" className="border-destructive/50">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{job.error_message}</AlertDescription>

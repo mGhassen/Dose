@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import { enrichJobsWithLatestSuccessor } from '@/lib/sync-job-recovery';
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,7 +67,9 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ jobs });
+    const enriched = await enrichJobsWithLatestSuccessor(supabase, jobs);
+
+    return NextResponse.json({ jobs: enriched });
   } catch (error: any) {
     console.error('Error listing sync jobs:', error);
     return NextResponse.json(

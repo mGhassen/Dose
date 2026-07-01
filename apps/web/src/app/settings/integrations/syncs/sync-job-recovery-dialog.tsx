@@ -94,11 +94,18 @@ export function SyncJobRecoveryDialog({ open, onOpenChange, jobId, recovery }: P
   const runAction = async () => {
     try {
       const result = await recoverSyncJob.mutateAsync({ jobId, action: selected });
-      if (result.redirect) {
-        router.push(result.redirect);
+      const target =
+        result.successor_job_id != null
+          ? `/settings/integrations/syncs/${result.successor_job_id}`
+          : result.redirect;
+      if (target) {
+        router.push(target);
       }
       toast({
-        title: "Job updated",
+        title:
+          result.successor_job_id != null
+            ? `Opened job #${result.successor_job_id}`
+            : "Job updated",
         description: result.message,
       });
       onOpenChange(false);

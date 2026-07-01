@@ -660,9 +660,16 @@ export interface SyncJob {
   bulk_review_payload?: Record<string, unknown>;
   parent_job_id?: number | null;
   recovery_action?: SyncJobRecoveryKind | null;
+  latest_successor?: SyncJobLatestSuccessor | null;
 }
 
 export interface SyncJobSuccessor {
+  id: number;
+  status: string;
+  recovery_action?: SyncJobRecoveryKind | null;
+}
+
+export interface SyncJobLatestSuccessor {
   id: number;
   status: string;
   recovery_action?: SyncJobRecoveryKind | null;

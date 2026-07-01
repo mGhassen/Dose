@@ -256,8 +256,11 @@ export function useRecoverSyncJob() {
       jobId: number;
       action: 'resume' | 'process_staged' | 'discard_staging' | 'cancel';
     }) => integrationsApi.recoverSyncJob(jobId, action),
-    onSuccess: (_, { jobId }) => {
+    onSuccess: (data, { jobId }) => {
       queryClient.invalidateQueries({ queryKey: ['sync-jobs', jobId] });
+      if (data.successor_job_id != null) {
+        queryClient.invalidateQueries({ queryKey: ['sync-jobs', data.successor_job_id] });
+      }
       queryClient.invalidateQueries({ queryKey: ['integrations'] });
       queryClient.invalidateQueries({ queryKey: ['sync-jobs', 'all'] });
     },

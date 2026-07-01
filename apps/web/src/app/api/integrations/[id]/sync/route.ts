@@ -12,6 +12,7 @@ import {
   periodToStats,
   stagingOptionsFromStats,
 } from '@/lib/sync-period-utils';
+import { enrichJobsWithLatestSuccessor } from '@/lib/sync-job-recovery';
 
 async function getIntegrationAndVerifyAccess(
   supabase: any,
@@ -317,7 +318,8 @@ export async function GET(
       .eq('integration_id', id)
       .order('created_at', { ascending: false })
       .limit(10);
-    return NextResponse.json(jobs || []);
+    const enriched = await enrichJobsWithLatestSuccessor(supabase, jobs || []);
+    return NextResponse.json(enriched);
   } catch (error: any) {
     console.error('Error fetching sync status:', error);
     return NextResponse.json(

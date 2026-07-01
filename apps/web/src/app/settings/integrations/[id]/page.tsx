@@ -43,6 +43,7 @@ import {
 import { useToast } from '@kit/hooks';
 import { cn } from '@kit/lib/utils';
 import { formatDateTime } from '@kit/lib/date-format';
+import { formatRecoveryActionLabel, isBenignStopMessage } from '@kit/lib/sync-job-utils';
 import SquareDataView from '../square-data-view';
 import { Alert, AlertDescription } from '@kit/ui/alert';
 import { ConfirmationDialog } from '@/components/confirmation-dialog';
@@ -685,14 +686,36 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                         <div className="flex items-center gap-2 mt-1">
                           {lastJob.status === 'completed' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
                           {lastJob.status === 'failed' && <XCircle className="w-4 h-4 text-red-500" />}
+                          {lastJob.status === 'stopped' && <Clock className="w-4 h-4 text-amber-500" />}
+                          {lastJob.status === 'cancelled' && <XCircle className="w-4 h-4 text-muted-foreground" />}
                           {(lastJob.status === 'staging' ||
                             lastJob.status === 'pending' ||
                             lastJob.status === 'processing') && (
                             <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                           )}
-                          <Badge variant={lastJob.status === 'failed' ? 'destructive' : lastJob.status === 'completed' ? 'default' : 'secondary'}>
+                          <Badge
+                            variant={
+                              lastJob.status === 'failed'
+                                ? 'destructive'
+                                : lastJob.status === 'completed'
+                                  ? 'default'
+                                  : lastJob.status === 'stopped'
+                                    ? 'outline'
+                                    : 'secondary'
+                            }
+                            className={
+                              lastJob.status === 'stopped'
+                                ? 'border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/10'
+                                : undefined
+                            }
+                          >
                             {lastJob.status}
                           </Badge>
+                          {lastJob.recovery_action && (
+                            <Badge variant="outline" className="text-xs">
+                              {formatRecoveryActionLabel(lastJob.recovery_action)}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -706,11 +729,27 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                         ) : null}
                       </p>
                     )}
-                    {lastJob.error_message && (
+                    {lastJob.error_message && !isBenignStopMessage(lastJob.status, lastJob.error_message) && (
                       <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>{lastJob.error_message}</AlertDescription>
                       </Alert>
+                    )}
+                    {lastJob.status === 'stopped' && lastJob.latest_successor && (
+                      <p className="text-sm text-muted-foreground">
+                        Recovery job:{' '}
+                        <Link
+                          href={`/settings/integrations/syncs/${lastJob.latest_successor.id}`}
+                          className="underline font-medium text-foreground"
+                        >
+                          #{lastJob.latest_successor.id}
+                        </Link>
+                        {formatRecoveryActionLabel(lastJob.latest_successor.recovery_action)
+                          ? ` (${formatRecoveryActionLabel(lastJob.latest_successor.recovery_action)})`
+                          : ''}
+                        {' · '}
+                        {lastJob.latest_successor.status}
+                      </p>
                     )}
                     <div className="flex gap-2 flex-wrap">
                       <Button variant="ghost" size="sm" asChild>
@@ -725,6 +764,13 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                         <Button variant="outline" size="sm" asChild>
                           <Link href={`/settings/integrations/syncs/${lastJob.id}`}>
                             Manage job
+                          </Link>
+                        </Button>
+                      )}
+                      {lastJob.status === 'stopped' && lastJob.latest_successor && (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/settings/integrations/syncs/${lastJob.latest_successor.id}`}>
+                            View recovery job
                           </Link>
                         </Button>
                       )}

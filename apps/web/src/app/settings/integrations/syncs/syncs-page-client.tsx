@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { useAllSyncJobs, useIntegrations, useRecoverSyncBatch, useToast } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
+import { formatRecoveryActionLabel, isBenignStopMessage } from '@kit/lib/sync-job-utils';
 
 function formatDuration(startedAt?: string | null, completedAt?: string | null): string {
   if (!startedAt || !completedAt) return startedAt ? 'In progress' : '—';
@@ -91,6 +92,11 @@ type JobRow = {
   error_message?: string | null;
   recovery_action?: string | null;
   parent_job_id?: number | null;
+  latest_successor?: {
+    id: number;
+    status: string;
+    recovery_action?: string | null;
+  } | null;
 };
 
 type BatchGroup = {
@@ -157,12 +163,17 @@ function JobTableRow({ job, router }: { job: JobRow; router: ReturnType<typeof u
         )}
         {job.recovery_action && (
           <Badge variant="outline" className="ml-2 text-xs">
-            {job.recovery_action.replace(/_/g, ' ')}
+            {formatRecoveryActionLabel(job.recovery_action)}
           </Badge>
         )}
         {job.parent_job_id && (
           <span className="block text-xs text-muted-foreground mt-0.5">
             from #{job.parent_job_id}
+          </span>
+        )}
+        {job.status === 'stopped' && job.latest_successor && (
+          <span className="block text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+            → recovery #{job.latest_successor.id}
           </span>
         )}
       </TableCell>
@@ -173,14 +184,24 @@ function JobTableRow({ job, router }: { job: JobRow; router: ReturnType<typeof u
         {job.status === 'completed' && <CheckCircle2 className="h-4 w-4 text-green-500 inline mr-1" />}
         {job.status === 'failed' && <XCircle className="h-4 w-4 text-destructive inline mr-1" />}
         {job.status === 'cancelled' && <XCircle className="h-4 w-4 text-muted-foreground inline mr-1" />}
-        {job.status === 'stopped' && <Clock className="h-4 w-4 text-muted-foreground inline mr-1" />}
+        {job.status === 'stopped' && <Clock className="h-4 w-4 text-amber-500 inline mr-1" />}
         {(job.status === 'staging' || job.status === 'pending' || job.status === 'processing') && (
           <Loader2 className="h-4 w-4 animate-spin text-blue-500 inline mr-1" />
         )}
         <Badge
           variant={
-            job.status === 'failed' ? 'destructive' :
-            job.status === 'completed' ? 'default' : 'secondary'
+            job.status === 'failed'
+              ? 'destructive'
+              : job.status === 'completed'
+                ? 'default'
+                : job.status === 'stopped'
+                  ? 'outline'
+                  : 'secondary'
+          }
+          className={
+            job.status === 'stopped'
+              ? 'border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/10'
+              : undefined
           }
         >
           {job.status}
@@ -196,7 +217,7 @@ function JobTableRow({ job, router }: { job: JobRow; router: ReturnType<typeof u
         {statsSummary(job.stats)}
       </TableCell>
       <TableCell className="max-w-[180px]">
-        {job.error_message ? (
+        {job.error_message && !isBenignStopMessage(job.status, job.error_message) ? (
           <span className="text-destructive text-sm truncate block" title={job.error_message}>
             {job.error_message.length > 40 ? job.error_message.slice(0, 40) + '…' : job.error_message}
           </span>
@@ -270,23 +291,34 @@ export function SyncsPageClient() {
   }, [integrationIdParam]);
 
   const filters = {
-    status: statusFilter === 'all' ? undefined : statusFilter,
+    status:
+      statusFilter === 'all' || statusFilter === 'recovery'
+        ? undefined
+        : statusFilter,
     integration_id: integrationFilter === 'all' ? undefined : integrationFilter,
     limit: 50,
   };
   const { data: jobs = [], isLoading } = useAllSyncJobs(filters);
   const { data: integrations = [] } = useIntegrations();
 
+  const displayedJobs = useMemo(() => {
+    const list = jobs as JobRow[];
+    if (statusFilter === 'recovery') {
+      return list.filter((j) => Boolean(j.recovery_action));
+    }
+    return list;
+  }, [jobs, statusFilter]);
+
   const { batches, standalone } = useMemo(
-    () => groupJobsByBatch(jobs as JobRow[]),
-    [jobs]
+    () => groupJobsByBatch(displayedJobs),
+    [displayedJobs]
   );
 
-  const runningCount = jobs.filter(
+  const runningCount = displayedJobs.filter(
     (j) => j.status === 'staging' || j.status === 'pending' || j.status === 'processing'
   ).length;
-  const failedCount = jobs.filter((j) => j.status === 'failed').length;
-  const completedCount = jobs.filter((j) => j.status === 'completed').length;
+  const failedCount = displayedJobs.filter((j) => j.status === 'failed').length;
+  const completedCount = displayedJobs.filter((j) => j.status === 'completed').length;
 
   const handleBatchAction = async (batchId: string, action: 'cancel_all' | 'retry_failed') => {
     try {
@@ -368,6 +400,7 @@ export function SyncsPageClient() {
               <SelectItem value="failed">Failed</SelectItem>
               <SelectItem value="stopped">Stopped</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="recovery">Recovery jobs</SelectItem>
             </SelectContent>
           </Select>
           <Select value={integrationFilter} onValueChange={setIntegrationFilter}>
@@ -395,7 +428,7 @@ export function SyncsPageClient() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-            ) : jobs.length === 0 ? (
+            ) : displayedJobs.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground">
                 <p>No syncs yet. Start a sync from an integration to see activity here.</p>
                 <Button variant="link" asChild className="mt-2">
