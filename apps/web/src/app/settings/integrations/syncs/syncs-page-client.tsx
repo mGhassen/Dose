@@ -50,6 +50,7 @@ function phaseLabel(status: string): string {
     case 'processing': return 'Phase 2: running';
     case 'completed': return 'Phase 2: done';
     case 'failed': return 'Phase 2: done';
+    case 'cancelled': return 'Cancelled';
     default: return status;
   }
 }
@@ -232,6 +233,7 @@ export function SyncsPageClient() {
                       <TableCell>
                         {job.status === 'completed' && <CheckCircle2 className="h-4 w-4 text-green-500 inline mr-1" />}
                         {job.status === 'failed' && <XCircle className="h-4 w-4 text-destructive inline mr-1" />}
+                        {job.status === 'cancelled' && <XCircle className="h-4 w-4 text-muted-foreground inline mr-1" />}
                         {(job.status === 'staging' || job.status === 'pending' || job.status === 'processing') && (
                           <Loader2 className="h-4 w-4 animate-spin text-blue-500 inline mr-1" />
                         )}

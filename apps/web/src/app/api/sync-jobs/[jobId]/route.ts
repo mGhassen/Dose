@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
+import { getJobRecoveryState } from '@/lib/sync-job-recovery';
 
 async function getJobAndVerifyAccess(
   supabase: any,
   jobId: string,
   accessToken: string | null
-): Promise<{ job: any; error: any }> {
+): Promise<{ job: any; integration: any; error: any }> {
   if (!accessToken) {
-    return { job: null, error: { status: 401, message: 'Unauthorized' } };
+    return { job: null, integration: null, error: { status: 401, message: 'Unauthorized' } };
   }
   const { data: { user } } = await supabase.auth.getUser(accessToken);
   if (!user) {
-    return { job: null, error: { status: 401, message: 'Unauthorized' } };
+    return { job: null, integration: null, error: { status: 401, message: 'Unauthorized' } };
   }
   const { data: account } = await supabase
     .from('accounts')
@@ -19,7 +20,7 @@ async function getJobAndVerifyAccess(
     .eq('auth_user_id', user.id)
     .single();
   if (!account) {
-    return { job: null, error: { status: 404, message: 'Account not found' } };
+    return { job: null, integration: null, error: { status: 404, message: 'Account not found' } };
   }
   const { data: job, error } = await supabase
     .from('sync_jobs')
@@ -27,17 +28,17 @@ async function getJobAndVerifyAccess(
     .eq('id', jobId)
     .single();
   if (error || !job) {
-    return { job: null, error: { status: 404, message: 'Job not found' } };
+    return { job: null, integration: null, error: { status: 404, message: 'Job not found' } };
   }
   const { data: integration } = await supabase
     .from('integrations')
-    .select('id, account_id')
+    .select('id, account_id, integration_type')
     .eq('id', job.integration_id)
     .single();
   if (!integration || integration.account_id !== account.id) {
-    return { job: null, error: { status: 404, message: 'Job not found' } };
+    return { job: null, integration: null, error: { status: 404, message: 'Job not found' } };
   }
-  return { job, error: null };
+  return { job, integration, error: null };
 }
 
 export async function GET(
@@ -50,7 +51,7 @@ export async function GET(
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
     const supabase = supabaseServer();
-    const { job, error: accessError } = await getJobAndVerifyAccess(supabase, jobId, token);
+    const { job, integration, error: accessError } = await getJobAndVerifyAccess(supabase, jobId, token);
     if (accessError) {
       return NextResponse.json(
         { error: accessError.message },
@@ -66,14 +67,22 @@ export async function GET(
 
     const { data: steps } = await supabase
       .from('sync_job_steps')
-      .select('id, sequence, name, status, details')
+      .select('id, sequence, name, status, details, created_at, updated_at')
       .eq('job_id', jobId)
       .order('sequence', { ascending: true });
+
+    const recovery = await getJobRecoveryState(
+      supabase,
+      job,
+      integration,
+      steps || []
+    );
 
     return NextResponse.json({
       ...job,
       errors: errors || [],
       steps: steps || [],
+      recovery,
     });
   } catch (error: any) {
     console.error('Error fetching sync job:', error);

@@ -38,11 +38,13 @@ import {
   FileWarning,
   Info,
   Wrench,
+  Settings2,
 } from 'lucide-react';
 import { useSyncJob, useRetrySyncJob, useBackfillSaleItems } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
 import { useToast } from '@kit/hooks';
 import type { SyncJobStep } from '@kit/types';
+import { SyncJobRecoveryDialog } from '../sync-job-recovery-dialog';
 
 function formatDuration(startedAt?: string | null, completedAt?: string | null): string {
   if (!startedAt || !completedAt) return startedAt ? 'In progress' : '—';
@@ -121,6 +123,7 @@ export function SyncJobDetailClient() {
     unmapped_items: number;
     errors: number;
   } | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
 
   useEffect(() => {
     if (params?.jobId != null && isNaN(Number(params.jobId))) {
@@ -248,8 +251,11 @@ export function SyncJobDetailClient() {
   }
 
   const steps: SyncJobStep[] = job.steps ?? [];
+  const recovery = job.recovery;
   const isRunning =
     job.status === 'staging' || job.status === 'pending' || job.status === 'processing';
+  const showRecovery =
+    isRunning && recovery && recovery.available_actions.length > 0;
   const hasErrors = Boolean(job.error_message || (job.errors && job.errors.length > 0));
   const stepProgress = stepsProgress(steps);
 
@@ -267,6 +273,14 @@ export function SyncJobDetailClient() {
         <Badge variant="destructive" className="gap-1.5">
           <XCircle className="h-3.5 w-3" />
           Failed
+        </Badge>
+      );
+    }
+    if (job.status === 'cancelled') {
+      return (
+        <Badge variant="secondary" className="gap-1.5">
+          <XCircle className="h-3.5 w-3" />
+          Cancelled
         </Badge>
       );
     }
@@ -306,38 +320,64 @@ export function SyncJobDetailClient() {
                 )}
             </div>
           </div>
-          {(job.status === 'failed' || job.status === 'completed') && (
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={handleBackfill}
-                disabled={backfillSaleItems.isPending || backfillProgress != null}
-                size="sm"
-                variant="outline"
-              >
-                {backfillProgress ? (
-                  <>
+          <div className="flex items-center gap-2 flex-wrap">
+            {showRecovery && (
+              <Button size="sm" variant="outline" onClick={() => setRecoveryOpen(true)}>
+                <Settings2 className="h-4 w-4 mr-2" />
+                Manage job
+              </Button>
+            )}
+            {(job.status === 'failed' || job.status === 'completed') && (
+              <>
+                <Button
+                  onClick={handleBackfill}
+                  disabled={backfillSaleItems.isPending || backfillProgress != null}
+                  size="sm"
+                  variant="outline"
+                >
+                  {backfillProgress ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Backfilling {backfillProgress.processed}
+                      {backfillProgress.total != null ? `/${backfillProgress.total}` : ''}…
+                    </>
+                  ) : (
+                    <>
+                      <Wrench className="h-4 w-4 mr-2" />
+                      Backfill stock
+                    </>
+                  )}
+                </Button>
+                <Button onClick={handleRetry} disabled={retrySyncJob.isPending} size="sm">
+                  {retrySyncJob.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Backfilling {backfillProgress.processed}
-                    {backfillProgress.total != null ? `/${backfillProgress.total}` : ''}…
-                  </>
-                ) : (
-                  <>
-                    <Wrench className="h-4 w-4 mr-2" />
-                    Backfill stock
-                  </>
-                )}
-              </Button>
-              <Button onClick={handleRetry} disabled={retrySyncJob.isPending} size="sm">
-                {retrySyncJob.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                )}
-                Retry
-              </Button>
-            </div>
-          )}
+                  ) : (
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                  )}
+                  Retry
+                </Button>
+              </>
+            )}
+          </div>
         </div>
+
+        {recovery?.is_stuck && isRunning && (
+          <Alert className="border-amber-500/50 bg-amber-500/5">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription>
+              This job appears stuck. Use <strong>Manage job</strong> to resume, process staged data, or cancel.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {showRecovery && recovery && (
+          <SyncJobRecoveryDialog
+            open={recoveryOpen}
+            onOpenChange={setRecoveryOpen}
+            jobId={job.id}
+            recovery={recovery}
+          />
+        )}
 
         {job.error_message && (
           <Alert variant="destructive" className="border-destructive/50">

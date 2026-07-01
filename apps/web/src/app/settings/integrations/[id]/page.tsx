@@ -712,13 +712,22 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                         <AlertDescription>{lastJob.error_message}</AlertDescription>
                       </Alert>
                     )}
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button variant="ghost" size="sm" asChild>
                         <Link href={`/settings/integrations/syncs?integration_id=${id}`}>
                           <Activity className="w-4 h-4 mr-1" />
                           View all syncs
                         </Link>
                       </Button>
+                      {(lastJob.status === 'staging' ||
+                        lastJob.status === 'pending' ||
+                        lastJob.status === 'processing') && (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/settings/integrations/syncs/${lastJob.id}`}>
+                            Manage job
+                          </Link>
+                        </Button>
+                      )}
                       {(lastJob.status === 'failed' || lastJob.status === 'completed') && (
                         <Button
                           variant="outline"

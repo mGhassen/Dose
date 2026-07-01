@@ -125,6 +125,12 @@ export const integrationsApi = {
     apiRequest<SyncJobWithErrors>('GET', `/api/sync-jobs/${jobId}`),
   retrySyncJob: (jobId: number) =>
     apiRequest<{ job_id: number; message: string }>('POST', `/api/sync-jobs/${jobId}/retry`),
+  recoverSyncJob: (jobId: number, action: 'resume' | 'process_staged' | 'discard_staging' | 'cancel') =>
+    apiRequest<{ job_id: number; action: string; message: string; redirect?: string }>(
+      'POST',
+      `/api/sync-jobs/${jobId}/recover`,
+      { action }
+    ),
   getBulkImportPreview: (jobId: number, params?: { limit?: number; offset?: number }) => {
     const searchParams = new URLSearchParams();
     if (params?.limit != null) searchParams.set('limit', String(params.limit));

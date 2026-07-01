@@ -244,6 +244,24 @@ export function useRetrySyncJob() {
   });
 }
 
+export function useRecoverSyncJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      jobId,
+      action,
+    }: {
+      jobId: number;
+      action: 'resume' | 'process_staged' | 'discard_staging' | 'cancel';
+    }) => integrationsApi.recoverSyncJob(jobId, action),
+    onSuccess: (_, { jobId }) => {
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['integrations'] });
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', 'all'] });
+    },
+  });
+}
+
 export function useBulkImportPreview(
   jobId: number | null,
   params?: { limit?: number; offset?: number }

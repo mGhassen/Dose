@@ -22,6 +22,11 @@ const CRON_SECRET = process.env.CRON_SECRET;
 /** PostgREST/Supabase cap at 1000 rows per query; use that so pagination matches reality. */
 const STAGING_CHUNK_SIZE = 1000;
 
+async function isJobAborted(supabase: ReturnType<typeof supabaseServer>, jobId: number): Promise<boolean> {
+  const { data } = await supabase.from('sync_jobs').select('status').eq('id', jobId).maybeSingle();
+  return !data || data.status === 'cancelled' || data.status === 'failed';
+}
+
 function isAuthorized(request: NextRequest): boolean {
   if (!CRON_SECRET) return true;
   const auth = request.headers.get('authorization');
@@ -81,6 +86,10 @@ async function runProcessor(specificJobId?: number) {
   }
 
   for (const job of jobs) {
+    if (await isJobAborted(supabase, job.id)) {
+      continue;
+    }
+
     const { data: integration, error: intErr } = await supabase
       .from('integrations')
       .select('*')
@@ -110,6 +119,10 @@ async function runProcessor(specificJobId?: number) {
         .update({ status: 'processing', started_at: new Date().toISOString() })
         .eq('id', job.id);
       if (updateErr) continue;
+    }
+
+    if (await isJobAborted(supabase, job.id)) {
+      continue;
     }
 
     if (integration.integration_type === 'csv_bulk') {
@@ -289,6 +302,10 @@ async function runProcessor(specificJobId?: number) {
     try {
       let chunkIndex = 0;
       while (true) {
+        if (await isJobAborted(supabase, job.id)) {
+          break;
+        }
+
         const { data: chunkRows, error: chunkErr } = await supabase
           .from('sync_square_data')
           .select('id, data_type, source_id, payload')
@@ -323,6 +340,10 @@ async function runProcessor(specificJobId?: number) {
           .update({ processed_at: new Date().toISOString() })
           .in('id', ids);
         chunkIndex += 1;
+      }
+
+      if (await isJobAborted(supabase, job.id)) {
+        continue;
       }
 
       if (missingCatalogHints.size > 0) {

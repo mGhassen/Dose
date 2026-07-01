@@ -58,9 +58,9 @@ export async function POST(
       );
     }
 
-    if (job.status !== 'failed' && job.status !== 'completed') {
+    if (job.status !== 'failed' && job.status !== 'completed' && job.status !== 'processing') {
       return NextResponse.json(
-        { error: 'Only failed or completed jobs can be retried' },
+        { error: 'Only failed, completed, or stuck processing jobs can be retried' },
         { status: 400 }
       );
     }

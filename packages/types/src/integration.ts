@@ -620,11 +620,34 @@ export interface IntegrationSyncData {
   error?: string;
 }
 
+export type SyncJobRecoveryAction = 'resume' | 'process_staged' | 'discard_staging' | 'cancel';
+
+export type SyncJobRecoveryPhase = 'fetch' | 'review' | 'process' | 'terminal';
+
+export interface SyncJobRecoveryState {
+  recovery_phase: SyncJobRecoveryPhase;
+  is_stuck: boolean;
+  is_running: boolean;
+  staging: {
+    staged_rows: number;
+    unprocessed_rows: number;
+    processed_rows: number;
+  };
+  last_step: {
+    sequence: number;
+    name: string;
+    status: string;
+  } | null;
+  available_actions: SyncJobRecoveryAction[];
+  phase_label: string;
+  review_redirect?: string;
+}
+
 export interface SyncJob {
   id: number;
   integration_id: number;
   sync_type: string;
-  status: 'staging' | 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'staging' | 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
   created_at: string;
   started_at?: string;
   completed_at?: string;
@@ -698,6 +721,7 @@ export interface SyncJobStep {
 export interface SyncJobWithErrors extends SyncJob {
   errors?: Array<{ data_type: string; source_id: string; error_message: string }>;
   steps?: SyncJobStep[];
+  recovery?: SyncJobRecoveryState;
 }
 
 export type SyncStartResponse =
