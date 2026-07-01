@@ -13,7 +13,7 @@ import { Switch } from "@kit/ui/switch";
 import { Label } from "@kit/ui/label";
 import { Loader2, ArrowLeft, Package } from "lucide-react";
 import type { SquareCatalogItemRow } from "@/app/api/integrations/[id]/square-catalog-items/route";
-import { SyncPeriodDialog, type SyncPeriodSelection } from "../sync-period-dialog";
+import { SyncPeriodDialog, formatSyncPeriodSummary, type SyncPeriodSelection } from "../sync-period-dialog";
 
 export default function CatalogProduceOnSalePage() {
   const params = useParams();
@@ -128,14 +128,7 @@ export default function CatalogProduceOnSalePage() {
     void runSyncAfterSave(syncType === "full" ? pendingPeriod ?? undefined : undefined);
   };
 
-  const periodSummary =
-    pendingPeriod?.mode === "last_sync"
-      ? "Since last sync"
-      : pendingPeriod?.mode === "custom"
-        ? "Custom date range"
-        : pendingPeriod?.mode === "all"
-          ? "All from start"
-          : null;
+  const periodSummary = pendingPeriod ? formatSyncPeriodSummary(pendingPeriod) : null;
 
   return (
     <AppLayout>
