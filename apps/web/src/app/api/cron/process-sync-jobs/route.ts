@@ -382,10 +382,13 @@ async function runProcessor(specificJobId?: number) {
     const accumulatedStats: Record<string, number> = {
       items_imported: 0,
       items_failed: 0,
+      items_skipped_mapped: 0,
       orders_imported: 0,
       orders_failed: 0,
+      orders_skipped_mapped: 0,
       payments_imported: 0,
       payments_failed: 0,
+      payments_skipped_mapped: 0,
       stock_reconciled: 0,
       stock_reconcile_failed: 0,
     };
@@ -400,15 +403,25 @@ async function runProcessor(specificJobId?: number) {
           break;
         }
 
-        const { data: chunkRows, error: chunkErr } = await supabase
-          .from('sync_square_data')
-          .select('id, data_type, source_id, payload')
-          .eq('job_id', stagingJobId)
-          .is('processed_at', null)
-          .order('id', { ascending: true })
-          .limit(STAGING_CHUNK_SIZE);
-        if (chunkErr) throw new Error(chunkErr.message);
-        const rows = chunkRows ?? [];
+        const { data: claimedRows, error: claimErr } = await supabase.rpc(
+          'claim_sync_square_staging_chunk',
+          { p_job_id: stagingJobId, p_limit: STAGING_CHUNK_SIZE }
+        );
+
+        let rows: { id: number; data_type: string; source_id: string; payload: unknown }[];
+        if (!claimErr && claimedRows && (claimedRows as unknown[]).length > 0) {
+          rows = claimedRows as typeof rows;
+        } else {
+          const { data: chunkRows, error: chunkErr } = await supabase
+            .from('sync_square_data')
+            .select('id, data_type, source_id, payload')
+            .eq('job_id', stagingJobId)
+            .is('processed_at', null)
+            .order('id', { ascending: true })
+            .limit(STAGING_CHUNK_SIZE);
+          if (chunkErr) throw new Error(chunkErr.message);
+          rows = (chunkRows ?? []) as typeof rows;
+        }
         if (rows.length === 0) break;
 
         const chunkContext = {
@@ -419,20 +432,41 @@ async function runProcessor(specificJobId?: number) {
           affectedSales,
         };
         const result = await processSyncJob(supabase, job, integration, rows, chunkContext);
-        accumulatedStats.items_imported += result.stats.items_imported;
-        accumulatedStats.items_failed += result.stats.items_failed;
-        accumulatedStats.orders_imported += result.stats.orders_imported;
-        accumulatedStats.orders_failed += result.stats.orders_failed;
-        accumulatedStats.payments_imported += result.stats.payments_imported;
-        accumulatedStats.payments_failed += result.stats.payments_failed;
+        accumulatedStats.items_imported += result.stats.items_imported ?? 0;
+        accumulatedStats.items_failed += result.stats.items_failed ?? 0;
+        accumulatedStats.items_skipped_mapped += result.stats.items_skipped_mapped ?? 0;
+        accumulatedStats.orders_imported += result.stats.orders_imported ?? 0;
+        accumulatedStats.orders_failed += result.stats.orders_failed ?? 0;
+        accumulatedStats.orders_skipped_mapped += result.stats.orders_skipped_mapped ?? 0;
+        accumulatedStats.payments_imported += result.stats.payments_imported ?? 0;
+        accumulatedStats.payments_failed += result.stats.payments_failed ?? 0;
+        accumulatedStats.payments_skipped_mapped += result.stats.payments_skipped_mapped ?? 0;
         accumulatedStats.stock_reconciled += result.stats.stock_reconciled ?? 0;
         accumulatedStats.stock_reconcile_failed += result.stats.stock_reconcile_failed ?? 0;
 
-        const ids = rows.map((r: { id: number }) => r.id);
-        await supabase
-          .from('sync_square_data')
-          .update({ processed_at: new Date().toISOString() })
-          .in('id', ids);
+        const processedAt = new Date().toISOString();
+        const byReason = new Map<string, number[]>();
+        for (const outcome of result.rowOutcomes) {
+          const list = byReason.get(outcome.skip_reason) ?? [];
+          list.push(outcome.id);
+          byReason.set(outcome.skip_reason, list);
+        }
+        for (const [skipReason, ids] of byReason) {
+          await supabase
+            .from('sync_square_data')
+            .update({ processed_at: processedAt, skip_reason: skipReason })
+            .in('id', ids);
+        }
+        const outcomeIds = new Set(result.rowOutcomes.map((o) => o.id));
+        const missingOutcomeIds = rows
+          .map((r) => r.id)
+          .filter((id) => !outcomeIds.has(id));
+        if (missingOutcomeIds.length > 0) {
+          await supabase
+            .from('sync_square_data')
+            .update({ processed_at: processedAt, skip_reason: 'imported' })
+            .in('id', missingOutcomeIds);
+        }
         chunkIndex += 1;
       }
 

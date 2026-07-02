@@ -100,6 +100,21 @@ export type ChunkContext = {
   affectedSales?: Map<number, { squareOrderId: string; dateStr: string }>;
 };
 
+export type StagingRowOutcome = {
+  id: number;
+  skip_reason: 'imported' | 'skipped_mapped' | 'failed';
+};
+
+function initRowOutcomes(
+  rows: { id?: number }[]
+): Map<number, StagingRowOutcome['skip_reason']> {
+  const out = new Map<number, StagingRowOutcome['skip_reason']>();
+  for (const row of rows) {
+    if (row.id != null) out.set(row.id, 'imported');
+  }
+  return out;
+}
+
 function getCatalogObjectsFromRows(
   rows: { data_type: string; source_id: string; payload: any }[]
 ): any[] {
@@ -217,9 +232,14 @@ export async function processSyncJob(
   supabase: SupabaseClient,
   job: { id: number; integration_id: number; sync_type: string },
   integration: any,
-  stagingRows: { data_type: string; source_id: string; payload: any }[],
+  stagingRows: { id?: number; data_type: string; source_id: string; payload: any }[],
   chunkContext?: ChunkContext
-): Promise<{ status: 'completed' | 'failed'; error_message?: string; stats: Record<string, number> }> {
+): Promise<{
+  status: 'completed' | 'failed';
+  error_message?: string;
+  stats: Record<string, number>;
+  rowOutcomes: StagingRowOutcome[];
+}> {
   const jobId = job.id;
   const integrationId = integration.id as number;
   const syncType = job.sync_type;
@@ -242,13 +262,17 @@ export async function processSyncJob(
   const stats: Record<string, number> = {
     items_imported: 0,
     items_failed: 0,
+    items_skipped_mapped: 0,
     orders_imported: 0,
     orders_failed: 0,
+    orders_skipped_mapped: 0,
     payments_imported: 0,
     payments_failed: 0,
+    payments_skipped_mapped: 0,
     stock_reconciled: 0,
     stock_reconcile_failed: 0,
   };
+  const rowOutcomeMap = initRowOutcomes(stagingRows);
 
   const defaultUnitVariableId = await getDefaultUnitVariableId(supabase);
 
@@ -905,7 +929,11 @@ export async function processSyncJob(
       const orderId = order?.id || row.source_id;
       try {
         const existingSaleId = orderMap.get(makeMappingKey('order', String(orderId))) ?? null;
-        if (existingSaleId != null) continue;
+        if (existingSaleId != null) {
+          stats.orders_skipped_mapped += 1;
+          if (row.id != null) rowOutcomeMap.set(row.id, 'skipped_mapped');
+          continue;
+        }
 
         const netAmounts = order?.net_amounts || {};
         const totalCents = netAmounts.total_money?.amount ?? 0;
@@ -1044,6 +1072,7 @@ export async function processSyncJob(
         if (saleErr) {
           await recordImportError(supabase, jobId, 'order', orderId, saleErr.message);
           stats.orders_failed += 1;
+          if (row.id != null) rowOutcomeMap.set(row.id, 'failed');
           continue;
         }
         const saleId = saleRow.id;
@@ -1134,6 +1163,7 @@ export async function processSyncJob(
           await supabase.from('sales').delete().eq('id', saleId);
           await recordImportError(supabase, jobId, 'order', orderId, stockRes.message);
           stats.orders_failed += 1;
+          if (row.id != null) rowOutcomeMap.set(row.id, 'failed');
           continue;
         }
 
@@ -1170,6 +1200,7 @@ export async function processSyncJob(
       } catch (e: any) {
         await recordImportError(supabase, jobId, 'order', orderId, e?.message || String(e));
         stats.orders_failed += 1;
+        if (row.id != null) rowOutcomeMap.set(row.id, 'failed');
       }
     }
 
@@ -1177,6 +1208,7 @@ export async function processSyncJob(
       rows: orderRows.length,
       orders_imported: stats.orders_imported,
       orders_failed: stats.orders_failed,
+      orders_skipped_mapped: stats.orders_skipped_mapped,
       stock_reconciled: stats.stock_reconciled,
       stock_reconcile_failed: stats.stock_reconcile_failed,
     });
@@ -1202,12 +1234,29 @@ export async function processSyncJob(
       paymentsStepSeq = stepSeq;
       await insertStep(supabase, jobId, stepSeq, 'Process payments', 'running', {});
     }
+    const paymentSourceIds: string[] = [];
+    for (const row of paymentRows) {
+      const payment = row.payload;
+      const paymentId = payment?.id || row.source_id;
+      if (paymentId) paymentSourceIds.push(String(paymentId));
+    }
+    const paymentMap = await getMappedAppEntityIdsBatch(
+      supabase,
+      integrationId,
+      ['payment'],
+      paymentSourceIds
+    );
+
     for (const row of paymentRows) {
       const payment = row.payload;
       const paymentId = payment?.id || row.source_id;
       try {
-        const existingPayId = await getMappedAppEntityId(supabase, integrationId, 'payment', paymentId);
-        if (existingPayId != null) continue;
+        const existingPayId = paymentMap.get(makeMappingKey('payment', String(paymentId))) ?? null;
+        if (existingPayId != null) {
+          stats.payments_skipped_mapped += 1;
+          if (row.id != null) rowOutcomeMap.set(row.id, 'skipped_mapped');
+          continue;
+        }
 
         const orderId = payment?.order_id;
         if (!orderId) continue;
@@ -1243,6 +1292,7 @@ export async function processSyncJob(
         if (payInsertErr) {
           await recordImportError(supabase, jobId, 'payment', paymentId, payInsertErr.message);
           stats.payments_failed += 1;
+          if (row.id != null) rowOutcomeMap.set(row.id, 'failed');
           continue;
         }
         await insertMapping(supabase, integrationId, 'payment', paymentId, 'payment', payRow.id);
@@ -1250,12 +1300,14 @@ export async function processSyncJob(
       } catch (e: any) {
         await recordImportError(supabase, jobId, 'payment', paymentId, e?.message || String(e));
         stats.payments_failed += 1;
+        if (row.id != null) rowOutcomeMap.set(row.id, 'failed');
       }
     }
     await completeStep(supabase, jobId, paymentsStepSeq, {
       rows: paymentRows.length,
       payments_imported: stats.payments_imported,
       payments_failed: stats.payments_failed,
+      payments_skipped_mapped: stats.payments_skipped_mapped,
     });
   }
 
@@ -1300,9 +1352,14 @@ export async function processSyncJob(
       ? `${stats.items_failed} items, ${stats.orders_failed} orders, ${stats.payments_failed} payments failed`
       : undefined;
 
+  const rowOutcomes: StagingRowOutcome[] = Array.from(rowOutcomeMap.entries()).map(
+    ([id, skip_reason]) => ({ id, skip_reason })
+  );
+
   return {
     status: 'completed',
     error_message: summary,
     stats,
+    rowOutcomes,
   };
 }

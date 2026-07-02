@@ -77,16 +77,34 @@ function stepDetailsText(details?: Record<string, number | string> | null): stri
     const parts = [`${details.api_count} from API`];
     if (typeof details.inserted === 'number') parts.push(`${details.inserted} inserted`);
     if (typeof details.skipped_duplicates === 'number' && details.skipped_duplicates > 0) {
-      parts.push(`${details.skipped_duplicates} skipped`);
+      parts.push(`${details.skipped_duplicates} dup`);
+    }
+    if (typeof details.skipped_already_imported === 'number' && details.skipped_already_imported > 0) {
+      parts.push(`${details.skipped_already_imported} already imported`);
+    }
+    if (typeof details.skipped_already_processed === 'number' && details.skipped_already_processed > 0) {
+      parts.push(`${details.skipped_already_processed} already processed`);
+    }
+    if (typeof details.skipped_cross_job_active === 'number' && details.skipped_cross_job_active > 0) {
+      parts.push(`${details.skipped_cross_job_active} in-flight elsewhere`);
     }
     if (typeof details.verified_db_count === 'number') {
       parts.push(`${details.verified_db_count} verified`);
     }
     return parts.join(' · ');
   }
+  const skipKeys = [
+    'orders_skipped_mapped',
+    'payments_skipped_mapped',
+    'items_skipped_mapped',
+  ];
   const parts = Object.entries(details)
     .filter(([, v]) => typeof v === 'number' || (typeof v === 'string' && v !== ''))
-    .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`);
+    .map(([k, v]) => {
+      if (skipKeys.includes(k) && typeof v === 'number' && v === 0) return null;
+      return `${k.replace(/_/g, ' ')}: ${v}`;
+    })
+    .filter(Boolean) as string[];
   return parts.join(', ');
 }
 

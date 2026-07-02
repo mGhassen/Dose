@@ -20,8 +20,18 @@ import {
   shouldSkipMonth,
 } from '@/lib/sync-fetch-checkpoint';
 import { isFetchComplete } from '@/lib/sync-fetch-checkpoint';
+import { filterKnownStagingRows } from '@/lib/sync-entity-key';
 
 export type { FullSyncPeriod } from '@/lib/sync-period-utils';
+
+export type StagingUpsertResult = {
+  error?: string;
+  inserted: number;
+  skipped_duplicates: number;
+  skipped_already_imported: number;
+  skipped_already_processed: number;
+  skipped_cross_job_active: number;
+};
 
 const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
 const SQUARE_API_BASE = SQUARE_USE_SANDBOX
@@ -43,7 +53,8 @@ function isDuplicateStagingError(message: string | undefined): boolean {
   if (!message) return false;
   return (
     message.includes('duplicate key') ||
-    message.includes('idx_sync_square_data_job_type_source')
+    message.includes('idx_sync_square_data_job_type_source') ||
+    message.includes('idx_sync_square_data_integration_type_source')
   );
 }
 
@@ -51,40 +62,91 @@ async function upsertSquareStagingRows(
   supabase: { from: (t: string) => any },
   rows: SquareStagingRow[],
   label: string,
-  stepId?: number
-): Promise<{ error?: string; inserted: number; skipped: number }> {
-  if (rows.length === 0) return { inserted: 0, skipped: 0 };
+  ctx: { integrationId: number; stagingJobId: number; stepId?: number }
+): Promise<StagingUpsertResult> {
+  const empty: StagingUpsertResult = {
+    inserted: 0,
+    skipped_duplicates: 0,
+    skipped_already_imported: 0,
+    skipped_already_processed: 0,
+    skipped_cross_job_active: 0,
+  };
+  if (rows.length === 0) return empty;
 
-  const withStep = stepId ? rows.map((r) => ({ ...r, step_id: stepId })) : rows;
+  const filtered = await filterKnownStagingRows(
+    supabase,
+    ctx.integrationId,
+    ctx.stagingJobId,
+    rows
+  );
 
-  const { error: upsertErr } = await supabase
-    .from('sync_square_data')
-    .upsert(withStep, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
+  const toInsert = ctx.stepId
+    ? filtered.rows.map((r) => ({ ...r, step_id: ctx.stepId }))
+    : filtered.rows;
 
-  if (!upsertErr) {
-    return { inserted: rows.length, skipped: 0 };
-  }
+  let inserted = 0;
+  let skipped_duplicates = 0;
 
-  if (
-    isDuplicateStagingError(upsertErr.message) ||
-    upsertErr.message?.includes('no unique or exclusion constraint')
-  ) {
-    let inserted = 0;
-    let skipped = 0;
-    for (const row of withStep) {
-      const { error: insertErr } = await supabase.from('sync_square_data').insert(row);
-      if (insertErr && isDuplicateStagingError(insertErr.message)) {
-        skipped += 1;
-      } else if (insertErr) {
-        return { error: `Failed to stage ${label}: ${insertErr.message}`, inserted, skipped };
-      } else {
-        inserted += 1;
+  if (toInsert.length > 0) {
+    const { error: upsertErr } = await supabase
+      .from('sync_square_data')
+      .upsert(toInsert, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
+
+    if (!upsertErr) {
+      inserted = toInsert.length;
+    } else if (
+      isDuplicateStagingError(upsertErr.message) ||
+      upsertErr.message?.includes('no unique or exclusion constraint')
+    ) {
+      for (const row of toInsert) {
+        const { error: insertErr } = await supabase.from('sync_square_data').insert(row);
+        if (insertErr && isDuplicateStagingError(insertErr.message)) {
+          skipped_duplicates += 1;
+        } else if (insertErr) {
+          return {
+            error: `Failed to stage ${label}: ${insertErr.message}`,
+            inserted,
+            skipped_duplicates,
+            skipped_already_imported: filtered.skipped_already_imported,
+            skipped_already_processed: filtered.skipped_already_processed,
+            skipped_cross_job_active: filtered.skipped_cross_job_active,
+          };
+        } else {
+          inserted += 1;
+        }
       }
+    } else {
+      return {
+        error: `Failed to stage ${label}: ${upsertErr.message}`,
+        ...empty,
+        skipped_already_imported: filtered.skipped_already_imported,
+        skipped_already_processed: filtered.skipped_already_processed,
+        skipped_cross_job_active: filtered.skipped_cross_job_active,
+      };
     }
-    return { inserted, skipped };
   }
 
-  return { error: `Failed to stage ${label}: ${upsertErr.message}`, inserted: 0, skipped: 0 };
+  return {
+    inserted,
+    skipped_duplicates,
+    skipped_already_imported: filtered.skipped_already_imported,
+    skipped_already_processed: filtered.skipped_already_processed,
+    skipped_cross_job_active: filtered.skipped_cross_job_active,
+  };
+}
+
+function stagingStepDetails(
+  base: Record<string, unknown>,
+  stageRes: StagingUpsertResult
+): Record<string, unknown> {
+  return {
+    ...base,
+    inserted: stageRes.inserted,
+    skipped_duplicates: stageRes.skipped_duplicates,
+    skipped_already_imported: stageRes.skipped_already_imported,
+    skipped_already_processed: stageRes.skipped_already_processed,
+    skipped_cross_job_active: stageRes.skipped_cross_job_active,
+  };
 }
 
 async function verifiedCountForStep(
@@ -203,6 +265,8 @@ export async function fetchAndStageSquare(
     'Content-Type': 'application/json',
     'Square-Version': '2024-01-18',
   };
+  const integrationId = integration.id as number;
+  const stagingCtx = { integrationId, stagingJobId };
   const stats: Record<string, unknown> = {
     catalog_batches: 0,
     orders_fetched: 0,
@@ -269,7 +333,13 @@ export async function fetchAndStageSquare(
       catalogCursor = catalogData.cursor || null;
       const api_count = objects.length;
       let inserted = 0;
-      let skipped = 0;
+      let stageRes: StagingUpsertResult = {
+        inserted: 0,
+        skipped_duplicates: 0,
+        skipped_already_imported: 0,
+        skipped_already_processed: 0,
+        skipped_cross_job_active: 0,
+      };
       if (objects.length > 0) {
         const rows = objects.map((obj) => {
           const o = obj as { id?: string };
@@ -280,26 +350,41 @@ export async function fetchAndStageSquare(
             payload: obj,
           };
         });
-        const stageRes = await upsertSquareStagingRows(supabase, rows, 'catalog', stepId);
+        stageRes = await upsertSquareStagingRows(supabase, rows, 'catalog', {
+          ...stagingCtx,
+          stepId,
+        });
         if (stageRes.error) {
           await runner.fail(stepId, sequence, { error: stageRes.error });
           return { error: stageRes.error };
         }
         inserted = stageRes.inserted;
-        skipped = stageRes.skipped;
         stats.catalog_batches = Number(stats.catalog_batches) + 1;
       }
       const verified_db_count = await verifiedCountForStep(supabase, stepId);
-      await runner.complete(stepId, sequence, {
-        data_type: 'catalog_object',
-        page: Number(stats.catalog_batches) || 1,
-        api_count,
-        inserted,
-        skipped_duplicates: skipped,
-        verified_db_count,
-        next_cursor: catalogCursor,
-      });
-      if (!isResume && api_count > 0 && verified_db_count < api_count && skipped === 0) {
+      await runner.complete(
+        stepId,
+        sequence,
+        stagingStepDetails(
+          {
+            data_type: 'catalog_object',
+            page: Number(stats.catalog_batches) || 1,
+            api_count,
+            verified_db_count,
+            next_cursor: catalogCursor,
+          },
+          stageRes
+        )
+      );
+      if (
+        !isResume &&
+        api_count > 0 &&
+        verified_db_count < api_count &&
+        stageRes.skipped_duplicates === 0 &&
+        stageRes.skipped_already_imported === 0 &&
+        stageRes.skipped_already_processed === 0 &&
+        stageRes.skipped_cross_job_active === 0
+      ) {
         return { error: `Catalog staging count mismatch: api=${api_count} verified=${verified_db_count}` };
       }
       const progress: FetchProgress = {
@@ -399,8 +484,13 @@ export async function fetchAndStageSquare(
         const orders = ordersData.orders || [];
         ordersCursor = ordersData.cursor || null;
         const api_count = orders.length;
-        let inserted = 0;
-        let skipped = 0;
+        let stageRes: StagingUpsertResult = {
+          inserted: 0,
+          skipped_duplicates: 0,
+          skipped_already_imported: 0,
+          skipped_already_processed: 0,
+          skipped_cross_job_active: 0,
+        };
         if (orders.length > 0) {
           const rows = orders.map((order: { id?: string }) => ({
             job_id: stagingJobId,
@@ -408,13 +498,14 @@ export async function fetchAndStageSquare(
             source_id: order.id || '',
             payload: order,
           }));
-          const stageRes = await upsertSquareStagingRows(supabase, rows, 'order', stepId);
+          stageRes = await upsertSquareStagingRows(supabase, rows, 'order', {
+            ...stagingCtx,
+            stepId,
+          });
           if (stageRes.error) {
             await runner.fail(stepId, sequence, { error: stageRes.error });
             return { error: stageRes.error };
           }
-          inserted = stageRes.inserted;
-          skipped = stageRes.skipped;
           stats.orders_fetched = Number(stats.orders_fetched) + orders.length;
         }
         if (orders.length > 0) {
@@ -422,16 +513,21 @@ export async function fetchAndStageSquare(
           ordersStepAdded = true;
         }
         const verified_db_count = await verifiedCountForStep(supabase, stepId);
-        await runner.complete(stepId, sequence, {
-          data_type: 'order',
-          month_label: monthLabel,
-          page: ordersPageInMonth,
-          api_count,
-          inserted,
-          skipped_duplicates: skipped,
-          verified_db_count,
-          next_cursor: ordersCursor,
-        });
+        await runner.complete(
+          stepId,
+          sequence,
+          stagingStepDetails(
+            {
+              data_type: 'order',
+              month_label: monthLabel,
+              page: ordersPageInMonth,
+              api_count,
+              verified_db_count,
+              next_cursor: ordersCursor,
+            },
+            stageRes
+          )
+        );
         const progress: FetchProgress = {
           phase: 'orders',
           month_label: monthLabel,
@@ -508,8 +604,13 @@ export async function fetchAndStageSquare(
         const payments = payData.payments || [];
         paymentsCursor = payData.cursor || null;
         const api_count = payments.length;
-        let inserted = 0;
-        let skipped = 0;
+        let stageRes: StagingUpsertResult = {
+          inserted: 0,
+          skipped_duplicates: 0,
+          skipped_already_imported: 0,
+          skipped_already_processed: 0,
+          skipped_cross_job_active: 0,
+        };
         if (payments.length > 0) {
           const rows = payments.map((payment: { id?: string }) => ({
             job_id: stagingJobId,
@@ -517,13 +618,14 @@ export async function fetchAndStageSquare(
             source_id: payment.id || '',
             payload: payment,
           }));
-          const stageRes = await upsertSquareStagingRows(supabase, rows, 'payment', stepId);
+          stageRes = await upsertSquareStagingRows(supabase, rows, 'payment', {
+            ...stagingCtx,
+            stepId,
+          });
           if (stageRes.error) {
             await runner.fail(stepId, sequence, { error: stageRes.error });
             return { error: stageRes.error };
           }
-          inserted = stageRes.inserted;
-          skipped = stageRes.skipped;
           stats.payments_fetched = Number(stats.payments_fetched) + payments.length;
         }
         if (payments.length > 0) {
@@ -531,16 +633,21 @@ export async function fetchAndStageSquare(
           paymentsStepAdded = true;
         }
         const verified_db_count = await verifiedCountForStep(supabase, stepId);
-        await runner.complete(stepId, sequence, {
-          data_type: 'payment',
-          month_label: monthLabel,
-          page: paymentsPageInMonth,
-          api_count,
-          inserted,
-          skipped_duplicates: skipped,
-          verified_db_count,
-          next_cursor: paymentsCursor,
-        });
+        await runner.complete(
+          stepId,
+          sequence,
+          stagingStepDetails(
+            {
+              data_type: 'payment',
+              month_label: monthLabel,
+              page: paymentsPageInMonth,
+              api_count,
+              verified_db_count,
+              next_cursor: paymentsCursor,
+            },
+            stageRes
+          )
+        );
         const progress: FetchProgress = {
           phase: 'payments',
           month_label: monthLabel,
