@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
-import { enrichJobsWithLatestSuccessor } from '@/lib/sync-job-recovery';
+import { enrichJobsWithSuccessors } from '@/lib/sync-job-recovery';
 
 export async function GET(request: NextRequest) {
   try {
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const enriched = await enrichJobsWithLatestSuccessor(supabase, jobs);
+    const enriched = await enrichJobsWithSuccessors(supabase, jobs);
 
     return NextResponse.json({ jobs: enriched });
   } catch (error: any) {

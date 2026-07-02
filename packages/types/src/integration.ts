@@ -661,18 +661,21 @@ export interface SyncJob {
   parent_job_id?: number | null;
   recovery_action?: SyncJobRecoveryKind | null;
   latest_successor?: SyncJobLatestSuccessor | null;
+  successors?: SyncJobLatestSuccessor[];
 }
 
 export interface SyncJobSuccessor {
   id: number;
   status: string;
   recovery_action?: SyncJobRecoveryKind | null;
+  created_at?: string;
 }
 
 export interface SyncJobLatestSuccessor {
   id: number;
   status: string;
   recovery_action?: SyncJobRecoveryKind | null;
+  created_at?: string;
 }
 
 export interface RecoverSyncJobResponse {

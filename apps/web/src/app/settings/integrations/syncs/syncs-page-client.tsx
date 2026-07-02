@@ -29,10 +29,32 @@ import {
   XCircle,
   Clock,
   Activity,
+  ChevronRight,
+  ChevronDown,
+  Settings2,
+  ExternalLink,
 } from 'lucide-react';
-import { useAllSyncJobs, useIntegrations, useRecoverSyncBatch, useToast } from '@kit/hooks';
+import {
+  useAllSyncJobs,
+  useIntegrations,
+  useRecoverSyncBatch,
+  useSyncJob,
+  useToast,
+} from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
-import { formatRecoveryActionLabel, isBenignStopMessage } from '@kit/lib/sync-job-utils';
+import {
+  formatRecoveryActionLabel,
+  isBenignStopMessage,
+  canManageSyncJob,
+  isRunningSyncStatus,
+} from '@kit/lib/sync-job-utils';
+import {
+  groupJobsByLineage,
+  shouldAutoExpandLineage,
+  matchesRecoveryFilter,
+  type LineageNode,
+} from '@kit/lib/sync-job-lineage';
+import { SyncJobRecoveryDialog } from './sync-job-recovery-dialog';
 
 function formatDuration(startedAt?: string | null, completedAt?: string | null): string {
   if (!startedAt || !completedAt) return startedAt ? 'In progress' : '—';
@@ -97,6 +119,12 @@ type JobRow = {
     status: string;
     recovery_action?: string | null;
   } | null;
+  successors?: {
+    id: number;
+    status: string;
+    recovery_action?: string | null;
+    created_at?: string;
+  }[];
 };
 
 type BatchGroup = {
@@ -133,79 +161,126 @@ function groupJobsByBatch(jobs: JobRow[]): { batches: BatchGroup[]; standalone: 
   return { batches, standalone };
 }
 
-function JobTableRow({ job, router }: { job: JobRow; router: ReturnType<typeof useRouter> }) {
+function SyncJobStatusBadge({ status }: { status: string }) {
+  return (
+    <>
+      {status === 'completed' && <CheckCircle2 className="h-4 w-4 text-green-500 inline mr-1" />}
+      {status === 'failed' && <XCircle className="h-4 w-4 text-destructive inline mr-1" />}
+      {status === 'cancelled' && <XCircle className="h-4 w-4 text-muted-foreground inline mr-1" />}
+      {status === 'stopped' && <Clock className="h-4 w-4 text-amber-500 inline mr-1" />}
+      {isRunningSyncStatus(status) && (
+        <Loader2 className="h-4 w-4 animate-spin text-blue-500 inline mr-1" />
+      )}
+      <Badge
+        variant={
+          status === 'failed'
+            ? 'destructive'
+            : status === 'completed'
+              ? 'default'
+              : status === 'stopped'
+                ? 'outline'
+                : 'secondary'
+        }
+        className={
+          status === 'stopped'
+            ? 'border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/10'
+            : undefined
+        }
+      >
+        {status}
+      </Badge>
+    </>
+  );
+}
+
+function JobTableRow({
+  job,
+  router,
+  variant = 'parent',
+  depth = 0,
+  expanded,
+  onToggleExpand,
+  hasChildren,
+  onManage,
+  highlight,
+}: {
+  job: JobRow;
+  router: ReturnType<typeof useRouter>;
+  variant?: 'parent' | 'child';
+  depth?: number;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
+  hasChildren?: boolean;
+  onManage?: (jobId: number) => void;
+  highlight?: boolean;
+}) {
   const badge = batchBadge(job.stats);
+  const isChild = variant === 'child';
+  const canManage = isRunningSyncStatus(job.status);
+  const latestSuccessor = job.latest_successor;
+
+  const openJob = () => router.push(`/settings/integrations/syncs/${job.id}`);
+
   return (
     <TableRow
-      key={job.id}
-      role="button"
-      className="cursor-pointer hover:bg-muted/50"
-      onClick={() => router.push(`/settings/integrations/syncs/${job.id}`)}
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          router.push(`/settings/integrations/syncs/${job.id}`);
-        }
-      }}
+      className={`cursor-pointer hover:bg-muted/50 ${isChild ? 'bg-muted/20' : ''} ${highlight ? 'ring-1 ring-inset ring-primary/40' : ''}`}
+      onClick={openJob}
     >
+      <TableCell style={{ paddingLeft: `${12 + depth * 24}px` }}>
+        <div className="flex items-center gap-1">
+          {hasChildren ? (
+            <button
+              type="button"
+              className="p-0.5 rounded hover:bg-muted shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand?.();
+              }}
+              aria-label={expanded ? 'Collapse recovery jobs' : 'Expand recovery jobs'}
+            >
+              {expanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+          ) : (
+            <span className="w-5 shrink-0" />
+          )}
+          <span className="font-medium">{job.integration_name || job.integration_type || '—'}</span>
+          {job.integration_type && (
+            <Badge variant="outline" className="ml-2 text-xs">{job.integration_type}</Badge>
+          )}
+        </div>
+      </TableCell>
       <TableCell>
-        <span className="font-medium">{job.integration_name || job.integration_type || '—'}</span>
-        {job.integration_type && (
-          <Badge variant="outline" className="ml-2 text-xs">{job.integration_type}</Badge>
+        <span className="font-medium">#{job.id}</span>
+        {!isChild && job.successors && job.successors.length > 0 && (
+          <Badge variant="secondary" className="ml-2 text-xs">
+            {job.successors.length} recovery
+          </Badge>
         )}
       </TableCell>
-      <TableCell>{job.id}</TableCell>
       <TableCell>
         <span>{job.sync_type || '—'}</span>
-        {badge && (
-          <Badge variant="secondary" className="ml-2 text-xs">{badge}</Badge>
+        {badge && <Badge variant="secondary" className="ml-2 text-xs">{badge}</Badge>}
+        {isChild && (
+          <Badge variant="outline" className="ml-2 text-xs">Recovery subjob</Badge>
         )}
         {job.recovery_action && (
           <Badge variant="outline" className="ml-2 text-xs">
             {formatRecoveryActionLabel(job.recovery_action)}
           </Badge>
         )}
-        {job.parent_job_id && (
-          <span className="block text-xs text-muted-foreground mt-0.5">
-            from #{job.parent_job_id}
-          </span>
-        )}
-        {job.status === 'stopped' && job.latest_successor && (
-          <span className="block text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-            → recovery #{job.latest_successor.id}
-          </span>
+        {isChild && job.parent_job_id && (
+          <span className="block text-xs text-muted-foreground mt-0.5">from #{job.parent_job_id}</span>
         )}
       </TableCell>
       <TableCell>
         <Badge variant="secondary" className="text-xs">{phaseLabel(job.status)}</Badge>
       </TableCell>
       <TableCell>
-        {job.status === 'completed' && <CheckCircle2 className="h-4 w-4 text-green-500 inline mr-1" />}
-        {job.status === 'failed' && <XCircle className="h-4 w-4 text-destructive inline mr-1" />}
-        {job.status === 'cancelled' && <XCircle className="h-4 w-4 text-muted-foreground inline mr-1" />}
-        {job.status === 'stopped' && <Clock className="h-4 w-4 text-amber-500 inline mr-1" />}
-        {(job.status === 'staging' || job.status === 'pending' || job.status === 'processing') && (
-          <Loader2 className="h-4 w-4 animate-spin text-blue-500 inline mr-1" />
-        )}
-        <Badge
-          variant={
-            job.status === 'failed'
-              ? 'destructive'
-              : job.status === 'completed'
-                ? 'default'
-                : job.status === 'stopped'
-                  ? 'outline'
-                  : 'secondary'
-          }
-          className={
-            job.status === 'stopped'
-              ? 'border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/10'
-              : undefined
-          }
-        >
-          {job.status}
-        </Badge>
+        <SyncJobStatusBadge status={job.status} />
       </TableCell>
       <TableCell className="text-muted-foreground text-sm">
         {job.created_at ? formatDateTime(job.created_at) : '—'}
@@ -223,7 +298,81 @@ function JobTableRow({ job, router }: { job: JobRow; router: ReturnType<typeof u
           </span>
         ) : '—'}
       </TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="h-8 px-2" onClick={openJob}>
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Button>
+          {canManage && onManage && (
+            <Button variant="outline" size="sm" className="h-8" onClick={() => onManage(job.id)}>
+              <Settings2 className="h-3.5 w-3.5 mr-1" />
+              Manage
+            </Button>
+          )}
+          {job.status === 'stopped' && latestSuccessor && (
+            <Button variant="outline" size="sm" className="h-8" asChild>
+              <Link href={`/settings/integrations/syncs/${latestSuccessor.id}`}>Recovery</Link>
+            </Button>
+          )}
+        </div>
+      </TableCell>
     </TableRow>
+  );
+}
+
+function JobLineageGroup({
+  node,
+  router,
+  onManage,
+  highlightJobId,
+}: {
+  node: LineageNode;
+  router: ReturnType<typeof useRouter>;
+  onManage: (jobId: number) => void;
+  highlightJobId?: number | null;
+}) {
+  const hasChildren = node.children.length > 0;
+  const [expanded, setExpanded] = useState(() =>
+    shouldAutoExpandLineage(node.children) || highlightJobId === node.job.id
+  );
+
+  useEffect(() => {
+    if (shouldAutoExpandLineage(node.children)) setExpanded(true);
+  }, [node.children]);
+
+  useEffect(() => {
+    if (
+      highlightJobId != null &&
+      (highlightJobId === node.job.id || node.children.some((c) => c.id === highlightJobId))
+    ) {
+      setExpanded(true);
+    }
+  }, [highlightJobId, node.job.id, node.children]);
+
+  return (
+    <>
+      <JobTableRow
+        job={node.job as JobRow}
+        router={router}
+        variant="parent"
+        hasChildren={hasChildren}
+        expanded={expanded}
+        onToggleExpand={() => setExpanded((v) => !v)}
+        onManage={onManage}
+        highlight={highlightJobId === node.job.id}
+      />
+      {hasChildren && expanded &&
+        node.children.map((child) => (
+          <JobTableRow
+            key={child.id}
+            job={child as JobRow}
+            router={router}
+            variant="child"
+            depth={1}
+            highlight={highlightJobId === child.id}
+          />
+        ))}
+    </>
   );
 }
 
@@ -238,36 +387,22 @@ function BatchHeader({
   onRetryFailed: (batchId: string) => void;
   isPending: boolean;
 }) {
-  const hasRunning = batch.jobs.some((j) =>
-    ['staging', 'pending', 'processing'].includes(j.status)
-  );
+  const hasRunning = batch.jobs.some((j) => isRunningSyncStatus(j.status));
   const hasRetryable = batch.jobs.some((j) => ['failed', 'stopped'].includes(j.status));
 
   return (
     <TableRow className="bg-muted/30 hover:bg-muted/30">
-      <TableCell colSpan={9}>
+      <TableCell colSpan={10}>
         <div className="flex flex-wrap items-center justify-between gap-2 py-1">
-          <span className="text-sm font-medium">
-            Batch · {batch.jobs.length} jobs
-          </span>
+          <span className="text-sm font-medium">Batch · {batch.jobs.length} jobs</span>
           <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
             {hasRunning && (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={isPending}
-                onClick={() => onCancelAll(batch.batchId)}
-              >
+              <Button size="sm" variant="outline" disabled={isPending} onClick={() => onCancelAll(batch.batchId)}>
                 Cancel all
               </Button>
             )}
             {hasRetryable && (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={isPending}
-                onClick={() => onRetryFailed(batch.batchId)}
-              >
+              <Button size="sm" variant="outline" disabled={isPending} onClick={() => onRetryFailed(batch.batchId)}>
                 Retry failed
               </Button>
             )}
@@ -278,23 +413,65 @@ function BatchHeader({
   );
 }
 
+function LineageTableBody({
+  jobs,
+  router,
+  onManage,
+  highlightJobId,
+}: {
+  jobs: JobRow[];
+  router: ReturnType<typeof useRouter>;
+  onManage: (jobId: number) => void;
+  highlightJobId?: number | null;
+}) {
+  const { roots } = useMemo(() => groupJobsByLineage(jobs), [jobs]);
+
+  return (
+    <>
+      {roots.map((node) => (
+        <JobLineageGroup
+          key={node.job.id}
+          node={node}
+          router={router}
+          onManage={onManage}
+          highlightJobId={highlightJobId}
+        />
+      ))}
+    </>
+  );
+}
+
 export function SyncsPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const integrationIdParam = searchParams.get('integration_id');
+  const highlightJobParam = searchParams.get('highlight_job');
+  const highlightJobId = highlightJobParam ? Number(highlightJobParam) : null;
   const { toast } = useToast();
   const recoverBatch = useRecoverSyncBatch();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [integrationFilter, setIntegrationFilter] = useState<string>('all');
+  const [manageJobId, setManageJobId] = useState<number | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+
+  const { data: manageJob } = useSyncJob(manageJobId);
+
   useEffect(() => {
     if (integrationIdParam) setIntegrationFilter(integrationIdParam);
   }, [integrationIdParam]);
 
+  useEffect(() => {
+    if (
+      manageJob?.recovery &&
+      canManageSyncJob(manageJob, manageJob.recovery) &&
+      manageJobId != null
+    ) {
+      setRecoveryOpen(true);
+    }
+  }, [manageJob, manageJobId]);
+
   const filters = {
-    status:
-      statusFilter === 'all' || statusFilter === 'recovery'
-        ? undefined
-        : statusFilter,
+    status: statusFilter === 'all' || statusFilter === 'recovery' ? undefined : statusFilter,
     integration_id: integrationFilter === 'all' ? undefined : integrationFilter,
     limit: 50,
   };
@@ -304,7 +481,15 @@ export function SyncsPageClient() {
   const displayedJobs = useMemo(() => {
     const list = jobs as JobRow[];
     if (statusFilter === 'recovery') {
-      return list.filter((j) => Boolean(j.recovery_action));
+      const matching = list.filter((j) => matchesRecoveryFilter(j));
+      const parentIds = new Set(
+        matching
+          .filter((j) => j.parent_job_id != null)
+          .map((j) => j.parent_job_id as number)
+      );
+      const matchingIds = new Set(matching.map((j) => j.id));
+      const parents = list.filter((j) => parentIds.has(j.id) && !matchingIds.has(j.id));
+      return [...matching, ...parents];
     }
     return list;
   }, [jobs, statusFilter]);
@@ -314,11 +499,10 @@ export function SyncsPageClient() {
     [displayedJobs]
   );
 
-  const runningCount = displayedJobs.filter(
-    (j) => j.status === 'staging' || j.status === 'pending' || j.status === 'processing'
-  ).length;
+  const runningCount = displayedJobs.filter((j) => isRunningSyncStatus(j.status)).length;
   const failedCount = displayedJobs.filter((j) => j.status === 'failed').length;
   const completedCount = displayedJobs.filter((j) => j.status === 'completed').length;
+  const stoppedCount = displayedJobs.filter((j) => j.status === 'stopped').length;
 
   const handleBatchAction = async (batchId: string, action: 'cancel_all' | 'retry_failed') => {
     try {
@@ -332,6 +516,28 @@ export function SyncsPageClient() {
       });
     }
   };
+
+  const handleManage = (jobId: number) => {
+    setManageJobId(jobId);
+    setRecoveryOpen(false);
+  };
+
+  const tableHeader = (
+    <TableHeader>
+      <TableRow>
+        <TableHead>Integration</TableHead>
+        <TableHead>Job #</TableHead>
+        <TableHead>Type</TableHead>
+        <TableHead>Phase</TableHead>
+        <TableHead>Status</TableHead>
+        <TableHead>Created</TableHead>
+        <TableHead>Duration</TableHead>
+        <TableHead>Stats</TableHead>
+        <TableHead>Error</TableHead>
+        <TableHead className="w-[140px]">Actions</TableHead>
+      </TableRow>
+    </TableHeader>
+  );
 
   return (
     <AppLayout>
@@ -347,13 +553,13 @@ export function SyncsPageClient() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Sync activity</h1>
               <p className="text-muted-foreground text-sm">
-                Phase 1 = fetch + stage from source. Phase 2 = import into app.
+                Jobs and recovery subjobs. Expand a row to see recovery chain.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Running</CardTitle>
@@ -362,6 +568,16 @@ export function SyncsPageClient() {
             <CardContent>
               <div className="text-2xl font-bold">{runningCount}</div>
               <p className="text-xs text-muted-foreground">Fetching or importing</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Stopped</CardTitle>
+              <Clock className="h-4 w-4 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stoppedCount}</div>
+              <p className="text-xs text-muted-foreground">Stopped for recovery</p>
             </CardContent>
           </Card>
           <Card>
@@ -421,7 +637,7 @@ export function SyncsPageClient() {
         <Card>
           <CardHeader>
             <CardTitle>Jobs</CardTitle>
-            <CardDescription>All sync jobs for your integrations</CardDescription>
+            <CardDescription>Parent jobs with expandable recovery subjobs</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -437,19 +653,7 @@ export function SyncsPageClient() {
               </div>
             ) : (
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Integration</TableHead>
-                    <TableHead>Job #</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Phase</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Stats</TableHead>
-                    <TableHead>Error</TableHead>
-                  </TableRow>
-                </TableHeader>
+                {tableHeader}
                 <TableBody>
                   {batches.map((batch) => (
                     <React.Fragment key={batch.batchId}>
@@ -459,20 +663,38 @@ export function SyncsPageClient() {
                         onCancelAll={(id) => void handleBatchAction(id, 'cancel_all')}
                         onRetryFailed={(id) => void handleBatchAction(id, 'retry_failed')}
                       />
-                      {batch.jobs.map((job) => (
-                        <JobTableRow key={job.id} job={job} router={router} />
-                      ))}
+                      <LineageTableBody
+                        jobs={batch.jobs}
+                        router={router}
+                        onManage={handleManage}
+                        highlightJobId={highlightJobId}
+                      />
                     </React.Fragment>
                   ))}
-                  {standalone.map((job) => (
-                    <JobTableRow key={job.id} job={job} router={router} />
-                  ))}
+                  <LineageTableBody
+                    jobs={standalone}
+                    router={router}
+                    onManage={handleManage}
+                    highlightJobId={highlightJobId}
+                  />
                 </TableBody>
               </Table>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {manageJobId != null && manageJob?.recovery && (
+        <SyncJobRecoveryDialog
+          open={recoveryOpen}
+          onOpenChange={(open) => {
+            setRecoveryOpen(open);
+            if (!open) setManageJobId(null);
+          }}
+          jobId={manageJobId}
+          recovery={manageJob.recovery}
+        />
+      )}
     </AppLayout>
   );
 }

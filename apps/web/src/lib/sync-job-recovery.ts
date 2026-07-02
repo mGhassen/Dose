@@ -76,36 +76,51 @@ export type SuccessorSummary = {
   id: number;
   status: string;
   recovery_action?: string | null;
+  created_at?: string;
 };
 
+export async function enrichJobsWithSuccessors<T extends { id: number }>(
+  supabase: SupabaseClient,
+  jobs: T[]
+): Promise<(T & { successors?: SuccessorSummary[]; latest_successor?: SuccessorSummary | null })[]> {
+  if (jobs.length === 0) return [];
+  const parentIds = jobs.map((j) => j.id);
+  const { data: successorRows } = await supabase
+    .from('sync_jobs')
+    .select('id, status, recovery_action, parent_job_id, created_at')
+    .in('parent_job_id', parentIds)
+    .order('created_at', { ascending: true });
+
+  const byParent = new Map<number, SuccessorSummary[]>();
+  for (const row of successorRows ?? []) {
+    const parentId = row.parent_job_id as number;
+    const list = byParent.get(parentId) ?? [];
+    list.push({
+      id: row.id as number,
+      status: row.status as string,
+      recovery_action: row.recovery_action as string | null,
+      created_at: row.created_at as string,
+    });
+    byParent.set(parentId, list);
+  }
+
+  return jobs.map((job) => {
+    const successors = byParent.get(job.id) ?? [];
+    return {
+      ...job,
+      successors,
+      latest_successor: successors.length > 0 ? successors[successors.length - 1] : null,
+    };
+  });
+}
+
+/** @deprecated Use enrichJobsWithSuccessors */
 export async function enrichJobsWithLatestSuccessor<T extends { id: number }>(
   supabase: SupabaseClient,
   jobs: T[]
 ): Promise<(T & { latest_successor?: SuccessorSummary | null })[]> {
-  if (jobs.length === 0) return [];
-  const parentIds = jobs.map((j) => j.id);
-  const { data: successors } = await supabase
-    .from('sync_jobs')
-    .select('id, status, recovery_action, parent_job_id, created_at')
-    .in('parent_job_id', parentIds)
-    .order('created_at', { ascending: false });
-
-  const latestByParent = new Map<number, SuccessorSummary>();
-  for (const row of successors ?? []) {
-    const parentId = row.parent_job_id as number;
-    if (!latestByParent.has(parentId)) {
-      latestByParent.set(parentId, {
-        id: row.id as number,
-        status: row.status as string,
-        recovery_action: row.recovery_action as string | null,
-      });
-    }
-  }
-
-  return jobs.map((job) => ({
-    ...job,
-    latest_successor: latestByParent.get(job.id) ?? null,
-  }));
+  const enriched = await enrichJobsWithSuccessors(supabase, jobs);
+  return enriched.map(({ successors: _s, ...job }) => job as T & { latest_successor?: SuccessorSummary | null });
 }
 
 function isOlderThan(iso: string | null | undefined, ms: number): boolean {

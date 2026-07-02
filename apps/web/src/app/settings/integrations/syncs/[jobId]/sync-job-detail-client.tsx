@@ -342,31 +342,6 @@ export function SyncJobDetailClient() {
                   </Button>
                 )}
             </div>
-            {job.parent_job_id && (
-              <p className="text-sm text-muted-foreground">
-                Continues{' '}
-                <Link href={`/settings/integrations/syncs/${job.parent_job_id}`} className="underline">
-                  job #{job.parent_job_id}
-                </Link>
-                {recoveryLabel ? ` (${recoveryLabel})` : ''}
-              </p>
-            )}
-            {job.successors && job.successors.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                Successor:{' '}
-                {job.successors.map((s, i) => (
-                  <span key={s.id}>
-                    {i > 0 ? ', ' : ''}
-                    <Link href={`/settings/integrations/syncs/${s.id}`} className="underline">
-                      job #{s.id}
-                    </Link>
-                    {formatRecoveryActionLabel(s.recovery_action)
-                      ? ` (${formatRecoveryActionLabel(s.recovery_action)})`
-                      : ''}
-                  </span>
-                ))}
-              </p>
-            )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {showRecovery && (
@@ -470,6 +445,66 @@ export function SyncJobDetailClient() {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{job.error_message}</AlertDescription>
           </Alert>
+        )}
+
+        {(job.parent_job_id || (job.successors && job.successors.length > 0)) && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Recovery chain</CardTitle>
+              <CardDescription>Parent job and recovery subjobs</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {job.parent_job_id && (
+                <p className="text-sm">
+                  Parent:{' '}
+                  <Link
+                    href={`/settings/integrations/syncs/${job.parent_job_id}`}
+                    className="font-medium underline"
+                  >
+                    Job #{job.parent_job_id}
+                  </Link>
+                </p>
+              )}
+              {job.successors && job.successors.length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Job</TableHead>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {job.successors.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell>
+                          <Link
+                            href={`/settings/integrations/syncs/${s.id}`}
+                            className="font-medium underline"
+                          >
+                            #{s.id}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          {formatRecoveryActionLabel(s.recovery_action) ?? '—'}
+                        </TableCell>
+                        <TableCell>{s.status}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {s.created_at ? formatDateTime(s.created_at) : '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              <Button variant="link" className="h-auto p-0" asChild>
+                <Link href={`/settings/integrations/syncs?integration_id=${job.integration_id}&highlight_job=${job.id}`}>
+                  View in sync activity
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

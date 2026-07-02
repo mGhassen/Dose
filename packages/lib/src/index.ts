@@ -10,6 +10,7 @@ export { formatFrenchDate, formatRelativeTime, isToday, isPast, getDayName, getS
 // Export all from date-format.ts (this is the primary date formatting module that respects user preferences)
 export * from './date-format';
 export * from './sync-job-utils';
+export * from './sync-job-lineage';
 export * from './localStorage';
 export * from './queryClient';
 export * from './status-mapping';

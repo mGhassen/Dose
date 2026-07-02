@@ -735,21 +735,27 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                         <AlertDescription>{lastJob.error_message}</AlertDescription>
                       </Alert>
                     )}
-                    {lastJob.status === 'stopped' && lastJob.latest_successor && (
-                      <p className="text-sm text-muted-foreground">
-                        Recovery job:{' '}
-                        <Link
-                          href={`/settings/integrations/syncs/${lastJob.latest_successor.id}`}
-                          className="underline font-medium text-foreground"
-                        >
-                          #{lastJob.latest_successor.id}
-                        </Link>
-                        {formatRecoveryActionLabel(lastJob.latest_successor.recovery_action)
-                          ? ` (${formatRecoveryActionLabel(lastJob.latest_successor.recovery_action)})`
-                          : ''}
-                        {' · '}
-                        {lastJob.latest_successor.status}
-                      </p>
+                    {lastJob.status === 'stopped' && (lastJob.successors?.length ?? 0) > 0 && (
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p className="font-medium text-foreground">Recovery chain</p>
+                        <ul className="list-disc list-inside space-y-0.5">
+                          {(lastJob.successors ?? []).map((s) => (
+                            <li key={s.id}>
+                              <Link
+                                href={`/settings/integrations/syncs/${s.id}`}
+                                className="underline font-medium text-foreground"
+                              >
+                                Job #{s.id}
+                              </Link>
+                              {formatRecoveryActionLabel(s.recovery_action)
+                                ? ` · ${formatRecoveryActionLabel(s.recovery_action)}`
+                                : ''}
+                              {' · '}
+                              {s.status}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                     <div className="flex gap-2 flex-wrap">
                       <Button variant="ghost" size="sm" asChild>
@@ -767,13 +773,22 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                           </Link>
                         </Button>
                       )}
-                      {lastJob.status === 'stopped' && lastJob.latest_successor && (
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/settings/integrations/syncs/${lastJob.latest_successor.id}`}>
-                            View recovery job
-                          </Link>
-                        </Button>
-                      )}
+                      {lastJob.status === 'stopped' && (lastJob.successors?.length ?? 0) > 0 &&
+                        ((lastJob.successors?.length ?? 0) === 1 && lastJob.latest_successor ? (
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/settings/integrations/syncs/${lastJob.latest_successor.id}`}>
+                              View recovery job
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button variant="outline" size="sm" asChild>
+                            <Link
+                              href={`/settings/integrations/syncs?integration_id=${id}&highlight_job=${lastJob.id}`}
+                            >
+                              View recovery chain
+                            </Link>
+                          </Button>
+                        ))}
                       {(lastJob.status === 'failed' || lastJob.status === 'completed') && (
                         <Button
                           variant="outline"

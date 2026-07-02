@@ -17,3 +17,16 @@ export function formatRecoveryActionLabel(action?: string | null): string | null
 export function isBenignStopMessage(status: string, errorMessage?: string | null): boolean {
   return status === 'stopped' && Boolean(errorMessage?.includes(STOPPED_FOR_RECOVERY_MESSAGE));
 }
+
+const RUNNING_STATUSES = ['staging', 'pending', 'processing'] as const;
+
+export function isRunningSyncStatus(status: string): boolean {
+  return (RUNNING_STATUSES as readonly string[]).includes(status);
+}
+
+export function canManageSyncJob(
+  job: { status: string },
+  recovery?: { available_actions?: string[] } | null
+): boolean {
+  return isRunningSyncStatus(job.status) && Boolean(recovery?.available_actions?.length);
+}

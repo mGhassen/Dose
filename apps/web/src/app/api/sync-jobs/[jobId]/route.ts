@@ -80,10 +80,9 @@ export async function GET(
 
     const { data: successors } = await supabase
       .from('sync_jobs')
-      .select('id, status, recovery_action')
+      .select('id, status, recovery_action, created_at')
       .eq('parent_job_id', jobId)
-      .order('created_at', { ascending: false })
-      .limit(5);
+      .order('created_at', { ascending: true });
 
     return NextResponse.json({
       ...job,
