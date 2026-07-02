@@ -21,6 +21,49 @@ const SQUARE_API_BASE = SQUARE_USE_SANDBOX
 const SYNC_TZ = BUSINESS_TIMEZONE_EUROPE_PARIS;
 const PENNYLANE_API_BASE = 'https://app.pennylane.com/api/external/v2';
 
+type SquareStagingRow = {
+  job_id: number;
+  data_type: string;
+  source_id: string;
+  payload: unknown;
+};
+
+function isDuplicateStagingError(message: string | undefined): boolean {
+  if (!message) return false;
+  return (
+    message.includes('duplicate key') ||
+    message.includes('idx_sync_square_data_job_type_source')
+  );
+}
+
+/** Upsert staging rows; safe on resume when parent job already has partial data. */
+async function upsertSquareStagingRows(
+  supabase: { from: (t: string) => any },
+  rows: SquareStagingRow[],
+  label: string
+): Promise<{ error?: string }> {
+  if (rows.length === 0) return {};
+
+  const { error: upsertErr } = await supabase
+    .from('sync_square_data')
+    .upsert(rows, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
+
+  if (!upsertErr) return {};
+
+  // Partial unique index (source_id != '') is not always inferred by PostgREST — fall back per row.
+  if (isDuplicateStagingError(upsertErr.message) || upsertErr.message?.includes('no unique or exclusion constraint')) {
+    for (const row of rows) {
+      const { error: insertErr } = await supabase.from('sync_square_data').insert(row);
+      if (insertErr && !isDuplicateStagingError(insertErr.message)) {
+        return { error: `Failed to stage ${label}: ${insertErr.message}` };
+      }
+    }
+    return {};
+  }
+
+  return { error: `Failed to stage ${label}: ${upsertErr.message}` };
+}
+
 async function getNextStepSequence(supabase: { from: (t: string) => any }, jobId: number): Promise<number> {
   const { data } = await supabase
     .from('sync_job_steps')
@@ -114,17 +157,8 @@ export async function fetchAndStageSquare(
           source_id: obj.id || '',
           payload: obj,
         }));
-        const { error: upsertErr } = await supabase
-          .from('sync_square_data')
-          .upsert(rows, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
-        if (upsertErr) {
-          if (upsertErr.message?.includes('no unique or exclusion constraint')) {
-            const { error: insertErr } = await supabase.from('sync_square_data').insert(rows);
-            if (insertErr) return { error: `Failed to stage catalog: ${insertErr.message}` };
-          } else {
-            return { error: `Failed to stage catalog: ${upsertErr.message}` };
-          }
-        }
+        const stageErr = await upsertSquareStagingRows(supabase, rows, 'catalog');
+        if (stageErr.error) return stageErr;
         stats.catalog_batches += 1;
         await insertStep(`Catalog — page ${stats.catalog_batches}`, 'done', { objects: objects.length });
       }
@@ -208,17 +242,8 @@ export async function fetchAndStageSquare(
             source_id: order.id || '',
             payload: order,
           }));
-          const { error: upsertErr } = await supabase
-            .from('sync_square_data')
-            .upsert(rows, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
-          if (upsertErr) {
-            if (upsertErr.message?.includes('no unique or exclusion constraint')) {
-              const { error: insertErr } = await supabase.from('sync_square_data').insert(rows);
-              if (insertErr) return { error: `Failed to stage order: ${insertErr.message}` };
-            } else {
-              return { error: `Failed to stage order: ${upsertErr.message}` };
-            }
-          }
+          const stageErr = await upsertSquareStagingRows(supabase, rows, 'order');
+          if (stageErr.error) return stageErr;
           stats.orders_fetched += orders.length;
         }
         if (orders.length > 0) {
@@ -280,17 +305,8 @@ export async function fetchAndStageSquare(
             source_id: payment.id || '',
             payload: payment,
           }));
-          const { error: upsertErr } = await supabase
-            .from('sync_square_data')
-            .upsert(rows, { onConflict: 'job_id,data_type,source_id', ignoreDuplicates: true });
-          if (upsertErr) {
-            if (upsertErr.message?.includes('no unique or exclusion constraint')) {
-              const { error: insertErr } = await supabase.from('sync_square_data').insert(rows);
-              if (insertErr) return { error: `Failed to stage payment: ${insertErr.message}` };
-            } else {
-              return { error: `Failed to stage payment: ${upsertErr.message}` };
-            }
-          }
+          const stageErr = await upsertSquareStagingRows(supabase, rows, 'payment');
+          if (stageErr.error) return stageErr;
           stats.payments_fetched += payments.length;
         }
         if (payments.length > 0) {
