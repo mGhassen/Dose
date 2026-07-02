@@ -1,9 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { formatRecoveryActionLabel, isBenignStopMessage, STOPPED_FOR_RECOVERY_MESSAGE } from '@kit/lib/sync-job-utils';
+import { isFetchComplete } from '@/lib/sync-fetch-checkpoint';
+import { stagingOptionsFromStats } from '@/lib/sync-period-utils';
 
 export { formatRecoveryActionLabel, isBenignStopMessage, STOPPED_FOR_RECOVERY_MESSAGE };
 
 export const STUCK_THRESHOLD_MS = 10 * 60 * 1000;
+export const RUNNING_JOB_STATUSES = ['staging', 'pending', 'processing'] as const;
+export const TERMINAL_RECOVERABLE_STATUSES = ['cancelled', 'stopped', 'failed', 'partially_imported'] as const;
 
 export type RecoveryPhase = 'fetch' | 'review' | 'process' | 'terminal';
 export type RecoveryAction = 'resume' | 'process_staged' | 'discard_staging' | 'cancel';
@@ -30,6 +34,7 @@ export type JobRecoveryState = {
   available_actions: RecoveryAction[];
   phase_label: string;
   review_redirect?: string;
+  fetch_complete?: boolean;
 };
 
 type JobRow = {
@@ -43,6 +48,7 @@ type JobRow = {
   bulk_review_status?: string | null;
   parent_job_id?: number | null;
   recovery_action?: string | null;
+  stats?: Record<string, unknown> | null;
 };
 
 type IntegrationRow = {
@@ -128,11 +134,14 @@ function isOlderThan(iso: string | null | undefined, ms: number): boolean {
   return Date.now() - new Date(iso).getTime() > ms;
 }
 
-export function detectRecoveryPhase(
-  job: JobRow,
-  integration: IntegrationRow
-): RecoveryPhase {
-  if (job.status === 'stopped' || job.status === 'cancelled' || job.status === 'completed' || job.status === 'failed') {
+export function detectRecoveryPhase(job: JobRow, integration: IntegrationRow): RecoveryPhase {
+  if (
+    job.status === 'stopped' ||
+    job.status === 'cancelled' ||
+    job.status === 'completed' ||
+    job.status === 'failed' ||
+    job.status === 'partially_imported'
+  ) {
     return 'terminal';
   }
 
@@ -150,11 +159,7 @@ export function detectRecoveryPhase(
   return 'terminal';
 }
 
-export function computeIsStuck(
-  job: JobRow,
-  phase: RecoveryPhase,
-  steps: StepRow[]
-): boolean {
+export function computeIsStuck(job: JobRow, phase: RecoveryPhase, steps: StepRow[]): boolean {
   if (phase === 'terminal') return false;
 
   if (phase === 'review') {
@@ -178,29 +183,60 @@ export function computeIsStuck(
   return false;
 }
 
+function hasRunningSuccessor(successors: SuccessorSummary[] | undefined): boolean {
+  return (successors ?? []).some((s) => RUNNING_JOB_STATUSES.includes(s.status as (typeof RUNNING_JOB_STATUSES)[number]));
+}
+
 export function getAvailableActions(
   phase: RecoveryPhase,
   staging: StagingCounts,
-  jobStatus: string
+  jobStatus: string,
+  job?: JobRow,
+  successors?: SuccessorSummary[]
 ): RecoveryAction[] {
+  const isTerminal = TERMINAL_RECOVERABLE_STATUSES.includes(
+    jobStatus as (typeof TERMINAL_RECOVERABLE_STATUSES)[number]
+  );
+
+  if (isTerminal) {
+    const actions: RecoveryAction[] = [];
+    const fetchDone =
+      job && isFetchComplete(job.stats ?? {}, job.sync_type, stagingOptionsFromStats(job.stats));
+
+    if (!hasRunningSuccessor(successors)) {
+      if (staging.unprocessed_rows > 0 || !fetchDone) {
+        actions.push('resume');
+      }
+    }
+    if (staging.unprocessed_rows > 0) {
+      actions.push('discard_staging');
+    }
+    if (fetchDone && staging.unprocessed_rows > 0 && !hasRunningSuccessor(successors)) {
+      actions.push('process_staged');
+    }
+    return actions;
+  }
+
   if (phase === 'terminal') return [];
 
   const actions: RecoveryAction[] = ['resume', 'cancel'];
+  const fetchDone =
+    job && isFetchComplete(job.stats ?? {}, job.sync_type, stagingOptionsFromStats(job.stats));
 
-  if (phase === 'fetch' && staging.staged_rows > 0) {
-    actions.splice(1, 0, 'process_staged', 'discard_staging');
+  if (phase === 'fetch' && staging.staged_rows > 0 && fetchDone) {
+    actions.splice(1, 0, 'process_staged');
   }
 
-  if (phase === 'process' && staging.staged_rows > 0) {
+  if ((phase === 'fetch' || phase === 'process') && staging.unprocessed_rows > 0) {
+    if (!actions.includes('discard_staging')) {
+      actions.splice(1, 0, 'discard_staging');
+    }
+  } else if (phase === 'process' && staging.staged_rows > 0) {
     actions.push('discard_staging');
   }
 
   if (phase === 'review') {
     return ['resume', 'cancel'];
-  }
-
-  if (jobStatus === 'stopped') {
-    return [];
   }
 
   return actions;
@@ -216,6 +252,8 @@ export function getPhaseLabel(phase: RecoveryPhase, jobStatus: string): string {
       return jobStatus === 'processing' ? 'Phase 2 — Processing' : 'Phase 2 — Pending';
     default:
       if (jobStatus === 'stopped') return 'Stopped';
+      if (jobStatus === 'partially_imported') return 'Partially imported';
+      if (jobStatus === 'cancelled') return 'Cancelled';
       return 'Completed';
   }
 }
@@ -256,16 +294,92 @@ export async function fetchStagingCounts(
   };
 }
 
+/** @deprecated use deleteUnprocessedStagingForJob */
 export async function deleteStagingForJob(
   supabase: SupabaseClient,
   stagingJobId: number,
   integrationType: string
 ): Promise<void> {
+  await deleteUnprocessedStagingForJob(supabase, stagingJobId, integrationType);
+}
+
+export async function deleteUnprocessedStagingForJob(
+  supabase: SupabaseClient,
+  stagingJobId: number,
+  integrationType: string
+): Promise<number> {
   if (integrationType === 'square') {
-    await supabase.from('sync_square_data').delete().eq('job_id', stagingJobId);
-  } else {
-    await supabase.from('sync_pennylane_data').delete().eq('job_id', stagingJobId);
+    const { count } = await supabase
+      .from('sync_square_data')
+      .select('*', { count: 'exact', head: true })
+      .eq('job_id', stagingJobId)
+      .is('processed_at', null);
+    await supabase
+      .from('sync_square_data')
+      .delete()
+      .eq('job_id', stagingJobId)
+      .is('processed_at', null);
+    return count ?? 0;
   }
+  const { count } = await supabase
+    .from('sync_pennylane_data')
+    .select('*', { count: 'exact', head: true })
+    .eq('job_id', stagingJobId);
+  await supabase.from('sync_pennylane_data').delete().eq('job_id', stagingJobId);
+  return count ?? 0;
+}
+
+export async function getJobChainRootId(
+  supabase: SupabaseClient,
+  jobId: number
+): Promise<number> {
+  let current = jobId;
+  for (let i = 0; i < 20; i++) {
+    const { data } = await supabase
+      .from('sync_jobs')
+      .select('parent_job_id')
+      .eq('id', current)
+      .maybeSingle();
+    if (!data?.parent_job_id) return current;
+    current = data.parent_job_id as number;
+  }
+  return current;
+}
+
+export async function getActiveSyncJobRoots(
+  supabase: SupabaseClient,
+  integrationId: number
+): Promise<number[]> {
+  const { data: active } = await supabase
+    .from('sync_jobs')
+    .select('id, parent_job_id')
+    .eq('integration_id', integrationId)
+    .in('status', [...RUNNING_JOB_STATUSES]);
+
+  const roots = new Set<number>();
+  for (const row of active ?? []) {
+    const root = await getJobChainRootId(supabase, row.id as number);
+    roots.add(root);
+  }
+  return [...roots];
+}
+
+export async function assertNoConflictingActiveJob(
+  supabase: SupabaseClient,
+  integrationId: number,
+  jobId: number
+): Promise<{ ok: true } | { ok: false; message: string; blockingJobId: number }> {
+  const myRoot = await getJobChainRootId(supabase, jobId);
+  const activeRoots = await getActiveSyncJobRoots(supabase, integrationId);
+  const conflict = activeRoots.find((r) => r !== myRoot);
+  if (conflict != null) {
+    return {
+      ok: false,
+      message: `Job #${conflict} is still active for this integration. Cancel or wait before resuming job #${jobId}.`,
+      blockingJobId: conflict,
+    };
+  }
+  return { ok: true };
 }
 
 export function pickLastStep(steps: StepRow[]): LastStepInfo {
@@ -279,15 +393,16 @@ export function buildJobRecoveryState(
   job: JobRow,
   integration: IntegrationRow,
   staging: StagingCounts,
-  steps: StepRow[]
+  steps: StepRow[],
+  successors?: SuccessorSummary[]
 ): JobRecoveryState {
   const recovery_phase = detectRecoveryPhase(job, integration);
   const is_stuck = computeIsStuck(job, recovery_phase, steps);
-  const is_running =
-    job.status === 'staging' || job.status === 'pending' || job.status === 'processing';
-  const available_actions = getAvailableActions(recovery_phase, staging, job.status);
+  const is_running = RUNNING_JOB_STATUSES.includes(job.status as (typeof RUNNING_JOB_STATUSES)[number]);
+  const available_actions = getAvailableActions(recovery_phase, staging, job.status, job, successors);
   const phase_label = getPhaseLabel(recovery_phase, job.status);
   const last_step = pickLastStep(steps);
+  const fetch_complete = isFetchComplete(job.stats ?? {}, job.sync_type, stagingOptionsFromStats(job.stats));
 
   const state: JobRecoveryState = {
     recovery_phase,
@@ -297,6 +412,7 @@ export function buildJobRecoveryState(
     last_step,
     available_actions,
     phase_label,
+    fetch_complete,
   };
 
   if (recovery_phase === 'review') {
@@ -310,11 +426,12 @@ export async function getJobRecoveryState(
   supabase: SupabaseClient,
   job: JobRow,
   integration: IntegrationRow,
-  steps: StepRow[]
+  steps: StepRow[],
+  successors?: SuccessorSummary[]
 ): Promise<JobRecoveryState> {
   const stagingJobId = resolveStagingJobId(job);
   const staging = await fetchStagingCounts(supabase, stagingJobId, integration.integration_type);
-  return buildJobRecoveryState(job, integration, staging, steps);
+  return buildJobRecoveryState(job, integration, staging, steps, successors);
 }
 
 export function fireProcessSyncJob(origin: string, jobId: number): void {
@@ -322,4 +439,30 @@ export function fireProcessSyncJob(origin: string, jobId: number): void {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (secret) headers['x-cron-secret'] = secret;
   fetch(`${origin}/api/cron/process-sync-jobs?job_id=${jobId}`, { method: 'POST', headers }).catch(() => {});
+}
+
+export async function stopJobForRecovery(
+  supabase: SupabaseClient,
+  jobId: number
+): Promise<void> {
+  await supabase
+    .from('sync_jobs')
+    .update({
+      status: 'stopped',
+      completed_at: new Date().toISOString(),
+      error_message: STOPPED_FOR_RECOVERY_MESSAGE,
+    })
+    .eq('id', jobId);
+}
+
+export async function releaseIntegrationSyncLock(
+  supabase: SupabaseClient,
+  integrationId: number,
+  jobId: number
+): Promise<void> {
+  await supabase
+    .from('integrations')
+    .update({ sync_active_job_id: null })
+    .eq('id', integrationId)
+    .eq('sync_active_job_id', jobId);
 }

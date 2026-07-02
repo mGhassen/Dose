@@ -12,7 +12,8 @@ import {
   periodToStats,
   stagingOptionsFromStats,
 } from '@/lib/sync-period-utils';
-import { enrichJobsWithSuccessors } from '@/lib/sync-job-recovery';
+import { buildFetchPlan } from '@/lib/sync-fetch-checkpoint';
+import { enrichJobsWithSuccessors, getActiveSyncJobRoots } from '@/lib/sync-job-recovery';
 
 async function getIntegrationAndVerifyAccess(
   supabase: any,
@@ -45,11 +46,17 @@ async function getIntegrationAndVerifyAccess(
 
 function buildJobStats(
   base: Record<string, unknown>,
-  period?: FullSyncPeriod
+  period?: FullSyncPeriod,
+  integration?: { last_sync_at?: string | null },
+  syncType?: string,
+  stagingOptions?: ReturnType<typeof stagingOptionsFromStats>
 ): Record<string, unknown> {
   const stats: Record<string, unknown> = { ...base };
   if (period) {
     stats.sync_period = periodToStats(period);
+  }
+  if (integration && syncType) {
+    stats.fetch_plan = buildFetchPlan(integration, period, syncType, stagingOptions ?? {});
   }
   return stats;
 }
@@ -140,6 +147,16 @@ export async function POST(
       );
     }
 
+    const activeRoots = await getActiveSyncJobRoots(supabase, integration.id);
+    if (activeRoots.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Another sync job (#${activeRoots[0]}) is still active for this integration. Cancel or wait before starting a new sync.`,
+        },
+        { status: 409 }
+      );
+    }
+
     const isPennylane = integration.integration_type === 'pennylane';
     const effectiveSyncType = isPennylane ? (syncType === 'full' ? 'transactions' : syncType) : syncType;
     if (isPennylane && effectiveSyncType !== 'transactions') {
@@ -166,7 +183,10 @@ export async function POST(
 
       const catalogStats = buildJobStats(
         { batch_id: batchId, batch_role: 'catalog' },
-        undefined
+        undefined,
+        integration,
+        'catalog',
+        {}
       );
       const catalogJob = await createSyncJob(supabase, integration.id, 'catalog', catalogStats);
       if ('error' in catalogJob) {
@@ -191,7 +211,13 @@ export async function POST(
             include_catalog: false,
             include_locations: false,
           },
-          monthPeriod
+          monthPeriod,
+          integration,
+          'full',
+          stagingOptionsFromStats({
+            include_catalog: false,
+            include_locations: false,
+          })
         );
         const dataJob = await createSyncJob(supabase, integration.id, 'full', dataStats);
         if ('error' in dataJob) {
@@ -231,7 +257,13 @@ export async function POST(
               include_catalog: false,
               include_locations: false,
             },
-            monthPeriod
+            monthPeriod,
+            integration,
+            'full',
+            stagingOptionsFromStats({
+              include_catalog: false,
+              include_locations: false,
+            })
           );
           await runStagingForJob(
             supabaseBg,
@@ -258,7 +290,13 @@ export async function POST(
       );
     }
 
-    const singleStats = buildJobStats({}, period);
+    const singleStats = buildJobStats(
+      {},
+      period,
+      integration,
+      syncType,
+      stagingOptionsFromStats({})
+    );
     const singleJob = await createSyncJob(supabase, integration.id, syncType, singleStats);
     if ('error' in singleJob) {
       return NextResponse.json({ error: singleJob.error }, { status: 500 });

@@ -25,8 +25,8 @@ export function isRunningSyncStatus(status: string): boolean {
 }
 
 export function canManageSyncJob(
-  job: { status: string },
+  _job: { status: string },
   recovery?: { available_actions?: string[] } | null
 ): boolean {
-  return isRunningSyncStatus(job.status) && Boolean(recovery?.available_actions?.length);
+  return Boolean(recovery?.available_actions?.length);
 }

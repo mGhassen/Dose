@@ -18,7 +18,9 @@ import {
 } from '@/app/api/integrations/[id]/sync/recover-missing-catalog';
 import { getDefaultUnitVariableId } from '@/app/api/integrations/[id]/sync/square-measurement-unit';
 import {
-  deleteStagingForJob,
+  deleteUnprocessedStagingForJob,
+  fetchStagingCounts,
+  releaseIntegrationSyncLock,
   resolveStagingJobId,
 } from '@/lib/sync-job-recovery';
 
@@ -39,7 +41,13 @@ type CronJob = {
 
 async function isJobAborted(supabase: ReturnType<typeof supabaseServer>, jobId: number): Promise<boolean> {
   const { data } = await supabase.from('sync_jobs').select('status').eq('id', jobId).maybeSingle();
-  return !data || data.status === 'cancelled' || data.status === 'failed' || data.status === 'stopped';
+  return (
+    !data ||
+    data.status === 'cancelled' ||
+    data.status === 'failed' ||
+    data.status === 'stopped' ||
+    data.status === 'partially_imported'
+  );
 }
 
 function isAuthorized(request: NextRequest): boolean {
@@ -126,24 +134,45 @@ async function runProcessor(specificJobId?: number) {
           .eq('id', job.id);
       }
       try {
-        await deleteStagingForJob(supabase, job.parent_job_id, integration.integration_type);
+        const parentId = job.parent_job_id;
+        const stagingBefore = await fetchStagingCounts(
+          supabase,
+          parentId,
+          integration.integration_type as string
+        );
+        const unprocessed_deleted = await deleteUnprocessedStagingForJob(
+          supabase,
+          parentId,
+          integration.integration_type as string
+        );
         const completedAt = new Date().toISOString();
+        const parentStats = (job as { stats?: Record<string, unknown> }).stats ?? {};
         await supabase
           .from('sync_jobs')
           .update({
             status: 'completed',
             completed_at: completedAt,
             error_message: null,
-            stats: { staging_discarded_from_job: job.parent_job_id },
+            stats: {
+              ...parentStats,
+              staging_discarded_from_job: parentId,
+              discard_snapshot: {
+                unprocessed_deleted,
+                processed_retained: stagingBefore.processed_rows,
+                app_imports_unchanged: true,
+              },
+            },
           })
           .eq('id', job.id);
-      } catch (e: any) {
+        await releaseIntegrationSyncLock(supabase, job.integration_id, job.id);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Discard staging failed';
         await supabase
           .from('sync_jobs')
           .update({
             status: 'failed',
             completed_at: new Date().toISOString(),
-            error_message: e?.message || 'Discard staging failed',
+            error_message: msg,
           })
           .eq('id', job.id);
       }
@@ -158,6 +187,25 @@ async function runProcessor(specificJobId?: number) {
     }
 
     const stagingJobId = resolveStagingJobId(job);
+
+    const { data: intLock } = await supabase
+      .from('integrations')
+      .select('sync_active_job_id')
+      .eq('id', job.integration_id)
+      .maybeSingle();
+    if (
+      intLock?.sync_active_job_id != null &&
+      intLock.sync_active_job_id !== job.id &&
+      integration.integration_type !== 'csv_bulk'
+    ) {
+      continue;
+    }
+    if (intLock?.sync_active_job_id == null && integration.integration_type !== 'csv_bulk') {
+      await supabase
+        .from('integrations')
+        .update({ sync_active_job_id: job.id })
+        .eq('id', job.integration_id);
+    }
 
     if (job.status === 'pending') {
       const { error: updateErr } = await supabase
@@ -475,16 +523,18 @@ async function runProcessor(specificJobId?: number) {
           last_sync_at: completedAt,
           last_sync_status: 'success',
           last_sync_error: error_message ?? null,
+          sync_active_job_id: null,
         })
         .eq('id', job.integration_id);
-    } catch (e: any) {
+    } catch (e: unknown) {
       const completedAt = new Date().toISOString();
+      const errMsg = e instanceof Error ? e.message : 'Processing failed';
       await supabase
         .from('sync_jobs')
         .update({
           status: 'failed',
           completed_at: completedAt,
-          error_message: e?.message || 'Processing failed',
+          error_message: errMsg,
         })
         .eq('id', job.id);
       await supabase
@@ -492,7 +542,8 @@ async function runProcessor(specificJobId?: number) {
         .update({
           last_sync_at: completedAt,
           last_sync_status: 'error',
-          last_sync_error: e?.message || 'Processing failed',
+          last_sync_error: errMsg,
+          sync_active_job_id: null,
         })
         .eq('id', job.integration_id);
     }

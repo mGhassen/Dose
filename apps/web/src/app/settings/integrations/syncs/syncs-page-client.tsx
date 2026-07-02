@@ -34,6 +34,7 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  AlertCircle,
   Activity,
   ChevronRight,
   ChevronDown,
@@ -84,6 +85,7 @@ function phaseLabel(status: string): string {
     case 'failed': return 'Phase 2: done';
     case 'cancelled': return 'Cancelled';
     case 'stopped': return 'Stopped';
+    case 'partially_imported': return 'Partially imported';
     default: return status;
   }
 }
@@ -176,6 +178,7 @@ function SyncJobStatusBadge({ status }: { status: string }) {
       {status === 'failed' && <XCircle className="h-4 w-4 text-destructive inline mr-1" />}
       {status === 'cancelled' && <XCircle className="h-4 w-4 text-muted-foreground inline mr-1" />}
       {status === 'stopped' && <Clock className="h-4 w-4 text-amber-500 inline mr-1" />}
+      {status === 'partially_imported' && <AlertCircle className="h-4 w-4 text-amber-500 inline mr-1" />}
       {isRunningSyncStatus(status) && (
         <Loader2 className="h-4 w-4 animate-spin text-blue-500 inline mr-1" />
       )}
@@ -185,12 +188,12 @@ function SyncJobStatusBadge({ status }: { status: string }) {
             ? 'destructive'
             : status === 'completed'
               ? 'default'
-              : status === 'stopped'
+              : status === 'stopped' || status === 'partially_imported'
                 ? 'outline'
                 : 'secondary'
         }
         className={
-          status === 'stopped'
+          status === 'stopped' || status === 'partially_imported'
             ? 'border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/10'
             : undefined
         }
@@ -224,7 +227,9 @@ function JobTableRow({
 }) {
   const badge = batchBadge(job.stats);
   const isChild = variant === 'child';
-  const canManage = isRunningSyncStatus(job.status);
+  const canManage =
+    isRunningSyncStatus(job.status) ||
+    ['cancelled', 'stopped', 'failed', 'partially_imported'].includes(job.status);
   const latestSuccessor = job.latest_successor;
 
   const openJob = () => router.push(`/settings/integrations/syncs/${job.id}`);
@@ -636,6 +641,7 @@ export function SyncsPageClient() {
               <SelectItem value="failed">Failed</SelectItem>
               <SelectItem value="stopped">Stopped</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="partially_imported">Partially imported</SelectItem>
               <SelectItem value="recovery">Recovery jobs</SelectItem>
             </SelectContent>
           </Select>

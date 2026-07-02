@@ -643,13 +643,14 @@ export interface SyncJobRecoveryState {
   available_actions: SyncJobRecoveryAction[];
   phase_label: string;
   review_redirect?: string;
+  fetch_complete?: boolean;
 }
 
 export interface SyncJob {
   id: number;
   integration_id: number;
   sync_type: string;
-  status: 'staging' | 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'stopped';
+  status: 'staging' | 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'stopped' | 'partially_imported';
   created_at: string;
   started_at?: string;
   completed_at?: string;

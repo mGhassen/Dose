@@ -71,18 +71,19 @@ export async function GET(
       .eq('job_id', jobId)
       .order('sequence', { ascending: true });
 
-    const recovery = await getJobRecoveryState(
-      supabase,
-      job,
-      integration,
-      steps || []
-    );
-
     const { data: successors } = await supabase
       .from('sync_jobs')
       .select('id, status, recovery_action, created_at')
       .eq('parent_job_id', jobId)
       .order('created_at', { ascending: true });
+
+    const recovery = await getJobRecoveryState(
+      supabase,
+      job,
+      integration,
+      steps || [],
+      successors || []
+    );
 
     return NextResponse.json({
       ...job,

@@ -73,10 +73,39 @@ function stepStatusIcon(status: string) {
 
 function stepDetailsText(details?: Record<string, number | string> | null): string {
   if (!details || typeof details !== 'object') return '';
+  if (typeof details.api_count === 'number') {
+    const parts = [`${details.api_count} from API`];
+    if (typeof details.inserted === 'number') parts.push(`${details.inserted} inserted`);
+    if (typeof details.skipped_duplicates === 'number' && details.skipped_duplicates > 0) {
+      parts.push(`${details.skipped_duplicates} skipped`);
+    }
+    if (typeof details.verified_db_count === 'number') {
+      parts.push(`${details.verified_db_count} verified`);
+    }
+    return parts.join(' · ');
+  }
   const parts = Object.entries(details)
     .filter(([, v]) => typeof v === 'number' || (typeof v === 'string' && v !== ''))
     .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`);
   return parts.join(', ');
+}
+
+function fetchCoverageSummary(stats?: Record<string, unknown> | null): string | null {
+  const plan = stats?.fetch_plan as { months?: string[]; end_at?: string } | undefined;
+  const coverage = stats?.fetch_coverage as Record<string, { orders?: string; payments?: string }> | undefined;
+  if (!plan?.months?.length) return null;
+  const complete = plan.months.filter((m) => {
+    const row = coverage?.[m];
+    return row?.orders === 'complete' && row?.payments === 'complete';
+  }).length;
+  const missing = plan.months.filter((m) => {
+    const row = coverage?.[m];
+    return row?.orders !== 'complete' || row?.payments !== 'complete';
+  });
+  const base = `Fetch coverage: ${complete}/${plan.months.length} months`;
+  if (missing.length > 0) return `${base} — missing ${missing.join(', ')}`;
+  if (stats?.fetch_complete) return `${base} — complete`;
+  return base;
 }
 
 function isFetchStep(name: string): boolean {
@@ -256,8 +285,7 @@ export function SyncJobDetailClient() {
   const recovery = job.recovery;
   const isRunning =
     job.status === 'staging' || job.status === 'pending' || job.status === 'processing';
-  const showRecovery =
-    isRunning && recovery && recovery.available_actions.length > 0;
+  const showRecovery = Boolean(recovery && recovery.available_actions.length > 0);
   const recoveryLabel = formatRecoveryActionLabel(job.recovery_action);
   const isDiscardSuccessor = job.recovery_action === 'discard_staging';
   const isDiscardComplete = isDiscardSuccessor && job.status === 'completed';
@@ -299,6 +327,14 @@ export function SyncJobDetailClient() {
         <Badge variant="outline" className="gap-1.5 border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/10">
           <Clock className="h-3.5 w-3" />
           Stopped
+        </Badge>
+      );
+    }
+    if (job.status === 'partially_imported') {
+      return (
+        <Badge variant="outline" className="gap-1.5 border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/10">
+          <AlertCircle className="h-3.5 w-3" />
+          Partially imported
         </Badge>
       );
     }
@@ -419,6 +455,36 @@ export function SyncJobDetailClient() {
               {(job.stats?.staging_discarded_from_job as number | undefined) ?? job.parent_job_id}.
               Imported app data was not changed.
             </AlertDescription>
+          </Alert>
+        )}
+
+        {job.status === 'cancelled' && recovery && recovery.staging.staged_rows > 0 && (
+          <Alert className="border-muted">
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Staging kept ({recovery.staging.staged_rows.toLocaleString()} rows). Use{' '}
+              <strong>Manage job</strong> to discard unprocessed staging or resume.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {job.status === 'partially_imported' && (
+          <Alert className="border-amber-500/50 bg-amber-500/5">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription>
+              Import was started then aborted.{' '}
+              {recovery?.staging.processed_rows
+                ? `${recovery.staging.processed_rows.toLocaleString()} records were imported and their staging rows are kept.`
+                : 'Some records were imported.'}{' '}
+              App data was not rolled back.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {fetchCoverageSummary(job.stats) && (
+          <Alert className={job.stats?.fetch_complete ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-amber-500/50 bg-amber-500/5'}>
+            <Info className="h-4 w-4" />
+            <AlertDescription>{fetchCoverageSummary(job.stats)}</AlertDescription>
           </Alert>
         )}
 
