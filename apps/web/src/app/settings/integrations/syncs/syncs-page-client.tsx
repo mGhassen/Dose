@@ -23,6 +23,12 @@ import {
   SelectValue,
 } from '@kit/ui/select';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@kit/ui/dropdown-menu';
+import {
   ArrowLeft,
   Loader2,
   CheckCircle2,
@@ -33,6 +39,8 @@ import {
   ChevronDown,
   Settings2,
   ExternalLink,
+  MoreHorizontal,
+  ArrowRight,
 } from 'lucide-react';
 import {
   useAllSyncJobs,
@@ -299,22 +307,34 @@ function JobTableRow({
         ) : '—'}
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-8 px-2" onClick={openJob}>
-            <ExternalLink className="h-3.5 w-3.5" />
-          </Button>
-          {canManage && onManage && (
-            <Button variant="outline" size="sm" className="h-8" onClick={() => onManage(job.id)}>
-              <Settings2 className="h-3.5 w-3.5 mr-1" />
-              Manage
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+              <span className="sr-only">Job actions</span>
             </Button>
-          )}
-          {job.status === 'stopped' && latestSuccessor && (
-            <Button variant="outline" size="sm" className="h-8" asChild>
-              <Link href={`/settings/integrations/syncs/${latestSuccessor.id}`}>Recovery</Link>
-            </Button>
-          )}
-        </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={openJob}>
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Open job
+            </DropdownMenuItem>
+            {canManage && onManage && (
+              <DropdownMenuItem onClick={() => onManage(job.id)}>
+                <Settings2 className="h-4 w-4 mr-2" />
+                Manage job
+              </DropdownMenuItem>
+            )}
+            {job.status === 'stopped' && latestSuccessor && (
+              <DropdownMenuItem asChild>
+                <Link href={`/settings/integrations/syncs/${latestSuccessor.id}`}>
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  View recovery job
+                </Link>
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </TableCell>
     </TableRow>
   );
@@ -534,7 +554,7 @@ export function SyncsPageClient() {
         <TableHead>Duration</TableHead>
         <TableHead>Stats</TableHead>
         <TableHead>Error</TableHead>
-        <TableHead className="w-[140px]">Actions</TableHead>
+        <TableHead className="w-[52px]">Actions</TableHead>
       </TableRow>
     </TableHeader>
   );
