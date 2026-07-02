@@ -39,7 +39,6 @@ import {
   ChevronRight,
   ChevronDown,
   Settings2,
-  ExternalLink,
   MoreHorizontal,
   ArrowRight,
 } from 'lucide-react';
@@ -232,6 +231,12 @@ function JobTableRow({
     ['cancelled', 'stopped', 'failed', 'partially_imported'].includes(job.status);
   const latestSuccessor = job.latest_successor;
 
+  const canManageJob = canManage && Boolean(onManage);
+  const canViewRecovery =
+    ['stopped', 'cancelled', 'failed', 'partially_imported'].includes(job.status) &&
+    Boolean(latestSuccessor);
+  const hasMenuActions = canManageJob || canViewRecovery;
+
   const openJob = () => router.push(`/settings/integrations/syncs/${job.id}`);
 
   return (
@@ -312,34 +317,34 @@ function JobTableRow({
         ) : '—'}
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-4 w-4" />
-              <span className="sr-only">Job actions</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={openJob}>
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Open job
-            </DropdownMenuItem>
-            {canManage && onManage && (
-              <DropdownMenuItem onClick={() => onManage(job.id)}>
-                <Settings2 className="h-4 w-4 mr-2" />
-                Manage job
-              </DropdownMenuItem>
-            )}
-            {job.status === 'stopped' && latestSuccessor && (
-              <DropdownMenuItem asChild>
-                <Link href={`/settings/integrations/syncs/${latestSuccessor.id}`}>
-                  <ArrowRight className="h-4 w-4 mr-2" />
-                  View recovery job
-                </Link>
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {hasMenuActions ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">Job actions</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canManageJob && (
+                <DropdownMenuItem onClick={() => onManage!(job.id)}>
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  Manage job
+                </DropdownMenuItem>
+              )}
+              {canViewRecovery && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/settings/integrations/syncs/${latestSuccessor!.id}`}>
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    View recovery job
+                  </Link>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <span className="text-muted-foreground text-sm">—</span>
+        )}
       </TableCell>
     </TableRow>
   );
@@ -547,6 +552,11 @@ export function SyncsPageClient() {
     setRecoveryOpen(false);
   };
 
+  const backHref = integrationIdParam
+    ? `/settings/integrations/${integrationIdParam}`
+    : '/settings/integrations';
+  const backLabel = integrationIdParam ? 'Back to integration' : 'Back to Integrations';
+
   const tableHeader = (
     <TableHeader>
       <TableRow>
@@ -570,9 +580,9 @@ export function SyncsPageClient() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/settings/integrations">
+              <Link href={backHref}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Integrations
+                {backLabel}
               </Link>
             </Button>
             <div>

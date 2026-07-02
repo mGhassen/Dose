@@ -275,6 +275,70 @@ export async function recoverMissingCatalog(
   return out;
 }
 
+export type AffectedSaleRef = { squareOrderId: string; dateStr: string };
+
+export async function buildAffectedSalesFromImportErrors(
+  supabase: SupabaseClient,
+  integrationId: number,
+  jobIds: number[]
+): Promise<Map<number, AffectedSaleRef>> {
+  const out = new Map<number, AffectedSaleRef>();
+  if (jobIds.length === 0) return out;
+
+  const { data: errors } = await supabase
+    .from('sync_import_errors')
+    .select('source_id')
+    .in('job_id', jobIds)
+    .eq('data_type', 'sale_stock');
+  const saleIds = [
+    ...new Set(
+      (errors ?? [])
+        .map((e: { source_id: string }) => parseInt(e.source_id, 10))
+        .filter((n: number) => !Number.isNaN(n))
+    ),
+  ];
+  if (saleIds.length === 0) return out;
+
+  const CHUNK = 500;
+  for (let i = 0; i < saleIds.length; i += CHUNK) {
+    const slice = saleIds.slice(i, i + CHUNK);
+    const [{ data: mappings }, { data: sales }] = await Promise.all([
+      supabase
+        .from('integration_entity_mapping')
+        .select('source_id, app_entity_id')
+        .eq('integration_id', integrationId)
+        .eq('source_type', 'order')
+        .eq('app_entity_type', 'sale')
+        .in('app_entity_id', slice),
+      supabase.from('sales').select('id, date').in('id', slice),
+    ]);
+    const dateBySale = new Map<number, string>(
+      (sales ?? []).map((s: { id: number; date: string }) => [
+        s.id,
+        (s.date || '').split('T')[0] || '',
+      ])
+    );
+    for (const m of mappings ?? []) {
+      const saleId = m.app_entity_id as number;
+      out.set(saleId, {
+        squareOrderId: m.source_id as string,
+        dateStr: dateBySale.get(saleId) || '',
+      });
+    }
+  }
+  return out;
+}
+
+export function mergeAffectedSalesMaps(
+  base: Map<number, AffectedSaleRef>,
+  extra: Map<number, AffectedSaleRef>
+): Map<number, AffectedSaleRef> {
+  for (const [saleId, ref] of extra) {
+    if (!base.has(saleId)) base.set(saleId, ref);
+  }
+  return base;
+}
+
 /**
  * After recovery populates new mappings, re-resolve `sale_line_items.item_id`
  * for the affected sales and rewrite their stock movements.
@@ -283,7 +347,8 @@ export async function backfillAffectedSales(
   supabase: SupabaseClient,
   integrationId: number,
   jobId: number,
-  affectedSales: Map<number, { squareOrderId: string; dateStr: string }>
+  affectedSales: Map<number, AffectedSaleRef>,
+  options?: { errorJobIds?: number[] }
 ): Promise<{ sales_backfilled: number; stock_rewritten: number; errors: number }> {
   const stats = { sales_backfilled: 0, stock_rewritten: 0, errors: 0 };
   if (affectedSales.size === 0) return stats;
@@ -402,13 +467,14 @@ export async function backfillAffectedSales(
   }
 
   if (resolvedSaleIds.length > 0) {
+    const errorJobIds = options?.errorJobIds?.length ? options.errorJobIds : [jobId];
     const CHUNK = 500;
     for (let i = 0; i < resolvedSaleIds.length; i += CHUNK) {
       const slice = resolvedSaleIds.slice(i, i + CHUNK);
       await supabase
         .from('sync_import_errors')
         .delete()
-        .eq('job_id', jobId)
+        .in('job_id', errorJobIds)
         .eq('data_type', 'sale_stock')
         .in('source_id', slice);
     }

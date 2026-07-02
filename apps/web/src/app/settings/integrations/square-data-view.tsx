@@ -11,6 +11,7 @@ import {
 import { Button } from '@kit/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@kit/ui/tabs';
 import { Badge } from '@kit/ui/badge';
+import { Alert, AlertDescription } from '@kit/ui/alert';
 import {
   Store,
   ShoppingCart,
@@ -20,21 +21,31 @@ import {
   RefreshCw,
   Download,
   MapPin,
+  Info,
 } from 'lucide-react';
-import { formatDateTime } from '@kit/lib/date-format';
+import { formatDateTime, appDefaultTimeZone, startOfZonedCalendarDayForInstant, endOfZonedCalendarDay } from '@kit/lib/date-format';
 import DataTablePage from '@/components/data-table-page';
 import { ColumnDef } from '@tanstack/react-table';
 import { processCatalogData } from './process-catalog';
 
 interface SquareDataViewProps {
   integrationId: string;
-  onSync?: (syncType: 'orders' | 'payments' | 'catalog' | 'locations' | 'full') => void;
-  isSyncing?: boolean;
+  /** Only used for inline "Sync locations" when orders tab has no locations */
+  onSyncLocations?: () => void;
 }
 
-export default function SquareDataView({ integrationId, onSync, isSyncing }: SquareDataViewProps) {
+export default function SquareDataView({ integrationId, onSyncLocations }: SquareDataViewProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('locations');
+
+  const todayRange = useMemo(() => {
+    const now = new Date();
+    const tz = appDefaultTimeZone();
+    return {
+      startAt: startOfZonedCalendarDayForInstant(now, tz).toISOString(),
+      endAt: endOfZonedCalendarDay(now, tz).toISOString(),
+    };
+  }, []);
 
   // Fetch data automatically when tab is active
   // Always fetch locations first (needed for orders)
@@ -50,9 +61,21 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
   const ordersParams = useMemo(
     () =>
       locationIds.length > 0
-        ? { location_ids: locationIds }
+        ? {
+            location_ids: locationIds,
+            query: {
+              filter: {
+                date_time_filter: {
+                  created_at: {
+                    start_at: todayRange.startAt,
+                    end_at: todayRange.endAt,
+                  },
+                },
+              },
+            },
+          }
         : undefined,
-    [locationIds]
+    [locationIds, todayRange]
   );
 
   const { data: orders, isLoading: ordersLoading, refetch: refetchOrders, error: ordersError } = useSquareOrders(
@@ -62,7 +85,13 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
       enabled: activeTab === 'orders' && locationIds.length > 0,
     }
   );
-  const paymentsParams = useMemo(() => ({}), []);
+  const paymentsParams = useMemo(
+    () => ({
+      begin_time: todayRange.startAt,
+      end_time: todayRange.endAt,
+    }),
+    [todayRange]
+  );
 
   const { data: payments, isLoading: paymentsLoading, refetch: refetchPayments, error: paymentsError } = useSquarePayments(
     integrationId,
@@ -671,6 +700,13 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
 
   return (
     <div className="space-y-4">
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          Live preview from Square&apos;s API — not your imported app data. Orders and payments are
+          limited to today only. Use Sync on the overview to import historical data into Dose.
+        </AlertDescription>
+      </Alert>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="locations">
@@ -721,18 +757,18 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
         <TabsContent value="orders" className="">
           {activeTab === 'orders' && (!locations || locations.length === 0) ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground mb-2">No locations found. Please sync locations first.</p>
-              {onSync && (
-                <Button variant="outline" size="sm" onClick={() => onSync('locations')}>
+              <p className="text-muted-foreground mb-2">No locations found. Sync locations from the overview first.</p>
+              {onSyncLocations && (
+                <Button variant="outline" size="sm" onClick={onSyncLocations}>
                   <MapPin className="w-4 h-4 mr-2" />
-                  Sync Locations
+                  Sync locations
                 </Button>
               )}
             </div>
           ) : (
             <DataTablePage
               title="Square Orders"
-              description="Orders from your Square POS"
+              description="Orders from today (live Square preview)"
               data={orders?.orders || []}
               columns={ordersColumns}
               loading={ordersLoading || (activeTab === 'orders' && locationsLoading)}
@@ -777,7 +813,7 @@ export default function SquareDataView({ integrationId, onSync, isSyncing }: Squ
         <TabsContent value="payments" className="">
           <DataTablePage
             title="Square Payments"
-            description="Payment transactions from Square"
+            description="Payments from today (live Square preview)"
             data={payments?.payments || []}
             columns={paymentsColumns}
             loading={paymentsLoading}

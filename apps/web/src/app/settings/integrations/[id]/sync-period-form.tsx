@@ -6,7 +6,7 @@ import { Label } from '@kit/ui/label';
 import { DatePicker } from '@kit/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@kit/ui/select';
 import { formatDateTime } from '@kit/lib/date-format';
-import { getDateRangeForPreset, type DatePeriodPreset } from '@kit/lib/date-periods';
+import { getDateRangeForPreset, DATE_PERIOD_PRESETS, type DatePeriodPreset } from '@kit/lib/date-periods';
 import { dateToYYYYMMDD, parseYYYYMMDDToLocalDate } from '@kit/lib/date-utils';
 import { useMetadataEnum } from '@kit/hooks';
 import type { FullSyncPeriod } from '@/lib/sync-period-utils';
@@ -55,6 +55,8 @@ export interface SyncPeriodFormProps {
   value?: SyncPeriodSelection | null;
   onChange: (selection: SyncPeriodSelection) => void;
   idPrefix?: string;
+  /** Hide the intro paragraph (use when the parent already explains the step). */
+  hideIntro?: boolean;
 }
 
 export function buildSelectionFromState(
@@ -73,13 +75,15 @@ export function buildSelectionFromState(
   return { mode };
 }
 
-export function SyncPeriodForm({ lastSyncAt, value, onChange, idPrefix = 'period' }: SyncPeriodFormProps) {
+export function SyncPeriodForm({ lastSyncAt, value, onChange, idPrefix = 'period', hideIntro }: SyncPeriodFormProps) {
   const hasLastSync = Boolean(lastSyncAt);
   const { data: presetsFromApi = [], isLoading: presetsLoading } = useMetadataEnum('GlobalDateFilterPreset');
-  const presets = useMemo<PresetOption[]>(
-    () => presetsFromApi.map((p) => ({ name: p.name, label: p.label ?? p.name })),
-    [presetsFromApi]
-  );
+  const presets = useMemo<PresetOption[]>(() => {
+    if (presetsFromApi.length > 0) {
+      return presetsFromApi.map((p) => ({ name: p.name, label: p.label ?? p.name }));
+    }
+    return DATE_PERIOD_PRESETS.map((p) => ({ name: p.value, label: p.label }));
+  }, [presetsFromApi]);
 
   const [mode, setMode] = useState<SyncPeriodMode>(value?.mode ?? (hasLastSync ? 'last_sync' : 'all'));
   const [preset, setPreset] = useState(DEFAULT_PRESET);
@@ -160,9 +164,11 @@ export function SyncPeriodForm({ lastSyncAt, value, onChange, idPrefix = 'period
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Choose which time range of orders and payments to pull from Square. Catalog and locations are always refreshed.
-      </p>
+      {!hideIntro && (
+        <p className="text-sm text-muted-foreground">
+          Choose which time range of orders and payments to pull from Square. Catalog and locations are always refreshed.
+        </p>
+      )}
       <RadioGroup value={mode} onValueChange={(v) => handleModeChange(v as SyncPeriodMode)} className="gap-3">
         <div className="flex items-start gap-3 rounded-md border p-3">
           <RadioGroupItem
@@ -194,7 +200,7 @@ export function SyncPeriodForm({ lastSyncAt, value, onChange, idPrefix = 'period
                 <Select
                   value={preset}
                   onValueChange={handlePresetChange}
-                  disabled={presetsLoading || presets.length === 0}
+                  disabled={presetsLoading}
                 >
                   <SelectTrigger className="w-full h-9">
                     <SelectValue placeholder={presetsLoading ? 'Loading…' : 'Select period'} />

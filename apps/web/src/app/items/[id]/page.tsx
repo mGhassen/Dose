@@ -23,7 +23,7 @@ import { Switch } from "@kit/ui/switch";
 import { Badge } from "@kit/ui/badge";
 import { StatusPin } from "@/components/status-pin";
 import { StockMovementType } from "@kit/types";
-import { Save, X, Trash2, MoreVertical, Edit2, Package, TrendingUp, TrendingDown, Plus, DollarSign, ChevronRight, Link2 } from "lucide-react";
+import { Save, X, Trash2, MoreVertical, Edit2, Package, TrendingUp, TrendingDown, Plus, DollarSign, ChevronRight, Link2, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@kit/ui/tabs";
 import { Separator } from "@kit/ui/separator";
 import {
@@ -43,7 +43,7 @@ import {
 import AppLayout from "@/components/app-layout";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import MergedItemsCard from "@/app/items/[id]/_components/merged-items-card";
-import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum, useVariablesByType, useRecipes, useUpdateRecipe } from "@kit/hooks";
+import { useItemById, useUpdateItem, useDeleteItem, useInventorySuppliers, useStockMovements, useUnits, useMetadataEnum, useVariablesByType, useRecipes, useUpdateRecipe, useIntegrations, useSquareCatalog } from "@kit/hooks";
 import type { ItemKind } from "@kit/types";
 
 function toggleItemKind(current: ItemKind[], k: ItemKind): ItemKind[] {
@@ -58,7 +58,7 @@ const ITEM_KIND_OPTIONS: { id: ItemKind; label: string }[] = [
   { id: "ingredient", label: "Ingredient" },
 ];
 import { toast } from "sonner";
-import { dateToYYYYMMDD, taxRulesApi, recipesApi } from "@kit/lib";
+import { dateToYYYYMMDD, taxRulesApi, recipesApi, itemsApi } from "@kit/lib";
 import { formatCurrency } from "@kit/lib/config";
 import { to2Decimals, netUnitPriceFromInclusive, unitPriceExclToIncl } from "@/lib/transaction-tax";
 import { formatDate } from "@kit/lib/date-format";
@@ -135,6 +135,12 @@ interface ItemCatalogPayload {
       supplyItemAffectsStock: boolean;
     }[];
   }[];
+  squareMapping?: {
+    integrationId: number;
+    integrationName: string | null;
+    sourceType: string;
+    sourceId: string;
+  } | null;
 }
 
 function HistoryEntryTable({
@@ -1117,6 +1123,20 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [linkRecipeOpen, setLinkRecipeOpen] = useState(false);
   const [linkRecipeId, setLinkRecipeId] = useState<number | null>(null);
+  const [linkSquareOpen, setLinkSquareOpen] = useState(false);
+  const [linkSquareIntegrationId, setLinkSquareIntegrationId] = useState<number | null>(null);
+  const [linkSquareSearch, setLinkSquareSearch] = useState("");
+  const [linkSquareSelected, setLinkSquareSelected] = useState<{
+    sourceType: "catalog_variation" | "catalog_item";
+    sourceId: string;
+    label: string;
+  } | null>(null);
+  const [linkSquarePending, setLinkSquarePending] = useState(false);
+  const { data: integrations = [] } = useIntegrations();
+  const squareIntegrations = useMemo(
+    () => integrations.filter((i) => i.integration_type === "square" && i.is_active),
+    [integrations]
+  );
   const { data: item, isLoading, refetch: refetchItem } = useItemById(resolvedParams?.id || "");
   const { data: recipesListResponse } = useRecipes({ page: 1, limit: 500 });
   const updateRecipe = useUpdateRecipe();
@@ -1335,15 +1355,78 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     if (resolvedParams?.id) fetchItemTaxes(resolvedParams.id);
   }, [resolvedParams?.id, fetchItemTaxes]);
 
+  const fetchCatalogInfo = useCallback(async (itemId: string) => {
+    setCatalogLoading(true);
+    try {
+      const d = await itemsApi.getCatalog(itemId);
+      setCatalogInfo(d);
+    } catch {
+      setCatalogInfo(null);
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!resolvedParams?.id) return;
-    setCatalogLoading(true);
-    fetch(`/api/items/${resolvedParams.id}/catalog`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setCatalogInfo(d))
-      .catch(() => setCatalogInfo(null))
-      .finally(() => setCatalogLoading(false));
-  }, [resolvedParams?.id]);
+    void fetchCatalogInfo(resolvedParams.id);
+  }, [resolvedParams?.id, fetchCatalogInfo]);
+
+  const { data: squareCatalogData, isLoading: squareCatalogLoading } = useSquareCatalog(
+    linkSquareIntegrationId != null ? String(linkSquareIntegrationId) : "",
+    { types: ["ITEM", "ITEM_VARIATION"] },
+    { enabled: linkSquareOpen && linkSquareIntegrationId != null }
+  );
+
+  const squareLinkOptions = useMemo(() => {
+    const objects = squareCatalogData?.objects ?? [];
+    const itemsById = new Map<string, { item_data?: { name?: string; variations?: unknown[] } }>();
+    for (const o of objects) {
+      if (o.type === "ITEM" && o.id) itemsById.set(o.id, o);
+    }
+    const opts: {
+      sourceType: "catalog_variation" | "catalog_item";
+      sourceId: string;
+      label: string;
+    }[] = [];
+    for (const o of objects) {
+      if (o.type !== "ITEM_VARIATION" || !o.id || o.is_deleted) continue;
+      const itemId = o.item_variation_data?.item_id;
+      const parent = itemId ? itemsById.get(itemId) : undefined;
+      const parentName = parent?.item_data?.name ?? "";
+      const vName = o.item_variation_data?.name ?? o.id;
+      const multiVar = (parent?.item_data?.variations?.length ?? 0) > 1;
+      const label = multiVar && parentName ? `${parentName} - ${vName}` : parentName || vName;
+      opts.push({ sourceType: "catalog_variation", sourceId: o.id, label });
+    }
+    for (const o of objects) {
+      if (o.type !== "ITEM" || !o.id || o.is_deleted) continue;
+      const varCount = o.item_data?.variations?.length ?? 0;
+      if (varCount > 0) continue;
+      opts.push({
+        sourceType: "catalog_item",
+        sourceId: o.id,
+        label: o.item_data?.name ?? o.id,
+      });
+    }
+    return opts.sort((a, b) => a.label.localeCompare(b.label));
+  }, [squareCatalogData]);
+
+  const filteredSquareLinkOptions = useMemo(() => {
+    const q = linkSquareSearch.trim().toLowerCase();
+    if (!q) return squareLinkOptions;
+    return squareLinkOptions.filter(
+      (o) => o.label.toLowerCase().includes(q) || o.sourceId.toLowerCase().includes(q)
+    );
+  }, [squareLinkOptions, linkSquareSearch]);
+
+  useEffect(() => {
+    if (!linkSquareOpen) return;
+    if (linkSquareIntegrationId != null) return;
+    if (squareIntegrations.length === 1) {
+      setLinkSquareIntegrationId(squareIntegrations[0]!.id);
+    }
+  }, [linkSquareOpen, linkSquareIntegrationId, squareIntegrations]);
 
   const toggleModifierAffectsStock = useCallback(
     async (supplyItemId: number, next: boolean) => {
@@ -2306,6 +2389,21 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                         </div>
                       ) : (
                         <>
+                          {catalogInfo?.squareMapping && (
+                            <div className="rounded-md border p-3 space-y-1 text-sm">
+                              <p className="font-medium">Square catalog link</p>
+                              <p className="text-muted-foreground">
+                                {catalogInfo.squareMapping.integrationName ?? "Square"} ·{" "}
+                                {catalogInfo.squareMapping.sourceType === "catalog_variation"
+                                  ? "Variation"
+                                  : "Item"}
+                              </p>
+                              <p className="font-mono text-xs text-muted-foreground break-all">
+                                {catalogInfo.squareMapping.sourceId}
+                              </p>
+                            </div>
+                          )}
+
                           {catalogInfo?.parentItem && (
                             <div>
                               <p className="text-sm font-medium mb-2">Parent catalog group</p>
@@ -2360,13 +2458,36 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                           )}
 
                           {!catalogInfo?.parentItem &&
-                            !(item.isCatalogParent && (catalogInfo?.variations?.length ?? 0) > 0) && (
-                              <p className="text-sm text-muted-foreground">
-                                {item.isCatalogParent &&
-                                (catalogInfo?.variations?.length ?? 0) === 0
-                                  ? "No linked variants in the catalog for this group yet."
-                                  : "No Square catalog parent or variation link for this item."}
-                              </p>
+                            !(item.isCatalogParent && (catalogInfo?.variations?.length ?? 0) > 0) &&
+                            !catalogInfo?.squareMapping && (
+                              <div className="space-y-3">
+                                <p className="text-sm text-muted-foreground">
+                                  {item.isCatalogParent &&
+                                  (catalogInfo?.variations?.length ?? 0) === 0
+                                    ? "No linked variants in the catalog for this group yet."
+                                    : "No Square catalog link for this item."}
+                                </p>
+                                {squareIntegrations.length > 0 && !item.isCatalogParent && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setLinkSquareSearch("");
+                                      setLinkSquareSelected(null);
+                                      setLinkSquareIntegrationId(
+                                        squareIntegrations.length === 1
+                                          ? squareIntegrations[0]!.id
+                                          : null
+                                      );
+                                      setLinkSquareOpen(true);
+                                    }}
+                                  >
+                                    <Link2 className="h-4 w-4 mr-2" />
+                                    Link to Square catalog
+                                  </Button>
+                                )}
+                              </div>
                             )}
                         </>
                       )}
@@ -2576,6 +2697,127 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
             </div>
           </div>
         )}
+        <Dialog
+          open={linkSquareOpen}
+          onOpenChange={(open) => {
+            setLinkSquareOpen(open);
+            if (!open) {
+              setLinkSquareSearch("");
+              setLinkSquareSelected(null);
+              setLinkSquareIntegrationId(null);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Link to Square catalog</DialogTitle>
+              <DialogDescription>
+                Map this item to a Square SKU so future syncs update it in place instead of creating a duplicate.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              {squareIntegrations.length > 1 && (
+                <div className="space-y-2">
+                  <Label>Square integration</Label>
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                    value={linkSquareIntegrationId ?? ""}
+                    onChange={(e) => {
+                      setLinkSquareIntegrationId(e.target.value ? Number(e.target.value) : null);
+                      setLinkSquareSelected(null);
+                    }}
+                  >
+                    <option value="">Select integration…</option>
+                    {squareIntegrations.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {linkSquareIntegrationId != null && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Search catalog</Label>
+                    <Input
+                      value={linkSquareSearch}
+                      onChange={(e) => setLinkSquareSearch(e.target.value)}
+                      placeholder="Filter by name or Square id…"
+                    />
+                  </div>
+                  <div className="max-h-[280px] overflow-y-auto rounded-md border divide-y">
+                    {squareCatalogLoading ? (
+                      <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading Square catalog…
+                      </div>
+                    ) : filteredSquareLinkOptions.length === 0 ? (
+                      <p className="text-sm text-muted-foreground p-4">No matching catalog items.</p>
+                    ) : (
+                      filteredSquareLinkOptions.map((opt) => (
+                        <button
+                          key={`${opt.sourceType}:${opt.sourceId}`}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-muted/50 ${
+                            linkSquareSelected?.sourceId === opt.sourceId ? "bg-primary/10" : ""
+                          }`}
+                          onClick={() => setLinkSquareSelected(opt)}
+                        >
+                          <div className="font-medium">{opt.label}</div>
+                          <div className="text-xs text-muted-foreground font-mono truncate">
+                            {opt.sourceId}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setLinkSquareOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={
+                  !linkSquareSelected ||
+                  linkSquareIntegrationId == null ||
+                  !resolvedParams?.id ||
+                  linkSquarePending
+                }
+                onClick={async () => {
+                  if (!linkSquareSelected || linkSquareIntegrationId == null || !resolvedParams?.id) return;
+                  setLinkSquarePending(true);
+                  try {
+                    await itemsApi.linkSquareCatalog(resolvedParams.id, {
+                      integrationId: linkSquareIntegrationId,
+                      sourceType: linkSquareSelected.sourceType,
+                      sourceId: linkSquareSelected.sourceId,
+                    });
+                    toast.success("Linked to Square catalog");
+                    setLinkSquareOpen(false);
+                    await fetchCatalogInfo(resolvedParams.id);
+                    await refetchItem();
+                  } catch (e: unknown) {
+                    toast.error(e instanceof Error ? e.message : "Failed to link");
+                  } finally {
+                    setLinkSquarePending(false);
+                  }
+                }}
+              >
+                {linkSquarePending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Linking…
+                  </>
+                ) : (
+                  "Link"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         <Dialog
           open={linkRecipeOpen}
           onOpenChange={(open) => {

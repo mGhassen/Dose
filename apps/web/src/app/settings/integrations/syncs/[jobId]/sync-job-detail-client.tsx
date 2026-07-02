@@ -7,7 +7,6 @@ import AppLayout from '@/components/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { Button } from '@kit/ui/button';
 import { Badge } from '@kit/ui/badge';
-import { Progress } from '@kit/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@kit/ui/tabs';
 import {
   Collapsible,
@@ -30,22 +29,20 @@ import {
   XCircle,
   Clock,
   AlertCircle,
-  RotateCcw,
-  Circle,
   ChevronRight,
   ListOrdered,
   BarChart3,
   FileWarning,
   Info,
   Wrench,
-  Settings2,
 } from 'lucide-react';
-import { useSyncJob, useRetrySyncJob, useBackfillSaleItems } from '@kit/hooks';
+import { useSyncJob, useRetrySyncJob, useBackfillSyncJobStock } from '@kit/hooks';
 import { formatDateTime } from '@kit/lib/date-format';
 import { formatRecoveryActionLabel, isBenignStopMessage } from '@kit/lib/sync-job-utils';
 import { useToast } from '@kit/hooks';
 import type { SyncJobStep } from '@kit/types';
-import { SyncJobRecoveryDialog } from '../sync-job-recovery-dialog';
+import { SyncStepsExplorer } from './sync-steps-explorer';
+import { SyncJobActionsMenu } from './sync-job-actions-menu';
 
 function formatDuration(startedAt?: string | null, completedAt?: string | null): string {
   if (!startedAt || !completedAt) return startedAt ? 'In progress' : '—';
@@ -56,47 +53,6 @@ function formatDuration(startedAt?: string | null, completedAt?: string | null):
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return s ? `${m}m ${s}s` : `${m}m`;
-}
-
-function stepStatusIcon(status: string) {
-  switch (status) {
-    case 'done':
-      return <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />;
-    case 'failed':
-      return <XCircle className="h-4 w-4 text-destructive shrink-0" />;
-    case 'running':
-      return <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />;
-    default:
-      return <Circle className="h-4 w-4 text-muted-foreground shrink-0" />;
-  }
-}
-
-function stepDetailsText(details?: Record<string, number | string> | null): string {
-  if (!details || typeof details !== 'object') return '';
-  if (typeof details.api_count === 'number') {
-    const parts = [`${details.api_count} from API`];
-    if (typeof details.inserted === 'number') parts.push(`${details.inserted} inserted`);
-    if (typeof details.skipped_duplicates === 'number' && details.skipped_duplicates > 0) {
-      parts.push(`${details.skipped_duplicates} dup`);
-    }
-    if (typeof details.verified_db_count === 'number') {
-      parts.push(`${details.verified_db_count} verified`);
-    }
-    return parts.join(' · ');
-  }
-  const skipKeys = [
-    'orders_skipped_mapped',
-    'payments_skipped_mapped',
-    'items_skipped_mapped',
-  ];
-  const parts = Object.entries(details)
-    .filter(([, v]) => typeof v === 'number' || (typeof v === 'string' && v !== ''))
-    .map(([k, v]) => {
-      if (skipKeys.includes(k) && typeof v === 'number' && v === 0) return null;
-      return `${k.replace(/_/g, ' ')}: ${v}`;
-    })
-    .filter(Boolean) as string[];
-  return parts.join(', ');
 }
 
 function fetchCoverageSummary(stats?: Record<string, unknown> | null): string | null {
@@ -117,52 +73,21 @@ function fetchCoverageSummary(stats?: Record<string, unknown> | null): string | 
   return base;
 }
 
-function isFetchStep(name: string): boolean {
-  return (
-    name.startsWith('Catalog —') ||
-    name.startsWith('Orders —') ||
-    name.startsWith('Payments —') ||
-    name === 'Fetch catalog' ||
-    name === 'Fetch orders' ||
-    name === 'Fetch payments'
-  );
-}
-
-function stepsProgress(steps: SyncJobStep[]): number {
-  if (!steps.length) return 0;
-  const done = steps.filter((s) => s.status === 'done').length;
-  return Math.round((done / steps.length) * 100);
-}
-
 export function SyncJobDetailClient() {
   const router = useRouter();
   const params = useParams();
   const jobId = params?.jobId != null ? Number(params.jobId) : null;
   const { data: job, isLoading, error, isError } = useSyncJob(jobId);
   const retrySyncJob = useRetrySyncJob();
-  const backfillSaleItems = useBackfillSaleItems();
+  const backfillSyncJobStock = useBackfillSyncJobStock();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
-  const [backfillProgress, setBackfillProgress] = useState<{ processed: number; total: number | null } | null>(null);
-  type BackfillEvent = {
-    saleId: number;
-    squareOrderId: string;
-    status: 'missing_payload' | 'unmapped' | 'updated' | 'no_change' | 'error';
-    lines_updated: number;
-    movements_written: number;
-    total_lines: number;
-    message?: string;
-  };
-  const [backfillEvents, setBackfillEvents] = useState<BackfillEvent[]>([]);
-  const [backfillTotals, setBackfillTotals] = useState<{
-    sales_scanned: number;
-    lines_updated: number;
-    movements_written: number;
-    missing_payload: number;
-    unmapped_items: number;
+  const [backfillResult, setBackfillResult] = useState<{
+    affected_sales: number;
+    sales_backfilled: number;
+    stock_rewritten: number;
     errors: number;
   } | null>(null);
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
 
   useEffect(() => {
     if (params?.jobId != null && isNaN(Number(params.jobId))) {
@@ -171,46 +96,25 @@ export function SyncJobDetailClient() {
   }, [params?.jobId, router]);
 
   const handleBackfill = async () => {
-    const integrationId = job?.integration_id;
-    if (!integrationId) {
-      toast({ title: 'Backfill failed', description: 'Missing integration id on job.', variant: 'destructive' });
-      return;
-    }
-    setBackfillEvents([]);
-    setBackfillTotals(null);
+    if (jobId == null) return;
     try {
-      let offset = 0;
-      const limit = 200;
-      const totals = {
-        sales_scanned: 0,
-        lines_updated: 0,
-        movements_written: 0,
-        missing_payload: 0,
-        unmapped_items: 0,
-        errors: 0,
-      };
-      setBackfillProgress({ processed: 0, total: null });
-      while (true) {
-        const res = await backfillSaleItems.mutateAsync({ id: String(integrationId), offset, limit });
-        for (const k of Object.keys(totals) as (keyof typeof totals)[]) {
-          totals[k] += res.results[k] ?? 0;
-        }
-        setBackfillTotals({ ...totals });
-        if (res.events?.length) {
-          setBackfillEvents((prev) => [...prev, ...res.events].slice(-2000));
-        }
-        setBackfillProgress({ processed: offset + res.processed, total: res.total });
-        if (!res.has_more || res.next_offset == null) break;
-        offset = res.next_offset;
-      }
+      const res = await backfillSyncJobStock.mutateAsync(jobId);
+      setBackfillResult({
+        affected_sales: res.affected_sales,
+        sales_backfilled: res.sales_backfilled,
+        stock_rewritten: res.stock_rewritten,
+        errors: res.errors,
+      });
       toast({
         title: 'Backfill complete',
-        description: `Scanned ${totals.sales_scanned} sales, patched ${totals.lines_updated} lines, wrote ${totals.movements_written} movements. Unmapped: ${totals.unmapped_items}, errors: ${totals.errors}.`,
+        description: res.message,
       });
-    } catch (e: any) {
-      toast({ title: 'Backfill failed', description: e?.message || 'Failed', variant: 'destructive' });
-    } finally {
-      setBackfillProgress(null);
+    } catch (e: unknown) {
+      toast({
+        title: 'Backfill failed',
+        description: e instanceof Error ? e.message : 'Failed',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -294,17 +198,20 @@ export function SyncJobDetailClient() {
   const recovery = job.recovery;
   const isRunning =
     job.status === 'staging' || job.status === 'pending' || job.status === 'processing';
-  const showRecovery = Boolean(recovery && recovery.available_actions.length > 0);
   const recoveryLabel = formatRecoveryActionLabel(job.recovery_action);
   const isDiscardSuccessor = job.recovery_action === 'discard_staging';
   const isDiscardComplete = isDiscardSuccessor && job.status === 'completed';
-  const showRetryBackfill =
+  const showRetry =
     job.status === 'failed' || (job.status === 'completed' && !isDiscardSuccessor);
+  const stockReconcileFailed = (job.stats?.stock_reconcile_failed as number | undefined) ?? 0;
+  const showBackfill = stockReconcileFailed > 0 && !isRunning;
   const primarySuccessor = job.successors?.[0];
+  const syncActivityHref = job.integration_id
+    ? `/settings/integrations/syncs?integration_id=${job.integration_id}`
+    : '/settings/integrations/syncs';
   const hasErrors =
     Boolean(job.error_message && !isBenignStopMessage(job.status, job.error_message)) ||
     Boolean(job.errors && job.errors.length > 0);
-  const stepProgress = stepsProgress(steps);
 
   const statusBadge = () => {
     if (job.status === 'completed') {
@@ -361,11 +268,17 @@ export function SyncJobDetailClient() {
 
   return (
     <AppLayout>
-      <div className="space-y-6 p-4 md:p-6 max-w-4xl">
+      <div
+        className={
+          activeTab === 'steps'
+            ? 'flex flex-col flex-1 min-h-0 p-4 md:p-6 max-w-none h-full'
+            : 'space-y-6 p-4 md:p-6 max-w-4xl'
+        }
+      >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" asChild>
-              <Link href="/settings/integrations/syncs">
+              <Link href={syncActivityHref}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Sync activity
               </Link>
@@ -389,45 +302,29 @@ export function SyncJobDetailClient() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {showRecovery && (
-              <Button size="sm" variant="outline" onClick={() => setRecoveryOpen(true)}>
-                <Settings2 className="h-4 w-4 mr-2" />
-                Manage job
-              </Button>
-            )}
-            {showRetryBackfill && (
-              <>
-                <Button
-                  onClick={handleBackfill}
-                  disabled={backfillSaleItems.isPending || backfillProgress != null}
-                  size="sm"
-                  variant="outline"
-                >
-                  {backfillProgress ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Backfilling {backfillProgress.processed}
-                      {backfillProgress.total != null ? `/${backfillProgress.total}` : ''}…
-                    </>
-                  ) : (
-                    <>
-                      <Wrench className="h-4 w-4 mr-2" />
-                      Backfill stock
-                    </>
-                  )}
-                </Button>
-                <Button onClick={handleRetry} disabled={retrySyncJob.isPending} size="sm">
-                  {retrySyncJob.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                  )}
-                  Retry
-                </Button>
-              </>
-            )}
+            <SyncJobActionsMenu
+              jobId={job.id}
+              recovery={recovery}
+              showRetry={showRetry}
+              showBackfill={showBackfill}
+              onRetry={handleRetry}
+              onBackfill={handleBackfill}
+              retryPending={retrySyncJob.isPending}
+              backfillPending={backfillSyncJobStock.isPending}
+            />
           </div>
         </div>
+
+        {showBackfill && (
+          <Alert className="border-amber-500/50 bg-amber-500/5">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription>
+              {stockReconcileFailed.toLocaleString()} sale
+              {stockReconcileFailed === 1 ? '' : 's'} missing stock movements (catalog was not mapped at import time).
+              Use <strong>Backfill stock</strong> in the job menu, or retry/resume the job to run the backfill step automatically.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {job.status === 'stopped' && (
           <Alert className="border-amber-500/50 bg-amber-500/5">
@@ -471,8 +368,25 @@ export function SyncJobDetailClient() {
           <Alert className="border-muted">
             <Info className="h-4 w-4" />
             <AlertDescription>
-              Staging kept ({recovery.staging.staged_rows.toLocaleString()} rows). Use{' '}
-              <strong>Manage job</strong> to discard unprocessed staging or resume.
+              Staging kept ({recovery.staging.staged_rows.toLocaleString()} rows). Use the{' '}
+              <strong>actions menu</strong> to resume or discard unprocessed staging (creates a recovery
+              subjob).
+              {primarySuccessor ? (
+                <>
+                  {' '}
+                  See recovery subjob{' '}
+                  <Link
+                    href={`/settings/integrations/syncs/${primarySuccessor.id}`}
+                    className="font-medium underline"
+                  >
+                    #{primarySuccessor.id}
+                  </Link>
+                  {formatRecoveryActionLabel(primarySuccessor.recovery_action)
+                    ? ` (${formatRecoveryActionLabel(primarySuccessor.recovery_action)})`
+                    : ''}
+                  .
+                </>
+              ) : null}
             </AlertDescription>
           </Alert>
         )}
@@ -501,18 +415,9 @@ export function SyncJobDetailClient() {
           <Alert className="border-amber-500/50 bg-amber-500/5">
             <AlertCircle className="h-4 w-4 text-amber-600" />
             <AlertDescription>
-              This job appears stuck. Use <strong>Manage job</strong> to resume, process staged data, or cancel.
+              This job appears stuck. Use the <strong>actions menu</strong> to resume, process staged data, or cancel.
             </AlertDescription>
           </Alert>
-        )}
-
-        {showRecovery && recovery && (
-          <SyncJobRecoveryDialog
-            open={recoveryOpen}
-            onOpenChange={setRecoveryOpen}
-            jobId={job.id}
-            recovery={recovery}
-          />
         )}
 
         {job.error_message && !isBenignStopMessage(job.status, job.error_message) && (
@@ -582,7 +487,7 @@ export function SyncJobDetailClient() {
           </Card>
         )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className={`w-full ${activeTab === 'steps' ? 'flex flex-col flex-1 min-h-0' : ''}`}>
           <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid lg:grid-cols-3">
             <TabsTrigger value="overview" className="gap-2">
               <BarChart3 className="h-4 w-4" />
@@ -710,54 +615,21 @@ export function SyncJobDetailClient() {
               </Card>
             )}
 
-            {(backfillProgress || backfillEvents.length > 0 || backfillTotals) && (
+            {backfillResult && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Wrench className="h-4 w-4" />
-                    Backfill log
-                    {backfillProgress ? (
-                      <Badge variant="secondary" className="gap-1.5">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        {backfillProgress.processed}
-                        {backfillProgress.total != null ? `/${backfillProgress.total}` : ''}
-                      </Badge>
-                    ) : (
-                      <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600/90 text-white">Done</Badge>
-                    )}
+                    Backfill result
+                    <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600/90 text-white">
+                      Done
+                    </Badge>
                   </CardTitle>
-                  {backfillTotals && (
-                    <CardDescription>
-                      scanned {backfillTotals.sales_scanned} · lines patched {backfillTotals.lines_updated} · movements {backfillTotals.movements_written} · unmapped {backfillTotals.unmapped_items} · missing payload {backfillTotals.missing_payload} · errors {backfillTotals.errors}
-                    </CardDescription>
-                  )}
+                  <CardDescription>
+                    affected {backfillResult.affected_sales} · sales patched {backfillResult.sales_backfilled} ·
+                    movements {backfillResult.stock_rewritten} · errors {backfillResult.errors}
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {backfillEvents.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Waiting for first batch…</p>
-                  ) : (
-                    <div className="max-h-80 overflow-auto rounded-md border bg-muted/30 font-mono text-xs">
-                      {backfillEvents.slice().reverse().map((e, i) => {
-                        const color =
-                          e.status === 'error' ? 'text-destructive' :
-                          e.status === 'unmapped' || e.status === 'missing_payload' ? 'text-amber-600 dark:text-amber-400' :
-                          e.status === 'updated' ? 'text-emerald-600 dark:text-emerald-400' :
-                          'text-muted-foreground';
-                        return (
-                          <div key={`${e.saleId}-${i}`} className="flex items-start gap-3 px-3 py-1.5 border-b last:border-b-0">
-                            <span className={`shrink-0 uppercase tracking-wider ${color}`}>{e.status}</span>
-                            <span className="shrink-0 text-muted-foreground">sale #{e.saleId}</span>
-                            <span className="shrink-0 text-muted-foreground truncate max-w-[160px]" title={e.squareOrderId}>order {e.squareOrderId.slice(0, 10)}…</span>
-                            <span className="shrink-0 text-muted-foreground">lines {e.total_lines} · patched {e.lines_updated} · mov {e.movements_written}</span>
-                            {e.message && (
-                              <span className={`truncate ${color}`} title={e.message}>{e.message}</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
               </Card>
             )}
 
@@ -784,96 +656,8 @@ export function SyncJobDetailClient() {
             </Collapsible>
           </TabsContent>
 
-          <TabsContent value="steps" className="mt-6 space-y-6">
-            {steps.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Step progress</span>
-                  <span className="font-medium">{steps.filter((s) => s.status === 'done').length} / {steps.length}</span>
-                </div>
-                <Progress value={stepProgress} className="h-2" />
-              </div>
-            )}
-
-            {steps.length > 0 ? (
-              <div className="space-y-6">
-                {(() => {
-                  const fetchSteps = steps.filter((s) => isFetchStep(s.name));
-                  const processSteps = steps.filter((s) => !isFetchStep(s.name));
-                  return (
-                    <>
-                      {fetchSteps.length > 0 && (
-                        <div>
-                          <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">Fetch</span>
-                            {fetchSteps.length} steps
-                          </h3>
-                          <ul className="space-y-1.5">
-                            {fetchSteps.map((step) => (
-                              <li
-                                key={step.sequence}
-                                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
-                                  step.status === 'running' ? 'border-primary/30 bg-primary/5' :
-                                  step.status === 'failed' ? 'border-destructive/30 bg-destructive/5' : ''
-                                }`}
-                              >
-                                {stepStatusIcon(step.status)}
-                                <span className="font-medium flex-1 min-w-0 truncate">{step.name}</span>
-                                {(step.details == null ? 0 : Object.keys(step.details).length) > 0 && (
-                                  <span className="text-muted-foreground text-xs shrink-0 hidden sm:inline">
-                                    {stepDetailsText(step.details)}
-                                  </span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {processSteps.length > 0 && (
-                        <div>
-                          <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">Process</span>
-                            {processSteps.length} steps
-                          </h3>
-                          <ul className="space-y-1.5">
-                            {processSteps.map((step) => (
-                              <li
-                                key={step.sequence}
-                                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
-                                  step.status === 'running' ? 'border-primary/30 bg-primary/5' :
-                                  step.status === 'failed' ? 'border-destructive/30 bg-destructive/5' : ''
-                                }`}
-                              >
-                                {stepStatusIcon(step.status)}
-                                <span className="font-medium flex-1 min-w-0 truncate">{step.name}</span>
-                                {(step.details == null ? 0 : Object.keys(step.details).length) > 0 && (
-                                  <span className="text-muted-foreground text-xs shrink-0 hidden sm:inline">
-                                    {stepDetailsText(step.details)}
-                                  </span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  {isRunning ? (
-                    <>
-                      <Loader2 className="h-10 w-10 animate-spin text-muted-foreground mx-auto mb-3" />
-                      <p className="text-muted-foreground text-sm">Steps will appear as the sync runs…</p>
-                    </>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">No steps recorded for this job.</p>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+          <TabsContent value="steps" className="mt-4 flex flex-col flex-1 min-h-0 data-[state=inactive]:hidden">
+            <SyncStepsExplorer anchorJobId={job.id} />
           </TabsContent>
 
           <TabsContent value="errors" className="mt-6">

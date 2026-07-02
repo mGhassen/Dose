@@ -19,6 +19,9 @@ import type {
   PaginationParams,
   BulkImportPreviewResponse,
   RecoverSyncJobResponse,
+  SyncJobFamily,
+  SyncFamilyStep,
+  SyncStepEntriesResponse,
 } from '@kit/types';
 
 export const integrationsApi = {
@@ -126,10 +129,49 @@ export const integrationsApi = {
   },
   getSyncJobs: (integrationId: string) =>
     apiRequest<SyncJob[]>('GET', `/api/integrations/${integrationId}/sync`),
+  getLatestSyncJob: (integrationId: string) =>
+    apiRequest<{ id: number; status: string } | null>(
+      'GET',
+      `/api/integrations/${integrationId}/sync?minimal=1`
+    ),
   getSyncJob: (jobId: number) =>
     apiRequest<SyncJobWithErrors>('GET', `/api/sync-jobs/${jobId}`, undefined, undefined, { timeout: 30000 }),
+  getSyncJobFamily: (jobId: number) =>
+    apiRequest<SyncJobFamily>('GET', `/api/sync-jobs/${jobId}/family`),
+  getSyncFamilySteps: (jobId: number, jobIds?: number[]) => {
+    const q = jobIds?.length ? `?job_ids=${jobIds.join(',')}` : '';
+    return apiRequest<{ steps: SyncFamilyStep[] }>('GET', `/api/sync-jobs/${jobId}/steps${q}`);
+  },
+  getSyncStepEntries: (
+    jobId: number,
+    stepId: number,
+    params?: { limit?: number; offset?: number; search?: string; data_type?: string; errors_only?: boolean }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params?.limit != null) searchParams.set('limit', String(params.limit));
+    if (params?.offset != null) searchParams.set('offset', String(params.offset));
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.data_type) searchParams.set('data_type', params.data_type);
+    if (params?.errors_only) searchParams.set('errors_only', 'true');
+    const q = searchParams.toString();
+    return apiRequest<SyncStepEntriesResponse>(
+      'GET',
+      `/api/sync-jobs/${jobId}/steps/${stepId}/entries${q ? `?${q}` : ''}`
+    );
+  },
   retrySyncJob: (jobId: number) =>
     apiRequest<{ job_id: number; message: string }>('POST', `/api/sync-jobs/${jobId}/retry`),
+  backfillSyncJobStock: (jobId: number) =>
+    apiRequest<{
+      job_id: number;
+      message: string;
+      ran: boolean;
+      affected_sales: number;
+      sales_backfilled: number;
+      stock_rewritten: number;
+      errors: number;
+      sequence: number | null;
+    }>('POST', `/api/sync-jobs/${jobId}/backfill-stock`, undefined, undefined, { timeout: 300000 }),
   recoverSyncJob: (jobId: number, action: 'resume' | 'process_staged' | 'discard_staging' | 'cancel') =>
     apiRequest<RecoverSyncJobResponse>(
       'POST',

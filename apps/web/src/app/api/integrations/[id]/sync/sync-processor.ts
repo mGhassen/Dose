@@ -69,14 +69,20 @@ export async function insertStep(
   name: string,
   status: 'pending' | 'running' | 'done' | 'failed',
   details: Record<string, number> = {}
-): Promise<void> {
-  await supabase.from('sync_job_steps').insert({
-    job_id: jobId,
-    sequence,
-    name,
-    status,
-    details,
-  });
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('sync_job_steps')
+    .insert({
+      job_id: jobId,
+      sequence,
+      name,
+      status,
+      details,
+    })
+    .select('id')
+    .single();
+  if (error || !data) return null;
+  return data.id as number;
 }
 
 export async function completeStep(
@@ -103,6 +109,7 @@ export type ChunkContext = {
 export type StagingRowOutcome = {
   id: number;
   skip_reason: 'imported' | 'skipped_mapped' | 'failed';
+  process_step_id?: number | null;
 };
 
 function initRowOutcomes(
@@ -273,6 +280,7 @@ export async function processSyncJob(
     stock_reconcile_failed: 0,
   };
   const rowOutcomeMap = initRowOutcomes(stagingRows);
+  const rowProcessStepId = new Map<number, number>();
 
   const defaultUnitVariableId = await getDefaultUnitVariableId(supabase);
 
@@ -280,10 +288,11 @@ export async function processSyncJob(
   if (allCatalogObjects.length > 0 && (syncType === 'catalog' || syncType === 'full')) {
     let stepSeq: number;
     let catalogStepSeq: number;
+    let catalogStepId: number | null;
     if (isChunked) {
       stepSeq = await getNextStepSequence(supabase, jobId);
       catalogStepSeq = stepSeq;
-      await insertStep(
+      catalogStepId = await insertStep(
         supabase,
         jobId,
         stepSeq,
@@ -294,7 +303,17 @@ export async function processSyncJob(
     } else {
       stepSeq = await getNextStepSequence(supabase, jobId);
       catalogStepSeq = stepSeq;
-      await insertStep(supabase, jobId, stepSeq, 'Process catalog', 'running', {});
+      catalogStepId = await insertStep(supabase, jobId, stepSeq, 'Process catalog', 'running', {});
+    }
+    if (catalogStepId != null) {
+      for (const row of stagingRows) {
+        if (
+          row.id != null &&
+          (row.data_type === 'catalog_object' || row.data_type === 'catalog_batch')
+        ) {
+          rowProcessStepId.set(row.id, catalogStepId);
+        }
+      }
     }
     const itemsMap = new Map<string, any>();
     const variationsMap = new Map<string, any[]>();
@@ -404,6 +423,16 @@ export async function processSyncJob(
             .maybeSingle();
           if (!existingRow) continue;
           invItemId = existingRow.item_id;
+          await supabase
+            .from('modifiers')
+            .update({ name: obj.modifier_data?.name ?? modName })
+            .eq('id', existingRow.id);
+          if (invItemId != null) {
+            await supabase
+              .from('items')
+              .update({ name: modName, updated_at: new Date().toISOString() })
+              .eq('id', invItemId);
+          }
           if (invItemId == null) {
             const label = (existingRow.name as string | null) || modName;
             const { data: newItem, error: insItemErr } = await supabase
@@ -523,6 +552,8 @@ export async function processSyncJob(
             await supabase
               .from('items')
               .update({
+                name: itemName,
+                description: itemDesc || null,
                 category_id: categoryLocalId ?? null,
                 is_active: !itemArchived,
                 updated_at: new Date().toISOString(),
@@ -592,6 +623,8 @@ export async function processSyncJob(
         await supabase
           .from('items')
           .update({
+            name: itemName,
+            description: itemDesc || null,
             category_id: categoryLocalId ?? null,
             is_active: !itemArchived,
             updated_at: new Date().toISOString(),
@@ -684,6 +717,9 @@ export async function processSyncJob(
             await supabase
               .from('items')
               .update({
+                name: displayName,
+                description: itemDesc || null,
+                sku,
                 category_id: categoryLocalId ?? null,
                 is_active: !variationArchived,
                 updated_at: new Date().toISOString(),
@@ -703,6 +739,11 @@ export async function processSyncJob(
                   sort_order: vData.ordinal ?? vi,
                   name_snapshot: vData.name || null,
                 });
+              } else {
+                await supabase
+                  .from('item_variations')
+                  .update({ name_snapshot: vData.name || null })
+                  .eq('id', ivRow.id);
               }
             }
             if (typeof priceCents === 'number' && priceCents >= 0) {
@@ -804,10 +845,11 @@ export async function processSyncJob(
   if (orderRows.length > 0 && (syncType === 'orders' || syncType === 'full')) {
     let stepSeq: number;
     let ordersStepSeq: number;
+    let ordersStepId: number | null;
     if (isChunked) {
       stepSeq = await getNextStepSequence(supabase, jobId);
       ordersStepSeq = stepSeq;
-      await insertStep(
+      ordersStepId = await insertStep(
         supabase,
         jobId,
         stepSeq,
@@ -818,7 +860,12 @@ export async function processSyncJob(
     } else {
       stepSeq = await getNextStepSequence(supabase, jobId);
       ordersStepSeq = stepSeq;
-      await insertStep(supabase, jobId, stepSeq, 'Process orders', 'running', {});
+      ordersStepId = await insertStep(supabase, jobId, stepSeq, 'Process orders', 'running', {});
+    }
+    if (ordersStepId != null) {
+      for (const row of orderRows) {
+        if (row.id != null) rowProcessStepId.set(row.id, ordersStepId);
+      }
     }
     // ---- Preload per-chunk lookups to avoid N+1 round trips ----
     const orderSourceIds: string[] = [];
@@ -1218,10 +1265,11 @@ export async function processSyncJob(
   if (paymentRows.length > 0 && (syncType === 'payments' || syncType === 'full')) {
     let stepSeq: number;
     let paymentsStepSeq: number;
+    let paymentsStepId: number | null;
     if (isChunked) {
       stepSeq = await getNextStepSequence(supabase, jobId);
       paymentsStepSeq = stepSeq;
-      await insertStep(
+      paymentsStepId = await insertStep(
         supabase,
         jobId,
         stepSeq,
@@ -1232,7 +1280,12 @@ export async function processSyncJob(
     } else {
       stepSeq = await getNextStepSequence(supabase, jobId);
       paymentsStepSeq = stepSeq;
-      await insertStep(supabase, jobId, stepSeq, 'Process payments', 'running', {});
+      paymentsStepId = await insertStep(supabase, jobId, stepSeq, 'Process payments', 'running', {});
+    }
+    if (paymentsStepId != null) {
+      for (const row of paymentRows) {
+        if (row.id != null) rowProcessStepId.set(row.id, paymentsStepId);
+      }
     }
     const paymentSourceIds: string[] = [];
     for (const row of paymentRows) {
@@ -1353,7 +1406,11 @@ export async function processSyncJob(
       : undefined;
 
   const rowOutcomes: StagingRowOutcome[] = Array.from(rowOutcomeMap.entries()).map(
-    ([id, skip_reason]) => ({ id, skip_reason })
+    ([id, skip_reason]) => ({
+      id,
+      skip_reason,
+      process_step_id: rowProcessStepId.get(id) ?? null,
+    })
   );
 
   return {

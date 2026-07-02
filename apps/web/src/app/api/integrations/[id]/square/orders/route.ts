@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { SquareListOrdersResponse } from '@kit/types';
-import { getIntegrationWithValidToken } from '../_utils';
+import { getIntegrationWithValidToken, squareLivePreviewDayRange } from '../_utils';
 
 const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
 const SQUARE_API_BASE = SQUARE_USE_SANDBOX 
@@ -89,6 +89,15 @@ export async function GET(
         console.error('Invalid query JSON:', e);
         // Invalid JSON, ignore
       }
+    } else {
+      const { startAt, endAt } = squareLivePreviewDayRange();
+      requestBody.query = {
+        filter: {
+          date_time_filter: {
+            created_at: { start_at: startAt, end_at: endAt },
+          },
+        },
+      };
     }
     
     if (limit) {

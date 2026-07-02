@@ -1,6 +1,11 @@
 // Shared utilities for Square API routes
 
 import { supabaseServer } from '@kit/lib/supabase';
+import {
+  appDefaultTimeZone,
+  endOfZonedCalendarDay,
+  startOfZonedCalendarDayForInstant,
+} from '@kit/lib/date-format';
 
 const SQUARE_APP_ID = process.env.SQUARE_APPLICATION_ID;
 const SQUARE_APP_SECRET = process.env.SQUARE_APPLICATION_SECRET;
@@ -234,5 +239,15 @@ async function refreshSquareToken(
       },
     };
   }
+}
+
+/** Live preview default: today's calendar day in app timezone (avoids unbounded Square pagination). */
+export function squareLivePreviewDayRange(): { startAt: string; endAt: string } {
+  const now = new Date();
+  const tz = appDefaultTimeZone();
+  return {
+    startAt: startOfZonedCalendarDayForInstant(now, tz).toISOString(),
+    endAt: endOfZonedCalendarDay(now, tz).toISOString(),
+  };
 }
 

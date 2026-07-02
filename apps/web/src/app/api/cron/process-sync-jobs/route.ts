@@ -13,7 +13,6 @@ import { processPennylaneSyncJob } from '@/app/api/integrations/[id]/sync/pennyl
 import { processBulkImportJob } from '@/app/api/integrations/[id]/sync/bulk-import-processor';
 import {
   recoverMissingCatalog,
-  backfillAffectedSales,
   type MissingCatalogHint,
 } from '@/app/api/integrations/[id]/sync/recover-missing-catalog';
 import { getDefaultUnitVariableId } from '@/app/api/integrations/[id]/sync/square-measurement-unit';
@@ -23,6 +22,10 @@ import {
   releaseIntegrationSyncLock,
   resolveStagingJobId,
 } from '@/lib/sync-job-recovery';
+import {
+  resolveAffectedSalesForJob,
+  runStockBackfillStep,
+} from '@/lib/sale-stock-backfill';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 /** PostgREST/Supabase cap at 1000 rows per query; use that so pagination matches reality. */
@@ -445,17 +448,27 @@ async function runProcessor(specificJobId?: number) {
         accumulatedStats.stock_reconcile_failed += result.stats.stock_reconcile_failed ?? 0;
 
         const processedAt = new Date().toISOString();
-        const byReason = new Map<string, number[]>();
+        const byGroup = new Map<
+          string,
+          { ids: number[]; skip_reason: string; processStepId: number | null }
+        >();
         for (const outcome of result.rowOutcomes) {
-          const list = byReason.get(outcome.skip_reason) ?? [];
-          list.push(outcome.id);
-          byReason.set(outcome.skip_reason, list);
+          const key = `${outcome.skip_reason}:${outcome.process_step_id ?? ''}`;
+          let entry = byGroup.get(key);
+          if (!entry) {
+            entry = {
+              ids: [],
+              skip_reason: outcome.skip_reason,
+              processStepId: outcome.process_step_id ?? null,
+            };
+            byGroup.set(key, entry);
+          }
+          entry.ids.push(outcome.id);
         }
-        for (const [skipReason, ids] of byReason) {
-          await supabase
-            .from('sync_square_data')
-            .update({ processed_at: processedAt, skip_reason: skipReason })
-            .in('id', ids);
+        for (const { ids, skip_reason, processStepId } of byGroup.values()) {
+          const patch: Record<string, unknown> = { processed_at: processedAt, skip_reason };
+          if (processStepId != null) patch.process_step_id = processStepId;
+          await supabase.from('sync_square_data').update(patch).in('id', ids);
         }
         const outcomeIds = new Set(result.rowOutcomes.map((o) => o.id));
         const missingOutcomeIds = rows
@@ -502,35 +515,21 @@ async function runProcessor(specificJobId?: number) {
           ((accumulatedStats as any).catalog_recovered ?? 0) + recoverRes.recovered;
         (accumulatedStats as any).catalog_synthesized =
           ((accumulatedStats as any).catalog_synthesized ?? 0) + recoverRes.synthesized;
+      }
 
-        if (affectedSales.size > 0) {
-          const backfillSeq = await getNextStepSequence(supabase as any, job.id);
-          await insertStep(
-            supabase as any,
-            job.id,
-            backfillSeq,
-            `Backfill sale line items + stock movements`,
-            'running',
-            { affected_sales: affectedSales.size }
-          );
-          const backfillRes = await backfillAffectedSales(
-            supabase as any,
-            job.integration_id,
-            job.id,
-            affectedSales
-          );
-          await completeStep(supabase as any, job.id, backfillSeq, {
-            affected_sales: affectedSales.size,
-            sales_backfilled: backfillRes.sales_backfilled,
-            stock_rewritten: backfillRes.stock_rewritten,
-            errors: backfillRes.errors,
-          });
-          accumulatedStats.stock_reconciled += backfillRes.sales_backfilled;
-          accumulatedStats.stock_reconcile_failed = Math.max(
-            0,
-            accumulatedStats.stock_reconcile_failed - backfillRes.sales_backfilled
-          );
-        }
+      const { affectedSales: salesToBackfill, familyJobIds } = await resolveAffectedSalesForJob(
+        supabase as any,
+        job.integration_id,
+        job.id,
+        affectedSales
+      );
+      if (salesToBackfill.size > 0 || accumulatedStats.stock_reconcile_failed > 0) {
+        await runStockBackfillStep(
+          supabase as any,
+          { id: job.id, integration_id: job.integration_id, stats: accumulatedStats },
+          salesToBackfill,
+          familyJobIds
+        );
       }
 
       const hasFailures =

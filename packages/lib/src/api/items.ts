@@ -38,6 +38,12 @@ export interface ItemCatalogResponse {
     number,
     Array<{ recipeId: number; recipeName: string; modifierCount: number }>
   >;
+  squareMapping?: {
+    integrationId: number;
+    integrationName: string | null;
+    sourceType: string;
+    sourceId: string;
+  } | null;
 }
 
 export const itemsApi = {
@@ -57,6 +63,14 @@ export const itemsApi = {
   update: (id: string, data: UpdateItemData) => apiRequest<Item>('PUT', `/api/items/${id}`, data),
   delete: (id: string) => apiRequest<void>('DELETE', `/api/items/${id}`),
   getCatalog: (id: string) => apiRequest<ItemCatalogResponse>('GET', `/api/items/${id}/catalog`),
+  linkSquareCatalog: (
+    id: string,
+    data: {
+      integrationId: number;
+      sourceType: 'catalog_variation' | 'catalog_item';
+      sourceId: string;
+    }
+  ) => apiRequest<{ ok: boolean }>('POST', `/api/items/${id}/square-link`, data),
 };
 
 // Legacy alias for backward compatibility

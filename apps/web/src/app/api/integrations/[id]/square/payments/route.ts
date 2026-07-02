@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@kit/lib/supabase';
 import type { SquareListPaymentsResponse } from '@kit/types';
-import { getIntegrationWithValidToken } from '../_utils';
+import { getIntegrationWithValidToken, squareLivePreviewDayRange } from '../_utils';
 
 const SQUARE_USE_SANDBOX = process.env.SQUARE_USE_SANDBOX === 'true';
 const SQUARE_API_BASE = SQUARE_USE_SANDBOX 
@@ -60,6 +60,11 @@ export async function GET(
     }
     if (endTime && !endTime.includes('T')) {
       endTime = `${endTime}T23:59:59Z`;
+    }
+    if (!beginTime || !endTime) {
+      const day = squareLivePreviewDayRange();
+      beginTime = beginTime ?? day.startAt;
+      endTime = endTime ?? day.endAt;
     }
 
     // Fetch all pages of payments using pagination

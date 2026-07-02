@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useIntegrationById, useSyncIntegration, useSyncJobs, useRetrySyncJob, useDisconnectIntegration, useImportBankFile, useImportBulkFile, useBackfillSaleItems } from '@kit/hooks';
+import { useIntegrationById, useSyncIntegration, useSyncJobs, useRetrySyncJob, useDisconnectIntegration, useImportBankFile, useImportBulkFile } from '@kit/hooks';
 import AppLayout from '@/components/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@kit/ui/card';
 import { Button } from '@kit/ui/button';
@@ -27,24 +27,19 @@ import {
   Clock,
   Loader2,
   ArrowLeft,
-  ShoppingCart,
-  CreditCard,
-  Package,
-  MapPin,
   AlertCircle,
   Trash2,
   MoreVertical,
   Activity,
   Upload,
   X,
-  Wrench,
   Database,
 } from 'lucide-react';
 import { useToast } from '@kit/hooks';
 import { cn } from '@kit/lib/utils';
 import { formatDateTime } from '@kit/lib/date-format';
 import { formatRecoveryActionLabel, isBenignStopMessage } from '@kit/lib/sync-job-utils';
-import SquareDataView from '../square-data-view';
+import { SquareIntegrationClient } from './square-integration-client';
 import { Alert, AlertDescription } from '@kit/ui/alert';
 import { ConfirmationDialog } from '@/components/confirmation-dialog';
 import {
@@ -218,12 +213,10 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
   const syncIntegration = useSyncIntegration();
   const importBankFile = useImportBankFile();
   const importBulkFile = useImportBulkFile();
-  const backfillSaleItems = useBackfillSaleItems();
   const { data: syncJobs = [] } = useSyncJobs(id);
   const retrySyncJob = useRetrySyncJob();
   const disconnectIntegration = useDisconnectIntegration();
   const { toast } = useToast();
-  const [backfillProgress, setBackfillProgress] = useState<{ processed: number; total: number | null } | null>(null);
 
   const lastJob = Array.isArray(syncJobs) ? syncJobs[0] : null;
 
@@ -313,39 +306,6 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
     }
   };
 
-  const handleBackfill = async () => {
-    try {
-      let offset = 0;
-      const limit = 200;
-      const totals = {
-        sales_scanned: 0,
-        lines_updated: 0,
-        movements_written: 0,
-        missing_payload: 0,
-        unmapped_items: 0,
-        errors: 0,
-      };
-      setBackfillProgress({ processed: 0, total: null });
-      while (true) {
-        const res = await backfillSaleItems.mutateAsync({ id, offset, limit });
-        for (const k of Object.keys(totals) as (keyof typeof totals)[]) {
-          totals[k] += res.results[k] ?? 0;
-        }
-        setBackfillProgress({ processed: offset + res.processed, total: res.total });
-        if (!res.has_more || res.next_offset == null) break;
-        offset = res.next_offset;
-      }
-      toast({
-        title: 'Backfill complete',
-        description: `Scanned ${totals.sales_scanned} sales, patched ${totals.lines_updated} lines, wrote ${totals.movements_written} movements. Unmapped: ${totals.unmapped_items}, errors: ${totals.errors}.`,
-      });
-    } catch (e: any) {
-      toast({ title: 'Backfill failed', description: e?.message || 'Failed', variant: 'destructive' });
-    } finally {
-      setBackfillProgress(null);
-    }
-  };
-
   const handleRetryJob = async (jobId: number) => {
     try {
       await retrySyncJob.mutateAsync(jobId);
@@ -401,6 +361,10 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
     );
   }
 
+  if (integration.integration_type === 'square') {
+    return <SquareIntegrationClient id={id} />;
+  }
+
   const Icon = getIntegrationIcon(integration.integration_type);
 
   return (
@@ -448,77 +412,6 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
                           </>
                         )}
                       </DropdownMenuItem>
-                    ) : integration.integration_type === 'square' ? (
-                      <>
-                        <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            router.push(`/settings/integrations/${id}/catalog-produce-on-sale?sync=full`);
-                          }}
-                          disabled={syncIntegration.isPending}
-                        >
-                          {syncIntegration.isPending ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Syncing...
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCw className="w-4 h-4 mr-2" />
-                              Sync All Data
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleSync('orders')}
-                          disabled={syncIntegration.isPending}
-                        >
-                          <ShoppingCart className="w-4 h-4 mr-2" />
-                          Sync Orders
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleSync('payments')}
-                          disabled={syncIntegration.isPending}
-                        >
-                          <CreditCard className="w-4 h-4 mr-2" />
-                          Sync Payments
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            router.push(`/settings/integrations/${id}/catalog-produce-on-sale?sync=catalog`);
-                          }}
-                          disabled={syncIntegration.isPending}
-                        >
-                          <Package className="w-4 h-4 mr-2" />
-                          Sync Catalog
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleSync('locations')}
-                          disabled={syncIntegration.isPending}
-                        >
-                          <MapPin className="w-4 h-4 mr-2" />
-                          Sync Locations
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={handleBackfill}
-                          disabled={backfillSaleItems.isPending || backfillProgress != null}
-                        >
-                          {backfillProgress ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Backfilling {backfillProgress.processed}
-                              {backfillProgress.total != null ? `/${backfillProgress.total}` : ''}…
-                            </>
-                          ) : (
-                            <>
-                              <Wrench className="w-4 h-4 mr-2" />
-                              Backfill sale stock
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                      </>
                     ) : null}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
@@ -549,9 +442,6 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            {integration.integration_type === 'square' && (
-              <TabsTrigger value="data">Data</TabsTrigger>
-            )}
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -828,16 +718,6 @@ function IntegrationDetailContent({ id, activeTab, setActiveTab }: { id: string;
               </Card>
             )}
           </TabsContent>
-
-          {integration.integration_type === 'square' && (
-            <TabsContent value="data">
-              <SquareDataView 
-                integrationId={id} 
-                onSync={handleSync}
-                isSyncing={syncIntegration.isPending}
-              />
-            </TabsContent>
-          )}
         </Tabs>
         <ConfirmationDialog
           open={isDisconnectDialogOpen}

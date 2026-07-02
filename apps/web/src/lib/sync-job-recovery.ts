@@ -346,6 +346,31 @@ export async function getJobChainRootId(
   return current;
 }
 
+/** Root job plus all recovery successors in the chain (for shared staging/errors). */
+export async function collectJobFamilyIds(
+  supabase: SupabaseClient,
+  jobId: number
+): Promise<number[]> {
+  const rootId = await getJobChainRootId(supabase, jobId);
+  const ids = new Set<number>([rootId]);
+  let frontier = [rootId];
+  for (let depth = 0; depth < 10 && frontier.length > 0; depth++) {
+    const { data } = await supabase
+      .from('sync_jobs')
+      .select('id')
+      .in('parent_job_id', frontier);
+    frontier = [];
+    for (const row of data ?? []) {
+      const id = row.id as number;
+      if (!ids.has(id)) {
+        ids.add(id);
+        frontier.push(id);
+      }
+    }
+  }
+  return [...ids];
+}
+
 export async function getActiveSyncJobRoots(
   supabase: SupabaseClient,
   integrationId: number

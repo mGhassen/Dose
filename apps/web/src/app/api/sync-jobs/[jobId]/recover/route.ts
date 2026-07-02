@@ -140,10 +140,16 @@ export async function POST(
     const recovery = await getJobRecoveryState(supabase, job, integration, steps || []);
 
     if (!recovery.available_actions.includes(action)) {
-      return NextResponse.json(
-        { error: `Action "${action}" is not available for this job in phase "${recovery.recovery_phase}"` },
-        { status: 400 }
-      );
+      let error = `Action "${action}" is not available for this job in phase "${recovery.recovery_phase}"`;
+      if (action === 'discard_staging') {
+        if (recovery.staging.staged_rows === 0) {
+          error = 'No staging data to discard.';
+        } else if (recovery.staging.unprocessed_rows === 0) {
+          error =
+            'No unprocessed staging rows to discard. All staging rows were already imported.';
+        }
+      }
+      return NextResponse.json({ error }, { status: 400 });
     }
 
     const origin = request.nextUrl.origin;
@@ -180,7 +186,7 @@ export async function POST(
         stopped_job_id: null,
         successor_job_id: null,
         action,
-        message: 'Job cancelled.',
+        message: 'Job cancelled. Staging kept — use "Discard unprocessed staging" to remove it (creates a recovery subjob).',
       });
     }
 

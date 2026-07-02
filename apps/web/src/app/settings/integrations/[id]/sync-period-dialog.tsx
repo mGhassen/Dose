@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@kit/ui/dialog';
 import { Button } from '@kit/ui/button';
+import { Checkbox } from '@kit/ui/checkbox';
+import { Label } from '@kit/ui/label';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { formatShortDate } from '@kit/lib/date-format';
-import { SyncPeriodForm, type SyncPeriodSelection } from './sync-period-form';
+import { countMonthsInSyncPeriod } from '@/lib/sync-period-utils';
+import type { Integration } from '@kit/types';
+import { SyncPeriodForm, isSyncPeriodValid, type SyncPeriodSelection } from './sync-period-form';
 
 export type { SyncPeriodMode, SyncPeriodSelection } from './sync-period-form';
 
@@ -23,18 +27,46 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lastSyncAt: string | null | undefined;
-  onConfirm: (selection: SyncPeriodSelection) => void | Promise<void>;
+  integration: Integration;
+  onConfirm: (selection: SyncPeriodSelection, fragmentByMonth: boolean) => void | Promise<void>;
   isPending?: boolean;
   confirmLabel?: string;
 }
 
-export function SyncPeriodDialog({ open, onOpenChange, lastSyncAt, onConfirm, isPending, confirmLabel = 'Start sync' }: Props) {
+export function SyncPeriodDialog({
+  open,
+  onOpenChange,
+  lastSyncAt,
+  integration,
+  onConfirm,
+  isPending,
+  confirmLabel = 'Start sync',
+}: Props) {
   const [selection, setSelection] = useState<SyncPeriodSelection | null>(null);
+  const [fragmentByMonth, setFragmentByMonth] = useState(true);
+
+  useEffect(() => {
+    if (!open) {
+      setSelection(null);
+      setFragmentByMonth(true);
+    }
+  }, [open]);
+
+  const monthCount = useMemo(() => {
+    if (!selection || !isSyncPeriodValid(selection)) return 0;
+    return countMonthsInSyncPeriod(integration, {
+      mode: selection.mode,
+      startAt: selection.startAt,
+      endAt: selection.endAt,
+    });
+  }, [selection, integration]);
 
   const handleConfirm = async () => {
-    if (!selection) return;
-    await onConfirm(selection);
+    if (!selection || !isSyncPeriodValid(selection)) return;
+    await onConfirm(selection, monthCount > 1 && fragmentByMonth);
   };
+
+  const valid = selection != null && isSyncPeriodValid(selection);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -46,13 +78,31 @@ export function SyncPeriodDialog({ open, onOpenChange, lastSyncAt, onConfirm, is
           </DialogDescription>
         </DialogHeader>
 
-        <SyncPeriodForm lastSyncAt={lastSyncAt} onChange={setSelection} />
+        <SyncPeriodForm lastSyncAt={lastSyncAt} onChange={setSelection} hideIntro />
+
+        {monthCount > 1 && (
+          <div className="flex items-start gap-3 rounded-md border p-3">
+            <Checkbox
+              id="sync-fragment-by-month"
+              checked={fragmentByMonth}
+              onCheckedChange={(v) => setFragmentByMonth(v === true)}
+            />
+            <div className="space-y-1">
+              <Label htmlFor="sync-fragment-by-month" className="font-medium cursor-pointer">
+                Split into {monthCount} monthly jobs
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Recommended for long periods — easier to recover if one month fails.
+              </p>
+            </div>
+          </div>
+        )}
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isPending}>
             Cancel
           </Button>
-          <Button onClick={handleConfirm} disabled={isPending || !selection}>
+          <Button onClick={handleConfirm} disabled={isPending || !valid}>
             {isPending ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -208,11 +208,43 @@ export async function GET(
       }
     }
 
+    let squareMapping: {
+      integrationId: number;
+      integrationName: string | null;
+      sourceType: string;
+      sourceId: string;
+    } | null = null;
+
+    const { data: mappingRows } = await supabase
+      .from('integration_entity_mapping')
+      .select('integration_id, source_type, source_id')
+      .eq('app_entity_type', 'item')
+      .eq('app_entity_id', itemId)
+      .in('source_type', ['catalog_variation', 'catalog_item']);
+
+    const primaryMapping = (mappingRows ?? [])[0] as
+      | { integration_id: number; source_type: string; source_id: string }
+      | undefined;
+    if (primaryMapping) {
+      const { data: integrationRow } = await supabase
+        .from('integrations')
+        .select('id, name')
+        .eq('id', primaryMapping.integration_id)
+        .maybeSingle();
+      squareMapping = {
+        integrationId: primaryMapping.integration_id,
+        integrationName: (integrationRow?.name as string) ?? null,
+        sourceType: primaryMapping.source_type,
+        sourceId: primaryMapping.source_id,
+      };
+    }
+
     return NextResponse.json({
       parentItem,
       variantMeta,
       variations,
       modifierLists,
+      squareMapping,
       /** Modifier lists were loaded from this item id (parent when this row is a variant). */
       modifierListsSourceItemId: modifierSourceItemId,
       /** Per-modifier-list map of recipes that bind a quantity to this list. */

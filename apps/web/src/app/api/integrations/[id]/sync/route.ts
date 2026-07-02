@@ -350,6 +350,19 @@ export async function GET(
         { status: accessError.status }
       );
     }
+
+    const minimal = request.nextUrl.searchParams.get('minimal') === '1';
+    if (minimal) {
+      const { data: job } = await supabase
+        .from('sync_jobs')
+        .select('id, status')
+        .eq('integration_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return NextResponse.json(job ?? null);
+    }
+
     const { data: jobs } = await supabase
       .from('sync_jobs')
       .select('*')

@@ -15,6 +15,7 @@ import type {
   SquareListPaymentsResponse,
   SquareListLocationsResponse,
   SquareListCatalogResponse,
+  SyncJobFamily,
 } from '@kit/types';
 
 // CRUD hooks
@@ -49,6 +50,7 @@ export function useIntegrationById(id: string) {
     queryKey: ['integrations', id],
     queryFn: () => integrationsApi.getById(id),
     enabled: !!id,
+    staleTime: 60_000,
   });
 }
 
@@ -197,10 +199,37 @@ export function useImportBulkFile() {
   });
 }
 
+export function useBackfillSyncJobStock() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (jobId: number) => integrationsApi.backfillSyncJobStock(jobId),
+    onSuccess: (_, jobId) => {
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', jobId, 'family'] });
+      queryClient.invalidateQueries({ queryKey: ['sync-jobs', jobId, 'family-steps'] });
+    },
+  });
+}
+
 export function useBackfillSaleItems() {
   return useMutation({
     mutationFn: ({ id, offset, limit }: { id: string; offset?: number; limit?: number }) =>
       integrationsApi.backfillSaleItems(id, { offset, limit }),
+  });
+}
+
+export function useLatestSyncJob(integrationId: string) {
+  return useQuery({
+    queryKey: ['integrations', integrationId, 'sync', 'latest'],
+    queryFn: () => integrationsApi.getLatestSyncJob(integrationId),
+    enabled: !!integrationId,
+    staleTime: 30_000,
+    refetchInterval: (query) => {
+      const job = query.state.data;
+      const s = job?.status;
+      return s === 'staging' || s === 'pending' || s === 'processing' ? 2000 : false;
+    },
   });
 }
 
@@ -231,6 +260,48 @@ export function useSyncJob(jobId: number | null) {
       const s = data?.status;
       return s === 'staging' || s === 'pending' || s === 'processing' ? 2000 : false;
     },
+  });
+}
+
+const RUNNING_STATUSES = new Set(['staging', 'pending', 'processing']);
+
+export function useSyncJobFamily(jobId: number | null) {
+  return useQuery({
+    queryKey: ['sync-jobs', jobId, 'family'],
+    queryFn: () => integrationsApi.getSyncJobFamily(jobId!),
+    enabled: jobId != null,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const anyRunning = data?.jobs?.some((j) => RUNNING_STATUSES.has(j.status));
+      return anyRunning ? 2000 : false;
+    },
+  });
+}
+
+export function useSyncFamilySteps(jobId: number | null, jobIds?: number[] | null) {
+  const queryClient = useQueryClient();
+  const jobIdsKey = jobIds?.join(',') ?? 'all';
+  return useQuery({
+    queryKey: ['sync-jobs', jobId, 'family-steps', jobIdsKey],
+    queryFn: () => integrationsApi.getSyncFamilySteps(jobId!, jobIds ?? undefined),
+    enabled: jobId != null,
+    refetchInterval: () => {
+      const family = queryClient.getQueryData<SyncJobFamily>(['sync-jobs', jobId, 'family']);
+      const anyRunning = family?.jobs?.some((j) => RUNNING_STATUSES.has(j.status));
+      return anyRunning ? 2000 : false;
+    },
+  });
+}
+
+export function useSyncStepEntries(
+  jobId: number | null,
+  stepId: number | null,
+  params?: { limit?: number; offset?: number; search?: string; data_type?: string; errors_only?: boolean }
+) {
+  return useQuery({
+    queryKey: ['sync-jobs', jobId, 'step-entries', stepId, params],
+    queryFn: () => integrationsApi.getSyncStepEntries(jobId!, stepId!, params),
+    enabled: jobId != null && stepId != null,
   });
 }
 

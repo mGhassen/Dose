@@ -17,6 +17,7 @@ import { Loader2 } from "lucide-react";
 import { useRecoverSyncJob, useToast } from "@kit/hooks";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import type { SyncJobRecoveryAction, SyncJobRecoveryState } from "@kit/types";
+import { buildRecoveryOptions, getRecoveryConfirmCopy } from "./sync-job-recovery-options";
 
 type Props = {
   open: boolean;
@@ -25,78 +26,11 @@ type Props = {
   recovery: SyncJobRecoveryState;
 };
 
-type ActionOption = {
-  value: SyncJobRecoveryAction;
-  label: string;
-  description: string;
-  destructive?: boolean;
-};
-
-function buildOptions(jobId: number, recovery: SyncJobRecoveryState): ActionOption[] {
-  const opts: ActionOption[] = [];
-  const isTerminal = recovery.recovery_phase === "terminal";
-  const hasProcessed = recovery.staging.processed_rows > 0;
-  const unprocessed = recovery.staging.unprocessed_rows;
-
-  if (recovery.recovery_phase === "review") {
-    opts.push({
-      value: "resume",
-      label: "Continue review",
-      description: `Stop job #${jobId} and open the review page to finish editing.`,
-    });
-  } else if (recovery.available_actions.includes("resume")) {
-    opts.push({
-      value: "resume",
-      label: "Continue from where it stopped",
-      description:
-        recovery.recovery_phase === "fetch" || !recovery.fetch_complete
-          ? `Resume fetch from the last checkpoint. Staging stays on job #${jobId}.`
-          : `Start a new job to resume processing staged data from #${jobId}.`,
-    });
-  }
-
-  if (recovery.available_actions.includes("process_staged")) {
-    opts.push({
-      value: "process_staged",
-      label: "Process staged data now",
-      description: `Import staged data from job #${jobId} into the app (fetch is complete).`,
-    });
-  }
-
-  if (recovery.available_actions.includes("discard_staging")) {
-    const discardDesc =
-      hasProcessed && unprocessed > 0
-        ? `Remove ${unprocessed.toLocaleString()} unprocessed staging rows. ${recovery.staging.processed_rows.toLocaleString()} already-imported rows and their staging copies are kept.`
-        : unprocessed > 0
-          ? `Remove all ${unprocessed.toLocaleString()} staging rows from job #${jobId}. Nothing was imported yet.`
-          : `Remove remaining staging rows from job #${jobId}.`;
-    opts.push({
-      value: "discard_staging",
-      label: "Discard unprocessed staging",
-      description: isTerminal
-        ? discardDesc
-        : `Stop job #${jobId} and ${discardDesc.charAt(0).toLowerCase()}${discardDesc.slice(1)}`,
-      destructive: true,
-    });
-  }
-
-  if (recovery.available_actions.includes("cancel")) {
-    opts.push({
-      value: "cancel",
-      label: "Cancel this job only",
-      description: `Mark job #${jobId} as cancelled. Staging is kept on #${jobId}.`,
-      destructive: true,
-    });
-  }
-
-  return opts;
-}
-
 export function SyncJobRecoveryDialog({ open, onOpenChange, jobId, recovery }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const recoverSyncJob = useRecoverSyncJob();
-  const options = buildOptions(jobId, recovery);
+  const options = buildRecoveryOptions(jobId, recovery);
   const [selected, setSelected] = useState<SyncJobRecoveryAction>(options[0]?.value ?? "resume");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -141,6 +75,8 @@ export function SyncJobRecoveryDialog({ open, onOpenChange, jobId, recovery }: P
     recovery.staging.processed_rows > 0
       ? `${recovery.staging.staged_rows.toLocaleString()} staged · ${recovery.staging.processed_rows.toLocaleString()} processed · ${recovery.staging.unprocessed_rows.toLocaleString()} remaining`
       : `${recovery.staging.staged_rows.toLocaleString()} staged`;
+
+  const confirmCopy = getRecoveryConfirmCopy(jobId, selected, recovery);
 
   return (
     <>
@@ -214,15 +150,9 @@ export function SyncJobRecoveryDialog({ open, onOpenChange, jobId, recovery }: P
       <ConfirmationDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title={selected === "cancel" ? "Cancel job?" : "Discard unprocessed staging?"}
-        description={
-          selected === "cancel"
-            ? `Job #${jobId} will be marked cancelled. Staging data is kept — use Manage job later to resume or discard.`
-            : recovery.staging.processed_rows > 0
-              ? `Deletes ${recovery.staging.unprocessed_rows.toLocaleString()} unprocessed staging rows. ${recovery.staging.processed_rows.toLocaleString()} imported records and their staging rows are NOT removed.`
-              : `Deletes all staging rows for job #${jobId}. Nothing was imported into the app yet.`
-        }
-        confirmText={selected === "cancel" ? "Cancel job" : "Discard unprocessed"}
+        title={confirmCopy.title}
+        description={confirmCopy.description}
+        confirmText={confirmCopy.confirmText}
         variant="destructive"
         isPending={recoverSyncJob.isPending}
         onConfirm={() => {

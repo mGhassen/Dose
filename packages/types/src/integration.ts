@@ -746,6 +746,70 @@ export interface SyncJobStep {
   name: string;
   status: 'pending' | 'running' | 'done' | 'failed';
   details?: Record<string, number | string>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SyncJobFamilyMember {
+  id: number;
+  parent_job_id: number | null;
+  status: string;
+  sync_type: string;
+  recovery_action: string | null;
+  batch_role: string | null;
+  month_label: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  stats: Record<string, unknown>;
+  staging: { staged_rows: number; processed_rows: number; unprocessed_rows: number };
+  staging_job_id: number;
+  step_count: number;
+  entry_count: number;
+  error_count: number;
+  last_step: { name: string; status: string; updated_at: string } | null;
+}
+
+export interface SyncJobFamily {
+  anchor_job_id: number;
+  root_job_id: number;
+  staging_job_id: number;
+  batch_id: string | null;
+  jobs: SyncJobFamilyMember[];
+  lineage: Array<{ parent_id: number; child_id: number }>;
+}
+
+export interface SyncFamilyStep {
+  id: number;
+  job_id: number;
+  sequence: number;
+  name: string;
+  status: string;
+  details: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  entry_count: number;
+  error_count: number;
+  staging_job_id: number;
+}
+
+export interface SyncStepEntry {
+  id: number;
+  data_type: string;
+  source_id: string;
+  payload: unknown;
+  processed_at: string | null;
+  skip_reason: string | null;
+  error_message: string | null;
+}
+
+export interface SyncStepEntriesResponse {
+  step: SyncJobStep & { id: number; job_id?: number };
+  staging_job_id: number;
+  entries: SyncStepEntry[];
+  pagination: { total: number; limit: number; offset: number };
+  error_count: number;
+  message?: string;
 }
 
 export interface SyncJobWithErrors extends SyncJob {
