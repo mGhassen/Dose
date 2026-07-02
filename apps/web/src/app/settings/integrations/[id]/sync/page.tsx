@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { getAuthToken } from "@kit/lib/api";
-import { useIntegrationById, useSyncIntegration, useLatestSyncJob } from "@kit/hooks";
+import { useIntegrationById, useIntegrations, useSyncIntegration, useLatestSyncJob } from "@kit/hooks";
 import { useToast } from "@kit/hooks";
 import AppLayout from "@/components/app-layout";
 import { Alert, AlertDescription } from "@kit/ui/alert";
@@ -94,7 +94,12 @@ export default function SquareSyncPage() {
   const router = useRouter();
   const id = typeof params?.id === "string" ? params.id : "";
   const { toast } = useToast();
-  const { data: integration, isLoading: integrationLoading } = useIntegrationById(id);
+  const { data: integrations = [] } = useIntegrations();
+  const { data: integrationById } = useIntegrationById(id);
+  const integration = useMemo(
+    () => integrationById ?? integrations.find((i) => String(i.id) === id) ?? null,
+    [integrationById, integrations, id]
+  );
   const { data: latestJob } = useLatestSyncJob(id);
   const syncIntegration = useSyncIntegration();
 
@@ -318,20 +323,15 @@ export default function SquareSyncPage() {
             <button
               type="button"
               onClick={() => {
-                if (!integrationReady) return;
                 selectSyncAll();
                 setStep(1);
               }}
-              disabled={!integrationReady || syncBlocked}
+              disabled={syncBlocked}
               className="w-full text-left rounded-xl border-2 border-primary bg-primary/5 p-6 transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 disabled:pointer-events-none"
             >
               <div className="flex items-start gap-4">
                 <div className="rounded-lg bg-primary p-3 text-primary-foreground shrink-0">
-                  {integrationLoading ? (
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-6 w-6" />
-                  )}
+                  <Sparkles className="h-6 w-6" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-lg font-semibold">Sync all</p>
@@ -363,7 +363,7 @@ export default function SquareSyncPage() {
                     id={`sync-scope-${key}`}
                     checked={scope[key]}
                     onCheckedChange={(v) => toggleScope(key, v === true)}
-                    disabled={!integrationReady || syncBlocked}
+                    disabled={syncBlocked}
                   />
                   <div className="flex flex-1 items-start gap-3">
                     <Icon className="h-5 w-5 mt-0.5 text-muted-foreground shrink-0" />
@@ -510,7 +510,7 @@ export default function SquareSyncPage() {
             {step === 0 ? "Cancel" : "Previous"}
           </Button>
           {!isLastStep ? (
-            <Button onClick={handleNext} disabled={!canAdvance() || integrationLoading}>
+            <Button onClick={handleNext} disabled={!canAdvance()}>
               Next
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>

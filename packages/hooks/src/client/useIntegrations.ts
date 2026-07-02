@@ -46,11 +46,18 @@ export function useIntegrations() {
 }
 
 export function useIntegrationById(id: string) {
+  const queryClient = useQueryClient();
+  const fromList = queryClient
+    .getQueryData<Integration[]>(['integrations'])
+    ?.find((i) => String(i.id) === id);
+
   return useQuery({
     queryKey: ['integrations', id],
     queryFn: () => integrationsApi.getById(id),
     enabled: !!id,
     staleTime: 60_000,
+    retry: false,
+    placeholderData: fromList,
   });
 }
 
